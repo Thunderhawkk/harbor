@@ -24,11 +24,11 @@ export function BackupRow() {
   const [applying, setApplying] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const doExport = async (selected: BackupSectionKey[]) => {
+  const doExport = async (selected: BackupSectionKey[], subOptions: Record<string, string[]>) => {
     setError(null);
     setPickerOpen(false);
     try {
-      const saved = await downloadBackup(selected);
+      const saved = await downloadBackup(selected, subOptions);
       if (saved) {
         setExported(true);
         window.setTimeout(() => setExported(false), 1600);
@@ -137,11 +137,18 @@ function ExportPicker({
   onExport,
   onCancel,
 }: {
-  onExport: (selected: BackupSectionKey[]) => void;
+  onExport: (selected: BackupSectionKey[], subOptions: Record<string, string[]>) => void;
   onCancel: () => void;
 }) {
   const t = useT();
   const [selected, setSelected] = useState<Set<BackupSectionKey>>(() => new Set(BACKUP_SECTIONS.map((s) => s.key)));
+  const [subOptions, setSubOptions] = useState<Record<string, string[]>>(() => {
+    const initial: Record<string, string[]> = {};
+    for (const section of BACKUP_SECTIONS) {
+      if (section.subOptions) initial[section.key] = section.subOptions.map((o) => o.key);
+    }
+    return initial;
+  });
 
   const allSelected = selected.size === BACKUP_SECTIONS.length;
   const toggle = (key: BackupSectionKey) => {
@@ -153,6 +160,13 @@ function ExportPicker({
         next.add(key);
       }
       return next;
+    });
+  };
+  const toggleSubOption = (sectionKey: BackupSectionKey, subKey: string) => {
+    setSubOptions((prev) => {
+      const current = prev[sectionKey] ?? [];
+      const next = current.includes(subKey) ? current.filter((k) => k !== subKey) : [...current, subKey];
+      return { ...prev, [sectionKey]: next };
     });
   };
   const toggleAll = () => {
@@ -192,28 +206,59 @@ function ExportPicker({
 
         <div className="mt-2 grid max-h-[52vh] grid-cols-1 gap-1.5 overflow-y-auto pe-1 sm:grid-cols-2">
           {BACKUP_SECTIONS.map((section) => (
-            <label
+            <div
               key={section.key}
-              className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-edge-soft/60 bg-canvas/30 px-3.5 py-2.5 transition-colors hover:bg-raised/70"
+              className="rounded-lg border border-edge-soft/60 bg-canvas/30 px-3.5 py-2.5 transition-colors hover:bg-raised/70"
             >
-              <input
-                type="checkbox"
-                checked={selected.has(section.key)}
-                onChange={() => toggle(section.key)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
-              />
-              <span className="flex min-w-0 flex-col gap-0.5">
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={selected.has(section.key)}
+                  onChange={() => toggle(section.key)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
+                />
                 <span className="flex items-center gap-1.5">
                   <span className="text-[13px] font-medium text-ink">{t(backupSectionLabel(section.key))}</span>
                   {section.warning && (
                     <AlertTriangle size={13} strokeWidth={2.4} className="shrink-0 text-amber-500" aria-label={t("contains login credentials")} />
                   )}
                 </span>
-                <span className="text-[11.5px] leading-snug text-ink-subtle">
-                  {t(backupSectionDescription(section.key))}
-                </span>
-              </span>
-            </label>
+              </label>
+              <p className="ms-6.5 mt-0.5 text-[11.5px] leading-snug text-ink-subtle">
+                {t(backupSectionDescription(section.key))}
+              </p>
+              {selected.has(section.key) &&
+                section.subOptions &&
+                section.subOptions.length > 0 && (
+                  <div className="ms-6 mt-2 border-s border-edge-soft/50 ps-3">
+                    {section.subOptions.map((sub) => {
+                      const checked = subOptions[section.key]?.includes(sub.key) ?? false;
+                      return (
+                        <label
+                          key={sub.key}
+                          className="flex cursor-pointer items-start gap-2 py-1.5"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleSubOption(section.key, sub.key)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
+                          />
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-[12px] font-medium text-ink">{t(sub.label)}</span>
+                              {sub.warning && (
+                                <AlertTriangle size={13} strokeWidth={2.4} className="shrink-0 text-amber-500" aria-label={t("contains login credentials")} />
+                              )}
+                            </span>
+                            <span className="text-[11px] leading-snug text-ink-subtle">{t(sub.description)}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+            </div>
           ))}
         </div>
 
@@ -227,7 +272,7 @@ function ExportPicker({
           </button>
           <button
             type="button"
-            onClick={() => onExport([...selected])}
+            onClick={() => onExport([...selected], subOptions)}
             disabled={selected.size === 0}
             className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-5 text-[13px] font-semibold text-canvas transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -281,6 +326,11 @@ function RestoreConfirm({
             </span>
           ))}
         </div>
+        {backup.subOptions?.iptv && !backup.subOptions.iptv.includes("xtreamCredentials") && (
+          <p className="mt-3 text-[12px] text-ink-subtle">
+            {t("Xtream credentials were left out of this backup.")}
+          </p>
+        )}
         <p className="mt-3 text-[12px] text-ink-subtle">
           {t("Saved {when} from Harbor {app}. Your Stremio sign-in stays as is.", { when, app: backup.app })}
         </p>

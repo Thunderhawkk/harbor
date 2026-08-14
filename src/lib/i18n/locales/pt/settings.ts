@@ -1429,6 +1429,7 @@ const settings: Record<string, string> = {
   "Saved {when} from Harbor {app}.": "Salvo {when} pelo Harbor {app}.",
   "Restoring...": "Restaurando...",
   "Restore and reload": "Restaurar e recarregar",
+  "Xtream credentials were left out of this backup.": "As credenciais Xtream foram deixadas de fora deste backup.",
   "Get beta updates": "Receber atualizações beta",
   "Receive early builds with the newest fixes before they reach the stable release. Betas can be rough around the edges; switch this off to return to stable at the next update.": "Receba builds antecipadas com as correções mais recentes antes de chegarem à versão estável. Betas podem ter arestas; desative para voltar ao estável na próxima atualização.",
   "Catch stremio:// install links inside Harbor": "Capturar links de instalação stremio:// dentro do Harbor",
