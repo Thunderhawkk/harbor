@@ -1,5 +1,7 @@
 import { downloadText } from "@/lib/download-text";
 import { loadBgImage, saveBgImage } from "@/lib/theme-storage";
+import { activeProfileId } from "@/lib/active-profile-id";
+import { flushSecrets, getAllSecrets, isSecretKey, secretKeyForProfile, setSecret } from "@/lib/secret-store";
 
 declare const __APP_VERSION__: string;
 
@@ -245,6 +247,11 @@ export async function buildBackup(selected?: BackupSectionKey[]): Promise<Backup
     const value = localStorage.getItem(key);
     if (value != null) data[key] = value;
   }
+  for (const [key, value] of Object.entries(getAllSecrets())) {
+    if (!isPortable(key)) continue;
+    if (sectionSet && !sectionSet.has(sectionOf(key))) continue;
+    if (data[key] == null) data[key] = value;
+  }
   const includeBg = !sectionSet || sectionSet.has("theme");
   const bgImage = includeBg ? await loadBgImage() : null;
   return {
@@ -329,10 +336,28 @@ export async function applyBackup(backup: Backup): Promise<void> {
     stale.push(key);
   }
   for (const key of stale) localStorage.removeItem(key);
+  for (const key of Object.keys(getAllSecrets())) {
+    if (!isPortable(key)) continue;
+    if (!restore.has(sectionOf(key))) continue;
+    if (backup.data[key] == null) setSecret(key, null);
+  }
+  // Restore localStorage-backed entries first so a restored profiles list can
+  // change which profile the sign-ins land on.
   for (const [k, v] of Object.entries(backup.data)) {
-    if (!isPortable(k)) continue;
+    if (!isPortable(k) || isSecretKey(k)) continue;
     try {
       localStorage.setItem(k, v);
+    } catch {
+      /* keep restoring the rest even if one entry is rejected */
+    }
+  }
+  // Sign-ins are stored per profile; place them on the profile that is active
+  // after this restore so they come back regardless of where the backup was made.
+  const targetProfile = activeProfileId();
+  for (const [k, v] of Object.entries(backup.data)) {
+    if (!isPortable(k) || !isSecretKey(k)) continue;
+    try {
+      setSecret(secretKeyForProfile(k, targetProfile), v);
     } catch {
       /* keep restoring the rest even if one entry is rejected */
     }
@@ -344,4 +369,5 @@ export async function applyBackup(backup: Backup): Promise<void> {
       /* background restore is best-effort */
     }
   }
+  await flushSecrets();
 }
