@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSettings } from "@/lib/settings";
+import { usePlaylists, writePlaylists } from "@/lib/iptv/playlists-store";
 import { clearPlaylistCache } from "@/lib/iptv/store";
 import { clearEpg } from "@/lib/iptv/epg-store";
 import { purgePlaylistState } from "@/lib/iptv/source-cleanup";
@@ -57,12 +57,12 @@ function materialize(id: string, entry: PlaylistFormValue) {
 }
 
 export function useVodSources() {
-  const { settings, update } = useSettings();
+  const playlists = usePlaylists();
   const favorites = useFavorites();
 
   const sources = useMemo<IptvPlaylistSource[]>(
     () =>
-      settings.iptvPlaylists
+      playlists
         .filter((p) => (p.kind ?? "m3u") !== "epg")
         .map((p) => ({
           id: p.id,
@@ -72,7 +72,7 @@ export function useVodSources() {
           kind: p.kind,
           xtream: p.xtream,
         })),
-    [settings.iptvPlaylists],
+    [playlists],
   );
 
   const [activeId, setActiveId] = useState<string | null>(() => readActive());
@@ -101,37 +101,37 @@ export function useVodSources() {
     (entry: PlaylistFormValue) => {
       if (entry.kind === "epg") return;
       const id = `pl-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      update({ iptvPlaylists: [...settings.iptvPlaylists, materialize(id, entry)] });
+      writePlaylists([...playlists, materialize(id, entry)]);
       setActiveId(id);
       writeActive(id);
     },
-    [settings.iptvPlaylists, update],
+    [playlists],
   );
 
   const editPlaylist = useCallback(
     (id: string, entry: PlaylistFormValue) => {
-      const next = settings.iptvPlaylists.map((s) => (s.id === id ? materialize(id, entry) : s));
-      update({ iptvPlaylists: next });
+      const next = playlists.map((s) => (s.id === id ? materialize(id, entry) : s));
+      writePlaylists(next);
       clearPlaylistCache(id);
       clearXtreamVodLibraryCache(id);
       clearEpg(id);
     },
-    [settings.iptvPlaylists, update],
+    [playlists],
   );
 
   const removePlaylist = useCallback(
     (id: string) => {
-      const next = settings.iptvPlaylists.filter((s) => s.id !== id);
+      const next = playlists.filter((s) => s.id !== id);
       if (activeId === id) {
         const fallback = next[0]?.id ?? null;
         setActiveId(fallback);
         writeActive(fallback);
       }
-      update({ iptvPlaylists: next });
+      writePlaylists(next);
       clearXtreamVodLibraryCache(id);
       purgePlaylistState(id, favorites.removeForSource);
     },
-    [settings.iptvPlaylists, update, activeId, favorites.removeForSource],
+    [playlists, activeId, favorites.removeForSource],
   );
 
   return { sources, activeId, selectId, addPlaylist, editPlaylist, removePlaylist };

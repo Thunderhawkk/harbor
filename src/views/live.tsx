@@ -4,6 +4,7 @@ import { usePlaylistMutations } from "./live/hooks/use-playlist-mutations";
 import { useLiveActions } from "./live/hooks/use-live-actions";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
+import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { useScrollMemory, useView } from "@/lib/view";
 import { FAVORITES_GROUP_KEY, useFavorites } from "@/lib/iptv/favorites";
 import { clearPlaylistCache, getCachedPlaylist } from "@/lib/iptv/store";
@@ -67,7 +68,7 @@ export function LiveView({ active }: { active: boolean }) {
   const t = useT();
   const { settings } = useSettings();
   const { openMeta, setView } = useView();
-  const sources = settings.iptvPlaylists;
+  const sources = usePlaylists();
 
   const [activeId, setActiveId] = useState<string | null>(() => readActiveId());
   useEffect(() => {
@@ -163,7 +164,7 @@ export function LiveView({ active }: { active: boolean }) {
   const inFavorites = group === FAVORITES_GROUP_KEY;
   const allSources = useMemo<IptvPlaylistSource[]>(
     () =>
-      settings.iptvPlaylists
+      sources
         .filter((p) => (p.kind ?? "m3u") !== "epg")
         .map((p) => ({
           id: p.id,
@@ -173,11 +174,11 @@ export function LiveView({ active }: { active: boolean }) {
           kind: p.kind,
           xtream: p.xtream,
         })),
-    [settings.iptvPlaylists],
+    [sources],
   );
   const managedSources = useMemo<IptvPlaylistSource[]>(
     () =>
-      settings.iptvPlaylists.map((p) => ({
+      sources.map((p) => ({
         id: p.id,
         name: p.name,
         url: p.url,
@@ -185,7 +186,7 @@ export function LiveView({ active }: { active: boolean }) {
         kind: p.kind,
         xtream: p.xtream,
       })),
-    [settings.iptvPlaylists],
+    [sources],
   );
   const stubSources = useMemo(() => {
     const ids = new Set<string>();

@@ -31,6 +31,7 @@ const RETIRED_GEMINI = new Set([
 ]);
 import { DEFAULT, STORAGE_KEY } from "./defaults";
 import type { Settings } from "./types";
+import { readPlaylists } from "@/lib/iptv/playlists-store";
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 
@@ -247,12 +248,13 @@ export function loadStoredSettings(rawKey: string = STORAGE_KEY): Settings {
       parsed._streamCacheCapV1 = true;
     }
     if (!parsed._playlistsTabV1) {
-      const lists = parsed.iptvPlaylists;
-      const hasVodSource =
-        Array.isArray(lists) && lists.some((l) => l && (l as { kind?: string }).kind !== "epg");
+      const lists = readPlaylists();
+      const hasVodSource = Array.isArray(lists) && lists.some((l) => l?.kind !== "epg");
       if (hasVodSource) parsed.showPlaylistsTab = true;
       parsed._playlistsTabV1 = true;
     }
+    // Playlists now live in their own store; never let a legacy field leak into Settings.
+    if ("iptvPlaylists" in parsed) delete parsed.iptvPlaylists;
     if (!parsed._navThemeRepairV1) {
       const nav = parsed.navCustomization as Partial<Settings["navCustomization"]> | undefined;
       if (nav && Array.isArray(nav.hidden) && nav.hidden.length > 0) {

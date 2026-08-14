@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Meta } from "@/lib/cinemeta";
 import { getCachedPlaylist } from "@/lib/iptv/store";
+import { usePlaylists } from "@/lib/iptv/playlists-store";
 import type { IptvChannel, IptvPlaylistSource } from "@/lib/iptv/types";
-import { useSettings } from "@/lib/settings";
 import { useView } from "@/lib/view";
 import { useEpg, useNowTick } from "@/views/live/hooks/use-epg";
 import { useIptvPlaylist } from "@/views/live/hooks/use-iptv-playlist";
@@ -24,11 +24,11 @@ function synthChannelMeta(ch: IptvChannel): Meta {
 }
 
 export function GuideModal({ onClose }: { onClose: () => void }) {
-  const { settings } = useSettings();
+  const playlists = usePlaylists();
   const { openPlayer } = useView();
   const m3uSources = useMemo(
-    () => settings.iptvPlaylists.filter((p) => (p.kind ?? "m3u") !== "epg"),
-    [settings.iptvPlaylists],
+    () => playlists.filter((p) => (p.kind ?? "m3u") !== "epg"),
+    [playlists],
   );
   const [sourceId, setSourceId] = useState<string | null>(() => m3uSources[0]?.id ?? null);
   const source: IptvPlaylistSource | null = useMemo(() => {

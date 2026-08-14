@@ -16,6 +16,7 @@ import {
 import { getCachedPlaylist } from "./iptv/store";
 import { fetchAndParseXmltv, indexProgramsByChannel } from "./iptv/xmltv";
 import { computeTvgIdCounts, epgProgramsForChannel } from "./iptv/epg-resolver";
+import { readPlaylists } from "./iptv/playlists-store";
 import type { Settings, WebhookTrigger } from "./settings";
 import { getSession as getTraktSession } from "./trakt/session";
 
@@ -156,12 +157,11 @@ function loadIptvFavorites(): Set<string> {
 }
 
 async function fetchLiveTvEvents(
-  settings: Settings,
   leadMinutes: number,
   favoritesOnly: boolean,
   channelIds: string[] | null,
 ): Promise<CalendarItem[]> {
-  const playlists = settings.iptvPlaylists.filter((p) => (p.kind ?? "m3u") !== "epg");
+  const playlists = readPlaylists().filter((p) => (p.kind ?? "m3u") !== "epg");
   if (playlists.length === 0) return [];
   const now = Date.now();
   const cutoff = now + leadMinutes * 60_000;
@@ -312,7 +312,6 @@ export async function runWebhookTick(
     let candidates: CalendarItem[] = [];
     if (rule.trigger.event === "liveTvEvent") {
       candidates = await fetchLiveTvEvents(
-        settings,
         rule.trigger.leadMinutes ?? 15,
         rule.trigger.favoritesOnly !== false,
         rule.trigger.channelIds ?? null,

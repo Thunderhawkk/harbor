@@ -11,6 +11,7 @@ import {
   type Severity,
 } from "@/lib/bug-report";
 import { useSettings } from "@/lib/settings";
+import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { useT } from "@/lib/i18n";
 import { Section } from "./shared";
 import { ContributorCard } from "./bug-report/contributor-card";
@@ -22,6 +23,7 @@ import { SuccessCard } from "./bug-report/success-card";
 export function BugReportPanel() {
   const t = useT();
   const { settings } = useSettings();
+  const playlists = usePlaylists();
   const auth = useAuth();
   const [summary, setSummary] = useState("");
   const [severity, setSeverity] = useState<Severity>("normal");
@@ -51,7 +53,7 @@ export function BugReportPanel() {
       hasStremio: !!auth.authKey,
       debridCount: [settings.rdKey, settings.tbKey, settings.adKey, settings.pmKey, settings.dlKey].filter(Boolean).length,
       addonCount: 0,
-      iptvCount: settings.iptvPlaylists.length,
+      iptvCount: playlists.length,
     }).then((d) => {
       if (!cancelled) setDiag(d);
     });
@@ -64,7 +66,7 @@ export function BugReportPanel() {
     settings.tmdbKey,
     settings.rpdbKey,
     settings.traktAccessToken,
-    settings.iptvPlaylists.length,
+    playlists.length,
     settings.rdKey,
     settings.tbKey,
     settings.adKey,

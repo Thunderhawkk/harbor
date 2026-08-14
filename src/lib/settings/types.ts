@@ -565,18 +565,6 @@ export type Settings = {
   downloadDir: string;
   downloadCreateFolders: boolean;
   stremioDeeplinkInstall: boolean;
-  iptvPlaylists: Array<{
-    id: string;
-    name: string;
-    url: string;
-    epgUrl?: string;
-    kind?: "m3u" | "xtream" | "epg";
-    xtream?: {
-      server: string;
-      username: string;
-      password: string;
-    };
-  }>;
   iptvLiveContainer: "ts" | "m3u8";
   iptvForceProxy: boolean;
   iptvEpgOffsetHours: number;

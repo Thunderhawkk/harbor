@@ -5,8 +5,8 @@ import type { Meta } from "@/lib/cinemeta";
 import type { AddonResultGroup } from "@/lib/search-addons";
 import type { AddonHit } from "@/lib/search-addon-index";
 import { getCachedPlaylist } from "@/lib/iptv/store";
+import type { StoredPlaylist } from "@/lib/iptv/playlists-store";
 import { arabicAwareMatch } from "@/lib/iptv/rtl";
-import type { Settings } from "@/lib/settings";
 import { safeFetch } from "@/lib/safe-fetch";
 import { anilistAnimeSearch } from "@/lib/anilist/browse";
 import type { MangaSummary } from "@/lib/manga/model";
@@ -80,7 +80,7 @@ export type SearchIntent =
 
 export function searchLiveTvChannels(
   query: string,
-  iptvPlaylists: Settings["iptvPlaylists"],
+  iptvPlaylists: StoredPlaylist[],
   limit = 8,
 ): LiveTvHit[] {
   const q = query.trim().toLowerCase();

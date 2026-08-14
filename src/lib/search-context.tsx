@@ -13,6 +13,7 @@ import { anilistCharacterSearch, type CharacterHit } from "@/lib/anilist/charact
 import { gatherCatalogAddons, type Addon } from "@/lib/addons";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
+import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { isMagnetInput, isDirectVideoUrl } from "@/lib/torrent/magnet";
 import { useView, type Frame } from "@/lib/view";
 
@@ -148,6 +149,7 @@ function saveRecent(items: string[]): void {
 
 export function SearchProvider({ children }: { children: ReactNode }) {
   const { settings } = useSettings();
+  const playlists = usePlaylists();
   const { authKey } = useAuth();
   const { hiddenTabs } = useParental();
   const [open, setOpen] = useState(false);
@@ -202,11 +204,11 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     const animeAllowed = !hiddenTabs.anime && !settings.hideContent.anime;
     const mangaAllowed = settings.mangaEnabled && !settings.hideContent.manga;
     const franchiseAllowed = animeAllowed || mangaAllowed;
-    const liveTvAllowed = !hiddenTabs.liveTv && settings.iptvPlaylists.length > 0;
+    const liveTvAllowed = !hiddenTabs.liveTv && playlists.length > 0;
     debounceRef.current = window.setTimeout(() => {
       if (!requestGuardRef.current.isCurrent(id)) return;
       setStatus("loading");
-      const liveTv = liveTvAllowed ? searchLiveTvChannels(trimmed, settings.iptvPlaylists) : [];
+      const liveTv = liveTvAllowed ? searchLiveTvChannels(trimmed, playlists) : [];
       const guard = <T,>(p: Promise<T>, fallback: T): Promise<T> =>
         Promise.race([
           p.catch(() => fallback),
@@ -399,7 +401,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         debounceRef.current = null;
       }
     };
-  }, [query, aiHold, settings.tmdbKey, settings.tmdbLanguage, settings.iptvPlaylists, excludeGenres, hiddenTabs.anime, settings.hideContent.anime, hiddenTabs.liveTv, settings.mangaEnabled, settings.hideContent.manga, authKey]);
+  }, [query, aiHold, settings.tmdbKey, settings.tmdbLanguage, playlists, excludeGenres, hiddenTabs.anime, settings.hideContent.anime, hiddenTabs.liveTv, settings.mangaEnabled, settings.hideContent.manga, authKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
