@@ -21,6 +21,7 @@ export type BackupSectionKey =
   | "playerLayouts"
   | "feedDiscover"
   | "iptv"
+  | "iptvCredentials"
   | "manga"
   | "miscState"
   | "other";
@@ -33,8 +34,6 @@ type BackupSection = {
   /** Flags the section in the UI (e.g. it contains login credentials). */
   warning?: boolean;
   patterns: string[];
-  /** Optional sub-options the user can toggle within this section. */
-  subOptions?: Array<{ key: string; label: string; description: string; warning?: boolean }>;
 };
 
 /**
@@ -144,24 +143,23 @@ export const BACKUP_SECTIONS: readonly BackupSection[] = [
     patterns: ["harbor.player.", "harbor.sub.presets.v1"],
   },
   {
-    key: "feedDiscover",
-    label: "Feed & Discover",
-    description: "Feed preferences and Discover row state.",
-    patterns: ["harbor.feed", "harbor.discover."],
-  },
-  {
     key: "iptv",
     label: "Live TV",
     description: "M3U URLs, favorites, the EPG guide style, and stats.",
     patterns: ["harbor.iptv.", "harbor.guide.style"],
-    subOptions: [
-      {
-        key: "xtreamCredentials",
-        label: "Xtream credentials",
-        description: "Usernames and passwords for Xtream playlists. When disabled, Xtream playlists are left out entirely.",
-        warning: true,
-      },
-    ],
+  },
+  {
+    key: "iptvCredentials",
+    label: "Xtream credentials",
+    description: "Usernames and passwords for Xtream playlists.",
+    warning: true,
+    patterns: [],
+  },
+  {
+    key: "feedDiscover",
+    label: "Feed & Discover",
+    description: "Feed preferences and Discover row state.",
+    patterns: ["harbor.feed", "harbor.discover."],
   },
   {
     key: "manga",
@@ -237,8 +235,6 @@ export type Backup = {
   data: Record<string, string>;
   /** Which sections this backup contains. Absent on legacy files (= everything). */
   sections?: BackupSectionKey[];
-  /** Included sub-options per section. Absent = everything included. */
-  subOptions?: Record<string, string[]>;
   bgImage?: string | null;
 };
 
@@ -249,10 +245,7 @@ function isPortable(key: string): boolean {
   return true;
 }
 
-export async function buildBackup(
-  selected?: BackupSectionKey[],
-  subOptions?: Record<string, string[]>,
-): Promise<Backup> {
+export async function buildBackup(selected?: BackupSectionKey[]): Promise<Backup> {
   const sectionSet = selected && selected.length > 0 ? new Set<BackupSectionKey>(selected) : null;
   const data: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
@@ -267,14 +260,10 @@ export async function buildBackup(
     if (sectionSet && !sectionSet.has(sectionOf(key))) continue;
     if (data[key] == null) data[key] = value;
   }
-  // Xtream playlists embed credentials in their URLs; drop them when the
-  // sub-option is deselected so they never leave the device.
-  const iptvSubOptions = subOptions?.iptv;
-  if (
-    (!sectionSet || sectionSet.has("iptv")) &&
-    iptvSubOptions &&
-    !iptvSubOptions.includes("xtreamCredentials")
-  ) {
+  // Xtream playlists embed credentials in their URLs; when the Xtream
+  // credentials section is left out (but Live TV is exported), drop them so
+  // they never leave the device.
+  if (sectionSet?.has("iptv") && !sectionSet.has("iptvCredentials")) {
     const raw = data["harbor.iptv.playlists.v1"];
     if (raw != null) {
       try {
@@ -301,16 +290,12 @@ export async function buildBackup(
     exportedAt: new Date().toISOString(),
     data,
     sections: sectionSet ? (ALL_SECTION_KEYS.filter((k) => sectionSet.has(k)) as BackupSectionKey[]) : [...ALL_SECTION_KEYS],
-    ...(subOptions && Object.keys(subOptions).length > 0 ? { subOptions } : {}),
     ...(bgImage ? { bgImage } : {}),
   };
 }
 
-export async function downloadBackup(
-  selected?: BackupSectionKey[],
-  subOptions?: Record<string, string[]>,
-): Promise<boolean> {
-  const backup = await buildBackup(selected, subOptions);
+export async function downloadBackup(selected?: BackupSectionKey[]): Promise<boolean> {
+  const backup = await buildBackup(selected);
   const text = JSON.stringify(backup, null, 2);
   const stamp = new Date().toISOString().slice(0, 10);
   return downloadText(`harbor-backup-${stamp}.harbx`, text, ["harbx"], "Harbor backup");
@@ -343,14 +328,6 @@ export function parseBackup(text: string): ParsedBackup {
     return { ok: false, error: "This backup contained nothing restorable." };
   }
   const sections = Array.isArray(b.sections) ? (b.sections.filter(isSectionKey) as BackupSectionKey[]) : undefined;
-  const subOptions: Record<string, string[]> = {};
-  if (b.subOptions && typeof b.subOptions === "object") {
-    for (const [k, v] of Object.entries(b.subOptions)) {
-      if (isSectionKey(k) && Array.isArray(v) && v.every((x) => typeof x === "string")) {
-        subOptions[k] = v;
-      }
-    }
-  }
   return {
     ok: true,
     backup: {
@@ -360,7 +337,6 @@ export function parseBackup(text: string): ParsedBackup {
       exportedAt: typeof b.exportedAt === "string" ? b.exportedAt : "",
       data,
       ...(sections && sections.length > 0 ? { sections } : {}),
-      ...(Object.keys(subOptions).length > 0 ? { subOptions } : {}),
       ...(typeof b.bgImage === "string" || b.bgImage === null ? { bgImage: b.bgImage } : {}),
     },
   };
