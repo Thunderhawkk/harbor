@@ -7,6 +7,8 @@ import { useFavorites } from "@/lib/iptv/favorites";
 import type { IptvPlaylistSource } from "@/lib/iptv/types";
 import { buildXtreamUrls, type PlaylistFormValue } from "@/views/live/source-picker/playlist-form";
 import { clearXtreamVodLibraryCache } from "./use-xtream-vod-library";
+import { alertDialog } from "@/lib/dialog";
+import { useT } from "@/lib/i18n";
 
 const ACTIVE_KEY = "harbor.vod.active";
 
@@ -59,6 +61,7 @@ function materialize(id: string, entry: PlaylistFormValue) {
 export function useVodSources() {
   const playlists = usePlaylists();
   const favorites = useFavorites();
+  const t = useT();
 
   const sources = useMemo<IptvPlaylistSource[]>(
     () =>
@@ -101,11 +104,15 @@ export function useVodSources() {
     (entry: PlaylistFormValue) => {
       if (entry.kind === "epg") return;
       const id = `pl-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      writePlaylists([...playlists, materialize(id, entry)]);
+      const persisted = writePlaylists([...playlists, materialize(id, entry)]);
+      if (!persisted) {
+        console.warn("harbor: playlist not persisted (storage quota)", id);
+        void alertDialog(t("Couldn't save the playlist. Free up storage space in Settings and try again."));
+      }
       setActiveId(id);
       writeActive(id);
     },
-    [playlists],
+    [playlists, t],
   );
 
   const editPlaylist = useCallback(

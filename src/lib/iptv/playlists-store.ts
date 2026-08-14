@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { setItemWithRecovery } from "@/lib/storage-recovery";
 
 export type StoredPlaylist = {
   id: string;
@@ -26,8 +27,10 @@ function ensureMigrated(): void {
 
 /**
  * Moves playlists out of the settings blob (harbor.settings.*) into their own
- * key. Runs once per session; also strips the legacy field from every settings
- * blob that still carries it so playlists stop exporting under Settings.
+ * key. Runs once per session. Legacy lists are merged from every settings blob
+ * (deduped by id, stored entries win) and the legacy field is stripped only
+ * after the dedicated key has been persisted, so a failed write never destroys
+ * the only surviving copy.
  */
 export function migrateLegacyPlaylists(): void {
   if (migrated) return;
@@ -56,7 +59,8 @@ export function migrateLegacyPlaylists(): void {
   } catch {
     /* localStorage enumeration is best-effort */
   }
-  let written = false;
+  const merged = new Map<string, StoredPlaylist>();
+  const dirty: Array<{ key: string; obj: Record<string, unknown> }> = [];
   for (const key of candidates) {
     let blob: unknown;
     try {
@@ -67,19 +71,28 @@ export function migrateLegacyPlaylists(): void {
     if (!blob || typeof blob !== "object") continue;
     const obj = blob as Record<string, unknown>;
     if (!("iptvPlaylists" in obj)) continue;
-    if (!written && Array.isArray(obj.iptvPlaylists)) {
-      try {
-        const lists = obj.iptvPlaylists as StoredPlaylist[];
-        const json = JSON.stringify(lists);
-        localStorage.setItem(STORAGE_KEY, json);
-        cache = lists;
-        cacheJson = json;
-        written = true;
-      } catch {
-        /* quota errors leave the legacy blob in place */
+    if (Array.isArray(obj.iptvPlaylists)) {
+      for (const entry of obj.iptvPlaylists as StoredPlaylist[]) {
+        if (entry && typeof entry.id === "string" && !merged.has(entry.id)) {
+          merged.set(entry.id, entry);
+        }
       }
     }
-    // Strip the legacy field so the playlists no longer export under Settings.
+    dirty.push({ key, obj });
+  }
+  if (merged.size === 0) return;
+  const lists = [...merged.values()];
+  const json = JSON.stringify(lists);
+  try {
+    if (!setItemWithRecovery(STORAGE_KEY, json)) return;
+  } catch {
+    return;
+  }
+  cache = lists;
+  cacheJson = json;
+  // Strip the legacy field only now that the dedicated key is persisted, so the
+  // playlists no longer export under Settings.
+  for (const { key, obj } of dirty) {
     try {
       delete obj.iptvPlaylists;
       localStorage.setItem(key, JSON.stringify(obj));
@@ -87,6 +100,23 @@ export function migrateLegacyPlaylists(): void {
       /* best-effort */
     }
   }
+}
+
+/**
+ * Adopts a stranded legacy iptvPlaylists array into the dedicated store key,
+ * merging with anything already stored (stored entries win). Returns whether
+ * the result was persisted; callers should only drop the legacy field on true.
+ */
+export function adoptLegacyPlaylists(legacy: StoredPlaylist[]): boolean {
+  if (!Array.isArray(legacy) || legacy.length === 0) return true;
+  const merged = new Map<string, StoredPlaylist>();
+  for (const entry of cache) merged.set(entry.id, entry);
+  for (const entry of legacy) {
+    if (entry && typeof entry.id === "string" && !merged.has(entry.id)) {
+      merged.set(entry.id, entry);
+    }
+  }
+  return writePlaylists([...merged.values()]);
 }
 
 export function readPlaylists(): StoredPlaylist[] {
@@ -107,15 +137,20 @@ export function readPlaylists(): StoredPlaylist[] {
   }
 }
 
-export function writePlaylists(playlists: StoredPlaylist[]): void {
+export function writePlaylists(playlists: StoredPlaylist[]): boolean {
   cache = playlists;
   cacheJson = JSON.stringify(playlists);
+  let persisted = false;
   try {
-    localStorage.setItem(STORAGE_KEY, cacheJson);
-  } catch {
-    /* quota errors must not break the in-memory store */
+    persisted = setItemWithRecovery(STORAGE_KEY, cacheJson);
+  } catch (e) {
+    console.warn("[playlists] storage write failed", e);
+  }
+  if (!persisted) {
+    console.warn(`[playlists] storage is full; not persisted (${playlists.length} playlists)`);
   }
   notify();
+  return persisted;
 }
 
 export function subscribePlaylists(cb: () => void): () => void {

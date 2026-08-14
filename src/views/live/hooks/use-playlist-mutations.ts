@@ -6,6 +6,8 @@ import { clearEpg } from "@/lib/iptv/epg-store";
 import { deleteIptvCache } from "@/lib/iptv/persistent-cache";
 import { purgePlaylistState } from "@/lib/iptv/source-cleanup";
 import { useFavorites } from "@/lib/iptv/favorites";
+import { alertDialog } from "@/lib/dialog";
+import { useT } from "@/lib/i18n";
 import { buildXtreamUrls, type PlaylistFormValue } from "../source-picker/playlist-form";
 
 export function materializePlaylistEntry(id: string, entry: PlaylistFormValue): StoredPlaylist {
@@ -43,17 +45,23 @@ export function usePlaylistMutations(params: {
   const { settings, update } = useSettings();
   const favorites = useFavorites();
   const playlists = usePlaylists();
+  const t = useT();
 
   const addPlaylist = useCallback(
     (entry: PlaylistFormValue) => {
       const id = `pl-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const built = materializePlaylistEntry(id, entry);
       const carriesVod = entry.kind === "xtream" || entry.kind === "m3u";
-      writePlaylists([...playlists, built]);
+      const persisted = writePlaylists([...playlists, built]);
+      if (!persisted) {
+        console.warn("harbor: playlist not persisted (storage quota)", id);
+        void alertDialog(t("Couldn't save the playlist. Free up storage space in Settings and try again."));
+      }
       if (carriesVod && !settings.showPlaylistsTab) update({ showPlaylistsTab: true });
       if (entry.kind !== "epg") setActiveId(id);
+      return persisted;
     },
-    [playlists, update, setActiveId, settings.showPlaylistsTab],
+    [playlists, update, setActiveId, settings.showPlaylistsTab, t],
   );
 
   const removePlaylist = useCallback(
