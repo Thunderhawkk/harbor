@@ -55,6 +55,7 @@ const PRUNABLE_PREFIXES = [
   "harbor.manga.cache.v2.",
   "harbor.manga.art.",
   "harbor.tvdbo.",
+  "harbor.playback-history.v1.",
 ];
 
 function isPrunable(key: string): boolean {

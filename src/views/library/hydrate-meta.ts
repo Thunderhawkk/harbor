@@ -1,6 +1,8 @@
 import { type Meta } from "@/lib/cinemeta";
 import { lruSet } from "@/lib/cache";
 import { resolveMeta } from "@/lib/meta-resource";
+import { readLocalEntries } from "@/lib/watchlist";
+import { readActiveStremioAuthKey } from "@/lib/auth";
 
 const metaHydrateCache = new Map<string, Promise<Meta | null>>();
 
@@ -14,10 +16,7 @@ export async function hydrateLibraryMeta(
   if (cached) return cached;
   const authKey = (() => {
     try {
-      const raw = localStorage.getItem("harbor.auth");
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { authKey?: string };
-      return parsed.authKey ?? null;
+      return readActiveStremioAuthKey();
     } catch {
       return null;
     }
@@ -56,20 +55,7 @@ export async function hydrateLibraryMeta(
 
 export function loadLocalIds(): Set<string> {
   try {
-    const raw = localStorage.getItem("harbor.watchlist.v1");
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return new Set();
-    const ids = arr
-      .map((el) =>
-        typeof el === "string"
-          ? el
-          : el && typeof el === "object" && typeof (el as { id?: unknown }).id === "string"
-            ? (el as { id: string }).id
-            : null,
-      )
-      .filter((v): v is string => typeof v === "string");
-    return new Set(ids);
+    return new Set(readLocalEntries().map((e) => e.id));
   } catch {
     return new Set();
   }

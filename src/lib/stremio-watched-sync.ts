@@ -7,16 +7,71 @@ import { detectAnimeForCw, isDetectedAnime } from "@/lib/anime-detect";
 
 const ANIME_ID = /^(kitsu|mal|anilist|anidb):/;
 
-const FRESH_KEY = "harbor.stremio.freshwatched.v1";
+const FRESH_KEY_PREFIX = "harbor.stremio.freshwatched.v1.";
+const LEGACY_FRESH_KEY = "harbor.stremio.freshwatched.v1";
+const PROFILES_KEY = "harbor.profiles.v1";
 const FRESH_CAP = 300;
 const freshWatched = new Map<string, { watched: string | null; mtime: number }>();
 let freshLoaded = false;
 
+function activeProfileId(): string {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    if (!raw) return "";
+    const s = JSON.parse(raw) as {
+      activeId?: string;
+      profiles?: Array<{ id?: string; isPrimary?: boolean; shareStremioWith?: string | null }>;
+    };
+    const profiles = Array.isArray(s.profiles) ? s.profiles : [];
+    const active = profiles.find((p) => p.id === s.activeId) ?? null;
+    const own = active?.id ?? (profiles.find((p) => p?.isPrimary)?.id ?? "");
+    if (!own) return "";
+    if (active && typeof active.shareStremioWith === "string" && active.shareStremioWith) {
+      const shared = profiles.find((p) => p.id === active.shareStremioWith);
+      if (shared?.id) return shared.id;
+    }
+    return own;
+  } catch {
+    return "";
+  }
+}
+
+function primaryProfileId(): string {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    const s = raw ? (JSON.parse(raw) as { profiles?: Array<{ id?: string; isPrimary?: boolean }> }) : null;
+    const primary = s?.profiles?.find((p) => p?.isPrimary);
+    return (primary && typeof primary.id === "string" && primary.id) || activeProfileId();
+  } catch {
+    return activeProfileId();
+  }
+}
+
+function storeKey(): string {
+  const id = activeProfileId();
+  return id ? FRESH_KEY_PREFIX + id : LEGACY_FRESH_KEY;
+}
+
+function migrateLegacy(): void {
+  try {
+    const legacy = localStorage.getItem(LEGACY_FRESH_KEY);
+    if (!legacy) return;
+    const pid = primaryProfileId();
+    if (!pid) return;
+    const perKey = FRESH_KEY_PREFIX + pid;
+    if (!localStorage.getItem(perKey)) localStorage.setItem(perKey, legacy);
+    localStorage.removeItem(LEGACY_FRESH_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
 function loadFresh(): void {
   if (freshLoaded) return;
+  migrateLegacy();
   freshLoaded = true;
   try {
-    const raw = JSON.parse(localStorage.getItem(FRESH_KEY) ?? "null");
+    const raw = JSON.parse(localStorage.getItem(storeKey()) ?? "null");
     if (raw && typeof raw === "object") {
       for (const [id, v] of Object.entries(raw as Record<string, { watched?: unknown; mtime?: unknown }>)) {
         if (v && typeof v.mtime === "number") {
@@ -38,13 +93,18 @@ function setFresh(id: string, watched: string, mtime: number): void {
       const sorted = [...freshWatched.entries()].sort((a, b) => a[1].mtime - b[1].mtime);
       for (let i = 0; i < sorted.length - FRESH_CAP; i++) freshWatched.delete(sorted[i][0]);
     }
-    localStorage.setItem(FRESH_KEY, JSON.stringify(Object.fromEntries(freshWatched)));
+    localStorage.setItem(storeKey(), JSON.stringify(Object.fromEntries(freshWatched)));
   } catch {}
 }
 
 export function freshestWatched(id: string): { watched: string | null; mtime: number } | undefined {
   loadFresh();
   return freshWatched.get(id);
+}
+
+export function freshWatchedIds(): string[] {
+  loadFresh();
+  return [...freshWatched.keys()];
 }
 
 type CinemetaVideo = NonNullable<Meta["videos"]>[number];
