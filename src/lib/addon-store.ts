@@ -3,11 +3,75 @@ import { readActiveStremioAuthKey } from "./auth";
 import { setUserAddons, userAddons, type Addon } from "./addons";
 import { applyOrderToItems } from "./addons-store/reorder";
 
-const STORAGE_KEY = "harbor.installed-addons";
+const PROFILES_KEY = "harbor.profiles.v1";
+
+const STORAGE_KEY_PREFIX = "harbor.installed-addons.";
+const LEGACY_STORAGE_KEY = "harbor.installed-addons";
 const SEEDED_KEY = "harbor.addons.seeded.v1";
-const DISABLED_KEY = "harbor.addons.disabled";
+const DISABLED_KEY_PREFIX = "harbor.addons.disabled.";
+const LEGACY_DISABLED_KEY = "harbor.addons.disabled";
 
 const DEFAULT_ADDONS: Array<{ id: string; transportUrl: string }> = [];
+
+function activeProfileId(): string {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    if (!raw) return "";
+    const s = JSON.parse(raw) as {
+      activeId?: string;
+      profiles?: Array<{ id?: string; isPrimary?: boolean; shareStremioWith?: string | null }>;
+    };
+    const profiles = Array.isArray(s.profiles) ? s.profiles : [];
+    const active = profiles.find((p) => p.id === s.activeId) ?? null;
+    const own = active?.id ?? (profiles.find((p) => p?.isPrimary)?.id ?? "");
+    if (!own) return "";
+    if (active && typeof active.shareStremioWith === "string" && active.shareStremioWith) {
+      const shared = profiles.find((p) => p.id === active.shareStremioWith);
+      if (shared?.id) return shared.id;
+    }
+    return own;
+  } catch {
+    return "";
+  }
+}
+
+function primaryProfileId(): string {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    const s = raw ? (JSON.parse(raw) as { profiles?: Array<{ id?: string; isPrimary?: boolean }> }) : null;
+    const primary = s?.profiles?.find((p) => p?.isPrimary);
+    return (primary && typeof primary.id === "string" && primary.id) || activeProfileId();
+  } catch {
+    return activeProfileId();
+  }
+}
+
+function storeKey(kind: "installed" | "disabled"): string {
+  const id = activeProfileId();
+  if (kind === "installed") return id ? STORAGE_KEY_PREFIX + id : LEGACY_STORAGE_KEY;
+  return id ? DISABLED_KEY_PREFIX + id : LEGACY_DISABLED_KEY;
+}
+
+function migrateLegacy(): void {
+  try {
+    const pid = primaryProfileId();
+    if (!pid) return;
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const perKey = STORAGE_KEY_PREFIX + pid;
+      if (!localStorage.getItem(perKey)) localStorage.setItem(perKey, legacy);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
+    const legacyDisabled = localStorage.getItem(LEGACY_DISABLED_KEY);
+    if (legacyDisabled) {
+      const perKey = DISABLED_KEY_PREFIX + pid;
+      if (!localStorage.getItem(perKey)) localStorage.setItem(perKey, legacyDisabled);
+      localStorage.removeItem(LEGACY_DISABLED_KEY);
+    }
+  } catch {
+    /* noop */
+  }
+}
 
 export async function seedDefaultAddonsIfFirstRun(): Promise<void> {
   try {
@@ -112,7 +176,8 @@ function slimManifest(manifest: Addon["manifest"] | undefined): Addon["manifest"
 }
 
 export function loadInstalled(): InstalledAddon[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  migrateLegacy();
+  const raw = localStorage.getItem(storeKey("installed"));
   if (!raw) return [];
   try {
     return JSON.parse(raw) as InstalledAddon[];
@@ -124,7 +189,7 @@ export function loadInstalled(): InstalledAddon[] {
 function saveInstalled(list: InstalledAddon[]) {
   const slim = list.map((a) => ({ ...a, manifest: slimManifest(a.manifest) }));
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+    localStorage.setItem(storeKey("installed"), JSON.stringify(slim));
   } catch (e) {
     if (e instanceof DOMException && (e.name === "QuotaExceededError" || e.code === 22)) {
       const stripped = list.map((a) => ({
@@ -133,7 +198,7 @@ function saveInstalled(list: InstalledAddon[]) {
         installedAt: a.installedAt,
       }));
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
+        localStorage.setItem(storeKey("installed"), JSON.stringify(stripped));
       } catch (e2) {
         console.warn("[addons] localStorage still full after stripping manifests", e2);
       }
@@ -150,8 +215,9 @@ export function reorderInstalled(urlSequence: string[]): void {
 }
 
 export function loadDisabledAddons(): Set<string> {
+  migrateLegacy();
   try {
-    const raw = localStorage.getItem(DISABLED_KEY);
+    const raw = localStorage.getItem(storeKey("disabled"));
     if (!raw) return new Set();
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
@@ -163,7 +229,7 @@ export function loadDisabledAddons(): Set<string> {
 
 function saveDisabledAddons(set: Set<string>): void {
   try {
-    localStorage.setItem(DISABLED_KEY, JSON.stringify([...set]));
+    localStorage.setItem(storeKey("disabled"), JSON.stringify([...set]));
   } catch (e) {
     console.warn("[addons] couldn't persist disabled addons", e);
   }

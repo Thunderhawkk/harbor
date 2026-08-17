@@ -510,6 +510,21 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(`harbor.simkl.cache.v2.${id}`);
         localStorage.removeItem(`harbor.anilist.synced.v1.${id}`);
         localStorage.removeItem(`harbor.mal.synced.v1.${id}`);
+        localStorage.removeItem(`harbor.moviewatched.v1.${id}`);
+        localStorage.removeItem(`harbor.watchedFlag.v1.${id}`);
+        localStorage.removeItem(`harbor.manualwatched.v1.${id}`);
+        localStorage.removeItem(`harbor.manualunwatched.v1.${id}`);
+        localStorage.removeItem(`harbor.manualwatched.meta.v1.${id}`);
+        localStorage.removeItem(`harbor.manualwatched.dismissed.v1.${id}`);
+        localStorage.removeItem(`harbor.manualunwatched.at.v1.${id}`);
+        localStorage.removeItem(`harbor.manualwatched.fromremote.v1.${id}`);
+        localStorage.removeItem(`harbor.watchevents.v1.${id}`);
+        localStorage.removeItem(`harbor.playback-history.v1.${id}`);
+        localStorage.removeItem(`harbor.watchlist.v1.${id}`);
+        localStorage.removeItem(`harbor.watchlist.aggregate.v1.${id}`);
+        localStorage.removeItem(`harbor.installed-addons.${id}`);
+        localStorage.removeItem(`harbor.addons.disabled.${id}`);
+        localStorage.removeItem(`harbor.stremio.freshwatched.v1.${id}`);
       } catch {
         /* ignore */
       }
