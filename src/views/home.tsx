@@ -169,7 +169,11 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
   useEffect(() => {
     const onAddonsChanged = () => setAddonsTick((t) => t + 1);
     window.addEventListener("harbor:addons-changed", onAddonsChanged);
-    return () => window.removeEventListener("harbor:addons-changed", onAddonsChanged);
+    window.addEventListener("harbor:active-profile-changed", onAddonsChanged);
+    return () => {
+      window.removeEventListener("harbor:addons-changed", onAddonsChanged);
+      window.removeEventListener("harbor:active-profile-changed", onAddonsChanged);
+    };
   }, []);
 
   useEffect(() => {

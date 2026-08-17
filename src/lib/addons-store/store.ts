@@ -259,6 +259,12 @@ export function useAddonsCatalog(adultsAllowed: boolean): {
     return () => window.removeEventListener("harbor:addons-changed", onChange);
   }, []);
 
+  useEffect(() => {
+    const onProfileChanged = () => setTick((t) => t + 1);
+    window.addEventListener("harbor:active-profile-changed", onProfileChanged);
+    return () => window.removeEventListener("harbor:active-profile-changed", onProfileChanged);
+  }, []);
+
   return { loading, byId, installedIds, refetch: () => setTick((t) => t + 1) };
 }
 
