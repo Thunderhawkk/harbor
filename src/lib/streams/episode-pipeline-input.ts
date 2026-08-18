@@ -91,6 +91,7 @@ export function buildEpisodePipelineInput(params: {
     presetStreams: embedded.length > 0 ? embedded : undefined,
     addonTimeoutMs: Math.max(8, Math.min(120, settings.addonTimeoutSec ?? 30)) * 1000,
     addonRanks: resolveAddonRanks(addons, settings.streamPriority),
+    forcedAddonBases: meta.addonOrigin?.base ? [{ base: meta.addonOrigin.base, id: meta.id }] : undefined,
     trust: {
       kind: episode ? "series" : meta.type === "series" ? "series" : "movie",
       expectedTitle: meta.name,

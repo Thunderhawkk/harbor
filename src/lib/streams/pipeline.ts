@@ -74,6 +74,7 @@ export type PipelineInput = {
   presetStreams?: Stream[];
   addonTimeoutMs?: number;
   addonRanks?: AddonRankFn | null;
+  forcedAddonBases?: Array<{ base: string; id: string }>;
 };
 
 export type DebridError = { slug: string; name: string; code: string };
@@ -132,7 +133,7 @@ export async function runPipeline(
     }),
     presets.length > 0
       ? Promise.resolve(presets)
-      : fetchAddonStreams(input.addons, input.request, signal, emitPartial, onAddonProgress, input.addonTimeoutMs, input.addonRanks),
+      : fetchAddonStreams(input.addons, input.request, signal, emitPartial, onAddonProgress, input.addonTimeoutMs, input.addonRanks, input.forcedAddonBases),
   ]);
   if (librarySettled.status === "fulfilled") library = librarySettled.value;
   const addonStreams = addonSettled.status === "fulfilled" ? addonSettled.value : [];

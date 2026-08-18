@@ -41,7 +41,9 @@ export async function fetchAddonStreams(
   onProgress?: (settled: number, total: number) => void,
   timeoutMs = TIMEOUT_MS_SLOW,
   ranks?: AddonRankFn | null,
+  forced?: Array<{ base: string; id: string }>,
 ): Promise<Stream[]> {
+  const forcedBases = new Map((forced ?? []).map((f) => [f.base, f.id]));
   const namedTasks: Array<{ name: string; p: Promise<Stream[]> }> = [];
   const skipped: string[] = [];
   for (let i = 0; i < addons.length; i++) {
@@ -51,16 +53,24 @@ export async function fetchAddonStreams(
       skipped.push(`${addon.manifest.name}(status-addon)`);
       continue;
     }
-    const ids = pickIds(addon, req.type, req.ids);
+    const forcedId = forcedBases.get(addon.transportUrl.replace(/\/manifest\.json$/, ""));
+    const ids = forcedId != null ? [forcedId] : pickIds(addon, req.type, req.ids);
     if (ids.length === 0) {
       skipped.push(`${addon.manifest.name}(no-matching-id)`);
       continue;
     }
     for (const id of ids) {
+      // Local lists only persist movie/series, which can drop the type an addon's
+      // catalog declared for non-standard id schemes. Retry the other declared
+      // types when the primary query comes back empty.
+      const altTypes =
+        forcedId != null || !hasStandardIdScheme(id)
+          ? alternateStreamTypes(addon, req.type, id)
+          : [];
       const name = ids.length > 1 ? `${addon.manifest.name}[${idScheme(id)}]` : addon.manifest.name;
       namedTasks.push({
         name,
-        p: fetchOne(addon, req.type, id, signal, timeoutMs).then((ss) =>
+        p: fetchOne(addon, req.type, id, signal, timeoutMs, altTypes).then((ss) =>
           ss.map((s, idx) => ({ ...s, addonPriority: priority, addonReturnIdx: idx })),
         ),
       });
@@ -113,8 +123,14 @@ function pickId(addon: Addon, type: string, ids: string[]): string | null {
 
 const ANIME_SCHEMES = ["kitsu", "mal", "anidb", "anilist"];
 
+const STANDARD_ID_SCHEMES = ["tt", "tmdb:", "kitsu:", "mal:", "anidb:", "anilist:", "tvdb:", "simkl:"];
+
 function idScheme(id: string): string {
   return id.startsWith("tt") ? "imdb" : id.split(":")[0];
+}
+
+function hasStandardIdScheme(id: string): boolean {
+  return STANDARD_ID_SCHEMES.some((p) => id.startsWith(p));
 }
 
 function pickIds(addon: Addon, type: string, ids: string[]): string[] {
@@ -152,75 +168,107 @@ function addonAcceptsId(addon: Addon, type: string, id: string): boolean {
   return true;
 }
 
+function alternateStreamTypes(addon: Addon, type: string, id: string): string[] {
+  const resources = addon.manifest.resources ?? [];
+  const streamResources = resources.filter(
+    (r): r is { name: string; types?: string[]; idPrefixes?: string[] } =>
+      typeof r === "object" && r.name === "stream",
+  );
+  const out = new Set<string>();
+  for (const r of streamResources) {
+    const idOk =
+      !r.idPrefixes ||
+      r.idPrefixes.length === 0 ||
+      r.idPrefixes.some((p) => id.startsWith(p));
+    if (!idOk) continue;
+    for (const t of r.types ?? []) {
+      if (t !== type) out.add(t);
+    }
+  }
+  return Array.from(out);
+}
+
 async function fetchOne(
   addon: Addon,
   type: string,
   id: string,
   signal: AbortSignal,
   timeoutMs: number,
+  altTypes: string[] = [],
 ): Promise<Stream[]> {
   const base = addon.transportUrl.replace(/\/manifest\.json$/, "");
-  const url = `${base}/stream/${type}/${id}.json`;
   const limit = timeoutFor(addon, timeoutMs);
-  const ac = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    ac.abort();
-  }, limit);
-  const onParentAbort = () => ac.abort();
-  signal.addEventListener("abort", onParentAbort);
-  const startedAt = performance.now();
-  try {
-    const res = await fetch(url, {
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-      },
-      signal: ac.signal,
-    });
-    if (!res.ok) {
-      dwarn(`[addons] ${addon.manifest.name} returned ${res.status} for ${type}/${id}`);
-      return [];
-    }
-    const json = (await res.json()) as { streams?: RawStream[] };
-    const list = json.streams ?? [];
-    const ranked = isAddonRanked(addon);
-    return list.map((s) => {
-      const mapped = {
-        ...s,
-        infoHash: s.infoHash?.toLowerCase(),
-        addonId: addon.manifest.id,
-        addonName: addon.manifest.name,
-        addonUrl: addon.transportUrl,
-        addonRanked: ranked,
-      };
-      if (!mapped.infoHash && hasUncachedMarker(s)) {
-        const fromUrl = s.url ? infoHashFromUrl(s.url) : null;
-        const hash = fromUrl?.infoHash ?? infoHashFromSources(s.sources);
-        if (hash) {
-          mapped.infoHash = hash;
-          if (mapped.fileIdx == null && fromUrl?.fileIdx != null) mapped.fileIdx = fromUrl.fileIdx;
-        }
+
+  const queryOnce = async (t: string): Promise<Stream[] | null> => {
+    const url = `${base}/stream/${t}/${id}.json`;
+    const ac = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      ac.abort();
+    }, limit);
+    const onParentAbort = () => ac.abort();
+    signal.addEventListener("abort", onParentAbort);
+    const startedAt = performance.now();
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        },
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        dwarn(`[addons] ${addon.manifest.name} returned ${res.status} for ${t}/${id}`);
+        return null;
       }
-      return mapped;
-    });
-  } catch (e) {
-    if (timedOut) {
-      dwarn(`[addons] ${addon.manifest.name} timed out after ${limit}ms — dropped`);
-    } else if (!signal.aborted) {
-      dwarn(`[addons] ${addon.manifest.name} failed`, e);
+      const json = (await res.json()) as { streams?: RawStream[] };
+      const list = json.streams ?? [];
+      const ranked = isAddonRanked(addon);
+      return list.map((s) => {
+        const mapped = {
+          ...s,
+          infoHash: s.infoHash?.toLowerCase(),
+          addonId: addon.manifest.id,
+          addonName: addon.manifest.name,
+          addonUrl: addon.transportUrl,
+          addonRanked: ranked,
+        };
+        if (!mapped.infoHash && hasUncachedMarker(s)) {
+          const fromUrl = s.url ? infoHashFromUrl(s.url) : null;
+          const hash = fromUrl?.infoHash ?? infoHashFromSources(s.sources);
+          if (hash) {
+            mapped.infoHash = hash;
+            if (mapped.fileIdx == null && fromUrl?.fileIdx != null) mapped.fileIdx = fromUrl.fileIdx;
+          }
+        }
+        return mapped;
+      });
+    } catch (e) {
+      if (timedOut) {
+        dwarn(`[addons] ${addon.manifest.name} timed out after ${limit}ms — dropped`);
+      } else if (!signal.aborted) {
+        dwarn(`[addons] ${addon.manifest.name} failed`, e);
+      }
+      return null;
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onParentAbort);
+      const elapsed = Math.round(performance.now() - startedAt);
+      if (elapsed > 2500 && !timedOut) {
+        dlog(`[addons] ${addon.manifest.name} took ${elapsed}ms`);
+      }
     }
-    return [];
-  } finally {
-    clearTimeout(timer);
-    signal.removeEventListener("abort", onParentAbort);
-    const elapsed = Math.round(performance.now() - startedAt);
-    if (elapsed > 2500 && !timedOut) {
-      dlog(`[addons] ${addon.manifest.name} took ${elapsed}ms`);
-    }
+  };
+
+  const primary = await queryOnce(type);
+  if (primary == null || primary.length > 0 || altTypes.length === 0) return primary ?? [];
+  const settled = await Promise.allSettled(altTypes.map((t) => queryOnce(t)));
+  for (const r of settled) {
+    if (r.status === "fulfilled" && r.value && r.value.length > 0) return r.value;
   }
+  return [];
 }
 
 function dedupeStreams(streams: Stream[]): Stream[] {
