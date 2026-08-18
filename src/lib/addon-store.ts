@@ -194,18 +194,26 @@ export function transportUrlFor(id: string): string | null {
   return loadInstalled().find((a) => a.id === id)?.transportUrl ?? null;
 }
 
-function transportHost(url: string): string | null {
+// Identifies an addon instance by host + base path, ignoring manifest.json /
+// configure suffixes and query strings, so distinct manifests on the same host
+// (e.g. /p/1/manifest.json vs /p/2/manifest.json) stay separate addons.
+function transportBaseKey(url: string): string | null {
   try {
-    return new URL(url).host.toLowerCase();
+    const u = new URL(url);
+    const path = u.pathname
+      .replace(/\/manifest\.json$/i, "")
+      .replace(/\/configure$/i, "")
+      .replace(/\/+$/, "");
+    return `${u.host.toLowerCase()}${path}`;
   } catch {
     return null;
   }
 }
 
 export function findHostnameMatch(transportUrl: string): InstalledAddon | null {
-  const host = transportHost(transportUrl);
-  if (!host) return null;
-  return loadInstalled().find((a) => transportHost(a.transportUrl) === host) ?? null;
+  const base = transportBaseKey(transportUrl);
+  if (!base) return null;
+  return loadInstalled().find((a) => transportBaseKey(a.transportUrl) === base) ?? null;
 }
 
 export type AddonUrlParse =
