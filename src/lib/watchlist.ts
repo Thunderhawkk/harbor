@@ -7,6 +7,7 @@ import { isAuthenticated as simklConnected } from "@/lib/simkl/session";
 import { setItemWithRecovery, freeStorageSpace } from "@/lib/storage-recovery";
 import { ANIME_CLOUD_ID, cloudWriteId, saveStremioBookmark, removeStremioBookmark } from "@/lib/stremio";
 import { readActiveStremioAuthKey } from "@/lib/auth";
+import { cappedEmbeddedVideos, type Meta } from "@/lib/cinemeta";
 
 const KEY = "harbor.watchlist.v1";
 const AGG_KEY = "harbor.watchlist.aggregate.v1";
@@ -18,9 +19,19 @@ export type LocalEntry = {
   name: string;
   poster?: string;
   addedAt: number;
+  addonOrigin?: Meta["addonOrigin"];
+  videos?: Meta["videos"];
 };
 
-export type WatchlistInput = { id: string; type?: string; name?: string; poster?: string; imdbId?: string | null };
+export type WatchlistInput = {
+  id: string;
+  type?: string;
+  name?: string;
+  poster?: string;
+  imdbId?: string | null;
+  addonOrigin?: Meta["addonOrigin"];
+  videos?: Meta["videos"];
+};
 
 let memoryFallback: Map<string, LocalEntry> | null = null;
 
@@ -44,6 +55,8 @@ function toEntry(input: string | WatchlistInput): LocalEntry {
     name: input.name ?? "",
     poster: input.poster,
     addedAt: Date.now(),
+    addonOrigin: input.addonOrigin,
+    videos: cappedEmbeddedVideos(input.videos),
   };
 }
 
@@ -59,13 +72,28 @@ function read(): Map<string, LocalEntry> {
       if (typeof el === "string") {
         map.set(el, { id: el, type: inferType(el), name: "", addedAt: 0 });
       } else if (el && typeof el === "object" && typeof (el as { id?: unknown }).id === "string") {
-        const e = el as { id: string; type?: string; name?: string; poster?: string; addedAt?: number };
+        const e = el as {
+          id: string;
+          type?: string;
+          name?: string;
+          poster?: string;
+          addedAt?: number;
+          addonOrigin?: unknown;
+          videos?: unknown;
+        };
         map.set(e.id, {
           id: e.id,
           type: e.type === "series" ? "series" : "movie",
           name: typeof e.name === "string" ? e.name : "",
           poster: typeof e.poster === "string" ? e.poster : undefined,
           addedAt: typeof e.addedAt === "number" ? e.addedAt : 0,
+          addonOrigin:
+            e.addonOrigin &&
+            typeof e.addonOrigin === "object" &&
+            typeof (e.addonOrigin as { id?: unknown }).id === "string"
+              ? (e.addonOrigin as Meta["addonOrigin"])
+              : undefined,
+          videos: Array.isArray(e.videos) ? (e.videos as Meta["videos"]) : undefined,
         });
       }
     }

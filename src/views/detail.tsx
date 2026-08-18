@@ -772,6 +772,8 @@ export function DetailView({
     type: meta.type,
     name: title || meta.name,
     poster: meta.poster ?? detail?.poster,
+    addonOrigin: meta.addonOrigin,
+    videos: meta.videos,
   };
   const overview =
     seasonArt?.description || (detail?.overview ?? (meta.id.startsWith("tmdb:") ? "" : meta.description) ?? "");
@@ -1386,6 +1388,8 @@ export function DetailView({
                           name: title || meta.name,
                           poster: meta.poster ?? detail?.poster,
                           imdbId: detail?.imdbId,
+                          addonOrigin: meta.addonOrigin,
+                          videos: meta.videos,
                         })
                       }
                       className={`flex h-12 items-center gap-2.5 whitespace-nowrap rounded-full border px-6 text-[15px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[transform,background-color,border-color] duration-200 active:scale-[0.98] ${
@@ -1440,6 +1444,8 @@ export function DetailView({
                         type: meta.type,
                         name: title || meta.name,
                         poster: meta.poster ?? detail?.poster,
+                        addonOrigin: meta.addonOrigin,
+                        videos: meta.videos,
                       })
                     }
                     hasTrailer={!!trailerCandidate}
@@ -1458,6 +1464,8 @@ export function DetailView({
                         name: title || meta.name,
                         poster: meta.poster ?? detail?.poster,
                         imdbId: detail?.imdbId,
+                        addonOrigin: meta.addonOrigin,
+                        videos: meta.videos,
                       })
                     }
                     simkl={{
@@ -1481,6 +1489,8 @@ export function DetailView({
                             type: meta.type,
                             name: title || meta.name,
                             poster: meta.poster ?? detail?.poster,
+                            addonOrigin: meta.addonOrigin,
+                            videos: meta.videos,
                           })
                         }
                         aria-label={isFav ? t("Remove from favorites") : t("Add to favorites")}

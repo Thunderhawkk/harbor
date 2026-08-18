@@ -157,7 +157,7 @@ export function FeedHero({
             <SecondaryAction
               icon={saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
               label={saved ? t("Saved") : t("Save")}
-              onClick={() => toggleWatchlist({ id: meta.id, type: meta.type, name: meta.name, poster: meta.poster, imdbId: resolvedImdb })}
+              onClick={() => toggleWatchlist({ id: meta.id, type: meta.type, name: meta.name, poster: meta.poster, imdbId: resolvedImdb, addonOrigin: meta.addonOrigin, videos: meta.videos })}
               active={saved}
             />
             <SecondaryAction

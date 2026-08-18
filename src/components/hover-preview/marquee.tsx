@@ -236,6 +236,8 @@ function MarqueeBlock({
               name: meta.name,
               poster: meta.poster,
               imdbId: alt ?? undefined,
+              addonOrigin: meta.addonOrigin,
+              videos: meta.videos,
             });
           }}
         >

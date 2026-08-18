@@ -669,7 +669,14 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
     const toMetas = (m: Map<string, MediaEntry>): Meta[] =>
       [...m.values()]
         .sort((a, b) => b.addedAt - a.addedAt)
-        .map((e) => ({ id: e.id, type: e.type, name: e.name, poster: e.poster }));
+        .map((e) => ({
+          id: e.id,
+          type: e.type,
+          name: e.name,
+          poster: e.poster,
+          addonOrigin: e.addonOrigin,
+          videos: e.videos,
+        }));
     const out: HomeRow[] = [];
     if (favItems.size > 0) {
       out.push({ key: "harbor-favorites", type: "movie", name: "Favorites", metas: toMetas(favItems), page: 1, hasMore: false, noDedup: true });

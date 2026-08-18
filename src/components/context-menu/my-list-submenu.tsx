@@ -44,7 +44,14 @@ export function MyListSubmenu({ item, onClose }: { item: ListItemInput; onClose:
   };
 
   const toggleDefault = () => {
-    local.toggle({ id: item.id, type: item.type, name: item.name, poster: item.poster });
+    local.toggle({
+      id: item.id,
+      type: item.type,
+      name: item.name,
+      poster: item.poster,
+      addonOrigin: item.addonOrigin,
+      videos: item.videos,
+    });
     emitListToast(inDefault ? t("Removed from My List") : t("Added to My List"));
   };
   const toggleCustom = (listId: string, name: string) => {

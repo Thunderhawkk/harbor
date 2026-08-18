@@ -249,7 +249,7 @@ function AnimeHeroMobile({
           <button
             type="button"
             aria-label={inWl ? "In My List" : "Add to My List"}
-            onClick={() => toggleWatchlist({ id: current.id, type: current.type, name: current.name, poster: current.poster })}
+            onClick={() => toggleWatchlist({ id: current.id, type: current.type, name: current.name, poster: current.poster, addonOrigin: current.addonOrigin, videos: current.videos })}
             className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-edge bg-canvas/55 text-ink transition-transform duration-150 active:scale-[0.94]"
           >
             {inWl ? <Check size={20} strokeWidth={2.6} className="text-accent" /> : <Plus size={21} strokeWidth={2.2} />}

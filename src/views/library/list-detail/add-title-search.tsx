@@ -68,7 +68,7 @@ export function AddTitleSearch({ list }: { list: CustomList }) {
       emitListToast(t("This list is full ({max} items)", { max: MAX_ITEMS }));
       return;
     }
-    addToList(list.id, { id: m.id, type: m.type, name: m.name, poster: m.poster });
+    addToList(list.id, { id: m.id, type: m.type, name: m.name, poster: m.poster, addonOrigin: m.addonOrigin, videos: m.videos });
     emitListToast(t('Added to "{name}"', { name: list.name }));
   };
 

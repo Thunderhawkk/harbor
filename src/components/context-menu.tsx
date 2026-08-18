@@ -193,6 +193,8 @@ export function ContextMenu() {
         name: meta.name,
         poster: meta.poster,
         imdbId: targetImdb,
+        addonOrigin: meta.addonOrigin,
+        videos: meta.videos,
       });
       close();
     };
@@ -239,7 +241,14 @@ export function ContextMenu() {
         icon={<Heart size={14} strokeWidth={2} fill={isFav ? "currentColor" : "none"} />}
         label={isFav ? "Favorited" : "Favorite"}
         onClick={() => {
-          toggleFavorite({ id: meta.id, type: meta.type, name: meta.name, poster: meta.poster });
+          toggleFavorite({
+            id: meta.id,
+            type: meta.type,
+            name: meta.name,
+            poster: meta.poster,
+            addonOrigin: meta.addonOrigin,
+            videos: meta.videos,
+          });
           close();
         }}
         accent={isFav}
@@ -248,7 +257,14 @@ export function ContextMenu() {
     items.push(
       <MyListSubmenu
         key="local-list"
-        item={{ id: meta.id, type: meta.type, name: meta.name, poster: meta.poster }}
+        item={{
+          id: meta.id,
+          type: meta.type,
+          name: meta.name,
+          poster: meta.poster,
+          addonOrigin: meta.addonOrigin,
+          videos: meta.videos,
+        }}
         onClose={close}
       />,
     );

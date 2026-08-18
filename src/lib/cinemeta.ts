@@ -52,6 +52,17 @@ export type Meta = {
   }>;
 };
 
+export function cappedEmbeddedVideos(videos: Meta["videos"]): Meta["videos"] {
+  if (!videos || videos.length === 0 || videos.length > 40) return undefined;
+  if (!videos.some((v) => Array.isArray(v.streams) && v.streams.length > 0)) return undefined;
+  try {
+    if (JSON.stringify(videos).length > 64000) return undefined;
+  } catch {
+    return undefined;
+  }
+  return videos;
+}
+
 export function isAddonNativeMeta(meta: Meta): boolean {
   if (meta.type === "tv" || meta.type === "channel") return true;
   if (!meta.addonOrigin) return false;

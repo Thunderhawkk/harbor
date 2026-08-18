@@ -1,6 +1,7 @@
 import { type Meta } from "@/lib/cinemeta";
 import { lruSet } from "@/lib/cache";
 import { resolveMeta } from "@/lib/meta-resource";
+import { fetchAddonMeta } from "@/lib/addons";
 
 const metaHydrateCache = new Map<string, Promise<Meta | null>>();
 
@@ -8,8 +9,9 @@ export async function hydrateLibraryMeta(
   id: string,
   type: "movie" | "series",
   tmdbKey: string | null,
+  origin?: Meta["addonOrigin"],
 ): Promise<Meta | null> {
-  const cacheKey = `${type}:${id}`;
+  const cacheKey = `${type}:${id}:${origin?.base ?? ""}`;
   const cached = metaHydrateCache.get(cacheKey);
   if (cached) return cached;
   const authKey = (() => {
@@ -23,6 +25,14 @@ export async function hydrateLibraryMeta(
     }
   })();
   const p = (async () => {
+    if (origin?.base) {
+      try {
+        const addonMeta = await fetchAddonMeta(origin.base, type, id);
+        if (addonMeta) return addonMeta;
+      } catch {
+        /* fall through to the existing resolve logic */
+      }
+    }
     if (id.startsWith("tmdb:") && tmdbKey) {
       const isTv = id.startsWith("tmdb:tv:") || id.startsWith("tmdb:series:");
       const tmdbType = isTv ? "tv" : "movie";

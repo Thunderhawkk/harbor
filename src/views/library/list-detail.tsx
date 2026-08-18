@@ -10,7 +10,7 @@ import { ListSettingsMenu } from "./list-detail/list-settings-menu";
 import { Grid } from "./shared";
 
 function itemToMeta(it: ListItem): Meta {
-  return { id: it.id, type: it.type, name: it.name, poster: it.poster };
+  return { id: it.id, type: it.type, name: it.name, poster: it.poster, addonOrigin: it.addonOrigin, videos: it.videos };
 }
 
 export function ListDetail({ listId, onBack }: { listId: string; onBack: () => void }) {

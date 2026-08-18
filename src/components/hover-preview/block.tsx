@@ -54,7 +54,7 @@ function WatchlistToggle({ data }: { data: PreviewData }) {
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
-        toggleWatchlist({ id: meta.id, type: meta.type, name: meta.name, poster: meta.poster, imdbId: alt ?? undefined });
+        toggleWatchlist({ id: meta.id, type: meta.type, name: meta.name, poster: meta.poster, imdbId: alt ?? undefined, addonOrigin: meta.addonOrigin, videos: meta.videos });
       }}
       className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle transition-colors duration-150 hover:bg-raised hover:text-ink"
     >

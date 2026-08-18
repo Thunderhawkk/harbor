@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useProfiles } from "./profiles";
+import { cappedEmbeddedVideos, type Meta } from "./cinemeta";
 
 export type MediaEntry = {
   id: string;
@@ -7,9 +8,18 @@ export type MediaEntry = {
   name: string;
   poster?: string;
   addedAt: number;
+  addonOrigin?: Meta["addonOrigin"];
+  videos?: Meta["videos"];
 };
 
-export type MediaInput = { id: string; type?: string; name?: string; poster?: string };
+export type MediaInput = {
+  id: string;
+  type?: string;
+  name?: string;
+  poster?: string;
+  addonOrigin?: Meta["addonOrigin"];
+  videos?: Meta["videos"];
+};
 
 export type MediaListStore = {
   ids: Set<string>;
@@ -44,6 +54,13 @@ function readMap(key: string): Map<string, MediaEntry> {
           name: typeof el.name === "string" ? el.name : "",
           poster: typeof el.poster === "string" ? el.poster : undefined,
           addedAt: typeof el.addedAt === "number" ? el.addedAt : 0,
+          addonOrigin:
+            el.addonOrigin &&
+            typeof el.addonOrigin === "object" &&
+            typeof (el.addonOrigin as { id?: unknown }).id === "string"
+              ? (el.addonOrigin as Meta["addonOrigin"])
+              : undefined,
+          videos: Array.isArray(el.videos) ? (el.videos as Meta["videos"]) : undefined,
         });
       }
     }
@@ -102,6 +119,8 @@ export function createMediaListStore(prefix: string) {
               name: input.name ?? "",
               poster: input.poster,
               addedAt: Date.now(),
+              addonOrigin: input.addonOrigin,
+              videos: cappedEmbeddedVideos(input.videos),
             });
           }
           writeMap(keyFor(pid), next);
@@ -145,6 +164,8 @@ export function createMediaListStore(prefix: string) {
         name: input.name ?? "",
         poster: input.poster,
         addedAt: Date.now(),
+        addonOrigin: input.addonOrigin,
+        videos: cappedEmbeddedVideos(input.videos),
       });
     } else {
       map.delete(input.id);

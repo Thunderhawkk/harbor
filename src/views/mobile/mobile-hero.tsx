@@ -214,7 +214,7 @@ export function MobileHero({ slides, onOpenDetail }: { slides: Meta[]; onOpenDet
                 type="button"
                 aria-label={inWl ? "In My List" : "Add to My List"}
                 onClick={() =>
-                  toggleWatchlist({ id: current.id, type: current.type, name: current.name, poster: current.poster })
+                  toggleWatchlist({ id: current.id, type: current.type, name: current.name, poster: current.poster, addonOrigin: current.addonOrigin, videos: current.videos })
                 }
                 className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white backdrop-blur-sm transition-transform duration-150 active:scale-[0.94]"
               >
