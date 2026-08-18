@@ -55,26 +55,39 @@ export async function fetchAddonStreams(
     }
     const forcedId = forcedBases.get(addon.transportUrl.replace(/\/manifest\.json$/, ""));
     const ids = forcedId != null ? [forcedId] : pickIds(addon, req.type, req.ids);
-    if (ids.length === 0) {
+    if (ids.length > 0) {
+      for (const id of ids) {
+        // Local lists only persist movie/series, which can drop the type an addon's
+        // catalog declared for non-standard id schemes. Retry the other declared
+        // types when the primary query comes back empty.
+        const altTypes =
+          forcedId != null || !hasStandardIdScheme(id)
+            ? alternateStreamTypes(addon, req.type, id)
+            : [];
+        const name = ids.length > 1 ? `${addon.manifest.name}[${idScheme(id)}]` : addon.manifest.name;
+        namedTasks.push({
+          name,
+          p: fetchOne(addon, req.type, id, signal, timeoutMs, altTypes).then((ss) =>
+            ss.map((s, idx) => ({ ...s, addonPriority: priority, addonReturnIdx: idx })),
+          ),
+        });
+      }
+      continue;
+    }
+    // No (type, id) pair matched the request, but a non-standard id may still be
+    // served under a type the catalog declared. Query those types directly.
+    const anyType = pickIdByDeclaredTypes(addon, req.ids);
+    if (anyType == null) {
       skipped.push(`${addon.manifest.name}(no-matching-id)`);
       continue;
     }
-    for (const id of ids) {
-      // Local lists only persist movie/series, which can drop the type an addon's
-      // catalog declared for non-standard id schemes. Retry the other declared
-      // types when the primary query comes back empty.
-      const altTypes =
-        forcedId != null || !hasStandardIdScheme(id)
-          ? alternateStreamTypes(addon, req.type, id)
-          : [];
-      const name = ids.length > 1 ? `${addon.manifest.name}[${idScheme(id)}]` : addon.manifest.name;
-      namedTasks.push({
-        name,
-        p: fetchOne(addon, req.type, id, signal, timeoutMs, altTypes).then((ss) =>
-          ss.map((s, idx) => ({ ...s, addonPriority: priority, addonReturnIdx: idx })),
-        ),
-      });
-    }
+    const { id, types } = anyType;
+    namedTasks.push({
+      name: `${addon.manifest.name}[${idScheme(id)}]`,
+      p: fetchOne(addon, types[0], id, signal, timeoutMs, types.slice(1)).then((ss) =>
+        ss.map((s, idx) => ({ ...s, addonPriority: priority, addonReturnIdx: idx })),
+      ),
+    });
   }
   if (skipped.length > 0) console.info(`[addons] skipped: ${skipped.join(", ")}`);
   console.info(`[addons] querying ${namedTasks.length}: ${namedTasks.map((t) => t.name).join(", ")}`);
@@ -143,6 +156,44 @@ function pickIds(addon: Addon, type: string, ids: string[]): string[] {
   return [accepted[0]];
 }
 
+function pickIdByDeclaredTypes(
+  addon: Addon,
+  ids: string[],
+): { id: string; types: string[] } | null {
+  const sorted = [...ids].sort((a, b) => idPriority(a) - idPriority(b));
+  for (const id of sorted) {
+    const types = streamTypesAcceptingId(addon, id);
+    if (types.length > 0) return { id, types };
+  }
+  return null;
+}
+
+function streamTypesAcceptingId(addon: Addon, id: string): string[] {
+  const m = addon.manifest;
+  const resources = m.resources ?? [];
+  const streamResources = resources.filter(
+    (r): r is { name: string; types?: string[]; idPrefixes?: string[] } =>
+      typeof r === "object" && r.name === "stream",
+  );
+  const out = new Set<string>();
+  if (streamResources.length > 0) {
+    for (const r of streamResources) {
+      const idOk =
+        !r.idPrefixes ||
+        r.idPrefixes.length === 0 ||
+        r.idPrefixes.some((p) => id.startsWith(p));
+      if (!idOk) continue;
+      for (const t of r.types ?? []) out.add(t);
+    }
+    return Array.from(out);
+  }
+  if (!resources.some((r) => r === "stream")) return [];
+  const idOk =
+    !m.idPrefixes || m.idPrefixes.length === 0 || m.idPrefixes.some((p) => id.startsWith(p));
+  if (!idOk) return [];
+  return Array.from(m.types ?? []);
+}
+
 function addonAcceptsId(addon: Addon, type: string, id: string): boolean {
   const m = addon.manifest;
   const resources = m.resources ?? [];
@@ -169,23 +220,7 @@ function addonAcceptsId(addon: Addon, type: string, id: string): boolean {
 }
 
 function alternateStreamTypes(addon: Addon, type: string, id: string): string[] {
-  const resources = addon.manifest.resources ?? [];
-  const streamResources = resources.filter(
-    (r): r is { name: string; types?: string[]; idPrefixes?: string[] } =>
-      typeof r === "object" && r.name === "stream",
-  );
-  const out = new Set<string>();
-  for (const r of streamResources) {
-    const idOk =
-      !r.idPrefixes ||
-      r.idPrefixes.length === 0 ||
-      r.idPrefixes.some((p) => id.startsWith(p));
-    if (!idOk) continue;
-    for (const t of r.types ?? []) {
-      if (t !== type) out.add(t);
-    }
-  }
-  return Array.from(out);
+  return streamTypesAcceptingId(addon, id).filter((t) => t !== type);
 }
 
 async function fetchOne(
