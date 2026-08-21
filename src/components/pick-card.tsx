@@ -240,7 +240,7 @@ const PosterCard = memo(function PosterCard({
 
   const [imgIdx, setImgIdx] = useState(0);
   const [hydratedPoster, setHydratedPoster] = useState<string | undefined>();
-  const localizedPoster = useLocalizedPoster(meta.id);
+  const { url: localizedPoster, localizing: posterLocalizing } = useLocalizedPoster(meta.id);
   const wantTmdbPoster = needsTmdbForPoster(settings.rpdbKey, meta.id);
   const resolvedTmdb = useTmdbIdFromImdb(wantTmdbPoster ? meta.id : undefined);
   const animeTmdb = useTmdbIdFromImdb(animeImdb) ?? undefined;
@@ -257,6 +257,7 @@ const PosterCard = memo(function PosterCard({
   const pinnedPoster = useTitlePoster(meta.id);
   const posterCandidates = useMemo(() => {
     if (posterPending && !pinnedPoster) return [];
+    if (posterLocalizing) return pinnedPoster ? [pinnedPoster] : [];
     const base = localizedPoster ?? meta.poster;
     const seen = new Set<string>();
     const out: string[] = [];
@@ -274,7 +275,7 @@ const PosterCard = memo(function PosterCard({
       out.push(u);
     }
     return out;
-  }, [settings.rpdbKey, meta.id, posterAltId, meta.poster, meta.background, hydratedPoster, animeImdb, animeTvdb, animeTmdb, localizedPoster, posterPending, pinnedPoster]);
+  }, [settings.rpdbKey, meta.id, posterAltId, meta.poster, meta.background, hydratedPoster, animeImdb, animeTvdb, animeTmdb, localizedPoster, posterLocalizing, posterPending, pinnedPoster]);
   const posterSrc = posterCandidates[imgIdx];
 
   useEffect(() => {

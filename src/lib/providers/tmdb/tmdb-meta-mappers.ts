@@ -72,19 +72,26 @@ function genresFromIds(ids: number[] | undefined, kind: "movie" | "tv"): string[
   return names.length > 0 ? names : undefined;
 }
 
-export const movieMeta = (m: RawMovie, englishName?: string): Meta => {
+export const movieMeta = (
+  m: RawMovie,
+  english?: { name?: string; overview?: string },
+): Meta => {
   const st = loadStoredSettings();
   const translate = st.translateTitles;
   const anime = isAnimeItem(m);
   let name = translate ? m.title : anime ? m.title : m.original_title || m.title;
-  if (anime && translate && englishName && JAPANESE_SCRIPT.test(name)) name = englishName;
+  if (anime && translate && english?.name && JAPANESE_SCRIPT.test(name)) name = english.name;
+  // TMDB returns a blank or original-language value when the requested language has no
+  // translation; fall back to English so non-localized titles still show readable info.
+  if (translate && (!name.trim() || JAPANESE_SCRIPT.test(name)) && english?.name) name = english.name;
+  const description = (translate && !m.overview?.trim() && english?.overview) ? english.overview : m.overview;
   return {
     id: `tmdb:movie:${m.id}`,
     type: "movie",
     name,
     poster: poster(m.poster_path),
     background: back(m.backdrop_path),
-    description: m.overview,
+    description,
     originalLanguage: m.original_language,
     releaseInfo: year(m.release_date),
     releaseDate: m.release_date,
@@ -94,19 +101,24 @@ export const movieMeta = (m: RawMovie, englishName?: string): Meta => {
   };
 };
 
-export const seriesMeta = (s: RawSeries, englishName?: string): Meta => {
+export const seriesMeta = (
+  s: RawSeries,
+  english?: { name?: string; overview?: string },
+): Meta => {
   const st = loadStoredSettings();
   const translate = st.translateTitles;
   const anime = isAnimeItem(s);
   let name = translate ? s.name : anime ? s.name : s.original_name || s.name;
-  if (anime && translate && englishName && JAPANESE_SCRIPT.test(name)) name = englishName;
+  if (anime && translate && english?.name && JAPANESE_SCRIPT.test(name)) name = english.name;
+  if (translate && (!name.trim() || JAPANESE_SCRIPT.test(name)) && english?.name) name = english.name;
+  const description = (translate && !s.overview?.trim() && english?.overview) ? english.overview : s.overview;
   return {
     id: `tmdb:tv:${s.id}`,
     type: "series",
     name,
     poster: poster(s.poster_path),
     background: back(s.backdrop_path),
-    description: s.overview,
+    description,
     originalLanguage: s.original_language,
     releaseInfo: year(s.first_air_date),
     releaseDate: s.first_air_date,

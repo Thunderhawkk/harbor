@@ -101,20 +101,6 @@ function normShow(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function sameShow(a: string, b: string): boolean {
-  const x = normShow(a);
-  return x.length > 0 && x === normShow(b);
-}
-
-function animeKindFromFormat(
-  format: string | null,
-  fallback: "movie" | "series",
-): "movie" | "series" {
-  const fmt = (format ?? "").toUpperCase();
-  if (!fmt) return fallback;
-  return fmt === "MOVIE" ? "movie" : "series";
-}
-
 function loadRecent(): string[] {
   try {
     const raw = localStorage.getItem(RECENT_KEY);
@@ -302,33 +288,10 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         const dedupedGroups = acc.groups
           .map((g) => ({ ...g, metas: dropAnime(g.metas.filter((m) => !shown.has(m.id))) }))
           .filter((g) => g.metas.length > 0);
-        const animeTop = acc.anime[0];
-        const animeTopKind: "movie" | "series" = animeTop
-          ? animeKindFromFormat(animeTop.format, base.topMatch?.kind ?? "series")
-          : "series";
-        const topMatch =
-          animeTop && base.topMatch && sameShow(base.topMatch.meta.name, animeTop.name)
-            ? {
-                kind: animeTopKind,
-                meta: {
-                  id: animeTop.kitsuId
-                    ? `kitsu:${animeTop.kitsuId}`
-                    : animeTop.malId
-                      ? `mal:${animeTop.malId}`
-                      : `anilist:${animeTop.anilistId}`,
-                  type: animeTopKind,
-                  name: animeTop.name,
-                  poster: animeTop.poster ?? base.topMatch.meta.poster,
-                  background: animeTop.background ?? undefined,
-                  description: animeTop.overview || undefined,
-                  releaseInfo: animeTop.year ?? undefined,
-                },
-                popularity: base.topMatch.popularity,
-                backdrop: animeTop.background ?? base.topMatch.backdrop,
-                overview: animeTop.overview || base.topMatch.overview,
-                voteAverage: base.topMatch.voteAverage,
-              }
-            : base.topMatch;
+        // Keep the top match as the localized TMDB entry. Replacing it with the anime
+        // (MAL/Kitsu) version changed its id and poster, which flickered the localized
+        // result to the English/MAL artwork once the anime search resolved.
+        const topMatch = base.topMatch;
         setResults({
           ...base,
           topMatch: settings.hideContent.anime && topMatch && metaLooksAnime(topMatch.meta) ? null : topMatch,
