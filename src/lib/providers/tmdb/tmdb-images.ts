@@ -1,5 +1,6 @@
 import { lruSet } from "@/lib/cache";
 import { registerCache } from "@/lib/memory-profiler";
+import { loadStoredSettings } from "@/lib/settings/load";
 import { get, IMG } from "./tmdb-client";
 import { imageLangParam, imageLangRank, pickedImageLangs } from "./tmdb-image-lang";
 
@@ -55,16 +56,24 @@ export const pickLogo = (logos: LogoEntry[], originalLang?: string | null): stri
 };
 
 export async function tmdbLocalizedPoster(key: string, metaId: string): Promise<string | undefined> {
-  const picks = pickedImageLangs();
-  if (!picks.length) return undefined;
-  const assets = await fetchMovieAssets(key, metaId);
-  const posters = (assets?.posters ?? []).filter(
-    (p) => typeof p.iso_639_1 === "string" && picks.includes(p.iso_639_1),
-  );
+  const st = loadStoredSettings();
+  const metaBase = (st.tmdbLanguage ?? "").split("-")[0]?.toLowerCase() ?? "";
+  // Prefer the metadata language, then configured image languages, then English, then original —
+  // so a missing localized poster falls back to English rather than the original-language (e.g. Japanese).
+  const want: string[] = [];
+  const add = (c: string | null) => {
+    if (c && !want.includes(c)) want.push(c);
+  };
+  if (metaBase && metaBase !== "en") add(metaBase);
+  for (const c of pickedImageLangs()) add(c);
+  add("en");
+  if (want.length === 0) return undefined;
+  const assets = await fetchMovieAssets(key, metaId, want[0] ?? null);
+  const posters = assets?.posters ?? [];
   if (!posters.length) return undefined;
   const rank = (iso?: string | null) => {
-    const i = picks.indexOf(iso ?? "");
-    return i === -1 ? -1 : picks.length - i;
+    const i = want.indexOf(iso ?? "");
+    return i === -1 ? -1 : want.length - i;
   };
   const best = [...posters].sort(
     (a, b) => rank(b.iso_639_1) - rank(a.iso_639_1) || (b.vote_average ?? 0) - (a.vote_average ?? 0),
