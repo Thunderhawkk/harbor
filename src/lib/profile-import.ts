@@ -9,13 +9,14 @@ export const DEFAULT_IMPORT_ADDON_URLS: readonly string[] = [
   "https://v3-cinemeta.strem.io/manifest.json",
 ];
 
-export type ImportDomain = "settings" | "addons" | "watchlist" | "watched" | "continueWatching";
+export type ImportDomain = "settings" | "addons" | "watchlist" | "favorites" | "watched" | "continueWatching";
 
 // Per-profile storage prefixes grouped by domain. Settings are handled
 // separately because their source key depends on whether the source profile is
 // linked to shared settings. Keep prefixes in sync with the owning modules.
 const DOMAIN_PREFIXES: Record<Exclude<ImportDomain, "settings" | "addons">, readonly string[]> = {
   watchlist: ["harbor.watchlist.v1.", "harbor.watchlist.aggregate.v1."],
+  favorites: ["harbor.favorites.v1.", "harbor.mangafav.v1.", "harbor.charfavorites.v1."],
   watched: [
     "harbor.watchedFlag.v1.",
     "harbor.moviewatched.v1.",
@@ -76,6 +77,7 @@ export type ImportAddonPreview = { name: string; transportUrl: string };
 export type ImportSourceSummary = {
   addons: ImportAddonPreview[];
   watchlistCount: number;
+  favoriteCount: number;
 };
 
 export function summarizeSource(profileId: string): ImportSourceSummary {
@@ -105,7 +107,12 @@ export function summarizeSource(profileId: string): ImportSourceSummary {
     const items = (watchlist as { items?: unknown }).items;
     if (Array.isArray(items)) watchlistCount = items.length;
   }
-  return { addons, watchlistCount };
+  let favoriteCount = 0;
+  for (const prefix of DOMAIN_PREFIXES.favorites) {
+    const list = readJson<unknown>(prefix + profileId);
+    if (Array.isArray(list)) favoriteCount += list.length;
+  }
+  return { addons, watchlistCount, favoriteCount };
 }
 
 // Which imported addons start checked when none were chosen yet.

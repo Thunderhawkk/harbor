@@ -105,6 +105,7 @@ export function EditorView({
     settings: false,
     addons: false,
     watchlist: false,
+    favorites: false,
     watched: false,
     continueWatching: false,
   });
@@ -148,6 +149,7 @@ export function EditorView({
       settings: false,
       addons: false,
       watchlist: false,
+      favorites: false,
       watched: false,
       continueWatching: false,
     });
@@ -662,6 +664,11 @@ export function EditorView({
                     checked={importSelection.watchlist}
                     label={t("Watchlist ({n})", { n: sourceSummary?.watchlistCount ?? 0 })}
                     onClick={() => toggleImportDomain("watchlist")}
+                  />
+                  <ImportRow
+                    checked={importSelection.favorites}
+                    label={t("Favorites ({n})", { n: sourceSummary?.favoriteCount ?? 0 })}
+                    onClick={() => toggleImportDomain("favorites")}
                   />
                   <ImportRow
                     checked={importSelection.watched}
