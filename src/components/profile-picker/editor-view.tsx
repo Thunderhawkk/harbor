@@ -110,6 +110,9 @@ export function EditorView({
   });
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
   const [sourceSummary, setSourceSummary] = useState<ImportSourceSummary | null>(null);
+  const [importExpanded, setImportExpanded] = useState(mode.kind === "create");
+  const [confirmingImport, setConfirmingImport] = useState(false);
+  const [confirmingShare, setConfirmingShare] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingPrimary, setConfirmingPrimary] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -130,12 +133,15 @@ export function EditorView({
   const canShare = !isPrimary && !!primary && primary.id !== editing?.id;
   const locked = editing ? !!editing.passwordHash : draftPin != null;
   const isCreate = mode.kind === "create";
-  const importPanelOpen = isCreate && canShare && !!primary && shareWith === null;
-  const primaryIdForImport = isCreate ? (primary?.id ?? null) : null;
+  const importPanelOpen = !isPrimary && canShare && !!primary && shareWith === null;
+  const importSourceId = !isPrimary && primary ? primary.id : null;
+  const importAnySelected = (Object.keys(importSelection) as ImportDomain[]).some(
+    (d) => importSelection[d],
+  );
 
   useEffect(() => {
-    setSourceSummary(primaryIdForImport ? summarizeSource(primaryIdForImport) : null);
-  }, [primaryIdForImport]);
+    setSourceSummary(importSourceId ? summarizeSource(importSourceId) : null);
+  }, [importSourceId]);
 
   const resetImportChoice = () => {
     setImportSelection({
@@ -163,6 +169,24 @@ export function EditorView({
       else next.add(transportUrl);
       return next;
     });
+  };
+
+  const applyImportToExisting = () => {
+    if (!primary || !editing) return;
+    const list = (Object.keys(importSelection) as ImportDomain[]).filter((d) => importSelection[d]);
+    if (list.length === 0) return;
+    importDomains(primary.id, editing.id, list, {
+      addonTransportUrls: list.includes("addons") ? [...selectedAddons] : null,
+    });
+    if (list.includes("settings") && editing.settingsLinked !== false) {
+      updateProfile(editing.id, { settingsLinked: false });
+    }
+    window.dispatchEvent(new Event("harbor:addons-changed"));
+    window.dispatchEvent(new Event("harbor:active-profile-changed"));
+    emitListToast(t("Data copied from {name}", { name: primary.name }));
+    resetImportChoice();
+    setConfirmingImport(false);
+    setImportExpanded(false);
   };
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -544,8 +568,12 @@ export function EditorView({
             <ShareOption
               active={shareWith === primary.id}
               onClick={() => {
-                setShareWith(primary.id);
-                resetImportChoice();
+                if (!editing) {
+                  setShareWith(primary.id);
+                  resetImportChoice();
+                } else {
+                  setConfirmingShare(true);
+                }
               }}
               icon={<Link2 size={14} strokeWidth={2.2} />}
               title={t("Share with {name}", { name: primary.name })}
@@ -555,16 +583,56 @@ export function EditorView({
               active={shareWith === null}
               onClick={() => {
                 setShareWith(null);
+                setConfirmingShare(false);
                 resetImportChoice();
               }}
               icon={<UserIcon size={14} strokeWidth={2.2} />}
               title={t("Use a separate Stremio account")}
               sub={t("Sign in from the sidebar after saving. Library and addons stay separate.")}
             />
-            {importPanelOpen && (
+            {confirmingShare && (
+              <div className="flex items-center gap-2 rounded-lg border border-edge-soft bg-canvas/40 px-3 py-2 text-[12px]">
+                <span className="min-w-0 flex-1 leading-snug text-ink-subtle">
+                  {t(
+                    "Switch to sharing? This profile will use {name}'s library, watchlist and addons. Its own data is kept but hidden until you switch back.",
+                    { name: primary.name },
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingShare(false)}
+                  className="shrink-0 text-ink-muted transition-colors hover:text-ink"
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShareWith(primary.id);
+                    resetImportChoice();
+                    setConfirmingShare(false);
+                  }}
+                  className="shrink-0 rounded-md bg-accent/20 px-2.5 py-1 font-semibold text-accent transition-colors hover:bg-accent/30"
+                >
+                  {t("common.confirm")}
+                </button>
+              </div>
+            )}
+            {importPanelOpen && !importExpanded && (
+              <button
+                type="button"
+                onClick={() => setImportExpanded(true)}
+                className="h-9 self-start rounded-lg border border-edge-soft px-3 text-[12.5px] font-semibold text-ink-muted transition-colors hover:border-edge hover:text-ink"
+              >
+                {t("Import data from {name}", { name: primary.name })}
+              </button>
+            )}
+            {importPanelOpen && importExpanded && (
               <div className="mt-1 flex flex-col gap-2 rounded-xl border border-edge-soft bg-canvas/40 p-3">
                 <span className="text-[12.5px] font-semibold text-ink">
-                  {t("Start with data from {name}", { name: primary?.name ?? "" })}
+                  {t(isCreate ? "Start with data from {name}" : "Import data from {name}", {
+                    name: primary?.name ?? "",
+                  })}
                 </span>
                 <div className="flex flex-col gap-1">
                   <ImportRow
@@ -608,9 +676,55 @@ export function EditorView({
                 </div>
                 <p className="text-[11px] leading-snug text-ink-subtle">
                   {t(
-                    "Copied once — afterwards this profile keeps its own copy. Nothing stays linked to Primary.",
+                    isCreate
+                      ? "Copied once — afterwards this profile keeps its own copy. Nothing stays linked to Primary."
+                      : "Checking an area replaces this profile's current data in it.",
                   )}
                 </p>
+                {!isCreate && (
+                  <div className="flex items-center justify-end gap-2 pt-1 text-[12px]">
+                    {!confirmingImport ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetImportChoice();
+                            setImportExpanded(false);
+                          }}
+                          className="text-ink-muted transition-colors hover:text-ink"
+                        >
+                          {t("common.cancel")}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!importAnySelected}
+                          onClick={() => setConfirmingImport(true)}
+                          className="rounded-md bg-accent/20 px-2.5 py-1 font-semibold text-accent transition-colors hover:bg-accent/30 disabled:opacity-40"
+                        >
+                          {t("Import")}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-ink-subtle">{t("Replace selected data?")}</span>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingImport(false)}
+                          className="text-ink-muted transition-colors hover:text-ink"
+                        >
+                          {t("common.cancel")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={applyImportToExisting}
+                          className="rounded-md bg-accent/20 px-2.5 py-1 font-semibold text-accent transition-colors hover:bg-accent/30"
+                        >
+                          {t("common.confirm")}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
