@@ -2,6 +2,7 @@ import { downloadText } from "@/lib/download-text";
 import { loadBgImage, saveBgImage } from "@/lib/theme-storage";
 import { activeProfileId } from "@/lib/active-profile-id";
 import { flushSecrets, getAllSecrets, isSecretKey, secretKeyForProfile, setSecret } from "@/lib/secret-store";
+import { setItemWithRecovery } from "@/lib/storage-recovery";
 
 declare const __APP_VERSION__: string;
 
@@ -354,30 +355,104 @@ export function backupSections(backup: Backup): BackupSectionKey[] {
   return backup.sections && backup.sections.length > 0 ? backup.sections : [...ALL_SECTION_KEYS];
 }
 
-export async function applyBackup(backup: Backup): Promise<void> {
-  const restore = new Set<BackupSectionKey>(backupSections(backup));
-  const stale: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key || !isPortable(key)) continue;
-    // Only clear keys that belong to a section this backup actually restores.
-    if (!restore.has(sectionOf(key))) continue;
-    stale.push(key);
+/**
+ * Final-segment shape of a stored profile id: the fallback "default", or a
+ * generated id like "p_mqxx2agk_ez1zro" (see createProfile in profiles.tsx).
+ */
+const PROFILE_ID_RE = /^(?:default|p_[a-z0-9]+_[a-z0-9]+)$/;
+const PROFILES_STATE_KEY = "harbor.profiles.v1";
+
+function profileSuffixOf(key: string): string | null {
+  const dot = key.lastIndexOf(".");
+  if (dot < 0) return null;
+  const id = key.slice(dot + 1);
+  return PROFILE_ID_RE.test(id) ? id : null;
+}
+
+/**
+ * Rewrites per-profile entries so a backup taken elsewhere lands where this
+ * build reads it. Most domains are read back with the active profile id
+ * appended, so foreign ids are swapped for it; when several source profiles
+ * collapse onto one target key, the entry with more data wins instead of
+ * whichever came last in key order.
+ * Watchlist is special: this build keeps it under a bare global key while
+ * newer builds store it per-profile, so suffixed entries are additionally
+ * aliased onto the bare key — including full backups that carry their own
+ * profiles state, whose foreign ids would otherwise stay unreadable here.
+ */
+const BARE_BASES = new Set(["harbor.watchlist.v1", "harbor.watchlist.aggregate.v1"]);
+
+function retargetProfileKeys(data: Record<string, string>): Record<string, string> {
+  const target = activeProfileId();
+  const profilesIncluded = data[PROFILES_STATE_KEY] != null;
+  const out: Record<string, string> = {};
+  const setMerged = (key: string, value: string) => {
+    const prev = out[key];
+    out[key] = prev != null && prev.length >= value.length ? prev : value;
+  };
+  for (const [key, value] of Object.entries(data)) {
+    const from = profileSuffixOf(key);
+    if (!from) {
+      out[key] = value;
+      continue;
+    }
+    const base = key.slice(0, key.length - from.length - 1);
+    if (BARE_BASES.has(base)) {
+      setMerged(base, value);
+      continue;
+    }
+    if (profilesIncluded) {
+      out[key] = value;
+      continue;
+    }
+    setMerged(`${base}.${target}`, value);
   }
-  for (const key of stale) localStorage.removeItem(key);
-  for (const key of Object.keys(getAllSecrets())) {
-    if (!isPortable(key)) continue;
-    if (!restore.has(sectionOf(key))) continue;
-    if (backup.data[key] == null) setSecret(key, null);
+  return out;
+}
+
+export async function applyBackup(backup: Backup): Promise<void> {
+  const data = retargetProfileKeys(backup.data);
+
+  // Whole-domain wiping is reserved for legacy full backups (no sections
+  // field): there, "restore everything" must also clear items the source
+  // install had deleted. Sectioned files replace only the exact entries they
+  // carry and never touch anything else, matching the restore dialog's promise.
+  let wipeSections: Set<BackupSectionKey> | null = null;
+  if (backup.sections == null || backup.sections.length === 0) {
+    const filled = new Set<BackupSectionKey>();
+    for (const key of Object.keys(backup.data)) {
+      if (!isPortable(key)) continue;
+      filled.add(sectionOf(key));
+    }
+    wipeSections = new Set<BackupSectionKey>([...ALL_SECTION_KEYS].filter((key) => filled.has(key)));
+    const stale: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !isPortable(key)) continue;
+      if (!wipeSections.has(sectionOf(key))) continue;
+      stale.push(key);
+    }
+    for (const key of stale) localStorage.removeItem(key);
+    for (const key of Object.keys(getAllSecrets())) {
+      if (!isPortable(key)) continue;
+      if (!wipeSections.has(sectionOf(key))) continue;
+      if (data[key] == null) setSecret(key, null);
+    }
   }
   // Restore localStorage-backed entries first so a restored profiles list can
-  // change which profile the sign-ins land on.
-  for (const [k, v] of Object.entries(backup.data)) {
-    if (!isPortable(k) || isSecretKey(k)) continue;
+  // change which profile the sign-ins land on. Small personal keys are written
+  // before bulky recomputable caches so a full storage degrades by dropping
+  // caches instead of user data; recovery prunes quotas and retries.
+  const entries = Object.entries(data)
+    .filter(([k]) => isPortable(k) && !isSecretKey(k))
+    .sort(([, a], [, b]) => a.length - b.length);
+  for (const [k, v] of entries) {
     try {
-      localStorage.setItem(k, v);
-    } catch {
-      /* keep restoring the rest even if one entry is rejected */
+      if (!setItemWithRecovery(k, v)) {
+        console.warn(`[backup] storage refused "${k}" during restore`);
+      }
+    } catch (e) {
+      console.warn(`[backup] failed to restore "${k}"`, e);
     }
   }
   // Sign-ins are stored per profile; place them on the profile that is active
@@ -391,7 +466,7 @@ export async function applyBackup(backup: Backup): Promise<void> {
       /* keep restoring the rest even if one entry is rejected */
     }
   }
-  if (backup.bgImage !== undefined && restore.has("theme")) {
+  if (backup.bgImage !== undefined && (wipeSections === null || wipeSections.has("theme"))) {
     try {
       await saveBgImage(backup.bgImage);
     } catch {
