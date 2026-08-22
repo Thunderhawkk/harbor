@@ -141,6 +141,32 @@ function shouldForward(url: string): boolean {
   return url.includes("manifest.json");
 }
 
+// Windows can relaunch the app with its original deep-link argv (app-restart
+// features, self-restarts), redelivering an old install URL on every start.
+const LAUNCH_SEEN_KEY = "harbor.deeplink.launchseen.v1";
+const LAUNCH_SEEN_MAX = 50;
+
+function loadLaunchSeen(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(LAUNCH_SEEN_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLaunchSeen(map: Record<string, number>): void {
+  try {
+    const entries = Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, LAUNCH_SEEN_MAX);
+    localStorage.setItem(LAUNCH_SEEN_KEY, JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    return;
+  }
+}
+
 export async function startDeepLinkBridge(): Promise<() => void> {
   const isTauri =
     typeof window !== "undefined" && ("__TAURI__" in window || "__TAURI_INTERNALS__" in window);
@@ -232,7 +258,18 @@ export async function startDeepLinkBridge(): Promise<() => void> {
     } catch {}
     try {
       const initial = await mod.getCurrent();
-      if (initial && initial.length > 0) handle(initial);
+      if (initial && initial.length > 0) {
+        const seen = loadLaunchSeen();
+        const now = Date.now();
+        const fresh: string[] = [];
+        for (const u of initial) {
+          if (typeof u !== "string" || !u) continue;
+          if (!seen[u]) fresh.push(u);
+          seen[u] = now;
+        }
+        saveLaunchSeen(seen);
+        if (fresh.length > 0) handle(fresh);
+      }
     } catch {}
     return () => {
       try {
