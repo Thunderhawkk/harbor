@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { isGenericEpisodeName } from "@/lib/providers/anime-episode-build";
+import { isGenericEpisodeName, isUsableLocalizedText } from "@/lib/providers/anime-episode-build";
 import { harborImdbEpisodes } from "@/lib/providers/harbor-imdb";
 import { omdbSeasonRatings } from "@/lib/providers/omdb";
 import type { Episode } from "@/lib/providers/tmdb";
@@ -12,12 +12,15 @@ export function useEpisodeEnrich({
   imdbId,
   tvdbKey,
   omdbKey,
+  enEpisodes,
 }: {
   episodes: Episode[];
   active: number;
   imdbId: string | null;
   tvdbKey: string;
   omdbKey: string;
+  /** en-US counterparts for `episodes`; used to detect TMDB's silent language fallback. */
+  enEpisodes?: Episode[];
 }): { episodes: Episode[]; imdbRatings: Map<string, number> } {
   const [tvdbBySeason, setTvdbBySeason] = useState<Map<number, Map<number, TvdbEpisode>>>(new Map());
   const [omdbBySeason, setOmdbBySeason] = useState<Map<number, Map<number, number>>>(new Map());
@@ -70,20 +73,32 @@ export function useEpisodeEnrich({
   const omdbForSeason = omdbBySeason.get(active);
   const enriched = useMemo<Episode[]>(() => {
     if (!tvdbForSeason && !omdbForSeason && harborImdb.size === 0) return episodes;
+    const lang = tmdbLanguageIso();
+    // A localized candidate only counts as real if it differs from its en-US counterpart:
+    // equality means TMDB had no translation and silently served English.
+    const usable = (text: string | null | undefined, enText?: string | null) => {
+      const t = (text ?? "").trim();
+      if (!t || isGenericEpisodeName(t) || !isUsableLocalizedText(t, lang)) return false;
+      const e = (enText ?? "").trim();
+      return !(lang && e && t === e);
+    };
+    const enByNumber = new Map<number, Episode>();
+    for (const e of enEpisodes ?? []) enByNumber.set(e.episodeNumber, e);
     return episodes.map((ep): Episode => {
       let next: Episode = ep;
       const tv = tvdbForSeason?.get(ep.episodeNumber);
+      const en = enByNumber.get(ep.episodeNumber);
       if (tv) {
-        // TMDB text is canonical for the requested language, but contributors fill
-        // untranslated episodes with generic placeholders ("2. Bölüm", "الحلقة 1") —
-        // treat those as missing so real titles from other sources still win.
-        const tmdbTitle = (next.name ?? "").trim();
-        const tvTitle = (tv.name ?? "").trim();
+        // Precedence: verified-localized TMDB, then TVDB (its requested-language fetch can
+        // also carry genuine translations TMDB lacks), then raw TMDB as last resort.
         const name =
-          (tmdbTitle && !isGenericEpisodeName(tmdbTitle) ? tmdbTitle : undefined) ??
-          (tvTitle && !isGenericEpisodeName(tvTitle) ? tvTitle : undefined) ??
+          (usable(next.name, en?.name) ? next.name : undefined) ??
+          (usable(tv.name) ? tv.name : undefined) ??
           next.name;
-        const overview = (next.overview ?? "").trim() ? next.overview : tv.overview ?? next.overview;
+        const overview =
+          (usable(next.overview, en?.overview) ? next.overview : undefined) ??
+          (usable(tv.overview) ? tv.overview : undefined) ??
+          next.overview;
         next = {
           ...next,
           name,
@@ -99,6 +114,6 @@ export function useEpisodeEnrich({
       }
       return next;
     });
-  }, [episodes, tvdbForSeason, omdbForSeason, harborImdb, active]);
+  }, [episodes, tvdbForSeason, omdbForSeason, harborImdb, active, enEpisodes]);
   return { episodes: enriched, imdbRatings: harborImdb };
 }

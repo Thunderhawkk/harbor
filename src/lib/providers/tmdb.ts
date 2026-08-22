@@ -62,6 +62,7 @@ export {
 export {
   tmdbDetails,
   tmdbSeasonEpisodes,
+  tmdbSeasonEpisodesPair,
   type CastEntry,
   type CrewEntry,
   type Season,

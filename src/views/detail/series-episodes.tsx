@@ -12,11 +12,11 @@ import { useHiddenEpisodes } from "@/lib/hidden-episodes";
 import type { Meta } from "@/lib/cinemeta";
 import { getEpisodeProgress, resumeDefaultSeason } from "@/lib/episode-progress";
 import { scrollToDataEp } from "@/lib/episode-scroll";
-import { tmdbSeasonEpisodes, type Episode, type Season } from "@/lib/providers/tmdb";
+import { tmdbSeasonEpisodesPair, type Episode, type Season } from "@/lib/providers/tmdb";
 import { tmdbLanguageIso } from "@/lib/providers/tmdb/tmdb-client";
 import type { OrderedEpisode } from "@/lib/providers/tvdb-order";
 import { pickLocalizedText } from "@/lib/localized-text";
-import { isGenericEpisodeName } from "@/lib/providers/anime-episode-build";
+import { isGenericEpisodeName, isUsableLocalizedText } from "@/lib/providers/anime-episode-build";
 import { useSettings } from "@/lib/settings";
 import { effectiveOrderProvider, tvdbPanelEnabled } from "@/lib/settings/episode-order";
 import { useTrakt } from "@/lib/trakt/provider";
@@ -113,6 +113,9 @@ export function SeriesEpisodes({
     return s;
   }, [stremioWatched, simklWatched, traktWatched, meta.id, mwVersion]);
   const cache = useRef<Map<number, Episode[]>>(new Map());
+  // English counterparts for the cached seasons; used to detect TMDB's silent
+  // fallback (localized text identical to en-US ⇒ no real translation exists).
+  const enCache = useRef<Map<number, Episode[]>>(new Map());
   // Bumped whenever a TMDB season lands in `cache`. The ordered-episodes merge reads the cache
   // for its localized-name candidates, but refs don't trigger re-renders — without this counter
   // an ordering that resolves before the fetch would stay on TVDB's (often English) names forever.
@@ -147,6 +150,7 @@ export function SeriesEpisodes({
     imdbId,
     tvdbKey: settings.tvdbKey,
     omdbKey: settings.omdbKey,
+    enEpisodes: enCache.current.get(active),
   });
   const tvdbStills = useSeriesTvdbStills(imdbId, enrichedBase.length, settings.tvdbSeasonType);
   const enrichedEpisodes = useMemo(() => {
@@ -213,16 +217,22 @@ export function SeriesEpisodes({
   useEffect(() => {
     let cancelled = false;
     const load = (season: number): Promise<Episode[]> =>
-      tmdbSeasonEpisodes(settings.tmdbKey, tvId, season).then((eps) => {
+      tmdbSeasonEpisodesPair(settings.tmdbKey, tvId, season).then(({ episodes: eps, en }) => {
         if (cancelled || eps.length === 0) return [];
         const m = cache.current;
         m.delete(season);
         m.set(season, eps);
+        if (en.length > 0) {
+          const em = enCache.current;
+          em.delete(season);
+          em.set(season, en);
+        }
         setTmdbCacheVersion((v) => v + 1);
         while (m.size > 2) {
           const oldest = m.keys().next().value;
           if (oldest === undefined) break;
           m.delete(oldest);
+          enCache.current.delete(oldest);
         }
         return eps;
       });
@@ -263,10 +273,21 @@ export function SeriesEpisodes({
     }
     return orderedEpsRaw.map((ep) => {
       const tmdbEp = airedLike ? tmdbByKey.get(`${ep.seasonNumber}:${ep.episodeNumber}`) : undefined;
-      // Same placeholder rule as the enrich path: generic localized titles ("2. Bölüm",
-      // "الحلقة 1") count as missing so real TVDB/English names still win.
+      const tmdbEpEn = airedLike
+        ? enCache.current.get(orderSeasonEff)?.find(
+            (e) =>
+              `${e.seasonNumber}:${e.episodeNumber}` ===
+              `${ep.seasonNumber}:${ep.episodeNumber}`,
+          )
+        : undefined;
+      // Same rules as the enrich path: generic placeholders AND silent fallback (localized
+      // text identical to its en-US counterpart) count as missing so real translations win.
       const tmdbName = (tmdbEp?.name ?? "").trim();
-      const usableTmdbName = tmdbName && !isGenericEpisodeName(tmdbName) ? tmdbName : "";
+      const tmdbNameIsFallback = lang !== "" && tmdbName === (tmdbEpEn?.name ?? "").trim();
+      const usableTmdbName =
+        tmdbName && !isGenericEpisodeName(tmdbName) && !tmdbNameIsFallback && isUsableLocalizedText(tmdbName, lang)
+          ? tmdbName
+          : "";
       const name =
         usableTmdbName ||
         (pickLocalizedText(
@@ -275,11 +296,26 @@ export function SeriesEpisodes({
         ) ??
           ep.name);
       const tmdbOverview = (tmdbEp?.overview ?? "").trim();
+      const tmdbOverviewIsFallback =
+        lang !== "" && tmdbOverview === (tmdbEpEn?.overview ?? "").trim();
       const overview =
-        tmdbOverview ||
-        (pickLocalizedText([{ text: ep.overview }, { text: ep.overviewEn ?? "" }], { lang }) ??
-          ep.overview);
+        tmdbOverview && !tmdbOverviewIsFallback && isUsableLocalizedText(tmdbOverview, lang)
+          ? tmdbOverview
+          : (pickLocalizedText([{ text: ep.overview }, { text: ep.overviewEn ?? "" }], { lang }) ??
+            ep.overview);
       let next = { ...ep, name, overview };
+      // Inside the order pair, a requested-language string differing from its English twin
+      // is a genuine translation — script ranking can't separate them for Latin targets
+      // and the length tie-break lets longer English win. TMDB keeps precedence when it
+      // also verified as real.
+      const ordName = (ep.name ?? "").trim();
+      const ordNameIsReal = lang !== "" && ordName !== "" && ordName !== (ep.nameEn ?? "").trim();
+      const ordOverview = (ep.overview ?? "").trim();
+      const ordOverviewIsReal =
+        lang !== "" && ordOverview !== "" && ordOverview !== (ep.overviewEn ?? "").trim();
+      if (ordNameIsReal && !usableTmdbName) next = { ...next, name: ordName };
+      if (ordOverviewIsReal && !(tmdbOverview && isUsableLocalizedText(tmdbOverview, lang)))
+        next = { ...next, overview: ordOverview };
       if (ep.imdbRating == null) {
         const r = imdbRatings.get(`${ep.seasonNumber}:${ep.episodeNumber}`);
         if (r != null && r > 0) next = { ...next, imdbRating: r };

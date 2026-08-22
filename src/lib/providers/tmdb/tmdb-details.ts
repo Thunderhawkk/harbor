@@ -447,6 +447,21 @@ export async function tmdbDetails(key: string, meta: Meta, lang?: string): Promi
   };
 }
 
+function toSeasonEpisodes(d: any): Episode[] {
+  if (!d?.episodes) return [];
+  return d.episodes.map((e: any) => ({
+    id: e.id,
+    episodeNumber: e.episode_number,
+    seasonNumber: e.season_number,
+    name: e.name ?? "",
+    overview: e.overview ?? "",
+    stillPath: e.still_path ?? null,
+    airDate: e.air_date ?? null,
+    runtime: e.runtime ?? null,
+    voteAverage: e.vote_average ?? null,
+  }));
+}
+
 export async function tmdbSeasonEpisodes(
   key: string,
   tvId: number,
@@ -458,20 +473,7 @@ export async function tmdbSeasonEpisodes(
   const data = await get<any>(key, `tv/${tvId}/season/${seasonNumber}`, {
     language: requested,
   });
-  if (!data?.episodes) return [];
-  const toEpisodes = (d: any): Episode[] =>
-    d.episodes.map((e: any) => ({
-      id: e.id,
-      episodeNumber: e.episode_number,
-      seasonNumber: e.season_number,
-      name: e.name ?? "",
-      overview: e.overview ?? "",
-      stillPath: e.still_path ?? null,
-      airDate: e.air_date ?? null,
-      runtime: e.runtime ?? null,
-      voteAverage: e.vote_average ?? null,
-    }));
-  const episodes = toEpisodes(data);
+  const episodes = toSeasonEpisodes(data);
   const base = requested.split("-")[0]?.toLowerCase() ?? "";
   const wantsEnglishFallback = base !== "" && base !== "en" && base !== "ja";
   const japanese = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]/;
@@ -479,7 +481,28 @@ export async function tmdbSeasonEpisodes(
     episodes.some((e) => japanese.test(e.name) || japanese.test(e.overview));
   if (fellBackToJapanese) {
     const en = await get<any>(key, `tv/${tvId}/season/${seasonNumber}`, { language: "en-US" });
-    if (en?.episodes) return toEpisodes(en);
+    if (en?.episodes) return toSeasonEpisodes(en);
   }
   return episodes;
+}
+
+/// Returns episodes in the requested language together with the en-US list, so callers can
+/// detect silent fallback: a title/overview identical to the English one means TMDB had no
+/// translation for that field, even when scripts can't tell the two apart (tr/de/vi…).
+export async function tmdbSeasonEpisodesPair(
+  key: string,
+  tvId: number,
+  seasonNumber: number,
+  lang?: string,
+): Promise<{ episodes: Episode[]; en: Episode[] }> {
+  if (!key) return { episodes: [], en: [] };
+  const requested = lang ?? (effectiveTmdbLanguage() || "en");
+  const isEn = requested.split("-")[0]?.toLowerCase() === "en";
+  const [locData, enData] = await Promise.all([
+    get<any>(key, `tv/${tvId}/season/${seasonNumber}`, { language: requested }),
+    isEn
+      ? Promise.resolve(null)
+      : get<any>(key, `tv/${tvId}/season/${seasonNumber}`, { language: "en-US" }).catch(() => null),
+  ]);
+  return { episodes: toSeasonEpisodes(locData), en: toSeasonEpisodes(enData) };
 }

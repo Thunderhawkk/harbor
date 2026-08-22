@@ -308,10 +308,12 @@ export async function tvdbEpisodes(
   lang?: string,
 ): Promise<TvdbEpisode[]> {
   if (!seriesId) return [];
-  const langSeg = lang ? `&language=${lang}` : "";
+  // Language must be a path segment on this endpoint — TVDB ignores `language=` as a
+  // query param here and silently serves the series' original language instead.
+  const langSeg = lang ? `/${lang}` : "";
   const data = await getJson<any>(
     apiKey,
-    `/series/${seriesId}/episodes/default?season=${season}${langSeg}`,
+    `/series/${seriesId}/episodes/default${langSeg}?season=${season}`,
   );
   const arr = data?.episodes ?? [];
   return (arr as any[])
