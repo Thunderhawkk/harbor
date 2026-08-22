@@ -16,6 +16,7 @@ import { tmdbSeasonEpisodes, type Episode, type Season } from "@/lib/providers/t
 import { tmdbLanguageIso } from "@/lib/providers/tmdb/tmdb-client";
 import type { OrderedEpisode } from "@/lib/providers/tvdb-order";
 import { pickLocalizedText } from "@/lib/localized-text";
+import { isGenericEpisodeName } from "@/lib/providers/anime-episode-build";
 import { useSettings } from "@/lib/settings";
 import { effectiveOrderProvider, tvdbPanelEnabled } from "@/lib/settings/episode-order";
 import { useTrakt } from "@/lib/trakt/provider";
@@ -262,12 +263,12 @@ export function SeriesEpisodes({
     }
     return orderedEpsRaw.map((ep) => {
       const tmdbEp = airedLike ? tmdbByKey.get(`${ep.seasonNumber}:${ep.episodeNumber}`) : undefined;
-      // TMDB cache holds episodes fetched with the requested metadata language, so its text is
-      // canonical; script ranking can't separate e.g. Turkish from English, so a length
-      // tie-break must never let longer TVDB English overwrite a real translation.
+      // Same placeholder rule as the enrich path: generic localized titles ("2. Bölüm",
+      // "الحلقة 1") count as missing so real TVDB/English names still win.
       const tmdbName = (tmdbEp?.name ?? "").trim();
+      const usableTmdbName = tmdbName && !isGenericEpisodeName(tmdbName) ? tmdbName : "";
       const name =
-        tmdbName ||
+        usableTmdbName ||
         (pickLocalizedText(
           [{ text: ep.name }, { text: ep.nameEn ?? "" }],
           { forName: true, lang },

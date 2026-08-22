@@ -79,6 +79,12 @@ const EPISODE_NUMBER_WORDS = [
   "aflevering",
   "avsnitt",
   "tập",
+  "episod",
+  "epizoda",
+  "epizod",
+  "dil",
+  "resz",
+  "jakso",
 ];
 
 export function isGenericEpisodeName(text: string | null | undefined): boolean {
@@ -89,7 +95,12 @@ export function isGenericEpisodeName(text: string | null | undefined): boolean {
   // Compact CJK forms like 第18話 / 第18集 / 18화
   if (/^第\s*\d+\s*[話话集]$/.test(t)) return true;
   if (/^\d+\s*화$/.test(t)) return true;
-  const lower = t.toLowerCase();
+  // Fold accents (Épisode→episode, Bölüm→bolum, Rész→resz) so one ASCII list
+  // covers every locale's "Episode N" placeholder regardless of diacritics.
+  const lower = t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   for (const word of EPISODE_NUMBER_WORDS) {
     if (!lower.includes(word)) continue;
     const rest = lower.replace(word, "").replace(/[\s\-–—:.,()\[\]'"،،]/g, "");
