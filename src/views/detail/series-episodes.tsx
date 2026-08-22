@@ -112,6 +112,10 @@ export function SeriesEpisodes({
     return s;
   }, [stremioWatched, simklWatched, traktWatched, meta.id, mwVersion]);
   const cache = useRef<Map<number, Episode[]>>(new Map());
+  // Bumped whenever a TMDB season lands in `cache`. The ordered-episodes merge reads the cache
+  // for its localized-name candidates, but refs don't trigger re-renders — without this counter
+  // an ordering that resolves before the fetch would stay on TVDB's (often English) names forever.
+  const [tmdbCacheVersion, setTmdbCacheVersion] = useState(0);
 
   const traktKey = imdbId ?? meta.id;
 
@@ -213,6 +217,7 @@ export function SeriesEpisodes({
         const m = cache.current;
         m.delete(season);
         m.set(season, eps);
+        setTmdbCacheVersion((v) => v + 1);
         while (m.size > 2) {
           const oldest = m.keys().next().value;
           if (oldest === undefined) break;
@@ -274,7 +279,7 @@ export function SeriesEpisodes({
       }
       return next;
     });
-  }, [orderedEpsRaw, imdbRatings, orderActive, orderSeasonEff, settings.tvdbSeasonType]);
+  }, [orderedEpsRaw, imdbRatings, orderActive, orderSeasonEff, settings.tvdbSeasonType, tmdbCacheVersion]);
   const visibleOrderedEps = useMemo(
     () =>
       hideActive && hiddenSet.size > 0
