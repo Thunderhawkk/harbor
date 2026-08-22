@@ -203,21 +203,8 @@ function markProfileSelectedNow(): void {
   }
 }
 
-const PICKER_SESSION_KEY = "harbor.pickerShown";
-function launchPickerShownThisSession(): boolean {
-  try {
-    return sessionStorage.getItem(PICKER_SESSION_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-function markLaunchPickerShown(): void {
-  try {
-    sessionStorage.setItem(PICKER_SESSION_KEY, "1");
-  } catch {
-    /* ignore */
-  }
-}
+// Module-level on purpose: sessionStorage can survive across app launches in the webview, which suppressed this prompt.
+let pickerPromptShownThisRun = false;
 
 export function readActiveProfileIdentity(): {
   id: string;
@@ -389,9 +376,9 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     const interval = readProfilePromptInterval();
     if (interval === "never") return false;
     if (interval === "launch") {
-      const shownThisSession = launchPickerShownThisSession();
-      markLaunchPickerShown();
-      return !shownThisSession;
+      const wasShown = pickerPromptShownThisRun;
+      pickerPromptShownThisRun = true;
+      return !wasShown;
     }
     return Date.now() - readLastProfileSelectAt() >= intervalMinutes(interval) * 60000;
   });
