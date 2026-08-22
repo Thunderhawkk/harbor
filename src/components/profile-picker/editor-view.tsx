@@ -1,5 +1,5 @@
 import { Check, ChevronLeft, Crown, Loader2, Lock, Link2, ShieldCheck, Trash2, Unlock, User as UserIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import traktLogo from "@/assets/trakt.svg";
 import simklLogo from "@/assets/simkl.png";
 import { AddonsIcon } from "@/components/icons/addons-icon";
@@ -26,6 +26,15 @@ import {
   type Profile,
   type ProfileColor,
 } from "@/lib/profiles";
+import { emitListToast } from "@/components/lists/list-toast";
+import {
+  defaultSelectedAddonUrls,
+  importDomains,
+  summarizeSource,
+  type ImportAddonPreview,
+  type ImportDomain,
+  type ImportSourceSummary,
+} from "@/lib/profile-import";
 import { useT } from "@/lib/i18n";
 import { hashProfilePassword, verifyProfilePassword } from "@/lib/profile-password";
 import { fetchTraktAvatar } from "@/lib/trakt/profile";
@@ -92,6 +101,15 @@ export function EditorView({
   const [shareWith, setShareWith] = useState<string | null>(
     editing ? editing.shareStremioWith : primary?.id ?? null,
   );
+  const [importSelection, setImportSelection] = useState<Record<ImportDomain, boolean>>({
+    settings: false,
+    addons: false,
+    watchlist: false,
+    watched: false,
+    continueWatching: false,
+  });
+  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
+  const [sourceSummary, setSourceSummary] = useState<ImportSourceSummary | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingPrimary, setConfirmingPrimary] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -111,6 +129,41 @@ export function EditorView({
   const isPrimary = editing?.isPrimary === true;
   const canShare = !isPrimary && !!primary && primary.id !== editing?.id;
   const locked = editing ? !!editing.passwordHash : draftPin != null;
+  const isCreate = mode.kind === "create";
+  const importPanelOpen = isCreate && canShare && !!primary && shareWith === null;
+  const primaryIdForImport = isCreate ? (primary?.id ?? null) : null;
+
+  useEffect(() => {
+    setSourceSummary(primaryIdForImport ? summarizeSource(primaryIdForImport) : null);
+  }, [primaryIdForImport]);
+
+  const resetImportChoice = () => {
+    setImportSelection({
+      settings: false,
+      addons: false,
+      watchlist: false,
+      watched: false,
+      continueWatching: false,
+    });
+    setSelectedAddons(new Set());
+  };
+
+  const toggleImportDomain = (domain: ImportDomain) => {
+    const turningOn = !importSelection[domain];
+    setImportSelection((prev) => ({ ...prev, [domain]: !prev[domain] }));
+    if (domain === "addons" && turningOn) {
+      setSelectedAddons(defaultSelectedAddonUrls(sourceSummary?.addons ?? []));
+    }
+  };
+
+  const toggleImportAddon = (transportUrl: string) => {
+    setSelectedAddons((prev) => {
+      const next = new Set(prev);
+      if (next.has(transportUrl)) next.delete(transportUrl);
+      else next.add(transportUrl);
+      return next;
+    });
+  };
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -213,6 +266,17 @@ export function EditorView({
       if (canShare && shareWith !== p.shareStremioWith) patch.shareStremioWith = shareWith;
       if (draftPin) patch.passwordHash = await hashProfilePassword(draftPin);
       if (anyTabLocked(draftLockedTabs)) patch.lockedTabs = draftLockedTabs;
+      const importList =
+        shareWith === null && primary
+          ? (Object.keys(importSelection) as ImportDomain[]).filter((d) => importSelection[d])
+          : [];
+      if (importList.length > 0 && primary) {
+        importDomains(primary.id, p.id, importList, {
+          addonTransportUrls: importList.includes("addons") ? [...selectedAddons] : null,
+        });
+        if (importList.includes("settings")) patch.settingsLinked = false;
+        emitListToast(t("Data copied from {name}", { name: primary.name }));
+      }
       if (Object.keys(patch).length > 0) updateProfile(p.id, patch);
       selectProfile(p.id);
     }
@@ -479,18 +543,76 @@ export function EditorView({
           <div className="flex flex-col gap-1.5">
             <ShareOption
               active={shareWith === primary.id}
-              onClick={() => setShareWith(primary.id)}
+              onClick={() => {
+                setShareWith(primary.id);
+                resetImportChoice();
+              }}
               icon={<Link2 size={14} strokeWidth={2.2} />}
               title={t("Share with {name}", { name: primary.name })}
               sub={t("Use the primary profile's Stremio library, watchlist, and addons.")}
             />
             <ShareOption
               active={shareWith === null}
-              onClick={() => setShareWith(null)}
+              onClick={() => {
+                setShareWith(null);
+                resetImportChoice();
+              }}
               icon={<UserIcon size={14} strokeWidth={2.2} />}
               title={t("Use a separate Stremio account")}
               sub={t("Sign in from the sidebar after saving. Library and addons stay separate.")}
             />
+            {importPanelOpen && (
+              <div className="mt-1 flex flex-col gap-2 rounded-xl border border-edge-soft bg-canvas/40 p-3">
+                <span className="text-[12.5px] font-semibold text-ink">
+                  {t("Start with data from {name}", { name: primary?.name ?? "" })}
+                </span>
+                <div className="flex flex-col gap-1">
+                  <ImportRow
+                    checked={importSelection.settings}
+                    label={t("Settings")}
+                    onClick={() => toggleImportDomain("settings")}
+                  />
+                  <ImportRow
+                    checked={importSelection.addons}
+                    label={t("Addons ({n})", { n: sourceSummary?.addons.length ?? 0 })}
+                    onClick={() => toggleImportDomain("addons")}
+                  />
+                  {importSelection.addons && (sourceSummary?.addons.length ?? 0) > 0 && (
+                    <div className="ms-6 flex flex-col gap-1">
+                      {(sourceSummary?.addons ?? []).map((addon: ImportAddonPreview) => (
+                        <ImportRow
+                          key={addon.transportUrl}
+                          compact
+                          checked={selectedAddons.has(addon.transportUrl)}
+                          label={addon.name}
+                          onClick={() => toggleImportAddon(addon.transportUrl)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <ImportRow
+                    checked={importSelection.watchlist}
+                    label={t("Watchlist ({n})", { n: sourceSummary?.watchlistCount ?? 0 })}
+                    onClick={() => toggleImportDomain("watchlist")}
+                  />
+                  <ImportRow
+                    checked={importSelection.watched}
+                    label={t("Watched history")}
+                    onClick={() => toggleImportDomain("watched")}
+                  />
+                  <ImportRow
+                    checked={importSelection.continueWatching}
+                    label={t("Continue watching")}
+                    onClick={() => toggleImportDomain("continueWatching")}
+                  />
+                </div>
+                <p className="text-[11px] leading-snug text-ink-subtle">
+                  {t(
+                    "Copied once — afterwards this profile keeps its own copy. Nothing stays linked to Primary.",
+                  )}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -885,6 +1007,37 @@ function SecurityView({
         </button>
       </div>
     </div>
+  );
+}
+
+function ImportRow({
+  checked,
+  label,
+  compact,
+  onClick,
+}: {
+  checked: boolean;
+  label: string;
+  compact?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2.5 rounded-lg border px-3 text-start transition-colors ${
+        checked ? "border-ink/40 bg-canvas/60" : "border-edge-soft hover:border-edge hover:bg-canvas/40"
+      } ${compact ? "py-1.5" : "py-2"}`}
+    >
+      <span
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+          checked ? "border-ink bg-ink text-canvas" : "border-edge"
+        }`}
+      >
+        {checked && <Check size={10} strokeWidth={3} />}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{label}</span>
+    </button>
   );
 }
 
