@@ -262,16 +262,22 @@ export function SeriesEpisodes({
     }
     return orderedEpsRaw.map((ep) => {
       const tmdbEp = airedLike ? tmdbByKey.get(`${ep.seasonNumber}:${ep.episodeNumber}`) : undefined;
+      // TMDB cache holds episodes fetched with the requested metadata language, so its text is
+      // canonical; script ranking can't separate e.g. Turkish from English, so a length
+      // tie-break must never let longer TVDB English overwrite a real translation.
+      const tmdbName = (tmdbEp?.name ?? "").trim();
       const name =
-        pickLocalizedText(
-          [{ text: ep.name }, { text: ep.nameEn ?? "" }, { text: tmdbEp?.name ?? "" }],
+        tmdbName ||
+        (pickLocalizedText(
+          [{ text: ep.name }, { text: ep.nameEn ?? "" }],
           { forName: true, lang },
-        ) ?? ep.name;
+        ) ??
+          ep.name);
+      const tmdbOverview = (tmdbEp?.overview ?? "").trim();
       const overview =
-        pickLocalizedText(
-          [{ text: ep.overview }, { text: ep.overviewEn ?? "" }, { text: tmdbEp?.overview ?? "" }],
-          { lang },
-        ) ?? ep.overview;
+        tmdbOverview ||
+        (pickLocalizedText([{ text: ep.overview }, { text: ep.overviewEn ?? "" }], { lang }) ??
+          ep.overview);
       let next = { ...ep, name, overview };
       if (ep.imdbRating == null) {
         const r = imdbRatings.get(`${ep.seasonNumber}:${ep.episodeNumber}`);

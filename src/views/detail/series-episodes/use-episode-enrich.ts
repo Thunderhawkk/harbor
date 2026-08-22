@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { pickLocalizedText } from "@/lib/localized-text";
 import { harborImdbEpisodes } from "@/lib/providers/harbor-imdb";
 import { omdbSeasonRatings } from "@/lib/providers/omdb";
 import type { Episode } from "@/lib/providers/tmdb";
@@ -74,14 +73,13 @@ export function useEpisodeEnrich({
       let next: Episode = ep;
       const tv = tvdbForSeason?.get(ep.episodeNumber);
       if (tv) {
-        // pickLocalizedText keys script tests by ISO-1 ("ko"), not TVDB codes ("kor").
-        const lang = tmdbLanguageIso();
-        const name =
-          pickLocalizedText([{ text: tv.name ?? "" }, { text: next.name }], { forName: true, lang }) ??
-          next.name;
-        const overview =
-          pickLocalizedText([{ text: tv.overview ?? "" }, { text: next.overview }], { lang }) ??
-          next.overview;
+        // TMDB episodes were fetched with the requested metadata language, making them the
+        // canonical localized source (their own fallback chain ends in English/original).
+        // Script ranking can't separate Turkish-style Latin text from English, so a length
+        // tie-break there would randomly overwrite real translations with longer TVDB English;
+        // TVDB therefore only fills fields TMDB left empty.
+        const name = (next.name ?? "").trim() ? next.name : tv.name ?? next.name;
+        const overview = (next.overview ?? "").trim() ? next.overview : tv.overview ?? next.overview;
         next = {
           ...next,
           name,
