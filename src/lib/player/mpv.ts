@@ -492,6 +492,29 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
     listeners.forEach((l) => l(next));
   };
 
+  // mpv's WASAPI output re-roots to the OS default audio device via its own
+  // hotplug notification. For device-topology changes (e.g. HDMI <-> Bluetooth,
+  // which differ in sample rate and format) that internal reload is unreliable
+  // and can leave audio routed to a now-unavailable endpoint, producing silence
+  // until the stream is restarted. When `audio-device-list` changes (mpv fires
+  // a property-change on every hotplug / default-device switch) we re-assert the
+  // device and force an `ao-reload`, which re-initializes the audio output onto
+  // the current default device — the same re-init a stream restart performs.
+  let audioDeviceReloadTimer: number | null = null;
+  const scheduleAudioDeviceReload = () => {
+    if (!isWindowsDesktop()) return;
+    if (!mpvStarted) return;
+    if (snap.status !== "playing" && snap.status !== "paused") return;
+    if (audioDeviceReloadTimer != null) window.clearTimeout(audioDeviceReloadTimer);
+    audioDeviceReloadTimer = window.setTimeout(() => {
+      audioDeviceReloadTimer = null;
+      void (async () => {
+        await applyAudioDevice(appliedAudioDevice ?? "auto").catch(() => {});
+        await invoke("mpv_command", { cmd: ["ao-reload"] }).catch(() => {});
+      })();
+    }, 300);
+  };
+
   const handleEvent = (raw: MpvEvent) => {
     if (raw.event === "log") {
       const prefix = String((raw as { prefix?: unknown }).prefix ?? "");
@@ -529,6 +552,7 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
       if (name === "eof-reached" && data === true) snap.status = "ended";
       if (name === "volume" && typeof data === "number") snap.volume = data / 100;
       if (name === "mute" && typeof data === "boolean") snap.muted = data;
+      if (name === "audio-device-list") scheduleAudioDeviceReload();
       if (name === "track-list" && Array.isArray(data)) {
         const list = data as Array<Record<string, unknown>>;
         pendingTracks["track-list"] = list;
