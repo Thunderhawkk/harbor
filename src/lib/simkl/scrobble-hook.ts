@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useSimkl } from "./provider";
 import { simklScrobble, buildBody, type ScrobbleInfo } from "./scrobble";
+import { addToHistory, markEpisodesWatched } from "./history";
+import { stremioIdToSimklTarget } from "./ids";
 import { getPlaybackPosition } from "@/lib/player/playback-clock";
 import { useSettings } from "@/lib/settings";
 import type { PlayerSrc } from "@/lib/view";
@@ -104,7 +106,8 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
                 Math.max(0, progressRef.current, (getPlaybackPosition() / snap.durationSec) * 100),
               )
             : 100;
-        void simklScrobble("stop", metaId, src.episode, endPct, infoRef.current);
+        sendBeacon(metaId, src.episode, endPct, "stop", infoRef.current);
+        void recordWatchedFallback(metaId, src.episode);
         lastActionRef.current = "stop";
       }
       return;
@@ -187,4 +190,21 @@ function sendBeacon(
   } catch {
     /* noop */
   }
+}
+
+/**
+ * Directly records the finished item in Simkl's watch history as a fallback,
+ * because the beacon is fire-and-forget and would otherwise leave the item
+ * stuck in "watching" if its request is ever lost.
+ */
+async function recordWatchedFallback(
+  metaId: string,
+  episode: PlayerSrc["episode"] | undefined,
+): Promise<void> {
+  const r = stremioIdToSimklTarget(metaId, episode);
+  if (!r.ok) return;
+  const t = r.target;
+  if (t.kind === "episode") await markEpisodesWatched(t.show.ids, t.season, [t.number]);
+  else if (t.kind === "anime-episode") await markEpisodesWatched(t.anime.ids, t.season, [t.number]);
+  else await addToHistory(t);
 }
