@@ -79,7 +79,8 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
       const prevProgress = progressRef.current;
       if (enabled && lastActionRef.current !== "stop") {
         if (prevProgress >= WATCHED_MARK_PCT) {
-          void simklScrobble("stop", prev.metaId, prev.episode, 100, prev.info);
+          sendBeacon(prev.metaId, prev.episode, 100, "stop", prev.info);
+          void recordWatchedFallback(prev.metaId, prev.episode);
         } else if (prevProgress > 0) {
           void simklScrobble("pause", prev.metaId, prev.episode, prevProgress, prev.info);
         }
