@@ -115,6 +115,22 @@ test("the season is not printed twice in the Continue Watching title", () => {
   assert.equal(stripFranchiseSuffix("Silo"), "Silo");
 });
 
+test("parenthesised and year suffixed titles are stripped too", () => {
+  assert.equal(
+    stripFranchiseSuffix("Mushoku Tensei: Jobless Reincarnation (Season 3)"),
+    "Mushoku Tensei: Jobless Reincarnation",
+  );
+  assert.equal(
+    stripFranchiseSuffix("Skeleton Knight in Another World (II)"),
+    "Skeleton Knight in Another World",
+  );
+  assert.equal(stripFranchiseSuffix("Re:Zero 2026"), "Re:Zero");
+  assert.equal(stripFranchiseSuffix("Re:Zero (2026)"), "Re:Zero");
+  assert.equal(stripFranchiseSuffix("Demon Slayer: Kimetsu no Yaiba S3"), "Demon Slayer: Kimetsu no Yaiba");
+  assert.equal(stripFranchiseSuffix("Sword Art Online 2nd Season"), "Sword Art Online");
+  assert.equal(stripFranchiseSuffix("86"), "86", "numeric titles must not be stripped");
+});
+
 test("an imdb id resolves to the same franchise root as its Kitsu id", () => {
   const src = readFileSync(new URL("../src/lib/providers/anime-franchise-root.ts", import.meta.url), "utf8");
   assert.match(src, /if \(id\.startsWith\("tt"\)\) \{/);

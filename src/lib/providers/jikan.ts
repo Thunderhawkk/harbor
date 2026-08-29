@@ -47,11 +47,12 @@ function bestTitle(a: JikanAnime): string {
 }
 
 const FRANCHISE_STRIP_RX: RegExp[] = [
-  /\s*[-:]?\s*(?:1st|2nd|3rd|4th|5th|6th|7th|8th|9th|10th|11th|12th|First|Second|Third|Fourth|Fifth|Sixth|Seventh|Eighth|Ninth|Tenth|Final|Last)\s+(?:Season|Cour|Part)\b.*$/i,
-  /\s*[-:]?\s*Season\s+\d+\b.*$/i,
-  /\s+S\d+(?:\s|$).*/i,
-  /\s*[-:]?\s*(?:Part|Cour|Chapter)\s+\d+\b.*$/i,
-  /\s+(?:II|III|IV|V|VI|VII|VIII|IX|X)\s*$/,
+  /\s*[-:(]?\s*(?:1st|2nd|3rd|4th|5th|6th|7th|8th|9th|10th|11th|12th|First|Second|Third|Fourth|Fifth|Sixth|Seventh|Eighth|Ninth|Tenth|Final|Last)\s+(?:Season|Cour|Part|Chapter)\b.*$/i,
+  /\s*[-:(]?\s*Season\s+\d+\b.*$/i,
+  /\s*[-:(]?\s*S\d+(?:\s|\)|:|$).*/i,
+  /\s*[-:(]?\s*(?:Part|Cour|Chapter)\s+\d+\b.*$/i,
+  /\s*[-:(]?\s*(?:II|III|IV|V|VI|VII|VIII|IX|X)\b[)\s:-]*$/i,
+  /\s+[-:(]*\s*(?:19|20)\d{2}[)\s:]*$/,
 ];
 
 export function stripFranchiseSuffix(name: string): string {
