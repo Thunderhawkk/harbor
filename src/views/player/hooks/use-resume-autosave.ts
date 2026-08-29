@@ -25,6 +25,7 @@ const TICK_MS = 4000;
 const MIN_POSITION_SEC = 5;
 const TASTE_MIN_SEC = 90;
 const WATCHED_RATIO = 0.85;
+const SYNC_RATIO = 0.7;
 const STUB_MAX_SEC = 150;
 
 const isAnimeId = (id: string) =>
@@ -162,12 +163,13 @@ export function useResumeAutosave(params: {
     const trackId = s.episode?.sourceMetaId ?? animeTrackId(s);
     const absEp = s.episode?.absoluteNumber;
     const trackEp = s.episode?.sourceMetaId ? ep : (s.episode?.imdbEpisode ?? ep);
+    const syncReady = finished || (sn.durationSec > 0 && pos / sn.durationSec >= SYNC_RATIO);
     const fireTrackers = (tid: string, tep: number | undefined): void => {
       if (anilistAutoSyncRef.current) void markAnimeWatching(tid, s.meta.name);
       if (malAutoSyncRef.current) void markMalWatching(tid, s.meta.name);
-      if (!finished) return;
-      if (anilistAutoSyncRef.current) void syncAnimeProgress(tid, tep, s.meta.name, absEp);
-      if (malAutoSyncRef.current) void syncMalProgress(tid, tep, s.meta.name, absEp);
+      if (!syncReady) return;
+      if (anilistAutoSyncRef.current) void syncAnimeProgress(tid, tep, s.meta.name, absEp, cs);
+      if (malAutoSyncRef.current) void syncMalProgress(tid, tep, s.meta.name, absEp, cs);
     };
     if (trackId) {
       fireTrackers(trackId, trackEp);

@@ -137,7 +137,9 @@ export function TraktProvider({ children }: { children: ReactNode }) {
       else if (action === "pause") await scrobblePause(target, progress);
       else {
         const outcome = await scrobbleStop(target, progress);
-        if (outcome === "failed") await pushWatched(target);
+        if (outcome !== "recorded" && outcome !== "already-recorded") {
+          await pushWatched(target);
+        }
       }
     },
     [resolveTarget],

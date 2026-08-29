@@ -155,6 +155,7 @@ export async function syncAnimeProgress(
   episode: number | undefined,
   title: string,
   absoluteEpisode?: number,
+  season?: number,
 ): Promise<void> {
   if (!isAuthenticated()) return;
   const ep = episode ?? 1;
@@ -165,7 +166,8 @@ export async function syncAnimeProgress(
       : null;
 
   const sent = loadSent();
-  if ((sent[harborId] ?? 0) >= (abs ?? ep)) return;
+  const sentKey = `${harborId}|${season ?? ""}|${ep}`;
+  if ((sent[sentKey] ?? 0) >= (abs ?? ep)) return;
 
   const flightKey = `${harborId}|${ep}|${abs ?? ""}`;
   if (inflight.has(flightKey)) return;
@@ -188,7 +190,7 @@ export async function syncAnimeProgress(
       target = total;
     }
     if (target <= current) {
-      sent[harborId] = Math.max(sent[harborId] ?? 0, current);
+      sent[sentKey] = Math.max(sent[sentKey] ?? 0, current);
       saveSent(sent);
       return;
     }
@@ -203,11 +205,11 @@ export async function syncAnimeProgress(
     });
 
     if (saved?.SaveMediaListEntry?.progress === target) {
-      sent[harborId] = target;
+      sent[sentKey] = target;
       saveSent(sent);
       emit({ kind: "ok", title, episode: target });
     } else {
-      sent[harborId] = Math.max(sent[harborId] ?? 0, target);
+      sent[sentKey] = Math.max(sent[sentKey] ?? 0, target);
       saveSent(sent);
       emit({ kind: "error", title, error: "update-not-confirmed" });
     }
