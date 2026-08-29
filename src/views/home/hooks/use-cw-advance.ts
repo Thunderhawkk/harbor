@@ -7,6 +7,7 @@ import { simklWatchedForId, statusForId, type WatchlistStatus } from "@/lib/simk
 import { episodeFromVideoId, isAnimeCwItem, libraryMetaType, type LibraryItem } from "@/lib/stremio";
 import { isEpisodeHidden } from "@/lib/hidden-episodes";
 import { isNextAired, resurfaceCandidates, type AnimeMode } from "@/lib/cw-resurface";
+import { franchiseDedupKey } from "@/lib/providers/jikan";
 import { useSettings } from "@/lib/settings";
 
 const FINISHED_RATIO = 0.9;
@@ -312,7 +313,7 @@ export function useCwAdvance(
       ? items
       : items.map((i) => advanced.get(i._id) ?? i).filter((i) => !removed.has(i._id));
   if (extra.length === 0) return base;
-  const keyOf = (i: LibraryItem) => `${i.type}|${(i.name ?? "").trim().toLowerCase()}`;
+  const keyOf = (i: LibraryItem) => `${i.type}|${franchiseDedupKey(i.name ?? "")}`;
   const baseKeys = new Set(base.map(keyOf));
   const dedupExtra = extra.filter((i) => !baseKeys.has(keyOf(i)));
   return dedupExtra.length === 0 ? base : base.concat(dedupExtra);

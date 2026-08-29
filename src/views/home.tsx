@@ -46,6 +46,7 @@ import { reconcileRemoteWatched } from "@/lib/stremio-watched-pull";
 import { isCorruptAnimeEntry } from "@/lib/anime-cw-repair";
 import { absorbCloudAnimeCw } from "@/lib/anime-cw-absorb";
 import { franchiseRoot, franchiseRootSync } from "@/lib/providers/anime-franchise-root";
+import { franchiseDedupKey } from "@/lib/providers/jikan";
 import {
   ANIME_CLOUD_ID,
   cwSortKey,
@@ -569,7 +570,7 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
       .map((i) => ({ i, k: cwSortKey(i) }))
       .sort((a, b) => b.k - a.k)
       .map((e) => e.i);
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+    const norm = (s: string) => franchiseDedupKey(s);
     const lastWatchedOf = (i: LibraryItem) => {
       const lw = Date.parse(i.state?.lastWatched ?? "");
       if (Number.isFinite(lw) && lw > 0) return lw;

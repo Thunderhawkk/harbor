@@ -10,7 +10,7 @@ import {
   applyAniZipEpisode,
   needsAniZipSyncIds,
 } from "../src/lib/cw-anime-episode.ts";
-import { stripFranchiseSuffix } from "../src/lib/providers/jikan.ts";
+import { stripFranchiseSuffix, franchiseDedupKey } from "../src/lib/providers/jikan.ts";
 import { buildBody } from "../src/lib/simkl/scrobble-body.ts";
 import {
   animeCoordPairs,
@@ -129,6 +129,28 @@ test("parenthesised and year suffixed titles are stripped too", () => {
   assert.equal(stripFranchiseSuffix("Demon Slayer: Kimetsu no Yaiba S3"), "Demon Slayer: Kimetsu no Yaiba");
   assert.equal(stripFranchiseSuffix("Sword Art Online 2nd Season"), "Sword Art Online");
   assert.equal(stripFranchiseSuffix("86"), "86", "numeric titles must not be stripped");
+});
+
+test("the Continue Watching dedup key collapses suffix variants of one show", () => {
+  assert.equal(
+    franchiseDedupKey("Mushoku Tensei: Jobless Reincarnation Season 3"),
+    franchiseDedupKey("Mushoku Tensei: Jobless Reincarnation"),
+  );
+  assert.equal(
+    franchiseDedupKey("Skeleton Knight in Another World II"),
+    franchiseDedupKey("Skeleton Knight in Another World"),
+  );
+  assert.equal(franchiseDedupKey("Re:Zero 2026"), franchiseDedupKey("Re:Zero"));
+  assert.equal(
+    franchiseDedupKey("Silo Season 9"),
+    franchiseDedupKey("Silo"),
+    "a later season is the same franchise and must share a key",
+  );
+  assert.notEqual(
+    franchiseDedupKey("Mushoku Tensei: Jobless Reincarnation"),
+    franchiseDedupKey("Re:Zero - Starting Life in Another World"),
+    "distinct shows must keep separate keys",
+  );
 });
 
 test("an imdb id resolves to the same franchise root as its Kitsu id", () => {

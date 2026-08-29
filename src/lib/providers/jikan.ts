@@ -65,6 +65,11 @@ export function animeFranchiseKey(name: string): string {
   return stripFranchiseSuffix(name).toLowerCase();
 }
 
+/** CW dedup key: collapses rows differing only by franchise suffix. */
+export function franchiseDedupKey(name: string): string {
+  return stripFranchiseSuffix(name).toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+}
+
 function franchiseKey(a: JikanAnime): string {
   return animeFranchiseKey(a.title_english || a.title || a.title_japanese || "");
 }
