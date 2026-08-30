@@ -10,7 +10,7 @@ import { isLocalUrl } from "@/lib/player/local-url";
 import { isManuallyWatched, recordManualWatchedMeta, setManualWatched } from "@/lib/manual-watched";
 import { savePlayback } from "@/lib/playback-history";
 import { clearResume, saveResumeMs } from "@/lib/resume";
-import { setMovieWatchedLocal } from "@/lib/movie-watched";
+import { isMovieWatchedLocal, setMovieWatchedLocal } from "@/lib/movie-watched";
 import { setViewedSeason } from "@/lib/season-view-pref";
 import type { PlayerSnapshot } from "@/lib/player/bridge";
 import { getPlaybackPosition, subscribePlaybackClock } from "@/lib/player/playback-clock";
@@ -24,6 +24,7 @@ const TICK_MS = 4000;
 const MIN_POSITION_SEC = 5;
 const TASTE_MIN_SEC = 90;
 const WATCHED_RATIO = 0.85;
+const REWATCH_RESUME_SEC = 45;
 const STUB_MAX_SEC = 150;
 
 const isAnimeId = (id: string) =>
@@ -125,9 +126,20 @@ export function useResumeAutosave(params: {
       id.startsWith("tt") &&
       !!s.episode?.kitsuStreamId &&
       (s.episode.imdbSeason == null || s.episode.imdbEpisode == null);
+    // Rewatching an already-finished movie (resumed past 45s, still below the finish ratio)
+    // must put it back in Continue Watching even when the Stremio cloud write is skipped (e.g.
+    // signed out). Clearing the local watched marker and tracking it locally yields an in-progress
+    // item with flaggedWatched=0 that isCwMember accepts, independent of authKey.
+    const rewatchMovie =
+      s.meta.type === "movie" &&
+      sn.durationSec > 0 &&
+      pos >= REWATCH_RESUME_SEC &&
+      pos / sn.durationSec < WATCHED_RATIO &&
+      isMovieWatchedLocal(id);
+    if (rewatchMovie) setMovieWatchedLocal(id, false);
     if (
       (s.meta.type === "series" || s.meta.type === "movie" || animeLocal) &&
-      (!CLOUD_OK.test(id) || isLocalUrl(s.url) || animeLocal || ttAnimeUnmapped)
+      (!CLOUD_OK.test(id) || isLocalUrl(s.url) || animeLocal || ttAnimeUnmapped || rewatchMovie)
     ) {
       saveLocalCw({
         id,
