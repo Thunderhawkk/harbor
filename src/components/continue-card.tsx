@@ -2,7 +2,8 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import simklLogo from "@/assets/simkl.png";
-import { meta as fetchMeta, narrowMediaType, type Meta } from "@/lib/cinemeta";
+import { narrowMediaType, type Meta } from "@/lib/cinemeta";
+import { resolveMeta } from "@/lib/meta-resource";
 import { animeKitsuMeta, type AnimeKitsuVideo } from "@/lib/providers/anime-kitsu-addon";
 import { tmdbLiteMeta } from "@/lib/providers/tmdb/tmdb-lite";
 import { tmdbIdFromImdb } from "@/lib/providers/tmdb";
@@ -18,6 +19,7 @@ import {
 import { useHasNewEpisode } from "@/lib/new-episodes";
 import { Tooltip } from "@/views/detail/tooltip";
 import { useProfiles, sharesStremioStorage } from "@/lib/profiles";
+import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
 import { useView, type PlayEpisode } from "@/lib/view";
 import { getWatchedBy } from "@/lib/watched-by";
@@ -53,6 +55,7 @@ export const ContinueCard = memo(function ContinueCard({
   const { openMeta, openPicker, openPlayer } = useView();
   const t = useT();
   const { settings, update } = useSettings();
+  const { authKey } = useAuth();
   const { profiles, activeProfile } = useProfiles();
   const watcherId = getWatchedBy(item._id);
   const watcher = watcherId ? profiles.find((p) => p.id === watcherId) : null;
@@ -207,7 +210,9 @@ export const ContinueCard = memo(function ContinueCard({
         return;
       }
       const looksEpisodic = item.type === "movie" && episodeFromVideoId(item.state?.video_id);
-      fetchMeta(looksEpisodic ? "series" : narrowMediaType(item.type), item._id)
+      // resolveMeta honours a custom metadata addon before Cinemeta, so disabling the Cinemeta
+      // toggle (to use another addon) no longer leaves this card with a blank/stretched thumbnail.
+      resolveMeta(authKey, looksEpisodic ? "series" : narrowMediaType(item.type), item._id)
         .then((full) => {
           if (cancelled || !full) return;
           setHydratedMeta(full);
