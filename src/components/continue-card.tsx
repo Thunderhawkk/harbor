@@ -33,6 +33,29 @@ import { aniZipLookupKey, applyAniZipEpisode, needsAniZipSyncIds } from "@/lib/c
 import { classifyAnimeNumbering } from "@/lib/subtitles/anime-numbering";
 import { ThreeLiquidGlassSurface } from "@/components/ThreeLiquidGlassSurface";
 
+// Bleach: Thousand-Year Blood War is split across four cours that carry their
+// own arc name appended to the base title (e.g. "... - The Separation"). The
+// library keeps the arc name, but the card should show only the base title.
+// This is a closed set of the four cour subtitles; do not add anime names here.
+const ANIME_ARC_STRIP: ReadonlyArray<{ matcher: string; replace: string }> = [
+  { matcher: "The Blood Warfare", replace: "" },
+  { matcher: "The Separation", replace: "" },
+  { matcher: "The Conflict", replace: "" },
+  { matcher: "The Calamity", replace: "" },
+];
+
+function stripAnimeArcSuffix(name: string): string {
+  let t = name;
+  for (const { matcher, replace } of ANIME_ARC_STRIP) {
+    t = t.replace(new RegExp(`(?:\\s*[-:—]\\s*|\\s)${escapeRegExp(matcher)}$`, "i"), replace);
+  }
+  return t.replace(/[\s°'."’˚_:\-]+$/g, "").trim();
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 type Props = {
   item: LibraryItem;
   watched?: boolean;
@@ -325,7 +348,9 @@ export const ContinueCard = memo(function ContinueCard({
       };
 
   const rawTitle = translatedTitle || hydratedMeta?.name?.trim() || item.name;
-  const displayTitle = isAnimeCwItem(item) ? stripFranchiseSuffix(rawTitle) || rawTitle : rawTitle;
+  const displayTitle = isAnimeCwItem(item)
+    ? stripAnimeArcSuffix(stripFranchiseSuffix(rawTitle)) || rawTitle
+    : rawTitle;
 
   const onOpenDetails = () => {
     const isAnime = /^(kitsu|mal|anilist|anidb):/.test(meta.id);
