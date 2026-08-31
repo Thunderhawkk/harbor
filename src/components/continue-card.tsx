@@ -30,6 +30,7 @@ import { resolvePreferredAnimeTitle } from "@/lib/anime-title";
 import { stripFranchiseSuffix } from "@/lib/providers/jikan";
 import { getAnimeCwId } from "@/lib/anime-cw-ids";
 import { aniZipLookupKey, applyAniZipEpisode, needsAniZipSyncIds } from "@/lib/cw-anime-episode";
+import { classifyAnimeNumbering } from "@/lib/subtitles/anime-numbering";
 import { ThreeLiquidGlassSurface } from "@/components/ThreeLiquidGlassSurface";
 
 type Props = {
@@ -114,6 +115,7 @@ export const ContinueCard = memo(function ContinueCard({
   const [metaBg, setMetaBg] = useState<string | undefined>();
   const [hydratedMeta, setHydratedMeta] = useState<Meta | null>(null);
   const [kitsuVideo, setKitsuVideo] = useState<AnimeKitsuVideo | null>(null);
+  const [absoluteNumber, setAbsoluteNumber] = useState<number | null>(null);
   const [epTitle, setEpTitle] = useState<string | null>(null);
   const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
   const [imgIdx, setImgIdx] = useState(0);
@@ -140,6 +142,7 @@ export const ContinueCard = memo(function ContinueCard({
     setMetaBg(undefined);
     setHydratedMeta(null);
     setKitsuVideo(null);
+    setAbsoluteNumber(null);
     setTranslatedTitle(null);
     setImgIdx(0);
     const el = cardRef.current;
@@ -184,6 +187,29 @@ export const ContinueCard = memo(function ContinueCard({
                 m.videos.find((v) => v.id === item.state?.video_id) ??
                 m.videos.find((v) => v.episode === animeEp);
               if (vid) setKitsuVideo(vid);
+            }
+            const key = aniZipLookupKey(item._id);
+            if (key && animeEp != null && Number.isFinite(animeEp) && animeEp > 0) {
+              const lookup =
+                key.scheme === "mal"
+                  ? aniZipByMal
+                  : key.scheme === "anilist"
+                    ? aniZipByAnilist
+                    : key.scheme === "anidb"
+                      ? aniZipByAnidb
+                      : aniZipByKitsu;
+              lookup(key.id)
+                .then((az) => {
+                  if (cancelled || !az?.episodes) return;
+                  if (classifyAnimeNumbering(az) !== "longRunning") return;
+                  // For continuous long-running entries, the entry-relative number
+                  // IS the absolute number (AniZip keys them 1..N across the whole
+                  // run, and only populates absoluteEpisodeNumber sparsely).
+                  const azEp = az.episodes[String(animeEp)];
+                  const abs = azEp?.absoluteEpisodeNumber ?? animeEp;
+                  if (abs != null && Number.isFinite(abs) && abs > 0) setAbsoluteNumber(abs);
+                })
+                .catch(() => {});
             }
           })
           .catch(() => {});
@@ -269,6 +295,7 @@ export const ContinueCard = memo(function ContinueCard({
 
   const episodeTitle = epTitle ?? kitsuVideo?.title ?? null;
 
+  const isAnimeItem = /^(kitsu|mal|anilist|anidb):/.test(item._id);
   const animeSeasonMapped =
     kitsuVideo &&
     kitsuVideo.imdbSeason != null &&
@@ -276,13 +303,16 @@ export const ContinueCard = memo(function ContinueCard({
     kitsuVideo.imdbEpisode != null
       ? { season: kitsuVideo.imdbSeason, episode: kitsuVideo.imdbEpisode }
       : null;
-  const sub = animeSeasonMapped
-    ? `S${animeSeasonMapped.season} · E${String(animeSeasonMapped.episode).padStart(2, "0")}`
-    : ep
-      ? `S${ep.season}E${ep.episode}`
-      : animeEp && Number.isFinite(animeEp) && animeEp > 0
-        ? `Ep ${animeEp}`
-        : "";
+  const sub =
+    isAnimeItem && absoluteNumber != null && Number.isFinite(absoluteNumber) && absoluteNumber > 0
+      ? `Ep ${absoluteNumber}`
+      : animeSeasonMapped
+        ? `S${animeSeasonMapped.season} · E${String(animeSeasonMapped.episode).padStart(2, "0")}`
+        : ep
+          ? `S${ep.season}E${ep.episode}`
+          : animeEp && Number.isFinite(animeEp) && animeEp > 0
+            ? `Ep ${animeEp}`
+            : "";
 
   const meta: Meta = hydratedMeta
     ? { ...hydratedMeta, id: item._id, type: libraryMetaType(item.type) }
