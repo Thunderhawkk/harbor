@@ -100,10 +100,16 @@ export function analyzeOverlaps(
   fromProfileId: string,
   toProfileId: string,
   domains: ImportDomain[],
+  addonUrls?: string[] | null,
 ): Partial<Record<ImportDomain, DomainOverlap>> {
   const result: Partial<Record<ImportDomain, DomainOverlap>> = {};
   const srcKeys = new Map<ImportDomain, Set<string>>();
   const dstKeys = new Map<ImportDomain, Set<string>>();
+  // Mirror applyAddons: a present (even empty) selection is a real subset; only
+  // null means "no subset / every source addon". An empty selection filters out
+  // all source addons, so it must report no addon overlap.
+  const addonSubset =
+    addonUrls != null ? new Set(addonUrls) : null;
   for (const domain of domains) {
     if (!MERGEABLE_DOMAINS.has(domain)) continue;
     const keyOf = DOMAIN_KEY_OF[domain];
@@ -111,7 +117,10 @@ export function analyzeOverlaps(
     const s = new Set<string>();
     const d = new Set<string>();
     if (domain === "addons") {
-      for (const e of readKeyedArray(INSTALLED_PREFIX + fromProfileId, keyOf)) s.add(e.key);
+      for (const e of readKeyedArray(INSTALLED_PREFIX + fromProfileId, keyOf)) {
+        if (addonSubset && !addonSubset.has(e.key)) continue;
+        s.add(e.key);
+      }
       for (const e of readKeyedArray(INSTALLED_PREFIX + toProfileId, keyOf)) d.add(e.key);
     } else if (domain !== "settings") {
       const prefixes = DOMAIN_PREFIXES[domain];

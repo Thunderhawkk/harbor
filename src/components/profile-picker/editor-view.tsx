@@ -180,8 +180,10 @@ export function EditorView({
       setOverlaps({});
       return;
     }
-    setOverlaps(analyzeOverlaps(importSourceId, targetProfileId, selectedMergeable));
-  }, [importSourceId, targetProfileId, importSelection]);
+    setOverlaps(
+      analyzeOverlaps(importSourceId, targetProfileId, selectedMergeable, [...selectedAddons]),
+    );
+  }, [importSourceId, targetProfileId, importSelection, selectedAddons]);
 
   const resetImportChoice = () => {
     setImportSelection({
