@@ -44,11 +44,14 @@ export function useTraktScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
       const progress = Math.min(100, Math.max(0, progressRef.current, live));
       const action = progress >= WATCHED_MARK_PCT ? "stop" : "pause";
       sendBeacon(target, action === "stop" ? 100 : progress, action);
+      // Beacon is fire-and-forget and may drop on exit, so also run the
+      // confirmed stop to clear Trakt's "Now Playing" and write history.
+      if (action === "stop") void scrobble("stop", { metaId, episode: a.episode, progress: 100 });
       lastActionRef.current = action;
     };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [isConnected, resolveTarget, metaId, src.episode]);
+  }, [isConnected, resolveTarget, scrobble, metaId, src.episode]);
 
   useEffect(() => {
     if (lastKeyRef.current && lastKeyRef.current !== key) {

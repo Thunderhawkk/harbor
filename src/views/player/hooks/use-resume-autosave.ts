@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { markAnimeWatching, syncAnimeProgress } from "@/lib/anilist/sync";
 import { markMalWatching, syncMalProgress } from "@/lib/mal/sync";
-import { animeIdentityEligible, resolveAnimeIdentity } from "@/lib/streams/anime-identity";
+import { resolveAnimeIdentity } from "@/lib/streams/anime-identity";
 import { profileFromMeta } from "@/lib/discover/profile";
 import { trackEvent } from "@/lib/discover/store";
 import { isExternalPlaylistId } from "@/lib/iptv/vod";
@@ -16,7 +16,7 @@ import { setViewedSeason } from "@/lib/season-view-pref";
 import type { PlayerSnapshot } from "@/lib/player/bridge";
 import { getPlaybackPosition, subscribePlaybackClock } from "@/lib/player/playback-clock";
 import { useSettings } from "@/lib/settings";
-import type { PlayerSrc } from "@/lib/view";
+import type { PlayerSrc, PlayEpisode } from "@/lib/view";
 import { ANIME_CLOUD_ID, CLOUD_OK } from "@/lib/stremio";
 import { syncSeriesWatchedToStremio } from "@/lib/stremio-episode-watched";
 import { isNaturalEnd } from "@/lib/player/playback-end";
@@ -37,6 +37,13 @@ const animeTrackId = (s: PlayerSrc): string | null => {
   if (ks?.startsWith("kitsu:")) return ks.split(":").slice(0, 2).join(":");
   return null;
 };
+
+// Keeps per-season sync resolution available even when the episode already
+// carries a kitsu stream id (later seasons need their own AniList/MAL media).
+const animeIdentityEligibleForSync = (metaId: string, episode: PlayEpisode | undefined | null): boolean =>
+  (isAnimeId(metaId) || metaId.startsWith("tt") || metaId.startsWith("tmdb:tv:")) &&
+  typeof episode?.imdbSeason === "number" &&
+  episode.imdbSeason >= 1;
 
 export function useResumeAutosave(params: {
   src: PlayerSrc;
@@ -171,12 +178,12 @@ export function useResumeAutosave(params: {
       if (anilistAutoSyncRef.current) void syncAnimeProgress(tid, tep, s.meta.name, absEp, cs);
       if (malAutoSyncRef.current) void syncMalProgress(tid, tep, s.meta.name, absEp, cs);
     };
-    if (trackId) {
-      fireTrackers(trackId, trackEp);
-    } else if (
+    const useIdentity =
       (anilistAutoSyncRef.current || malAutoSyncRef.current) &&
-      animeIdentityEligible(id, s.episode)
-    ) {
+      animeIdentityEligibleForSync(id, s.episode);
+    if (trackId && !useIdentity) {
+      fireTrackers(trackId, trackEp);
+    } else if (useIdentity) {
       void resolveAnimeIdentity(id, latestRef.current.resolvedImdbId, {
         season: cs,
         episode: ep,
@@ -184,9 +191,14 @@ export function useResumeAutosave(params: {
         imdbEpisode: s.episode?.imdbEpisode,
       })
         .then((identity) => {
+          // Prefer the season-scoped entry so multi-season franchises sync to
+          // the correct per-season AniList/MAL media, not the season-1 entry.
           if (identity) fireTrackers(`kitsu:${identity.kitsuId}`, identity.number);
+          else if (trackId) fireTrackers(trackId, trackEp);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (trackId) fireTrackers(trackId, trackEp);
+        });
     }
     const kind = finished ? "watched" : "play";
     const key = `${id}|${kind}`;

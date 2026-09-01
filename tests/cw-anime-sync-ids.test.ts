@@ -211,13 +211,27 @@ test("an imdb keyed Continue Watching play no longer drops the AniList and MAL s
     new URL("../src/views/player/hooks/use-resume-autosave.ts", import.meta.url),
     "utf8",
   );
-  assert.match(src, /animeIdentityEligible\(id, s\.episode\)/);
+  assert.match(src, /animeIdentityEligibleForSync\(id, s\.episode\)/);
   assert.match(src, /resolveAnimeIdentity\(id, latestRef\.current\.resolvedImdbId, \{/);
   assert.match(src, /fireTrackers\(`kitsu:\$\{identity\.kitsuId\}`, identity\.number\)/);
   assert.doesNotMatch(
     src,
     /anilistAutoSyncRef\.current && trackId/,
     "a null anime track id must resolve through the identity chain, not silently skip",
+  );
+});
+
+test("multi-season sync prefers the season-scoped identity over the base track id", () => {
+  const src = readFileSync(
+    new URL("../src/views/player/hooks/use-resume-autosave.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(src, /const useIdentity =\s*\n\s*\(anilistAutoSyncRef\.current \|\| malAutoSyncRef\.current\)/);
+  assert.match(src, /if \(trackId && !useIdentity\)/);
+  assert.match(
+    src,
+    /else if \(useIdentity\)/,
+    "a base track id alone must not block per-season identity resolution",
   );
 });
 
