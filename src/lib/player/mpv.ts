@@ -14,7 +14,7 @@ import {
 import { SUBTITLE_FPS_TRANSITION_FAILED_EVENT } from "./subtitle-fps";
 import { finishPlaybackTrace, markPlaybackTrace } from "@/lib/perf/playback-trace";
 import {
-  emptySnapshot,
+  initialPlayerSnapshot,
   type PlayerBridge,
   type PlayerCapabilities,
   type PlayerSeekPrecision,
@@ -210,7 +210,7 @@ function normalizeMediaPath(path: string): string {
 
 export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   let host: HTMLElement | null = null;
-  let snap: PlayerSnapshot = { ...emptySnapshot };
+  let snap: PlayerSnapshot = initialPlayerSnapshot();
   let profileAf = "";
   let hdrToSdr = mpvOptions?.hdrToSdr ?? true;
   const applyAudioFilters = () => {

@@ -1,7 +1,7 @@
 import Hls from "hls.js";
 import mpegts from "mpegts.js";
 import {
-  emptySnapshot,
+  initialPlayerSnapshot,
   type PlayerBridge,
   type PlayerCapabilities,
   type PlayerSnapshot,
@@ -22,7 +22,7 @@ let DOCUMENT_PIP_KNOWN_BROKEN = false;
 export function createHtml5Bridge(): PlayerBridge {
   let video: HTMLVideoElement | null = null;
   let host: HTMLElement | null = null;
-  let snap: PlayerSnapshot = { ...emptySnapshot };
+  let snap: PlayerSnapshot = initialPlayerSnapshot();
   const listeners = new Set<(s: PlayerSnapshot) => void>();
   let pendingStart: number | null = null;
   let pipWindow: Window | null = null;

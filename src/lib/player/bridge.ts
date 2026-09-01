@@ -1,3 +1,4 @@
+import { readPlayerVolume } from "@/lib/player-volume";
 import type { SubCue } from "@/lib/subtitles/parser";
 import type { SubtitleLoadMetadata } from "@/lib/subtitles/types";
 import type { SubtitleMatchConfidence } from "@/lib/subtitles/release-match";
@@ -160,3 +161,9 @@ export const emptySnapshot: PlayerSnapshot = {
   errorMessage: null,
   errorCode: null,
 };
+
+/** Snapshot seeded with the persisted volume/mute preference instead of the 1.0/100% default. */
+export function initialPlayerSnapshot(): PlayerSnapshot {
+  const saved = readPlayerVolume();
+  return { ...emptySnapshot, volume: saved.volume, muted: saved.muted };
+}

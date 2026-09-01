@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { emptySnapshot, type PlayerBridge, type PlayerSnapshot } from "@/lib/player/bridge";
+import {
+  emptySnapshot,
+  initialPlayerSnapshot,
+  type PlayerBridge,
+  type PlayerSnapshot,
+} from "@/lib/player/bridge";
 import { probeMpv } from "@/lib/player/mpv";
 import { mergeMpvOptions } from "@/lib/player/mpv-tuning";
 import { metaIsAnime } from "@/lib/player/anime-src";
@@ -50,7 +55,7 @@ export function usePlayerBridge(params: {
 }) {
   const { bridgeRef, videoMountRef, src, settings } = params;
 
-  const [snap, setSnap] = useState<PlayerSnapshot>(emptySnapshot);
+  const [snap, setSnap] = useState<PlayerSnapshot>(initialPlayerSnapshot);
   const prevSnapRef = useRef<PlayerSnapshot>(emptySnapshot);
   const [engine, setEngine] = useState<"html5" | "mpv">("html5");
   const [autoFallbackTried, setAutoFallbackTried] = useState(false);
