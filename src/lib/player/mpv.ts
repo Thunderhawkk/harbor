@@ -500,6 +500,12 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   // a property-change on every hotplug / default-device switch) we re-assert the
   // device and force an `ao-reload`, which re-initializes the audio output onto
   // the current default device — the same re-init a stream restart performs.
+  //
+  // After screensaver / system sleep, Windows can release the WASAPI endpoint
+  // without firing a hotplug event, leaving mpv with a stale device ID.  The
+  // `visibilitychange` listener below catches that case: when the app becomes
+  // visible again we schedule the same device re-assertion + ao-reload and
+  // re-select whichever audio track was active before the failure.
   let audioDeviceReloadTimer: number | null = null;
   const scheduleAudioDeviceReload = () => {
     if (!isWindowsDesktop()) return;
@@ -509,11 +515,29 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
     audioDeviceReloadTimer = window.setTimeout(() => {
       audioDeviceReloadTimer = null;
       void (async () => {
+        // Remember the selected audio track so we can restore it after the
+        // output reload deselects it (mpv drops the track on ao init failure).
+        const prevAid = snap.audioTracks.find((t) => t.selected)?.id ?? null;
         await applyAudioDevice(appliedAudioDevice ?? "auto").catch(() => {});
         await invoke("mpv_command", { cmd: ["ao-reload"] }).catch(() => {});
+        if (prevAid) {
+          await invoke("mpv_set_property", { name: "aid", value: prevAid }).catch(() => {});
+        }
       })();
     }, 300);
   };
+
+  // After screensaver / system sleep Windows may silently release the WASAPI
+  // audio endpoint without firing a device-list hotplug event.  When the app
+  // becomes visible again we schedule an audio output reload so mpv re-binds
+  // to the current default device and restores audio.
+  const onVisibilityRestore = () => {
+    if (document.visibilityState !== "visible") return;
+    scheduleAudioDeviceReload();
+  };
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibilityRestore);
+  }
 
   const handleEvent = (raw: MpvEvent) => {
     if (raw.event === "log") {
@@ -1353,6 +1377,11 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
         }
       }
       geomTauriUnlisten = [];
+      document.removeEventListener("visibilitychange", onVisibilityRestore);
+      if (audioDeviceReloadTimer != null) {
+        window.clearTimeout(audioDeviceReloadTimer);
+        audioDeviceReloadTimer = null;
+      }
       mpvStarted = false;
       currentIsLive = null;
       currentStartupProfile = null;
