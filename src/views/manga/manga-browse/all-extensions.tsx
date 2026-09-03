@@ -338,19 +338,18 @@ export function AllExtensionsView({
 }) {
   const t = useT();
   const { items: favs } = useMangaFavorites();
+  const config = useMemo<ServerConfig>(() => ({ baseUrl: activeMangaSource()?.baseUrl ?? "" }), []);
   const [sources, setSources] = useState<SuwayomiSource[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [langFilter, setLangFilter] = useState<string[]>(() => loadMangaLangFilter());
+  const [langFilter, setLangFilter] = useState<string[]>(() => loadMangaLangFilter(config.baseUrl));
 
   useEffect(
     () =>
       subscribeMangaLangFilter(() => {
-        setLangFilter(loadMangaLangFilter());
+        setLangFilter(loadMangaLangFilter(config.baseUrl));
       }),
-    [],
+    [config.baseUrl],
   );
-
-  const config = useMemo<ServerConfig>(() => ({ baseUrl: activeMangaSource()?.baseUrl ?? "" }), []);
 
   useEffect(() => {
     let alive = true;

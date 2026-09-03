@@ -160,7 +160,7 @@ export function MangaBrowse({
           .then((all) => {
             if (id !== reqRef.current) return { okSources: 0, failedSources: 0 };
             const filtered = all.filter((source) =>
-              langFilterMatches(loadMangaLangFilter(), source.lang),
+              langFilterMatches(loadMangaLangFilter(config.baseUrl), source.lang),
             );
             return searchExtensions(
               config,

@@ -1,6 +1,7 @@
 import { setItemWithRecovery } from "@/lib/storage-recovery";
 import {
   activeMangaProvider,
+  activeMangaSource,
   activeMangaSourceId,
   aggregateSubProviders,
   ensureMangaSources,
@@ -396,7 +397,8 @@ export function mangaTags() {
   const lib = mangaLibraryRevision();
   const langRev = mangaLangFilterRevision();
   // Key by the selection itself (not just a counter) so entries stay valid across app restarts.
-  const langKey = encodeURIComponent(loadMangaLangFilter().slice().sort().join("+"));
+  const serverBase = activeMangaSource()?.baseUrl;
+  const langKey = encodeURIComponent(loadMangaLangFilter(serverBase).slice().sort().join("+"));
   return cached(
     "tags",
     `${revision}|${lib}|${langRev}|${langKey}`,

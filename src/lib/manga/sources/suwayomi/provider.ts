@@ -123,7 +123,7 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
   });
 
   async function mergedPopular(): Promise<MangaSummary[]> {
-    const filter = loadMangaLangFilter();
+    const filter = loadMangaLangFilter(server.base);
     const cacheKey = `${server.base}|${[...filter].sort().join("+")}`;
     if (
       popularCache &&
@@ -285,7 +285,7 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
 
   async function tags(): Promise<MangaTag[]> {
     const t = await pickTransport(client);
-    const filter = loadMangaLangFilter();
+    const filter = loadMangaLangFilter(server.base);
     return (await loadSources(client, t))
       .filter((s) => langFilterMatches(filter, s.lang))
       .map((s) => ({
