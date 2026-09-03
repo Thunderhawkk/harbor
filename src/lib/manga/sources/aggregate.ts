@@ -1,4 +1,4 @@
-import type { MangaChapter, MangaProvider, MangaSummary } from "@/lib/manga/types";
+import type { MangaChapter, MangaProvider, MangaSummary, MangaTag } from "@/lib/manga/types";
 import { aggregateSubProviders } from "@/lib/manga/sources";
 
 const SEP = "::";
@@ -200,6 +200,16 @@ export async function ownSourceChapters(id: string): Promise<MangaChapter[]> {
   return labelChapters(await ownP.chapters(orig).catch(() => []), ownP);
 }
 
+async function mergeTags(): Promise<MangaTag[]> {
+  const lists = await Promise.all(
+    aggregateSubProviders().map((p) =>
+      withTimeout(p.tags?.() ?? Promise.resolve([]), [] as MangaTag[]),
+    ),
+  );
+  const seen = new Set<string>();
+  return lists.flat().filter((tg) => (seen.has(tg.id) ? false : (seen.add(tg.id), true)));
+}
+
 export const aggregateProvider: MangaProvider = {
   id: "all",
   name: "All Sources",
@@ -246,5 +256,5 @@ export const aggregateProvider: MangaProvider = {
     const { source, orig } = parseId(id);
     await subById(source).setLibrary?.(orig, inLibrary);
   },
-  tags: () => aggregateSubProviders()[0]?.tags?.() ?? Promise.resolve([]),
+  tags: mergeTags,
 };

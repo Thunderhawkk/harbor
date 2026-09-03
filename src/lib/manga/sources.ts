@@ -249,7 +249,11 @@ export function hasConfiguredMangaSources(): boolean {
 export function listMangaSources(): MangaSource[] {
   const subs = configuredSources();
   const out: MangaSource[] = [];
-  if (subs.length >= 2) out.push({ id: "all", name: "All Sources", baseUrl: "", builtin: true });
+  if (subs.length >= 2) {
+    // A Suwayomi server hosts many sources, so "All" pairs whole servers here, not sources.
+    const allServers = subs.every((s) => s.kind === "suwayomi");
+    out.push({ id: "all", name: allServers ? "All Servers" : "All Sources", baseUrl: "", builtin: true });
+  }
   out.push(...subs);
   return out;
 }
