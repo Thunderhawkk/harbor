@@ -8,6 +8,12 @@ export type MangaDownloadRec = {
   done: number;
   total: number;
   files: string[];
+  /** Grouping/display context for in-progress chapters (persisted meta only exists once a chapter finishes). */
+  mangaId?: string;
+  title?: string;
+  cover?: string;
+  chapter?: string | null;
+  num?: number;
 };
 
 export type MangaDownloadBatchStatus = "idle" | "downloading" | "paused" | "done" | "error";
@@ -40,6 +46,7 @@ export type MangaDownloadChapterItem = {
   pages: number;
   files: string[];
   num: number;
+  rec?: MangaDownloadRec;
 };
 
 export type MangaDownloadGroup = {
@@ -64,6 +71,54 @@ type BatchControl = {
 };
 
 const batchControls = new Map<string, BatchControl>();
+
+type ChapterGate = {
+  paused: boolean;
+  waiters: Set<() => void>;
+};
+
+const chapterControllers = new Map<string, AbortController>();
+const chapterGates = new Map<string, ChapterGate>();
+
+function chapterGate(chapterId: string): ChapterGate {
+  let gate = chapterGates.get(chapterId);
+  if (!gate) {
+    gate = { paused: false, waiters: new Set() };
+    chapterGates.set(chapterId, gate);
+  }
+  return gate;
+}
+
+/** Resolves when a chapter is neither batch-paused nor self-paused; rejects if cancelled. */
+function waitForResume(chapterId: string, batchControl?: BatchControl): Promise<void> {
+  const gate = chapterGate(chapterId);
+  const controller = chapterControllers.get(chapterId);
+  const signal = controller?.signal;
+  const batchWaiters = batchControl?.waiters;
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException("aborted", "AbortError"));
+    };
+    const proceed = () => {
+      cleanup();
+      resolve();
+    };
+    const cleanup = () => {
+      signal?.removeEventListener("abort", onAbort);
+      batchWaiters?.delete(proceed);
+      gate.waiters.delete(proceed);
+    };
+    if (signal?.aborted) return onAbort();
+    if (batchControl?.paused || gate.paused) {
+      batchWaiters?.add(proceed);
+      gate.waiters.add(proceed);
+      signal?.addEventListener("abort", onAbort, { once: true });
+    } else {
+      proceed();
+    }
+  });
+}
 
 function notify(changed?: string): void {
   for (const l of listeners) l(changed);
@@ -186,9 +241,75 @@ export function listMangaDownloadGroups(): MangaDownloadGroup[] {
   return out;
 }
 
+export function listActiveMangaDownloadGroups(): MangaDownloadGroup[] {
+  const groups = new Map<string, MangaDownloadGroup>();
+  for (const [chapterId, rec] of runtime) {
+    if (rec.status !== "downloading" && rec.status !== "paused" && rec.status !== "error") continue;
+    const key = rec.mangaId ?? "in-progress";
+    const label = rec.chapter == null
+      ? "Oneshot"
+      : `Chapter ${rec.chapter}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        key,
+        title: rec.title || prettySlug(key),
+        cover: rec.cover,
+        chapters: [],
+      };
+      groups.set(key, group);
+    }
+    group.chapters.push({
+      chapterId,
+      label,
+      chapterRaw: rec.chapter,
+      pages: rec.done,
+      files: rec.files,
+      num: Number.isFinite(rec.num) ? rec.num! : NaN,
+      rec,
+    });
+  }
+  const out = [...groups.values()];
+  for (const g of out) {
+    g.chapters.sort((a, b) => {
+      const an = Number.isFinite(a.num) ? a.num : Infinity;
+      const bn = Number.isFinite(b.num) ? b.num : Infinity;
+      return an - bn;
+    });
+  }
+  out.sort((a, b) => a.title.localeCompare(b.title));
+  return out;
+}
+
+function mergeDownloadGroups(): MangaDownloadGroup[] {
+  const active = new Map(listActiveMangaDownloadGroups().map((g) => [g.key, g]));
+  const merged = [...active.values()];
+  const seen = new Set(merged.map((g) => g.key));
+  for (const g of listMangaDownloadGroups()) {
+    if (seen.has(g.key)) {
+      const m = active.get(g.key)!;
+      m.title = m.title || g.title;
+      m.cover = m.cover || g.cover;
+      m.chapters = [...g.chapters, ...m.chapters];
+    } else {
+      merged.push(g);
+      seen.add(g.key);
+    }
+  }
+  for (const g of merged) {
+    g.chapters.sort((a, b) => {
+      const an = Number.isFinite(a.num) ? a.num : Infinity;
+      const bn = Number.isFinite(b.num) ? b.num : Infinity;
+      return an - bn || a.label.localeCompare(b.label);
+    });
+  }
+  merged.sort((a, b) => a.title.localeCompare(b.title));
+  return merged;
+}
+
 export function useMangaDownloadGroups(): MangaDownloadGroup[] {
-  const [groups, setGroups] = useState<MangaDownloadGroup[]>(listMangaDownloadGroups);
-  useEffect(() => subscribeMangaDownloads(() => setGroups(listMangaDownloadGroups())), []);
+  const [groups, setGroups] = useState<MangaDownloadGroup[]>(mergeDownloadGroups);
+  useEffect(() => subscribeMangaDownloads(() => setGroups(mergeDownloadGroups())), []);
   return groups;
 }
 
@@ -262,6 +383,25 @@ function waitForBatch(control?: BatchControl): Promise<void> {
   return new Promise((resolve) => control.waiters.add(resolve));
 }
 
+export function pauseChapterDownload(chapterId: string): void {
+  const rec = recOf(chapterId);
+  if (rec.status !== "downloading") return;
+  chapterGate(chapterId).paused = true;
+  runtime.set(chapterId, { ...rec, status: "paused" });
+  notify(chapterId);
+}
+
+export function resumeChapterDownload(chapterId: string): void {
+  const rec = recOf(chapterId);
+  if (rec.status !== "paused") return;
+  const gate = chapterGate(chapterId);
+  gate.paused = false;
+  runtime.set(chapterId, { ...rec, status: "downloading" });
+  for (const resolve of gate.waiters) resolve();
+  gate.waiters.clear();
+  notify(chapterId);
+}
+
 export async function downloadedPages(chapterId: string): Promise<string[] | null> {
   const files = readManifest()[chapterId];
   if (!files?.length) return null;
@@ -289,6 +429,12 @@ async function downloadChapterWithControl(
   info?: MangaDownloadInfo,
   batchControl?: BatchControl,
 ): Promise<boolean> {
+  let controller = chapterControllers.get(chapterId);
+  if (!controller) {
+    controller = new AbortController();
+    chapterControllers.set(chapterId, controller);
+  }
+
   const cur = recOf(chapterId);
   if (cur.status === "downloading" || cur.status === "paused" || cur.status === "done") {
     return cur.status === "done";
@@ -299,20 +445,29 @@ async function downloadChapterWithControl(
     notify(chapterId);
   };
 
+  const groupInfo = {
+    mangaId,
+    title: info?.title,
+    cover: info?.cover,
+    chapter: info?.chapter ?? null,
+    num: info?.chapter != null ? parseFloat(info.chapter) : NaN,
+  };
+
   try {
     setRec({
       status: batchControl?.paused ? "paused" : "downloading",
       done: 0,
       total: 0,
       files: [],
+      ...groupInfo,
     });
-    await waitForBatch(batchControl);
+    await waitForResume(chapterId, batchControl);
     const urls = (await chapterPages(chapterId)).filter((u) => /^https?:/i.test(u));
     if (!urls.length) {
-      setRec({ status: "error" });
+      setRec({ status: "error", ...groupInfo });
       return false;
     }
-    setRec({ total: urls.length });
+    setRec({ total: urls.length, ...groupInfo });
 
     const { join } = await import("@tauri-apps/api/path");
     const { mkdir, writeFile } = await import("@tauri-apps/plugin-fs");
@@ -323,26 +478,31 @@ async function downloadChapterWithControl(
     await mkdir(dir, { recursive: true });
 
     const fetchBytes = async (url: string): Promise<Uint8Array> => {
+      const signal = controller!.signal;
+      if (signal.aborted) throw new DOMException("aborted", "AbortError");
       try {
-        const r = await tauriFetch(url, { headers: IMG_HEADERS });
+        const r = await tauriFetch(url, { headers: IMG_HEADERS, signal });
         if (r.ok) return new Uint8Array(await r.arrayBuffer());
-      } catch {
+      } catch (e) {
+        if ((e as Error).name === "AbortError") throw e;
         /* direct fetch blocked (e.g. local Suwayomi server) - fall back to the in-app proxy */
       }
-      const r = await fetch(`/manga-img?u=${encodeURIComponent(url)}`);
+      const r = await fetch(`/manga-img?u=${encodeURIComponent(url)}`, { signal });
       if (!r.ok) throw new Error(`page fetch failed: ${r.status}`);
       return new Uint8Array(await r.arrayBuffer());
     };
 
     const files: string[] = [];
     for (let i = 0; i < urls.length; i++) {
-      await waitForBatch(batchControl);
+      await waitForResume(chapterId, batchControl);
       const bytes = await fetchBytes(urls[i]);
-      await waitForBatch(batchControl);
+      if (controller.signal.aborted) throw new DOMException("aborted", "AbortError");
+      await waitForResume(chapterId, batchControl);
       const path = await join(dir, `${String(i + 1).padStart(4, "0")}.${extOf(urls[i])}`);
       await writeFile(path, bytes);
       files.push(path);
-      setRec({ done: i + 1, files: [...files] });
+      if (controller.signal.aborted) throw new DOMException("aborted", "AbortError");
+      setRec({ done: i + 1, files: [...files], ...groupInfo });
     }
 
     const manifest = readManifest();
@@ -357,11 +517,12 @@ async function downloadChapterWithControl(
       at: Date.now(),
     };
     writeMeta(meta);
-    setRec({ status: "done", files });
+    setRec({ status: "done", files, ...groupInfo });
     return true;
   } catch (e) {
+    if ((e as Error).name === "AbortError") return false;
     console.error("[manga-download] chapter failed", chapterId, e);
-    setRec({ status: "error" });
+    setRec({ status: "error", ...groupInfo });
     return false;
   }
 }
@@ -424,6 +585,21 @@ async function removeChapterDir(firstFile: string): Promise<void> {
   }
 }
 
+export function cancelMangaDownload(chapterId: string): void {
+  const rec = recOf(chapterId);
+  const firstFile = rec.files[0];
+  chapterControllers.get(chapterId)?.abort();
+  chapterControllers.delete(chapterId);
+  const gate = chapterGates.get(chapterId);
+  if (gate) {
+    gate.paused = false;
+    for (const resolve of gate.waiters) resolve();
+    gate.waiters.clear();
+  }
+  deleteMangaDownload(chapterId);
+  if (firstFile) void removeChapterDir(firstFile);
+}
+
 export function deleteMangaDownload(chapterId: string): void {
   const manifest = readManifest();
   const files = manifest[chapterId];
@@ -432,6 +608,7 @@ export function deleteMangaDownload(chapterId: string): void {
   const meta = readMeta();
   delete meta[chapterId];
   writeMeta(meta);
+  chapterControllers.delete(chapterId);
   runtime.set(chapterId, { status: "idle", done: 0, total: 0, files: [] });
   notify(chapterId);
   if (files?.length) void removeChapterDir(files[0]);
