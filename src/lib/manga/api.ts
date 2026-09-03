@@ -191,10 +191,14 @@ export function clearMangaCache(): void {
 
 export function popularManga(offset = 0, tagId?: string) {
   const tag = tagId ?? "";
-  return cached("pop2", `${offset}|${tag}`, 5 * MIN, (p) => p.popular(offset, tagId), {
+  // Extension installs/updates/uninstalls change the sources behind the merged
+  // popular feed, so include the source revision in the key (same pattern as
+  // searchMangaEverywhere) to invalidate both the in-memory and disk caches.
+  const revision = suwayomiSourcesRevision();
+  return cached("pop2", `${revision}|${offset}|${tag}`, 5 * MIN, (p) => p.popular(offset, tagId), {
     tries: 3,
     timeout: 10_000,
-    disk: offset === 0 ? { key: `pop2|${tag}`, ...POPULAR_DISK } : undefined,
+    disk: offset === 0 ? { key: `pop2|${revision}|${tag}`, ...POPULAR_DISK } : undefined,
   });
 }
 
