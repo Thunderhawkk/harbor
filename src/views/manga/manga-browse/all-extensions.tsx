@@ -1,7 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type HTMLAttributes } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronsUp,
+  GripVertical,
+  ListOrdered,
+  RotateCcw,
+} from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { Row } from "@/components/row";
+import { moveItem } from "@/lib/addons-store/reorder";
 import { activeMangaSource } from "@/lib/manga/sources";
 import {
   sourceLatest,
@@ -10,8 +19,10 @@ import {
   type SuwayomiSource,
 } from "@/lib/manga/sources/suwayomi/provider";
 import { subscribeSuwayomiSourcesChanged } from "@/lib/manga/sources/suwayomi/source-events";
+import { applySuwayomiSourceOrder } from "@/lib/manga/sources/suwayomi/source-order";
 import { useMangaFavorites } from "@/lib/manga-favorites";
 import type { MangaSummary } from "@/lib/manga/types";
+import { useDragList } from "@/views/addons/organize/use-drag-list";
 import {
   cachedSuwayomiSources,
   invalidateSuwayomiSources,
@@ -20,6 +31,7 @@ import {
   loadMangaLangFilter,
   subscribeMangaLangFilter,
 } from "./langs";
+import { TRIGGER, useOutsideClose } from "./filters";
 import { MangaCard } from "./manga-card";
 
 export function sourceDisplayName(source: SuwayomiSource): string {
@@ -99,16 +111,17 @@ function FeedRail({
           ))}
         </Row>
       )}
-      {state === "ready" && items.length > 0 && (
-        // Each feed is a single page, so eager-render every card: the Row would
-        // otherwise virtualize items past EAGER_COUNT into blank skeletons that
-        // look like missing manga until scrolled into view.
-        <Row min={140} alwaysActive>
-          {items.map((m) => (
-            <MangaCard key={m.id} manga={m} onOpen={onOpen} />
-          ))}
-        </Row>
-      )}
+      {state === "ready" &&
+        items.length > 0 && (
+          // Each feed is a single page, so eager-render every card: the Row would
+          // otherwise virtualize items past EAGER_COUNT into blank skeletons that
+          // look like missing manga until scrolled into view.
+          <Row min={140} alwaysActive>
+            {items.map((m) => (
+              <MangaCard key={m.id} manga={m} onOpen={onOpen} />
+            ))}
+          </Row>
+        )}
     </div>
   );
 }
@@ -145,7 +158,184 @@ function ExtensionSection({
   );
 }
 
-export function AllExtensionsView({ onOpen }: { onOpen: (id: string) => void }) {
+export function ReorderMenu({
+  sources,
+  order,
+  onOrder,
+  onReset,
+}: {
+  sources: SuwayomiSource[];
+  order: string[];
+  onOrder: (ids: string[]) => void;
+  onReset: () => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const ref = useOutsideClose(open, () => setOpen(false));
+
+  const custom = order.length > 0;
+
+  const ordered = useMemo(() => applySuwayomiSourceOrder(sources, order), [sources, order]);
+
+  const move = (from: number, to: number) => {
+    const clamped = Math.max(0, Math.min(ordered.length - 1, to));
+    if (clamped === from) return;
+    onOrder(moveItem(ordered, from, clamped).map((s) => s.id));
+  };
+
+  const drag = useDragList(ordered.length, move);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={TRIGGER}
+      >
+        <ListOrdered size={15} className="text-ink-subtle" />
+        <span className="font-medium">{t("Reorder")}</span>
+        <ChevronDown size={14} className="text-ink-subtle" />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1.5 w-[300px] overflow-hidden rounded-lg border border-edge-soft bg-raised shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]">
+          <div className="flex items-center justify-between gap-3 border-b border-edge-soft/60 px-3.5 py-2.5">
+            <span className="text-[12.5px] font-medium text-ink">{t("Reorder extensions")}</span>
+            {custom && (
+              <button
+                type="button"
+                onClick={() => {
+                  onReset();
+                  setOpen(false);
+                }}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-semibold text-ink-muted transition-colors hover:bg-elevated/60 hover:text-ink"
+              >
+                <RotateCcw size={12} strokeWidth={2.4} />
+                {t("Reset order")}
+              </button>
+            )}
+          </div>
+          <div
+            className={`max-h-80 overflow-y-auto p-1.5 ${drag.dragIndex != null ? "select-none" : ""}`}
+          >
+            {ordered.map((source, i) => (
+              <ReorderRow
+                key={source.id}
+                name={sourceDisplayName(source)}
+                rowRef={drag.rowRef(i)}
+                handleProps={drag.handleProps(i)}
+                dragging={drag.dragIndex === i}
+                indicator={
+                  drag.dragIndex != null &&
+                  drag.overIndex === i &&
+                  drag.overIndex !== drag.dragIndex
+                    ? drag.overIndex < drag.dragIndex
+                      ? "above"
+                      : "below"
+                    : null
+                }
+                canUp={i > 0}
+                canDown={i < ordered.length - 1}
+                onUp={() => move(i, i - 1)}
+                onDown={() => move(i, i + 1)}
+                onTop={() => move(i, 0)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReorderRow({
+  name,
+  rowRef,
+  handleProps,
+  dragging,
+  indicator,
+  canUp,
+  canDown,
+  onUp,
+  onDown,
+  onTop,
+}: {
+  name: string;
+  rowRef: (el: HTMLDivElement | null) => void;
+  handleProps: HTMLAttributes<HTMLElement>;
+  dragging: boolean;
+  indicator: "above" | "below" | null;
+  canUp: boolean;
+  canDown: boolean;
+  onUp: () => void;
+  onDown: () => void;
+  onTop: () => void;
+}) {
+  const t = useT();
+  const btn =
+    "flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-elevated/70 hover:text-ink disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-ink-subtle";
+
+  return (
+    <div
+      ref={rowRef}
+      className={`relative flex items-center gap-1 rounded-lg px-0.5 py-1 ${dragging ? "opacity-50 ring-1 ring-accent/40" : ""}`}
+    >
+      {indicator && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-x-1 h-[3px] rounded-full bg-accent ${
+            indicator === "above" ? "-top-[3px]" : "-bottom-[3px]"
+          }`}
+        />
+      )}
+      <span
+        {...handleProps}
+        title={t("Drag to reorder")}
+        className="flex h-8 w-7 shrink-0 cursor-grab touch-none items-center justify-center text-ink-subtle transition-colors hover:text-ink active:cursor-grabbing"
+      >
+        <GripVertical size={15} strokeWidth={2.2} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{name}</span>
+      <button
+        type="button"
+        onClick={onTop}
+        disabled={!canUp}
+        aria-label={t("Move to top")}
+        className={btn}
+      >
+        <ChevronsUp size={14} strokeWidth={2.3} />
+      </button>
+      <button
+        type="button"
+        onClick={onUp}
+        disabled={!canUp}
+        aria-label={t("Move up")}
+        className={btn}
+      >
+        <ArrowUp size={14} strokeWidth={2.3} />
+      </button>
+      <button
+        type="button"
+        onClick={onDown}
+        disabled={!canDown}
+        aria-label={t("Move down")}
+        className={btn}
+      >
+        <ArrowDown size={14} strokeWidth={2.3} />
+      </button>
+    </div>
+  );
+}
+
+export function AllExtensionsView({
+  onOpen,
+  orderedIds,
+  onSources,
+}: {
+  onOpen: (id: string) => void;
+  orderedIds: string[];
+  onSources: (sources: SuwayomiSource[]) => void;
+}) {
   const t = useT();
   const { items: favs } = useMangaFavorites();
   const [sources, setSources] = useState<SuwayomiSource[] | null>(null);
@@ -160,7 +350,6 @@ export function AllExtensionsView({ onOpen }: { onOpen: (id: string) => void }) 
     [],
   );
 
-  // The parent remounts this view via `key` when the active source changes.
   const config = useMemo<ServerConfig>(() => ({ baseUrl: activeMangaSource()?.baseUrl ?? "" }), []);
 
   useEffect(() => {
@@ -198,12 +387,21 @@ export function AllExtensionsView({ onOpen }: { onOpen: (id: string) => void }) 
     [favs],
   );
 
-  const ordered = useMemo(() => {
+  const alphaSorted = useMemo(() => {
     if (!sources) return [];
     return [...sources]
       .filter((s) => langFilterMatches(langFilter, s.lang))
       .sort((a, b) => sourceDisplayName(a).localeCompare(sourceDisplayName(b)));
   }, [sources, langFilter]);
+
+  const ordered = useMemo(
+    () => applySuwayomiSourceOrder(alphaSorted, orderedIds),
+    [alphaSorted, orderedIds],
+  );
+
+  useEffect(() => {
+    onSources(ordered);
+  }, [ordered, onSources]);
 
   if (failed) {
     return (
