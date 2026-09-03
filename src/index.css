@@ -1016,6 +1016,31 @@ main[data-kids="on"]::-webkit-scrollbar-thumb:hover {
   overflow: visible;
 }
 
+.harbor-nav-lottie svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.harbor-nav-lottie svg path,
+.harbor-nav-lottie svg rect,
+.harbor-nav-lottie svg ellipse,
+.harbor-nav-lottie svg circle {
+  fill: currentColor;
+}
+
+.harbor-nav-lottie svg path[stroke],
+.harbor-nav-lottie svg line[stroke],
+.harbor-nav-lottie svg polyline[stroke] {
+  stroke: currentColor;
+}
+
+.harbor-nav-lottie mask path,
+.harbor-nav-lottie clipPath path {
+  fill: #fff;
+}
+
 .harbor-flame svg path {
   fill: currentColor;
 }

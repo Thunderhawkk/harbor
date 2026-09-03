@@ -2,6 +2,7 @@ import { Maximize2, Move, Timer } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
+import { normalizeFullscreenMode, type FullscreenMode } from "@/lib/fullscreen-state";
 import { STALL_WAIT_OPTIONS, stallWaitSec } from "@/lib/player/stall-wait";
 import { SettingGroup, SettingRow } from "../kit";
 import { Segmented, ToggleRow } from "../shared";
@@ -238,16 +239,19 @@ export function PlayModePanel() {
               icon={<Maximize2 size={16} />}
               label={t("What fullscreen does")}
               desc={t(
-                "True fullscreen covers the whole screen and hides the taskbar. Maximize fills the screen but keeps the taskbar and title bar, so you can still switch apps.",
+                "True fullscreen covers the whole screen and hides the taskbar, but switching apps can flicker. Borderless window covers the same area with a frameless window, so alt-tab and overlays stay instant. Maximize fills the screen but keeps the taskbar and title bar.",
               )}
             >
-              <Segmented
-                value={settings.fullscreenMode ?? "fullscreen"}
+              <Segmented<FullscreenMode>
+                value={normalizeFullscreenMode(settings.fullscreenMode)}
                 options={[
                   { value: "fullscreen", label: t("True fullscreen") },
+                  { value: "borderless", label: t("Borderless window") },
                   { value: "maximized", label: t("Maximize") },
                 ]}
-                onChange={(fullscreenMode) => update({ fullscreenMode })}
+                onChange={(mode) =>
+                  update({ fullscreenMode: mode as typeof settings.fullscreenMode })
+                }
               />
             </SettingRow>
           </Anchored>

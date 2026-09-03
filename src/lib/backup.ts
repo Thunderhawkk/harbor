@@ -202,6 +202,7 @@ export const BACKUP_SECTIONS: readonly BackupSection[] = [
       "harbor.custom-hover.v1",
       "harbor.awardpacks.v1",
       "harbor.cw.dismissed",
+      "harbor.advisory.ignored",
       "harbor.calendar.filtersOpen",
       "harbor.multiview.",
       "harbor.memoryHud.open",

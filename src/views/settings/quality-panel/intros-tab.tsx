@@ -1,11 +1,34 @@
+import { useEffect, useRef, useState } from "react";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { SettingRow } from "../kit";
-import { Section, Segmented, ToggleRow } from "../shared";
+import {
+  readTheIntroDbKey,
+  setTheIntroDbApiKey,
+  theIntroDbKeyPatch,
+} from "@/lib/skip-intro/theintrodb";
+import { SettingGroup, SettingRow } from "../kit";
+import { ExtLink, KeyField, Section, Segmented, ToggleRow } from "../shared";
 
 export function IntrosTab() {
   const t = useT();
   const { settings, update } = useSettings();
+  const storedKey = readTheIntroDbKey(settings);
+  const [keyDraft, setKeyDraft] = useState(storedKey);
+  const [keySaved, setKeySaved] = useState(false);
+  const savedTimerRef = useRef(0);
+
+  useEffect(() => () => window.clearTimeout(savedTimerRef.current), []);
+
+  const saveKey = (value: string) => {
+    const next = value.trim();
+    update(theIntroDbKeyPatch(next));
+    setTheIntroDbApiKey(next);
+    setKeyDraft(next);
+    setKeySaved(true);
+    window.clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = window.setTimeout(() => setKeySaved(false), 1800);
+  };
+
   return (
       <Section
         title={t("Skip intros & credits")}
@@ -54,6 +77,24 @@ export function IntrosTab() {
             />
           </SettingRow>
         )}
+        <SettingGroup label={t("Timing sources")}>
+          <KeyField
+            label={t("TheIntroDB · intro and credits timing")}
+            placeholder={t("Paste your TheIntroDB API key")}
+            value={keyDraft}
+            onChange={setKeyDraft}
+            onSave={() => saveKey(keyDraft)}
+            saved={keySaved}
+            help={
+              <>
+                {t(
+                  "Optional. TheIntroDB answers without a key, but a key raises your rate limit so timing keeps arriving when you binge. Get one at",
+                )}{" "}
+                <ExtLink href="https://theintrodb.org">theintrodb.org</ExtLink>.
+              </>
+            }
+          />
+        </SettingGroup>
       </Section>
   );
 }

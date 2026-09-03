@@ -7,6 +7,7 @@ import { useHideAnime } from "@/lib/anime-hide";
 import { useHeroLogos } from "@/components/anime-hero/use-hero-logos";
 import { dismissCw, isCwDismissed, useCwDismissVersion } from "@/lib/cw-dismiss";
 import { listLocalCw, subscribeLocalCw, type LocalCwEntry } from "@/lib/local-cw";
+import { useExternalCw } from "@/lib/feed/external-cw";
 import { readSnapshot, useSnapshotVersion } from "@/lib/snapshots";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
@@ -89,6 +90,7 @@ export function useMobileCw(limit = 14): LibraryItem[] {
   const { settings } = useSettings();
   const cwPerProfile = settings.cwPerProfile;
   const hideAnime = useHideAnime();
+  const externalCw = useExternalCw(!cwPerProfile && settings.externalContinueWatching);
   const [items, setItems] = useState<LibraryItem[]>(() =>
     authKey && cloudKey === authKey ? cloudCache : [],
   );
@@ -124,7 +126,9 @@ export function useMobileCw(limit = 14): LibraryItem[] {
   return useMemo(() => {
     void localVersion;
     void dismissVersion;
-    const base = cwPerProfile ? [] : items.filter((i) => !ANIME_CLOUD_ID.test(i._id));
+    const base = cwPerProfile
+      ? []
+      : [...items.filter((i) => !ANIME_CLOUD_ID.test(i._id)), ...externalCw];
     const merged = [...base, ...listLocalCw().map(localToLibraryItem)]
       .filter(
         (i) =>
@@ -146,7 +150,7 @@ export function useMobileCw(limit = 14): LibraryItem[] {
       if (out.length >= limit) break;
     }
     return out;
-  }, [items, localVersion, dismissVersion, limit, hideAnime, cwPerProfile]);
+  }, [items, externalCw, localVersion, dismissVersion, limit, hideAnime, cwPerProfile]);
 }
 
 function toMeta(item: LibraryItem): Meta {

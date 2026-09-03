@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { Section, Segmented, ToggleRow } from "./shared";
+import { Section, Segmented } from "./shared";
 import { SettingRow } from "./kit";
 import { isTauri } from "./player-panel/internals";
 import { QualityProfile } from "./mpv-panel/profile";
+import { BufferSizeSection } from "./mpv-panel/buffer";
 import { PictureDialsSection, ColorHdrSection } from "./mpv-panel/dials";
 import { AdvancedMpvSection } from "./mpv-panel/advanced";
 import { useSubTabs } from "./sub-tabs";
@@ -87,22 +88,7 @@ export function MpvPanel() {
           <ColorHdrSection />
         </>
       )}
-      {tab === "network" && (
-        <>
-      <Section
-        title={t("Slow or unstable connection")}
-        subtitle={t("If video keeps pausing to buffer, or you're on spotty Wi-Fi or a far-away server, this gives Harbor a bigger head start so playback rides through the rough patches.")}
-      >
-        <ToggleRow
-          label={t("Build a bigger buffer")}
-          sub={t("Loads more of the video ahead of time before playing. Smoother on weak connections, uses a little more memory and takes a moment longer to start.")}
-          value={settings.mpvBufferBoost}
-          onChange={(v) => update({ mpvBufferBoost: v })}
-        />
-      </Section>
-
-        </>
-      )}
+      {tab === "network" && <BufferSizeSection />}
       {tab === "advanced" && <AdvancedMpvSection />}
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
 import { listLocalCw, subscribeLocalCw } from "@/lib/local-cw";
+import { useExternalCw } from "@/lib/feed/external-cw";
 import {
   ANIME_CLOUD_ID,
   cwSortKey,
@@ -96,6 +97,7 @@ export function useContinueWatching(excludeId?: string, limit = 12): CwCard[] {
   const { authKey } = useAuth();
   const { settings } = useSettings();
   const cwPerProfile = settings.cwPerProfile;
+  const externalCw = useExternalCw(!cwPerProfile && settings.externalContinueWatching);
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [localVersion, setLocalVersion] = useState(0);
 
@@ -150,7 +152,9 @@ export function useContinueWatching(excludeId?: string, limit = 12): CwCard[] {
 
   return useMemo(() => {
     void localVersion;
-    const base = cwPerProfile ? [] : items.filter((i) => !ANIME_CLOUD_ID.test(i._id));
+    const base = cwPerProfile
+      ? []
+      : [...items.filter((i) => !ANIME_CLOUD_ID.test(i._id)), ...externalCw];
     const merged = [...base, ...listLocalCw().map(localToLibraryItem)]
       .filter((i) => (i.type as string) !== "other" && !i._id.startsWith("iptv:") && isCwMember(i))
       .map((i) => ({ i, k: cwSortKey(i) }))
@@ -165,5 +169,5 @@ export function useContinueWatching(excludeId?: string, limit = 12): CwCard[] {
       if (out.length >= limit) break;
     }
     return out;
-  }, [items, localVersion, excludeId, limit, cwPerProfile]);
+  }, [items, externalCw, localVersion, excludeId, limit, cwPerProfile]);
 }

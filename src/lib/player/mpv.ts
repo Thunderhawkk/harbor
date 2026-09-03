@@ -945,32 +945,31 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
     },
     setSubtitleTrack(id) {
       const requestMediaRevision = mediaRevision;
-      const request = mainSubtitleSelection.begin(
+      mainSubtitleSelection.begin(
         requestMediaRevision,
         id ?? "__harbor-subtitles-off__",
         snap.subtitleTracks.find((track) => track.selected)?.id ?? null,
       );
-      snap.subText = "";
-      snap.subStartSec = 0;
+      snap = {
+        ...snap,
+        subText: "",
+        subStartSec: 0,
+        subtitleTracks: snap.subtitleTracks.map((track) => ({
+          ...track,
+          selected: id != null && track.id === id,
+        })),
+      };
       emit();
       void enqueueSubtitleTransition(async () => {
-        if (
-          requestMediaRevision !== mediaRevision ||
-          !mainSubtitleSelection.isCurrent(request, mediaRevision)
-        )
-          return;
+        if (requestMediaRevision !== mediaRevision) return;
         await resetSubtitleFpsBeforeMpvTransition();
-        if (
-          requestMediaRevision !== mediaRevision ||
-          !mainSubtitleSelection.isCurrent(request, mediaRevision)
-        )
-          return;
+        if (requestMediaRevision !== mediaRevision) return;
         await invoke("mpv_set_property", {
           name: "sid",
           value: id == null ? "no" : Number(id) || id,
         });
       }).catch((error) => {
-        if (mainSubtitleSelection.isCurrent(request, mediaRevision)) {
+        if (requestMediaRevision === mediaRevision) {
           console.warn("[mpv] could not select a subtitle after resetting subtitle FPS", error);
           window.dispatchEvent(new Event(SUBTITLE_FPS_TRANSITION_FAILED_EVENT));
         }
@@ -987,17 +986,9 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
       snap.secondarySubText = "";
       emit();
       void enqueueSubtitleTransition(async () => {
-        if (
-          requestMediaRevision !== mediaRevision ||
-          !secondarySubtitleSelection.isCurrent(request, mediaRevision)
-        )
-          return;
+        if (requestMediaRevision !== mediaRevision) return;
         await resetSubtitleFpsBeforeMpvTransition();
-        if (
-          requestMediaRevision !== mediaRevision ||
-          !secondarySubtitleSelection.isCurrent(request, mediaRevision)
-        )
-          return;
+        if (requestMediaRevision !== mediaRevision) return;
         secondarySid = id;
         try {
           await invoke("mpv_set_property", {

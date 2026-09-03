@@ -31,6 +31,7 @@ import { OptionsSection } from "./options-section";
 import { EditLayoutCard, FooterBar, ThemeTabs } from "./panel-bars";
 import { useChromeEdits } from "./use-chrome-edits";
 import { AdvisoryPreview } from "./advisory-preview";
+import { AdvisoryIgnoreRow } from "./advisory-ignore-row";
 import { SeekBarPanel } from "../player-panel";
 import { FullscreenClockSettings } from "../theme-panel/fullscreen-clock-settings";
 import { Section, ToggleRow } from "../shared";
@@ -328,6 +329,7 @@ export function PlayerLayoutPanel() {
           onChange={(v) => update({ contentAdvisoryToast: v })}
           preview={<AdvisoryPreview />}
         />
+        <AdvisoryIgnoreRow featureOn={settings.contentAdvisoryToast} />
       </Section>
 
       <Section
