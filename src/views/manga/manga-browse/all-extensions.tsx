@@ -4,6 +4,7 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronsUp,
+  ExternalLink,
   GripVertical,
   ListOrdered,
   RotateCcw,
@@ -130,26 +131,39 @@ function ExtensionSection({
   config,
   source,
   onOpen,
+  onBrowseExtension,
 }: {
   config: ServerConfig;
   source: SuwayomiSource;
   onOpen: (id: string) => void;
+  onBrowseExtension: (source: SuwayomiSource) => void;
 }) {
   const [open, setOpen] = useState(true);
   const name = sourceDisplayName(source);
 
   return (
     <section className="flex flex-col gap-4">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="group flex w-fit items-center gap-1.5"
-      >
-        <CollapseChevron open={open} />
-        <h3 className="font-medium tracking-tight text-ink transition-colors group-hover:text-ink-muted">
-          {name}
-        </h3>
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="group flex w-fit items-center gap-1.5"
+        >
+          <CollapseChevron open={open} />
+          <h3 className="font-medium tracking-tight text-ink transition-colors group-hover:text-ink-muted">
+            {name}
+          </h3>
+        </button>
+        <button
+          type="button"
+          onClick={() => onBrowseExtension(source)}
+          title="Open extension"
+          aria-label="Open extension"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-elevated/70 hover:text-ink"
+        >
+          <ExternalLink size={14} strokeWidth={2.2} />
+        </button>
+      </div>
       <div className={open ? "flex flex-col gap-8" : "hidden"}>
         <FeedRail config={config} sourceId={source.id} mode="popular" onOpen={onOpen} />
         <FeedRail config={config} sourceId={source.id} mode="latest" onOpen={onOpen} />
@@ -329,10 +343,12 @@ function ReorderRow({
 
 export function AllExtensionsView({
   onOpen,
+  onBrowseExtension,
   orderedIds,
   onSources,
 }: {
   onOpen: (id: string) => void;
+  onBrowseExtension: (source: SuwayomiSource) => void;
   orderedIds: string[];
   onSources: (sources: SuwayomiSource[]) => void;
 }) {
@@ -420,7 +436,13 @@ export function AllExtensionsView({
         </Row>
       )}
       {ordered.map((s) => (
-        <ExtensionSection key={s.id} config={config} source={s} onOpen={onOpen} />
+        <ExtensionSection
+          key={s.id}
+          config={config}
+          source={s}
+          onOpen={onOpen}
+          onBrowseExtension={onBrowseExtension}
+        />
       ))}
     </div>
   );

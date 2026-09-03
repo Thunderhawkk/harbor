@@ -47,9 +47,11 @@ type SearchResultGroup = { sourceId: string; name: string; items: MangaSummary[]
 export function MangaBrowse({
   onOpen,
   onManageSources,
+  onBrowseExtension,
 }: {
   onOpen: (mangaId: string) => void;
   onManageSources: () => void;
+  onBrowseExtension: (source: SuwayomiSource) => void;
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
@@ -395,6 +397,7 @@ export function MangaBrowse({
         <AllExtensionsView
           key={activeSource?.id ?? ""}
           onOpen={onOpen}
+          onBrowseExtension={onBrowseExtension}
           orderedIds={orderedIds}
           onSources={setReorderSources}
         />

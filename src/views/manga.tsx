@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
 import { useView } from "@/lib/view";
 import {
+  activeMangaSource,
   activeMangaSourceId,
   hasAnyMangaSource,
   initMangaSource,
@@ -28,6 +29,8 @@ import { takeMangaReadIntent } from "@/lib/manga/read-intent";
 import { MangaHero } from "./manga/manga-hero";
 import { MangaBootstrap, MangaBootstrapError } from "./manga/manga-boot";
 import { MangaBrowse } from "./manga/manga-browse";
+import { BrowseResults } from "./manga/manga-sources-panel/suwayomi/browse-results";
+import type { SuwayomiSource } from "@/lib/manga/sources/suwayomi/provider";
 import { MangaCollections } from "./manga/manga-collections";
 import { MangaContinue } from "./manga/manga-continue";
 import { MangaDetail } from "./manga/manga-detail";
@@ -48,6 +51,7 @@ type Mode =
   | { screen: "universes" }
   | { screen: "sources" }
   | { screen: "downloads"; from?: string }
+  | { screen: "browse-extension"; source: SuwayomiSource }
   | { screen: "detail"; mangaId: string }
   | {
       screen: "reader";
@@ -77,6 +81,7 @@ export function MangaView() {
   topKindRef.current = topKind;
   const detailScrollRef = useRef<HTMLElement>(null);
   const browseScrollRef = useRef<HTMLElement>(null);
+  const browseExtensionScrollRef = useRef<HTMLElement>(null);
   const resumeRef = useRef<(entry: MangaProgressEntry) => void>(() => {});
 
   const openMangaItem = (item: MangaSummary) => {
@@ -325,6 +330,23 @@ export function MangaView() {
     );
   }
 
+  if (mode.screen === "browse-extension") {
+    return (
+      <main
+        ref={browseExtensionScrollRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24"
+      >
+        <BrowseResults
+          config={{ baseUrl: activeMangaSource()?.baseUrl ?? "" }}
+          source={mode.source}
+          onBack={() => setMode({ screen: "browse" })}
+          onOpen={(item) => setMode({ screen: "detail", mangaId: item.id })}
+          scrollRef={browseExtensionScrollRef}
+        />
+      </main>
+    );
+  }
+
   return (
     <main
       ref={browseScrollRef}
@@ -403,6 +425,7 @@ export function MangaView() {
       <MangaBrowse
         onOpen={(id) => setMode({ screen: "detail", mangaId: id })}
         onManageSources={() => setMode({ screen: "sources" })}
+        onBrowseExtension={(source) => setMode({ screen: "browse-extension", source })}
       />
       <BackToTop scrollRef={browseScrollRef} />
     </main>
