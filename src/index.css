@@ -1031,10 +1031,6 @@ main[data-kids="on"]::-webkit-scrollbar-thumb:hover {
   overflow: visible;
 }
 
-.harbor-nav-lottie {
-  z-index: 2;
-}
-
 .harbor-nav-lottie svg {
   display: block;
   width: 100%;

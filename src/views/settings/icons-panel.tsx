@@ -67,6 +67,11 @@ const SVG_RAW = import.meta.glob([
 
 const LOTTIE_NAV = import.meta.glob("../../assets/lottie/nav/*.json") as LazyGlob;
 const LOTTIE_MAIN = import.meta.glob("../../assets/lottie/*.json") as LazyGlob;
+const LOTTIE_APP: LazyGlob = {
+  "../../assets/harbor-lottie.json": () => import("../../assets/harbor-lottie.json"),
+  "../../../installer/ui/assets/boot-box.json": () =>
+    import("../../../installer/ui/assets/boot-box.json"),
+};
 
 function stem(path: string): string {
   const file = path.slice(path.lastIndexOf("/") + 1);
@@ -363,6 +368,13 @@ export function IconsPanel() {
 
       <Section title={t("Everything else that moves")} subtitle={t("Loaders, boats, and the bits between screens.")}>
         <AnimationSet glob={LOTTIE_MAIN} savedId={savedId} flash={flash} />
+      </Section>
+
+      <Section
+        title={t("Harbor and the installer")}
+        subtitle={t("The Big Picture opener and the boat that builds itself while Harbor installs.")}
+      >
+        <AnimationSet glob={LOTTIE_APP} savedId={savedId} flash={flash} />
       </Section>
 
       <Section title={t("Using these")}>

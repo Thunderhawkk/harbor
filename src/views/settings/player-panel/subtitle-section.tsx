@@ -1,4 +1,5 @@
-import { fillStyle } from "@/components/slider";
+import { fillStyle, SliderReset } from "@/components/slider";
+import { DEFAULT } from "@/lib/settings/defaults";
 import { Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import godfatherStill from "@/assets/godfather-offer.svg";
@@ -207,6 +208,7 @@ export function SubtitleStylePanel() {
                 style={fillStyle(settings.subBoxOpacity, 0.2, 1, 0.05)}
               />
               <span className={SLIDER_VALUE}>{`${boxOpacityPct}%`}</span>
+              <SliderReset show={settings.subBoxOpacity !== DEFAULT.subBoxOpacity} onReset={() => update({ subBoxOpacity: DEFAULT.subBoxOpacity })} />
             </div>
           </SettingRow>
         )}
@@ -232,6 +234,7 @@ export function SubtitleStylePanel() {
                 style={fillStyle(Math.max(1, settings.subBorderSize), 1, 6, 0.5)}
               />
               <span className={SLIDER_VALUE}>{`${Math.max(1, settings.subBorderSize)}px`}</span>
+              <SliderReset show={settings.subBorderSize !== DEFAULT.subBorderSize} onReset={() => update({ subBorderSize: DEFAULT.subBorderSize })} />
             </div>
           </SettingRow>
         )}
@@ -269,6 +272,7 @@ export function SubtitleStylePanel() {
               style={fillStyle(settings.subFontSize, 16, 120)}
             />
             <span className={SLIDER_VALUE}>{`${settings.subFontSize}px`}</span>
+              <SliderReset show={settings.subFontSize !== DEFAULT.subFontSize} onReset={() => update({ subFontSize: DEFAULT.subFontSize })} />
           </div>
         </SettingRow>
 
@@ -300,6 +304,7 @@ export function SubtitleStylePanel() {
               style={fillStyle(settings.subOpacity ?? 1, 0.2, 1, 0.05)}
             />
             <span className={SLIDER_VALUE}>{`${opacityPct}%`}</span>
+              <SliderReset show={(settings.subOpacity ?? 1) !== DEFAULT.subOpacity} onReset={() => update({ subOpacity: DEFAULT.subOpacity })} />
           </div>
         </SettingRow>
 
@@ -321,6 +326,7 @@ export function SubtitleStylePanel() {
               style={fillStyle(settings.subMarginY, 0, 100)}
             />
             <span className={SLIDER_VALUE}>{`${settings.subMarginY}%`}</span>
+              <SliderReset show={settings.subMarginY !== DEFAULT.subMarginY} onReset={() => update({ subMarginY: DEFAULT.subMarginY })} />
           </div>
         </SettingRow>
 

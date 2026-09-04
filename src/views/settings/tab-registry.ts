@@ -1,6 +1,11 @@
+import anilistLogo from "@/assets/anilist.png";
+import malLogo from "@/assets/mal.png";
+import simklLogo from "@/assets/simkl.png";
+import traktLogo from "@/assets/trakt.png";
+import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
 import type { SectionId } from "./shared";
 
-export type TabEntry = { id: string; label: string; icon: string };
+export type TabEntry = { id: string; label: string; icon: string; img?: string };
 
 export const SECTION_TABS: Partial<Record<SectionId, TabEntry[]>> = {
   account: [
@@ -106,6 +111,13 @@ export const SECTION_TABS: Partial<Record<SectionId, TabEntry[]>> = {
   relay: [
     { id: "status", label: "Status", icon: "Activity" },
     { id: "manage", label: "Manage", icon: "Settings2" },
+  ],
+  trackers: [
+    { id: "trakt", label: "Trakt", icon: "CircleUser", img: traktLogo },
+    { id: "simkl", label: "Simkl", icon: "RefreshCw", img: simklLogo },
+    { id: "anilist", label: "AniList", icon: "ListVideo", img: anilistLogo },
+    { id: "mal", label: "MyAnimeList", icon: "BookMarked", img: malLogo },
+    { id: "letterboxd", label: "Letterboxd", icon: "Clapperboard", img: letterboxdLogo },
   ],
   advanced: [
     { id: "system", label: "System", icon: "MonitorCog" },

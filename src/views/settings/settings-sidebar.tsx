@@ -225,7 +225,16 @@ export function SettingsSidebar({
                           className={`hset-rail-kid ${activeTab === tab.id ? "is-on" : ""}`}
                         >
                           <span className="hset-rail-kid-chip">
-                            <Glyph name={tab.icon} size={18} />
+                            {tab.img ? (
+                              <img
+                                src={tab.img}
+                                alt=""
+                                draggable={false}
+                                className="h-[18px] w-[18px] rounded-[4px] object-contain"
+                              />
+                            ) : (
+                              <Glyph name={tab.icon} size={18} />
+                            )}
                           </span>
                           <span className="hset-rail-label">{t(tab.label)}</span>
                         </button>

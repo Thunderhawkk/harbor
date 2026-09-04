@@ -7,6 +7,7 @@ import { groupForSection, TOP_GROUPS } from "./settings/groups";
 import { requestTracker } from "./settings/tracker-request";
 import { SubTabsProvider, type SubTabReg } from "./settings/sub-tabs";
 import { SettingsSidebar } from "./settings/settings-sidebar";
+import { tabsFor } from "./settings/tab-registry";
 import { PageActionsProvider, type PageActionReg } from "./settings/page-actions";
 import { SettingsFooter } from "./settings/settings-footer";
 import { SettingsActiveContext, type SectionId } from "./settings/shared";
@@ -388,6 +389,19 @@ export function Settings({ visible = true }: { visible?: boolean }) {
   const subReg = subRegRaw && subRegRaw.tabs.length > 0 ? subRegRaw : null;
   const subRegRef = useRef<SubTabReg>(null);
   subRegRef.current = subReg;
+  useEffect(() => {
+    if (!import.meta.env.DEV || !subReg) return;
+    const listed = tabsFor(active).map((tab) => tab.id);
+    if (listed.length === 0) return;
+    const live = subReg.tabs.map((tab) => tab.id);
+    const missing = live.filter((id) => !listed.includes(id));
+    const stale = listed.filter((id) => !live.includes(id));
+    if (missing.length || stale.length) {
+      console.warn(
+        `[settings] tab-registry drift on "${active}" - sidebar missing [${missing.join(", ")}] stale [${stale.join(", ")}]`,
+      );
+    }
+  }, [active, subReg]);
   useEffect(() => {
     const want = pendingTab.current;
     if (!want || !subReg) return;
