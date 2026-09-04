@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bookmark, Download } from "lucide-react";
 import { chapterPages, type MangaChapter } from "@/lib/manga/api";
@@ -7,7 +7,12 @@ import { t, useT } from "@/lib/i18n";
 import { downloadedPages, downloadMangaPage } from "@/lib/manga-downloads";
 import { recordMangaProgress, resumePageForChapter } from "@/lib/manga-progress";
 import { clearMangaReading } from "@/lib/manga-reading-state";
-import { subscribeMangaMatchRequest, normalizeTitle as normalizeMatchTitle } from "@/lib/manga-match";
+import {
+  subscribeMangaMatchRequest,
+  normalizeTitle as normalizeMatchTitle,
+  getMangaMatchEntry,
+  type MangaMatchRequest,
+} from "@/lib/manga-match";
 import { anilistMangaAuthed } from "@/lib/manga/tracking-anilist";
 import { malMangaAuthed } from "@/lib/manga/tracking-mal";
 import type { MangaTracker } from "@/lib/manga/sync";
@@ -86,11 +91,7 @@ export function MangaReader({
   const [manualHide, setManualHide] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
-  const [matchRequest, setMatchRequest] = useState<{
-    tracker: MangaTracker;
-    title: string;
-    chapter: number;
-  } | null>(null);
+  const [matchQueue, setMatchQueue] = useState<MangaMatchRequest[]>([]);
   const [hintDismissed, setHintDismissed] = useState(false);
   useEffect(() => setHintDismissed(false), [index]);
   const [pickBookmark, setPickBookmark] = useState(false);
@@ -105,6 +106,31 @@ export function MangaReader({
   const bookApi = useRef<BookApi | null>(null);
   const { activeId } = useProfiles();
   const pid = activeId ?? "default";
+
+  const titleKey = manga.title ? normalizeMatchTitle(manga.title) : "";
+  const hasStoredDecision = useCallback(
+    (tracker: MangaTracker) => {
+      return getMangaMatchEntry(pid, tracker, titleKey) != null;
+    },
+    [pid, titleKey],
+  );
+  const enqueueMatchWith = useCallback((trackers: MangaTracker[]) => {
+    setMatchQueue((q) => {
+      const next = [...q];
+      for (const tracker of trackers) {
+        if (!next.some((r) => r.tracker === tracker)) {
+          next.push({ tracker, title: manga.title, chapter: 0 });
+        }
+      }
+      return next;
+    });
+  }, [manga.title]);
+  const enqueueMatch = useCallback(
+    (trackers: MangaTracker[]) => {
+      enqueueMatchWith(trackers.filter((tr) => !hasStoredDecision(tr)));
+    },
+    [enqueueMatchWith, hasStoredDecision],
+  );
 
   const total = pages.length;
   const pageUrls = useMemo(() => pages.map((p) => p.url), [pages]);
@@ -373,7 +399,7 @@ export function MangaReader({
         document.activeElement.blur();
       }
       if (e.key === "Escape") {
-        if (!settingsOpen) onExit();
+        if (matchQueue.length === 0 && !settingsOpen) onExit();
       } else if (bookAtEnd && (e.key === " " || e.key === (rtl ? "ArrowLeft" : "ArrowRight"))) {
         e.preventDefault();
         advanceFromBookEnd();
@@ -391,15 +417,7 @@ export function MangaReader({
       } else if (e.key === "f") {
         toggleFullscreen();
       } else if (e.key === "c" || e.key === "C") {
-        if (matchRequest) return;
-        const tracker = activeTracker();
-        if (tracker && chapter && manga.title && matchChapter(chapter.chapter) > 0) {
-          setMatchRequest({
-            tracker,
-            title: manga.title,
-            chapter: matchChapter(chapter.chapter),
-          });
-        }
+        if (manga.title) enqueueMatchWith(connectedTrackers());
       }
     };
     window.addEventListener("keydown", onKey);
@@ -409,9 +427,13 @@ export function MangaReader({
   useEffect(() => {
     return subscribeMangaMatchRequest((req) => {
       if (!manga.title || normalizeMatchTitle(req.title) !== normalizeMatchTitle(manga.title)) return;
-      setMatchRequest(req);
+      enqueueMatchWith([req.tracker]);
     });
   }, [manga.title]);
+
+  useEffect(() => {
+    enqueueMatch(connectedTrackers());
+  }, [manga.id, enqueueMatch]);
 
   const pStyle = pageStyle(prefs.fit, prefs.zoom);
   const longStyle = { width: "100%", maxWidth: `${Math.round(880 * prefs.zoom)}px` };
@@ -887,12 +909,12 @@ export function MangaReader({
         />
       )}
 
-      {matchRequest && (
+      {matchQueue.length > 0 && (
         <ReaderMatchPicker
-          title={matchRequest.title}
+          title={matchQueue[0].title}
           pid={pid}
-          connected={connectedTrackers()}
-          onClose={() => setMatchRequest(null)}
+          trackers={matchQueue.map((r) => r.tracker)}
+          onClose={() => setMatchQueue([])}
         />
       )}
 
@@ -946,18 +968,6 @@ export function MangaReader({
 function chapterLabel(c: MangaChapter): string {
   if (c.chapter) return t("Chapter {n}", { n: c.chapter });
   return c.title || t("Oneshot");
-}
-
-function matchChapter(raw: string | number | null): number {
-  if (raw == null) return 0;
-  const n = Number.parseFloat(String(raw));
-  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 0;
-}
-
-function activeTracker(): MangaTracker | null {
-  if (anilistMangaAuthed()) return "anilist";
-  if (malMangaAuthed()) return "mal";
-  return null;
 }
 
 function connectedTrackers(): MangaTracker[] {

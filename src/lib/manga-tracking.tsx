@@ -12,7 +12,6 @@ import {
 import { malMangaAuthed, pushMalManga } from "@/lib/manga/tracking-mal";
 import { emitMangaSync, type MangaPushResult, type MangaTracker } from "@/lib/manga/sync";
 import {
-  emitMangaMatchRequest,
   getMangaMatchEntry,
   getMangaMatchTitle,
   normalizeTitle,
@@ -80,7 +79,6 @@ async function pushOne(
   const flight = `${tracker}:${entry.id}:${chapter}`;
   if (inflight.has(flight)) return null;
   inflight.add(flight);
-  const auto = explicitId == null;
   // Toast the tracker entry the user pinned (if any) rather than the local
   // title, so an explicit repair pick is reflected back even when the local
   // title names a different work.
@@ -102,9 +100,7 @@ async function pushOne(
     // Emit ok for "noop" too (tracker already has this chapter) so a "syncing"
     // toast for an already-synced chapter is not left hanging with no terminal event.
     emitMangaSync(tracker, { kind: "ok", title: displayTitle, chapter });
-  } else if (outcome.result === "title-miss" && !auto) {
-    // A pinned/repair entry that still misses is a real error; an auto miss is
-    // surfaced by the runner as the manual match picker instead.
+  } else if (outcome.result === "title-miss") {
     emitMangaSync(tracker, {
       kind: "error",
       title: displayTitle,
@@ -120,11 +116,6 @@ async function pushOne(
   inflight.delete(flight);
   return outcome.result;
 }
-
-const matchAsked: Record<MangaTracker, Set<string>> = {
-  anilist: new Set(),
-  mal: new Set(),
-};
 
 // Only the manga currently open in the reader is allowed to trigger the manual
 // match picker on first sync. Backlog progress entries (everything synced on
@@ -149,41 +140,14 @@ function run(pid: string): void {
     const chapter = candidateChapter(entry);
     if (chapter == null) continue;
     const titleKey = titleKeyOf(entry.title);
-    // Partition the connected trackers for this entry by what they should do.
-    // - A user-confirmed mapping is trusted and pushed directly; it never takes
-    //   part in the "should we open the manual match picker" decision.
-    // - A dismissed entry (id === null) is skipped on that tracker.
-    // - Every remaining tracker auto-searches below.
-    const explicit: { tracker: MangaTracker; id: string }[] = [];
-    const auto: MangaTracker[] = [];
     for (const tracker of upcoming) {
       if (chapter <= (pushed[tracker].get(entry.id) ?? 0)) continue;
       const map = getMangaMatchEntry(pid, tracker, titleKey);
       if (map && map.id == null) continue; // dismissed, do not re-prompt
       if (map && map.confirmed && map.id != null) {
-        explicit.push({ tracker, id: map.id });
-      } else {
-        auto.push(tracker);
+        void pushOne(tracker, entry, chapter, pid, map.id);
       }
     }
-    for (const { tracker, id } of explicit) {
-      void pushOne(tracker, entry, chapter, pid, id);
-    }
-    if (auto.length === 0) continue;
-    // Push every auto-search tracker in parallel, then decide on the picker only
-    // after all of them settle and only when all of them missed. A title missing
-    // from one tracker but syncing fine on another must not raise a pointless
-    // dead-end prompt, so the picker is a last resort when nothing was found
-    // anywhere, not a per-tracker "one miss = prompt".
-    void (async () => {
-      const results = await Promise.all(
-        auto.map((tracker) => pushOne(tracker, entry, chapter, pid)),
-      );
-      if (results.every((r) => r === "title-miss") && !matchAsked[auto[0]].has(entry.id)) {
-        matchAsked[auto[0]].add(entry.id);
-        emitMangaMatchRequest({ tracker: auto[0], title: entry.title, chapter });
-      }
-    })();
   }
 }
 
@@ -194,16 +158,11 @@ export function MangaTrackingRunner() {
     pushed.anilist.clear();
     pushed.mal.clear();
     inflight.clear();
-    // Reset which titles we already asked about so a match the user skipped in
-    // an earlier session can be asked again the next time they read that manga.
-    matchAsked.anilist.clear();
-    matchAsked.mal.clear();
     const tick = () => run(pid);
     tick();
     const offProgress = subscribeMangaProgress(tick);
-    // Re-evaluate as soon as a manga starts being read, so the match picker can
-    // appear for the very chapter being opened instead of only after a progress
-    // record lands.
+    // Re-evaluate as soon as a manga starts being read, so the sync runner can
+    // push confirmed picks for the chapter being opened.
     const offReading = subscribeMangaReading(tick);
     return () => {
       offProgress();
