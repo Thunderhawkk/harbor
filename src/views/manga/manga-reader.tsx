@@ -7,18 +7,24 @@ import { t, useT } from "@/lib/i18n";
 import { downloadedPages, downloadMangaPage } from "@/lib/manga-downloads";
 import { recordMangaProgress, resumePageForChapter } from "@/lib/manga-progress";
 import { clearMangaReading } from "@/lib/manga-reading-state";
+import { subscribeMangaMatchRequest, normalizeTitle as normalizeMatchTitle } from "@/lib/manga-match";
+import { anilistMangaAuthed } from "@/lib/manga/tracking-anilist";
+import { malMangaAuthed } from "@/lib/manga/tracking-mal";
+import type { MangaTracker } from "@/lib/manga/sync";
 import { activeMangaSourceId, listMangaSources } from "@/lib/manga/sources";
 import { useProfiles } from "@/lib/profiles";
 import { toggleWindowFullscreen } from "@/lib/fullscreen-state";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { ReaderBar } from "./manga-reader/reader-bar";
 import { ReaderFooter } from "./manga-reader/reader-footer";
+import { ReaderProgressMeter } from "./manga-reader/reader-progress-meter";
 import { ReaderPageJump } from "./manga-reader/reader-page-jump";
 import { ReaderSettings } from "./manga-reader/reader-settings";
 import { PageImage } from "./manga-reader/page-image";
 import { BookFlip, type BookApi } from "./manga-reader/book-view";
 import { ReaderNav } from "./manga-reader/reader-nav";
 import { BookmarksPanel, BookmarkPagePicker } from "./manga-reader/reader-bookmarks";
+import { ReaderMatchPicker } from "./manga-reader/reader-match-picker";
 import { useReaderProgress } from "./manga-reader/hooks/use-reader-progress";
 import { useReaderPaging } from "./manga-reader/hooks/use-reader-paging";
 import { detectWebtoon } from "./manga-reader/reader-utils";
@@ -80,6 +86,11 @@ export function MangaReader({
   const [manualHide, setManualHide] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [matchRequest, setMatchRequest] = useState<{
+    tracker: MangaTracker;
+    title: string;
+    chapter: number;
+  } | null>(null);
   const [hintDismissed, setHintDismissed] = useState(false);
   useEffect(() => setHintDismissed(false), [index]);
   const [pickBookmark, setPickBookmark] = useState(false);
@@ -379,11 +390,28 @@ export function MangaReader({
         else prevPage();
       } else if (e.key === "f") {
         toggleFullscreen();
+      } else if (e.key === "c" || e.key === "C") {
+        if (matchRequest) return;
+        const tracker = activeTracker();
+        if (tracker && chapter && manga.title && matchChapter(chapter.chapter) > 0) {
+          setMatchRequest({
+            tracker,
+            title: manga.title,
+            chapter: matchChapter(chapter.chapter),
+          });
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  useEffect(() => {
+    return subscribeMangaMatchRequest((req) => {
+      if (!manga.title || normalizeMatchTitle(req.title) !== normalizeMatchTitle(manga.title)) return;
+      setMatchRequest(req);
+    });
+  }, [manga.title]);
 
   const pStyle = pageStyle(prefs.fit, prefs.zoom);
   const longStyle = { width: "100%", maxWidth: `${Math.round(880 * prefs.zoom)}px` };
@@ -858,6 +886,22 @@ export function MangaReader({
         />
       )}
 
+      {matchRequest && (
+        <ReaderMatchPicker
+          title={matchRequest.title}
+          pid={pid}
+          connected={connectedTrackers()}
+          onClose={() => setMatchRequest(null)}
+        />
+      )}
+
+      {!loading && !failed && !book && <ReaderProgressMeter
+        currentPage={currentPage}
+        totalPages={total}
+        chapterNumber={chapter.chapter}
+        visible={!controlsVisible}
+      />}
+
       {!book && (
         <div className="absolute inset-x-0 bottom-0 z-40">
           <ReaderFooter
@@ -901,4 +945,23 @@ export function MangaReader({
 function chapterLabel(c: MangaChapter): string {
   if (c.chapter) return t("Chapter {n}", { n: c.chapter });
   return c.title || t("Oneshot");
+}
+
+function matchChapter(raw: string | number | null): number {
+  if (raw == null) return 0;
+  const n = Number.parseFloat(String(raw));
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 0;
+}
+
+function activeTracker(): MangaTracker | null {
+  if (anilistMangaAuthed()) return "anilist";
+  if (malMangaAuthed()) return "mal";
+  return null;
+}
+
+function connectedTrackers(): MangaTracker[] {
+  const out: MangaTracker[] = [];
+  if (anilistMangaAuthed()) out.push("anilist");
+  if (malMangaAuthed()) out.push("mal");
+  return out;
 }
