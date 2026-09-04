@@ -65,7 +65,14 @@ export async function readHandoffPlan(init?: RequestInit): Promise<HandoffPlan |
   const entry = manifest.installer?.[probe.platformKey];
   if (!entry?.url) return null;
   const payloadVersion = Number(entry.payloadVersion ?? 0);
-  if (!Number.isFinite(payloadVersion) || payloadVersion <= probe.payloadVersion) return null;
+  const { getVersion } = await import("@tauri-apps/api/app");
+  const running = await getVersion().catch(() => "");
+  const [major = 0, minor = 0, patch = 0] = running
+    .split(/[.\-+]/)
+    .map((n) => parseInt(n, 10) || 0);
+  const runningPayload = major * 1_000_000 + minor * 1_000 + patch;
+  const floor = Math.max(probe.payloadVersion, runningPayload);
+  if (!Number.isFinite(payloadVersion) || payloadVersion <= floor) return null;
   const signature = typeof entry.signature === "string" ? entry.signature.trim() : "";
   return {
     version: manifest.version ?? "",

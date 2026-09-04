@@ -1222,7 +1222,7 @@ dependencies = [
 
 [[package]]
 name = "harbor-setup"
-version = "0.9.122"
+version = "0.9.123"
 dependencies = [
  "crc32fast",
  "serde",
