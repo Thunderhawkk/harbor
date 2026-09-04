@@ -599,6 +599,11 @@ function safeName(s: string): string {
   return s.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "item";
 }
 
+function chapterDirName(info: MangaDownloadInfo | undefined, chapterId: string): string {
+  const n = info?.chapter ? String(info.chapter).trim() : "";
+  return n ? `Chapter ${safeName(n)}` : safeName(chapterId);
+}
+
 function extOf(url: string): string {
   const m = url.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i);
   return m ? m[1].toLowerCase() : "jpg";
@@ -660,7 +665,7 @@ async function downloadChapterWithControl(
     const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
 
     const base = getMangaDownloadDir() || (await defaultMangaDownloadDir());
-    const dir = await join(base, safeName(mangaId), safeName(chapterId));
+    const dir = await join(base, safeName(info?.title || mangaId), chapterDirName(info, chapterId));
     await mkdir(dir, { recursive: true });
 
     const fetchBytes = async (url: string): Promise<Uint8Array> => {
