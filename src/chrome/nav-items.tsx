@@ -111,7 +111,7 @@ const NAV_ITEMS_ALL: NavItem[] = [
   {
     id: "shows",
     label: "nav.shows",
-    render: (active, hovered) => <NavLottie data={lotShows} hovered={hovered} fallback={<TvIcon active={active} />} />,
+    render: (active, hovered) => <NavLottie data={lotShows} hovered={hovered} loop fallback={<TvIcon active={active} />} />,
     view: "shows",
     parentalKey: "shows",
   },
@@ -149,7 +149,7 @@ const NAV_ITEMS_ALL: NavItem[] = [
   {
     id: "live",
     label: "nav.live",
-    render: (active, hovered) => <NavLottie data={lotLiveTv} hovered={hovered} fallback={<LiveTvIcon active={active} />} />,
+    render: (active, hovered) => <NavLottie data={lotLiveTv} hovered={hovered} loop fallback={<LiveTvIcon active={active} />} />,
     view: "live",
     hideKey: "liveTv",
     parentalKey: "liveTv",

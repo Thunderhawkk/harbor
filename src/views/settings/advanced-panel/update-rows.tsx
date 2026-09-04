@@ -7,10 +7,13 @@ import {
   updateAvailable,
   useUpdate,
 } from "@/lib/updater/use-update";
-import { BetaTag } from "@/components/beta-tag";
+import { IS_BETA_BUILD } from "@/lib/build-info";
 import { useT } from "@/lib/i18n";
 import { ToggleRow } from "../shared";
-import { SettingRow } from "../kit";
+import { ROW_ACTION, ROW_ACTION_PRIMARY, SettingRow } from "../kit";
+
+const QUAL =
+  "inline-flex h-[22px] shrink-0 items-center rounded-[6px] px-2 text-[13px] font-bold uppercase leading-[17px] tracking-[0.72px]";
 
 export function BetaChannelRow() {
   const t = useT();
@@ -23,13 +26,11 @@ export function BetaChannelRow() {
         "Receive early builds with the newest fixes before they reach the stable release. Betas can be rough around the edges; switch this off to return to stable at the next update.",
       )}
       leading={
-        <span
-          className={`flex h-9 w-9 items-center justify-center rounded-md ${
-            on ? "bg-accent-soft text-accent" : "bg-raised text-ink-subtle"
-          }`}
-        >
-          <FlaskConical size={16} strokeWidth={2.2} />
-        </span>
+        <FlaskConical
+          size={20}
+          strokeWidth={2.1}
+          className={on ? "text-accent" : "text-ink-subtle"}
+        />
       }
       value={on}
       onChange={(betaUpdates) => {
@@ -64,41 +65,42 @@ export function UpdatesRow() {
   return (
     <SettingRow
       icon={
-        <span
-          className={`flex h-9 w-9 items-center justify-center rounded-md ${
-            ready ? "bg-accent-soft text-accent" : "bg-raised text-ink-muted"
-          }`}
-        >
-          <RotateCw size={16} strokeWidth={2} className={busy ? "animate-spin" : ""} />
-        </span>
+        <RotateCw
+          size={20}
+          strokeWidth={2}
+          className={`${ready ? "text-accent" : "text-ink-muted"} ${busy ? "animate-spin" : ""}`}
+        />
       }
       label={
-        <>
-          {ready && u.version
-            ? t("Harbor {version} available", { version: u.version })
-            : `Harbor ${__APP_VERSION__}`}
-          <BetaTag />
-        </>
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+          <span className="min-w-0">
+            {ready && u.version
+              ? t("Harbor {version} available", { version: u.version })
+              : `Harbor ${__APP_VERSION__}`}
+          </span>
+          {IS_BETA_BUILD && (
+            <span className={`${QUAL} bg-accent-soft text-accent`}>{t("Beta")}</span>
+          )}
+        </span>
       }
       desc={status}
     >
       {ready ? (
-        <button
-          onClick={openUpdatePanel}
-          className="harbor-press-pop flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-accent px-4 text-[12.5px] font-semibold text-canvas transition-[filter] hover:brightness-105"
-        >
-          <Download size={14} strokeWidth={2.2} /> {t("Update now")}
+        <button type="button" onClick={openUpdatePanel} className={ROW_ACTION_PRIMARY}>
+          <Download size={16} strokeWidth={2.2} />
+          {t("Update now")}
         </button>
       ) : (
         <button
-          onClick={() => void checkForUpdate(true)}
-          disabled={busy}
-          className="harbor-press-pop flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-raised px-3.5 text-[12.5px] font-semibold text-ink-muted transition-colors hover:text-ink disabled:opacity-60"
+          type="button"
+          onClick={busy ? undefined : () => void checkForUpdate(true)}
+          aria-disabled={busy}
+          className={`${ROW_ACTION}${busy ? " pointer-events-none opacity-45" : ""}`}
         >
           {busy ? (
-            <Loader2 size={14} className="animate-spin" />
+            <Loader2 size={16} className="animate-spin" />
           ) : (
-            <RotateCw size={14} strokeWidth={2.2} />
+            <RotateCw size={16} strokeWidth={2.2} />
           )}
           {busy ? t("Checking") : t("Check for updates")}
         </button>

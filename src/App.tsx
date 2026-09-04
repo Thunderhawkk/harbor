@@ -1452,7 +1452,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
         {settingsAlive && (
           <div className={layer(settingsTop)}>
             <Suspense fallback={null}>
-              <Settings />
+              <Settings visible={settingsTop} />
             </Suspense>
           </div>
         )}

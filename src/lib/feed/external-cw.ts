@@ -30,7 +30,7 @@ function setItems(next: LibraryItem[]): void {
 }
 
 export function externalCwConnected(): boolean {
-  return !!getSimklSession() || !!getTraktSession();
+  return (sourceMask.simkl && !!getSimklSession()) || (sourceMask.trakt && !!getTraktSession());
 }
 
 function activityOf(i: LibraryItem): number {
@@ -51,6 +51,16 @@ function merge(lists: LibraryItem[][]): LibraryItem[] {
   return [...byId.values()].sort((a, b) => activityOf(b) - activityOf(a));
 }
 
+let sourceMask = { trakt: true, simkl: true };
+
+export function setExternalCwSources(mask: { trakt: boolean; simkl: boolean }): void {
+  if (mask.trakt === sourceMask.trakt && mask.simkl === sourceMask.simkl) return;
+  sourceMask = { trakt: mask.trakt, simkl: mask.simkl };
+  fetchedAt = 0;
+  if (!externalCwConnected()) setItems(EMPTY);
+  void refreshExternalCw(true);
+}
+
 export function refreshExternalCw(force = false): Promise<void> {
   if (!externalCwConnected()) {
     fetchedAt = 0;
@@ -61,8 +71,12 @@ export function refreshExternalCw(force = false): Promise<void> {
   if (!force && fetchedAt > 0 && Date.now() - fetchedAt < STALE_MS) return Promise.resolve();
   inflight = (async () => {
     const [simkl, trakt] = await Promise.all([
-      getSimklSession() ? fetchSimklPlaybackItems().catch(() => EMPTY) : Promise.resolve(EMPTY),
-      getTraktSession() ? fetchTraktPlaybackItems().catch(() => EMPTY) : Promise.resolve(EMPTY),
+      getSimklSession() && sourceMask.simkl
+        ? fetchSimklPlaybackItems().catch(() => EMPTY)
+        : Promise.resolve(EMPTY),
+      getTraktSession() && sourceMask.trakt
+        ? fetchTraktPlaybackItems().catch(() => EMPTY)
+        : Promise.resolve(EMPTY),
     ]);
     fetchedAt = Date.now();
     setItems(merge([simkl, trakt]));
@@ -84,7 +98,9 @@ export function subscribeExternalCw(fn: () => void): () => void {
 }
 
 function connSignature(): string {
-  return `${getSimklSession() ? "s" : "-"}${getTraktSession() ? "t" : "-"}`;
+  const sm = sourceMask.simkl && getSimklSession() ? "s" : "-";
+  const tm = sourceMask.trakt && getTraktSession() ? "t" : "-";
+  return `${sm}${tm}`;
 }
 
 let lastConn = "";

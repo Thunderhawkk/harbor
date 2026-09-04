@@ -312,6 +312,10 @@ export function loadStoredSettings(rawKey: string = STORAGE_KEY): Settings {
       }
       parsed._navThemeRepairV1 = true;
     }
+    if (parsed.cwSources == null) {
+      const ext = parsed.externalContinueWatching === true;
+      parsed.cwSources = { library: true, trakt: ext, simkl: ext, local: true };
+    }
     const posterCards = normalizePosterCardSettings(parsed);
     return {
       ...DEFAULT,

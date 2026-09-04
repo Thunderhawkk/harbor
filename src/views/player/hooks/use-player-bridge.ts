@@ -129,6 +129,8 @@ export function usePlayerBridge(params: {
         rtxVsr: settings.playerRtxVsr && !svpOn,
         embed: embedActive,
         d3d11Flip: settings.playerD3d11Flip,
+        renderer: settings.mpvRenderer,
+        forceYuv420p: settings.mpvForceYuv420p,
         anime4kShaders: [
           ...anime4kShadersFor(
             settings,

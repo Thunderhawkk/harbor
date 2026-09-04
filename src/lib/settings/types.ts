@@ -180,6 +180,7 @@ export type Settings = {
   heroFeed: "trending" | "trakt" | "simkl" | "classic";
   heroTrailers: boolean;
   heroTrailerAudio: boolean;
+  navIconAnimations: boolean;
   screensaver: boolean;
   screensaverDelayMin: number;
   resumePrompt: boolean;
@@ -333,6 +334,7 @@ export type Settings = {
   subOffsetIndicatorPosition: SubtitleOffsetPosition;
   subOffsetIndicatorSize: SubtitleOffsetSize;
   subShowInPip: boolean;
+  subHideSdh: boolean;
   secondarySubLang: string;
   subSecondaryPlacement: "top" | "bottom";
   subSecondaryScale: number;
@@ -403,6 +405,9 @@ export type Settings = {
   mpvExtraOptions: string;
   mpvQuality: "balanced" | "performance" | "quality";
   mpvHwdec: "auto" | "on" | "off";
+  mpvRenderer: "gpu-next" | "gpu";
+  uiGraphicsBackend: "auto" | "d3d11" | "opengl" | "vulkan" | "software";
+  mpvForceYuv420p: boolean;
   mpvBufferBoost: boolean;
   mpvBufferSize: BufferSizeId;
   mpvDownmixStereo: boolean;
@@ -459,6 +464,7 @@ export type Settings = {
   showSimklCard: boolean;
   showLetterboxdCard: boolean;
   externalContinueWatching: boolean;
+  cwSources: { library: boolean; trakt: boolean; simkl: boolean; local: boolean };
   showPlaylistsTab: boolean;
   skipProfileScreen: boolean;
   profilePromptInterval: "launch" | "15m" | "30m" | "never";

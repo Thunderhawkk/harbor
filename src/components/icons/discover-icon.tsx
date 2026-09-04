@@ -58,7 +58,7 @@ export function DiscoverIcon({ active = false }: { active?: boolean }) {
   return (
     <svg
       viewBox="0 0 512 512"
-      className="h-[26px] w-[26px] p-[2px]"
+      className="h-[26px] w-[26px] overflow-visible p-[2px]"
       fill="currentColor"
       aria-hidden
     >

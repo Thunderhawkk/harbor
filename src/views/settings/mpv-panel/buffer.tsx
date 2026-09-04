@@ -40,14 +40,17 @@ export function BufferSizeSection() {
   const stats = [
     {
       caption: t("Reads ahead"),
+      desc: t("How much of the video Harbor downloads in front of where you are watching."),
       readout: profile ? duration(profile.readaheadSecs) : adaptive,
     },
     {
       caption: t("Memory cap"),
+      desc: t("The most memory the head start is allowed to take while a video plays."),
       readout: profile ? formatBufferMemory(profile.maxBytes) : adaptive,
     },
     {
       caption: t("Wait before playing"),
+      desc: t("How long Harbor fills the buffer before the picture appears."),
       readout: !profile
         ? adaptive
         : profile.pauseWaitSecs > 0
@@ -63,6 +66,7 @@ export function BufferSizeSection() {
       newId="mpv:buffer-size"
     >
       <SettingRow
+        wide
         label={t("Buffer size")}
         desc={t(DESCRIPTIONS[value])}
         warn={
@@ -79,19 +83,13 @@ export function BufferSizeSection() {
           onChange={(v) => update({ mpvBufferSize: v })}
         />
       </SettingRow>
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-elevated px-4 py-3.5">
-        {stats.map((s) => (
-          <span
-            key={s.caption}
-            className="flex items-center gap-2.5 rounded-md bg-canvas px-3 py-1.5"
-          >
-            <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-subtle">
-              {s.caption}
-            </span>
-            <span className="text-[12.5px] font-semibold tabular-nums text-ink">{s.readout}</span>
+      {stats.map((s) => (
+        <SettingRow key={s.caption} label={s.caption} desc={s.desc}>
+          <span className="text-[15.5px] leading-[22px] tabular-nums text-ink-muted">
+            {s.readout}
           </span>
-        ))}
-      </div>
+        </SettingRow>
+      ))}
     </Section>
   );
 }

@@ -1,7 +1,6 @@
 import { useT } from "@/lib/i18n";
 import { isLinuxDesktop } from "@/lib/platform";
 import { Section } from "./shared";
-import { SettingGroup } from "./kit";
 import { BetaChannelRow, UpdatesRow } from "./advanced-panel";
 import { RollbackRow } from "./rollback-row";
 import { BuildFeedback } from "./build-feedback";
@@ -23,12 +22,10 @@ export function UpdatesPanel() {
             "Harbor checks harbor.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.",
           )}
         >
-          <SettingGroup>
-            <UpdatesRow />
-            <BetaChannelRow />
-            <RollbackRow />
-            <BuildFeedback />
-          </SettingGroup>
+          <UpdatesRow />
+          <BetaChannelRow />
+          <RollbackRow />
+          <BuildFeedback />
         </Section>
       )}
 
@@ -38,10 +35,8 @@ export function UpdatesPanel() {
           "Export your entire Harbor setup to a single file, then restore it on a new computer or keep it as a backup. Everything is included except your Stremio sign-in.",
         )}
       >
-        <SettingGroup>
-          <SettingsRecoverRow />
-          <BackupRow />
-        </SettingGroup>
+        <SettingsRecoverRow />
+        <BackupRow />
       </Section>
     </>
   );

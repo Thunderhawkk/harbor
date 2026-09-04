@@ -139,6 +139,8 @@ export type MpvOptions = {
   anime4kShaders?: string[];
   d3d11Flip?: boolean;
   macEdr?: boolean;
+  renderer?: "gpu-next" | "gpu";
+  forceYuv420p?: boolean;
   extraOptions?: string;
   fullDownload?: boolean;
   getEmbedRect?: () => Promise<MpvRect | null> | MpvRect | null;
@@ -154,6 +156,8 @@ function mpvReuseConfigKey(options: MpvOptions | undefined, hdrToSdr: boolean): 
     anime4kShaders: options?.anime4kShaders ?? [],
     d3d11Flip: options?.d3d11Flip === true,
     macEdr: options?.macEdr === true,
+    renderer: options?.renderer ?? "gpu-next",
+    forceYuv420p: options?.forceYuv420p === true,
     extraOptions: options?.extraOptions ?? "",
     fullDownload: options?.fullDownload === true,
   });
@@ -840,6 +844,8 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
             fullDownload: opts.fullDownload === true,
             startupProfile: nextStartupProfile,
             headers: src.headers ?? null,
+            renderer: opts.renderer ?? "gpu-next",
+            forceYuv420p: opts.forceYuv420p === true,
             extraOptions: opts.extraOptions || undefined,
           },
         });

@@ -107,10 +107,11 @@ const BETA_HEADERS = { headers: { "x-harbor-channel": "beta" } };
 
 async function runningPrerelease(): Promise<boolean> {
   try {
-    const [{ getVersion }, res] = await Promise.all([
+    const [{ getVersion }, { safeFetch }] = await Promise.all([
       import("@tauri-apps/api/app"),
-      fetch(`${HARBOR_API_BASE}/updates/latest.json`, { cache: "no-store" }),
+      import("@/lib/safe-fetch"),
     ]);
+    const res = await safeFetch(`${HARBOR_API_BASE}/updates/latest.json`, { cache: "no-store" });
     if (!res.ok) return false;
     const stable = (await res.json()) as { version?: string };
     if (!stable.version) return false;
@@ -148,7 +149,10 @@ export async function checkForUpdate(manual = false): Promise<void> {
       beta = true;
       update = await check(BETA_HEADERS);
     }
-    const plan = await readHandoffPlan(beta ? BETA_HEADERS : undefined).catch(() => null);
+    const plan = await readHandoffPlan(beta ? BETA_HEADERS : undefined).catch((e) => {
+      console.warn("installer handoff unavailable, falling back to nsis", e);
+      return null;
+    });
     if (plan) {
       handle = update ? (update as unknown as UpdateHandle) : null;
       const version = plan.version || update?.version || "";
@@ -346,7 +350,10 @@ async function detectFailedHandoff(pending: {
     return false;
   }
   clearPending();
-  const plan = await readHandoffPlan(betaChannel() ? BETA_HEADERS : undefined).catch(() => null);
+  const plan = await readHandoffPlan(betaChannel() ? BETA_HEADERS : undefined).catch((e) => {
+    console.warn("installer handoff unavailable, falling back to nsis", e);
+    return null;
+  });
   set({
     status: "error",
     installFailed: true,
