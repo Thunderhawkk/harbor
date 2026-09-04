@@ -2,6 +2,7 @@ import { Download, FlaskConical, Loader2, RotateCw } from "lucide-react";
 import { useId, useState } from "react";
 import { useSettings } from "@/lib/settings";
 import { readChannelPreference, selectedUpdateChannel } from "@/lib/updater/channel";
+import { readBetaReturnContext } from "@/lib/updater/beta-return";
 import {
   checkForUpdate,
   setUpdateChannel,
@@ -76,6 +77,7 @@ export function BetaChannelRow() {
 export function UpdatesRow() {
   const t = useT();
   const u = useUpdate();
+  const installedExperimental = readBetaReturnContext(__APP_VERSION__);
   const ready = u.intent !== "return-beta" && updateAvailable(u);
   const busy = u.intent === "return-beta" || u.status === "checking" || u.status === "installing";
   const status =
@@ -112,9 +114,13 @@ export function UpdatesRow() {
       label={
         <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
           <span className="min-w-0">
-            {ready && u.version
-              ? t("Harbor {version} available", { version: u.version })
-              : `Harbor ${__APP_VERSION__}`}
+            {ready && u.channel === "experimental" && u.experimentalVersion
+              ? `${t("Experimental")} ${u.experimentalVersion}`
+              : ready && u.version
+                ? t("Harbor {version} available", { version: u.version })
+                : installedExperimental
+                  ? `${t("Experimental")} ${installedExperimental.experimentalVersion}`
+                  : `Harbor ${__APP_VERSION__}`}
           </span>
           {u.channel === "experimental" ? (
             <span className={`${QUAL} bg-accent-soft text-accent`}>{t("Experimental")}</span>
