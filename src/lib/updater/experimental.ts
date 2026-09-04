@@ -4,6 +4,7 @@ type Artifact = { url: string; signature: string };
 type InstallerArtifact = Artifact & { payloadVersion: number; size: number; recoveryProtocol?: 1 };
 export type ExperimentalRelease = {
   version: string;
+  experimentalVersion: string;
   buildId: string;
   notes: string | null;
   artifact: Artifact;
@@ -39,6 +40,11 @@ export function experimentalPayloadVersion(version: string): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
+export function experimentalChannelVersion(version: string): number | null {
+  const value = experimentalPayloadVersion(version);
+  return value !== null && value > 0 && value < 1_000_000 ? value : null;
+}
+
 export function parseExperimentalRelease(
   raw: unknown,
   platformKey: string,
@@ -52,6 +58,11 @@ export function parseExperimentalRelease(
   if ("url" in manifest || "signature" in manifest) return null;
   const payloadVersion = experimentalPayloadVersion(manifest.version);
   if (payloadVersion === null) return null;
+  if (
+    typeof manifest.experimentalVersion !== "string" ||
+    experimentalChannelVersion(manifest.experimentalVersion) === null
+  )
+    return null;
   if (typeof manifest.buildId !== "string" || !/^[\w.-]{1,80}$/.test(manifest.buildId)) return null;
   const platform = artifact(object(manifest.platforms)?.[platformKey]);
   if (!platform) return null;
@@ -78,6 +89,7 @@ export function parseExperimentalRelease(
   }
   return {
     version: manifest.version,
+    experimentalVersion: manifest.experimentalVersion,
     buildId: manifest.buildId,
     notes: typeof manifest.notes === "string" ? manifest.notes : null,
     artifact: platform,
@@ -89,6 +101,7 @@ export function parseExperimentalRelease(
 export function sameExperimentalRelease(a: ExperimentalRelease, b: ExperimentalRelease): boolean {
   return (
     a.version === b.version &&
+    a.experimentalVersion === b.experimentalVersion &&
     a.buildId === b.buildId &&
     a.artifact.url === b.artifact.url &&
     a.artifact.signature === b.artifact.signature

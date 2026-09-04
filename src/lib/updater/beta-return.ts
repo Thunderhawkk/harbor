@@ -1,4 +1,4 @@
-import { experimentalPayloadVersion } from "./experimental";
+import { experimentalChannelVersion, experimentalPayloadVersion } from "./experimental";
 import type { HandoffPlan, HandoffProbe } from "./handoff";
 import { UPDATE_CHANNEL_KEY } from "./channel";
 
@@ -6,6 +6,7 @@ export const BETA_RETURN_KEY = "harbor.update.beta-return.v1";
 export type BetaReturnTarget = HandoffPlan & { recoveryProtocol: 1 };
 export type BetaReturnContext = {
   version: string;
+  experimentalVersion: string;
   buildId: string;
   platformKey: string;
   targets: BetaReturnTarget[];
@@ -80,6 +81,8 @@ export function readBetaReturnContext(installed?: string): BetaReturnContext | n
     if (
       !value ||
       typeof value.version !== "string" ||
+      typeof value.experimentalVersion !== "string" ||
+      experimentalChannelVersion(value.experimentalVersion) === null ||
       typeof value.buildId !== "string" ||
       !/^[A-Za-z0-9][\w.-]{0,79}$/.test(value.buildId) ||
       value.buildId.includes("..") ||
@@ -95,6 +98,7 @@ export function readBetaReturnContext(installed?: string): BetaReturnContext | n
 
 export function saveBetaReturnContext(
   version: string,
+  experimentalVersion: string,
   buildId: string,
   platformKey: string,
   returnToBeta: unknown,
@@ -102,7 +106,7 @@ export function saveBetaReturnContext(
   if (!parseBetaReturnTargets(returnToBeta, version, platformKey).length) {
     throw new Error("No tested return to beta is available for this build.");
   }
-  const raw = JSON.stringify({ version, buildId, platformKey, returnToBeta });
+  const raw = JSON.stringify({ version, experimentalVersion, buildId, platformKey, returnToBeta });
   localStorage.setItem(`${BETA_RETURN_KEY}.${version}`, raw);
   localStorage.setItem(BETA_RETURN_KEY, raw);
 }
