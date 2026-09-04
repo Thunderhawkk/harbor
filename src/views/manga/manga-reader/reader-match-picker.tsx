@@ -22,11 +22,13 @@ export function ReaderMatchPicker({
   title,
   pid,
   trackers,
+  shortcut,
   onClose,
 }: {
   title: string;
   pid: string;
   trackers: MangaTracker[];
+  shortcut: string;
   onClose: () => void;
 }) {
   const t = useT();
@@ -252,7 +254,7 @@ export function ReaderMatchPicker({
           <div className="flex items-center justify-center gap-1.5 border-t border-edge-soft px-4 py-2">
             <span className="text-[11px] text-ink-subtle">{t("Tip: press")}</span>
             <kbd className="rounded-md bg-elevated px-1.5 py-0.5 text-[10px] font-semibold leading-none text-ink ring-1 ring-edge-soft">
-              C
+              {shortcut}
             </kbd>
             <span className="text-[11px] text-ink-subtle">{t("to reopen this anytime")}</span>
           </div>

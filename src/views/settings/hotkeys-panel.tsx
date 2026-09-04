@@ -53,7 +53,7 @@ export function HotkeysPanel() {
   const [conflict, setConflict] = useState<HotkeyId | null>(null);
 
   const grouped = useMemo(() => {
-    const scopes: Record<HotkeyScope, HotkeyDef[]> = { Global: [], Player: [] };
+    const scopes: Record<HotkeyScope, HotkeyDef[]> = { Global: [], Player: [], Manga: [] };
     for (const def of HOTKEYS) scopes[def.scope].push(def);
     return scopes;
   }, []);
@@ -139,7 +139,7 @@ export function HotkeysPanel() {
               <Section
                 key={scope}
                 title={t(scope)}
-                subtitle={scope === "Player" ? t("Inside the playback view.") : t("Anywhere in Harbor.")}
+                subtitle={scope === "Player" ? t("Inside the playback view.") : scope === "Manga" ? t("In the manga reader.") : t("Anywhere in Harbor.")}
               >
                 {Array.from(subgroups.entries()).map(([groupName, items]) => (
                   <SSection key={groupName} label={t(groupName)}>

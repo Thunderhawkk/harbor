@@ -18,6 +18,8 @@ import { malMangaAuthed } from "@/lib/manga/tracking-mal";
 import type { MangaTracker } from "@/lib/manga/sync";
 import { activeMangaSourceId, listMangaSources } from "@/lib/manga/sources";
 import { useProfiles } from "@/lib/profiles";
+import { effectiveBinding, formatBindingForDisplay, matchesBinding } from "@/lib/hotkeys";
+import { useSettings } from "@/lib/settings";
 import { toggleWindowFullscreen } from "@/lib/fullscreen-state";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { ReaderBar } from "./manga-reader/reader-bar";
@@ -106,6 +108,8 @@ export function MangaReader({
   const bookApi = useRef<BookApi | null>(null);
   const { activeId } = useProfiles();
   const pid = activeId ?? "default";
+  const { settings } = useSettings();
+  const matchBinding = effectiveBinding("mangaMatch", settings.hotkeys);
 
   const titleKey = manga.title ? normalizeMatchTitle(manga.title) : "";
   const hasStoredDecision = useCallback(
@@ -416,7 +420,8 @@ export function MangaReader({
         else prevPage();
       } else if (e.key === "f") {
         toggleFullscreen();
-      } else if (e.key === "c" || e.key === "C") {
+      } else if (matchesBinding(e, matchBinding)) {
+        e.preventDefault();
         if (manga.title) enqueueMatchWith(connectedTrackers());
       }
     };
@@ -914,6 +919,7 @@ export function MangaReader({
           title={matchQueue[0].title}
           pid={pid}
           trackers={matchQueue.map((r) => r.tracker)}
+          shortcut={formatBindingForDisplay(matchBinding)}
           onClose={() => setMatchQueue([])}
         />
       )}
