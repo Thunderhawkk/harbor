@@ -39,6 +39,19 @@ type MangaDownloadMetaRec = {
   at: number;
 };
 
+/* Persisted record of a download that is still in progress (or was interrupted
+   by a restart). Lets a later run resume the chapter instead of treating its
+   partial files as a complete download or re-fetching everything. */
+type MangaDownloadProg = {
+  mangaId: string;
+  title?: string;
+  cover?: string;
+  chapter?: string | null;
+  total: number;
+  done: number;
+  at: number;
+};
+
 export type MangaDownloadChapterItem = {
   chapterId: string;
   label: string;
@@ -59,6 +72,7 @@ export type MangaDownloadGroup = {
 const MANIFEST_KEY = "harbor.manga.downloads.v1";
 const META_KEY = "harbor.manga.downloads.meta.v1";
 const DIR_KEY = "harbor.manga.downloads.dir.v1";
+const PROG_KEY = "harbor.manga.downloads.prog.v1";
 const runtime = new Map<string, MangaDownloadRec>();
 const batchRuntime = new Map<string, MangaDownloadBatchRec>();
 const listeners = new Set<(changed?: string) => void>();
@@ -161,6 +175,154 @@ function writeMeta(m: Record<string, MangaDownloadMetaRec>): void {
   } catch {
     return;
   }
+}
+
+/* Serialize read-modify-write access to the manifest + meta so concurrent
+   downloads cannot lose each other's updates. Each mutation runs through a
+   single promise chain, so any number of overlapping downloads persist. */
+let manifestMutex: Promise<void> = Promise.resolve();
+function mutateManifest(
+  fn: (m: Record<string, string[]>) => void,
+): Promise<void> {
+  const next = manifestMutex.then(() => {
+    const m = readManifest();
+    fn(m);
+    writeManifest(m);
+  });
+  manifestMutex = next.catch(() => {});
+  return next;
+}
+function mutateMeta(fn: (m: Record<string, MangaDownloadMetaRec>) => void): Promise<void> {
+  const next = manifestMutex.then(() => {
+    const m = readMeta();
+    fn(m);
+    writeMeta(m);
+  });
+  manifestMutex = next.catch(() => {});
+  return next;
+}
+
+function readProg(): Record<string, MangaDownloadProg> {
+  try {
+    return JSON.parse(localStorage.getItem(PROG_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeProg(p: Record<string, MangaDownloadProg>): void {
+  try {
+    localStorage.setItem(PROG_KEY, JSON.stringify(p));
+  } catch {
+    return;
+  }
+}
+
+function mutateProg(fn: (p: Record<string, MangaDownloadProg>) => void): Promise<void> {
+  const next = manifestMutex.then(() => {
+    const p = readProg();
+    fn(p);
+    writeProg(p);
+  });
+  manifestMutex = next.catch(() => {});
+  return next;
+}
+
+/* Recovers a chapter id from its on-disk folder name (`safeName` output).
+   Only reversible when the id is a ~-separated run of digits (the shape the
+   numeric sources produce); anything else is ambiguous after sanitising, so
+   it returns null and the chapter is skipped rather than mis-registered. */
+function reverseSafeId(folder: string): string | null {
+  if (!/^\d+(?:_\d+)+$/.test(folder)) return null;
+  return folder.replace(/_/g, "~");
+}
+
+function naturalPageCompare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+/* Scans the download directory and registers any on-disk chapter that is not
+   yet in the manifest, so manga that were previously downloaded (before the
+   manifest recorded them) show up in the Downloads view. Returns how many
+   chapters were imported. */
+export async function importMangaDownloadsFromDisk(): Promise<number> {
+  const { join } = await import("@tauri-apps/api/path");
+  const { readDir } = await import("@tauri-apps/plugin-fs");
+  const base = getMangaDownloadDir() || (await defaultMangaDownloadDir());
+  const mangas = await readDir(base).catch(() => []);
+  let imported = 0;
+
+  const malformed = Object.entries(readManifest()).filter(
+    ([, files]) => !Array.isArray(files) || files.some((f) => typeof f !== "string"),
+  );
+  if (malformed.length) {
+    await mutateManifest((m) => {
+      for (const [chapterId] of malformed) delete m[chapterId];
+    });
+    await mutateMeta((m) => {
+      for (const [chapterId] of malformed) delete m[chapterId];
+    });
+    notify();
+  }
+
+  for (const manga of mangas) {
+    if (!manga.isDirectory) continue;
+    const mangaPath = await join(base, manga.name);
+    const chapterDirs = await readDir(mangaPath).catch(() => []);
+    for (const chapter of chapterDirs) {
+      if (!chapter.isDirectory) continue;
+      const chapterId = reverseSafeId(chapter.name);
+      if (!chapterId) continue;
+      if (readManifest()[chapterId]) continue;
+      const chapterPath = await join(mangaPath, chapter.name);
+      const pages = await readDir(chapterPath).catch(() => []);
+      const pageNames = pages
+        .filter((p) => p.isFile && /\.(jpe?g|png|webp|gif|avif)$/i.test(p.name))
+        .map((p) => p.name)
+        .sort((a, b) => naturalPageCompare(a, b));
+      if (!pageNames.length) continue;
+      const files = await Promise.all(pageNames.map((name) => join(chapterPath, name)));
+      const segments = chapterId.split("~");
+      const mangaId = segments.slice(0, 2).join("~");
+      await mutateManifest((m) => {
+        m[chapterId] = files;
+      });
+      await mutateMeta((m) => {
+        m[chapterId] = { mangaId, chapter: segments[2] ?? null, at: Date.now() };
+      });
+      notify(chapterId);
+      imported += 1;
+    }
+  }
+  return imported;
+}
+
+/* Persists the real title and cover for every tracked chapter of a given
+   manga, so an imported group (which only knows its id) shows a readable name
+   and poster. The detail page calls this once it resolves them. */
+export async function setMangaDetails(
+  mangaId: string,
+  title: string,
+  cover?: string,
+): Promise<void> {
+  if (!mangaId) return;
+  await mutateMeta((m) => {
+    for (const [chapterId, rec] of Object.entries(m)) {
+      if (rec.mangaId !== mangaId) continue;
+      const next = { ...rec };
+      let changed = false;
+      if (title && rec.title !== title) {
+        next.title = title;
+        changed = true;
+      }
+      if (cover && rec.cover !== cover) {
+        next.cover = cover;
+        changed = true;
+      }
+      if (changed) m[chapterId] = next;
+    }
+  });
+  notify();
 }
 
 export function getMangaDownloadDir(): string {
@@ -280,6 +442,29 @@ export function listActiveMangaDownloadGroups(): MangaDownloadGroup[] {
   }
   out.sort((a, b) => a.title.localeCompare(b.title));
   return out;
+}
+
+/* After a restart, resumes any downloads that were interrupted so they finish
+   instead of vanishing. Runs once (from a mount effect); each chapter's worker
+   reuses the pages it already wrote (see downloadChapterWithControl) and only
+   fetches the rest. */
+let hydrationStarted = false;
+export function hydrateDownloadProgress(): void {
+  if (hydrationStarted) return;
+  hydrationStarted = true;
+  const prog = readProg();
+  let resumed = 0;
+  for (const [chapterId, p] of Object.entries(prog)) {
+    if (readManifest()[chapterId] == null) continue;
+    runtime.set(chapterId, { status: "idle", done: 0, total: 0, files: [] });
+    void downloadChapter(p.mangaId, chapterId, {
+      title: p.title,
+      cover: p.cover,
+      chapter: p.chapter ?? null,
+    });
+    resumed += 1;
+  }
+  if (resumed) notify();
 }
 
 function mergeDownloadGroups(): MangaDownloadGroup[] {
@@ -493,31 +678,64 @@ async function downloadChapterWithControl(
       return new Uint8Array(await r.arrayBuffer());
     };
 
+    const existing = new Set(readManifest()[chapterId] ?? []);
+    const paths: string[] = [];
+    for (let i = 0; i < urls.length; i++) {
+      paths.push(await join(dir, `${String(i + 1).padStart(4, "0")}.${extOf(urls[i])}`));
+    }
+
+    // Register the chapter before fetching so a restart mid-download keeps it
+    // visible and lets a later run resume (skip pages already written).
+    await mutateManifest((m) => {
+      m[chapterId] = [];
+    });
+    await mutateMeta((m) => {
+      m[chapterId] = {
+        mangaId,
+        title: info?.title,
+        cover: info?.cover,
+        chapter: info?.chapter ?? null,
+        at: Date.now(),
+      };
+    });
+    await mutateProg((p) => {
+      p[chapterId] = {
+        mangaId,
+        title: info?.title,
+        cover: info?.cover,
+        chapter: info?.chapter ?? null,
+        total: urls.length,
+        done: 0,
+        at: Date.now(),
+      };
+    });
+
     const files: string[] = [];
     for (let i = 0; i < urls.length; i++) {
       await waitForResume(chapterId, batchControl);
-      const bytes = await fetchBytes(urls[i]);
+      if (!existing.has(paths[i])) {
+        const bytes = await fetchBytes(urls[i]);
+        if (controller.signal.aborted) throw new DOMException("aborted", "AbortError");
+        await waitForResume(chapterId, batchControl);
+        await writeFile(paths[i], bytes);
+      }
       if (controller.signal.aborted) throw new DOMException("aborted", "AbortError");
-      await waitForResume(chapterId, batchControl);
-      const path = await join(dir, `${String(i + 1).padStart(4, "0")}.${extOf(urls[i])}`);
-      await writeFile(path, bytes);
-      files.push(path);
-      if (controller.signal.aborted) throw new DOMException("aborted", "AbortError");
+      files.push(paths[i]);
+      await mutateManifest((m) => {
+        m[chapterId] = [...files];
+      });
+      await mutateProg((p) => {
+        if (p[chapterId]) p[chapterId] = { ...p[chapterId], done: i + 1 };
+      });
       setRec({ done: i + 1, files: [...files], ...groupInfo });
     }
 
-    const manifest = readManifest();
-    manifest[chapterId] = files;
-    writeManifest(manifest);
-    const meta = readMeta();
-    meta[chapterId] = {
-      mangaId,
-      title: info?.title,
-      cover: info?.cover,
-      chapter: info?.chapter ?? null,
-      at: Date.now(),
-    };
-    writeMeta(meta);
+    await mutateManifest((m) => {
+      m[chapterId] = files;
+    });
+    await mutateProg((p) => {
+      delete p[chapterId];
+    });
     setRec({ status: "done", files, ...groupInfo });
     return true;
   } catch (e) {
@@ -609,6 +827,9 @@ export function deleteMangaDownload(chapterId: string): void {
   const meta = readMeta();
   delete meta[chapterId];
   writeMeta(meta);
+  void mutateProg((p) => {
+    delete p[chapterId];
+  });
   chapterControllers.delete(chapterId);
   runtime.set(chapterId, { status: "idle", done: 0, total: 0, files: [] });
   notify(chapterId);

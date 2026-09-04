@@ -7,6 +7,8 @@ import {
   cancelMangaDownload,
   defaultMangaDownloadDir,
   deleteMangaDownload,
+  hydrateDownloadProgress,
+  importMangaDownloadsFromDisk,
   pauseChapterDownload,
   pauseMangaDownloadBatch,
   resumeChapterDownload,
@@ -299,6 +301,10 @@ export function MangaDownloadsView({
 }) {
   const t = useT();
   const groups = useMangaDownloadGroups();
+  useEffect(() => {
+    void importMangaDownloadsFromDisk();
+    hydrateDownloadProgress();
+  }, []);
   const totalChapters = groups.reduce((n, g) => n + g.chapters.length, 0);
   const totalPages = groups.reduce((n, g) => n + g.chapters.reduce((p, c) => p + c.pages, 0), 0);
 
