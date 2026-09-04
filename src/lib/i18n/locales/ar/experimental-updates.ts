@@ -54,8 +54,8 @@ export default {
   "Enable experimental updates on this device? This replaces your normal update feed until you leave. It does not install a build now.":
     "هل تريد تفعيل التحديثات التجريبية المبكرة على هذا الجهاز؟ سيحل ذلك محل قناة التحديث المعتادة حتى توقفه. لن يتم تثبيت أي إصدار الآن.",
   "Enable and check": "تفعيل والتحقق",
-  "Leaving returns you to {channel} updates when a newer version is available. It does not downgrade Harbor.":
-    "عند الإيقاف ستعود إلى تحديثات {channel} عند توفر إصدار أحدث. لن يعود Harbor إلى إصدار أقدم.",
+  "Leaving only turns off experimental checks. Use Return to beta below to replace the experimental app.":
+    "يؤدي الإيقاف إلى تعطيل التحقق من الإصدارات التجريبية فقط. استخدم العودة إلى بيتا أدناه لاستبدال التطبيق التجريبي.",
   "Couldn't save the update channel. Free some storage and try again.":
     "تعذّر حفظ قناة التحديث. أفرغ بعض مساحة التخزين وحاول مجددًا.",
   "Finish the current download or installation before changing channels.":

@@ -55,8 +55,8 @@ export default {
   "Enable experimental updates on this device? This replaces your normal update feed until you leave. It does not install a build now.":
     "Включить экспериментальные обновления на этом устройстве? Они заменят обычный канал обновлений до вашего отказа. Сейчас никакая сборка не будет установлена.",
   "Enable and check": "Включить и проверить",
-  "Leaving returns you to {channel} updates when a newer version is available. It does not downgrade Harbor.":
-    "После отказа обновления канала «{channel}» возобновятся, когда появится более новая версия. Версия Harbor не будет понижена.",
+  "Leaving only turns off experimental checks. Use Return to beta below to replace the experimental app.":
+    "Выход отключает только проверку экспериментальных сборок. Чтобы заменить экспериментальное приложение, используйте возврат к бета-версии ниже.",
   "Couldn't save the update channel. Free some storage and try again.":
     "Не удалось сохранить канал обновлений. Освободите место в хранилище и повторите попытку.",
   "Finish the current download or installation before changing channels.":

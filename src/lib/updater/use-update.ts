@@ -57,6 +57,7 @@ export type UpdateState = {
   intent: "update" | "return-beta";
   channel: UpdateChannel;
   buildId: string | null;
+  experimentalVersion: string | null;
   status: UpdateStatus;
   version: string | null;
   notes: string | null;
@@ -84,6 +85,7 @@ let state: UpdateState = {
   intent: "update",
   channel: selectedUpdateChannel(),
   buildId: null,
+  experimentalVersion: null,
   status: "idle",
   version: null,
   notes: null,
@@ -164,6 +166,7 @@ function revokeExperimentalAccess(): void {
     intent: "update",
     channel: selectedUpdateChannel(),
     buildId: null,
+    experimentalVersion: null,
     status: "idle",
     version: null,
     notes: null,
@@ -263,7 +266,13 @@ export async function checkForUpdate(manual = false): Promise<void> {
   const request = revision;
   const selected = selectedUpdateChannel();
   checkedChannel = selected;
-  set({ status: "checking", channel: selected, manualCheck: manual, error: null });
+  set({
+    status: "checking",
+    channel: selected,
+    experimentalVersion: null,
+    manualCheck: manual,
+    error: null,
+  });
   let candidate: UpdateHandle | null = null;
   try {
     if (selected === "experimental") {
@@ -334,6 +343,7 @@ export async function checkForUpdate(manual = false): Promise<void> {
       set({
         status: "available",
         version: release.version,
+        experimentalVersion: release.experimentalVersion,
         buildId: release.buildId,
         notes: release.notes,
         handoff: plan,
@@ -410,7 +420,14 @@ export async function prepareBetaReturn(version: string): Promise<void> {
   clearStagedUpdate();
   const request = revision;
   const selected = selectedUpdateChannel();
-  set({ intent: "return-beta", channel: "beta", status: "checking", version, manualCheck: true });
+  set({
+    intent: "return-beta",
+    channel: "beta",
+    status: "checking",
+    version,
+    experimentalVersion: null,
+    manualCheck: true,
+  });
   try {
     const [{ getVersion }, probe] = await Promise.all([
       import("@tauri-apps/api/app"),
@@ -435,7 +452,9 @@ export async function prepareBetaReturn(version: string): Promise<void> {
     if (!currentRequest(request, selected)) return;
     const release = parseExperimentalRelease(raw, context.platformKey);
     const target =
-      release?.version === context.version && release.buildId === context.buildId
+      release?.version === context.version &&
+      release.experimentalVersion === context.experimentalVersion &&
+      release.buildId === context.buildId
         ? parseBetaReturnTargets(release.returnToBeta, context.version, context.platformKey).find(
             (entry) => entry.version === version,
           )
@@ -567,6 +586,7 @@ export async function installUpdate(): Promise<void> {
             throw new Error("The update changed.");
           saveBetaReturnContext(
             experimentalRelease.version,
+            experimentalRelease.experimentalVersion,
             experimentalRelease.buildId,
             probe.platformKey,
             experimentalRelease.returnToBeta,
@@ -583,6 +603,7 @@ export async function installUpdate(): Promise<void> {
           recoverable: plan.recoveryProtocol === 1,
           channel: state.channel,
           buildId: state.buildId,
+          experimentalVersion: state.experimentalVersion,
           at: Date.now(),
         }),
       );
@@ -709,6 +730,7 @@ async function detectFailedHandoff(pending: {
   channel?: UpdateChannel;
   intent?: "update" | "return-beta";
   recoverable?: boolean;
+  experimentalVersion?: string;
   returnPreferenceUndo?: unknown;
 }): Promise<boolean> {
   if (pending.intent === "return-beta") {
@@ -728,6 +750,7 @@ async function detectFailedHandoff(pending: {
       status: "error",
       installFailed: true,
       version: pending.version ?? null,
+      experimentalVersion: pending.experimentalVersion ?? null,
       channel: selectedUpdateChannel(),
       error: t(
         "Return to beta did not finish. Your recovery files have been kept. Try again from Experimental builds.",
@@ -756,6 +779,7 @@ async function detectFailedHandoff(pending: {
     status: "error",
     installFailed: true,
     version: pending.version ?? null,
+    experimentalVersion: pending.experimentalVersion ?? null,
     handoff: plan,
     error: t("Harbor Setup did not finish updating Harbor. Check for updates to try again."),
     channel: pending.channel ?? selectedUpdateChannel(),
@@ -773,6 +797,7 @@ async function detectFailedUpdate(): Promise<boolean> {
     channel?: UpdateChannel;
     intent?: "update" | "return-beta";
     recoverable?: boolean;
+    experimentalVersion?: string;
   } | null = null;
   try {
     pending = JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null");
@@ -844,6 +869,7 @@ export function clearStagedUpdate(): void {
     intent: "update",
     status: "idle",
     version: null,
+    experimentalVersion: null,
     notes: null,
     progress: 0,
     downloadedBytes: 0,

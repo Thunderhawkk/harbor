@@ -28,7 +28,8 @@ export function ExperimentalBuildsSection() {
   const trigger = useRef<HTMLButtonElement>(null);
   const confirmationId = useId();
   const access = useExperimentalAccess();
-  const experimentalInstalled = readBetaReturnContext(__APP_VERSION__) !== null;
+  const installedContext = readBetaReturnContext(__APP_VERSION__);
+  const experimentalInstalled = installedContext !== null;
   const enabled = selectedUpdateChannel() === "experimental";
   const supported = isWindowsDesktop();
   const locked = updateChannelLocked();
@@ -75,9 +76,9 @@ export function ExperimentalBuildsSection() {
             ? t("Checking experimental builds…")
             : u.status === "uptodate"
               ? t("No newer experimental build is available for this device.")
-              : ready && u.version
+              : ready && u.experimentalVersion
                 ? t("Experimental {version} · Build {buildId}", {
-                    version: u.version,
+                    version: u.experimentalVersion,
                     buildId: u.buildId ?? "—",
                   })
                 : t("Experimental updates are enabled on this device.")))
@@ -98,7 +99,9 @@ export function ExperimentalBuildsSection() {
             )}
           </p>
           <p className="text-[12px] text-ink-muted">
-            {t("Installed: Harbor {version}", { version: __APP_VERSION__ })}
+            {experimentalInstalled
+              ? `${t("Installed")}: ${t("Experimental")} ${installedContext.experimentalVersion}`
+              : t("Installed: Harbor {version}", { version: __APP_VERSION__ })}
             {" · "}
             {t("Update channel: {channel}", { channel: enabled ? t("Experimental") : normal })}
           </p>
@@ -174,8 +177,7 @@ export function ExperimentalBuildsSection() {
           {enabled && (
             <p className="text-[12px] leading-relaxed text-ink-subtle">
               {t(
-                "Leaving returns you to {channel} updates when a newer version is available. It does not downgrade Harbor.",
-                { channel: normal },
+                "Leaving only turns off experimental checks. Use Return to beta below to replace the experimental app.",
               )}
             </p>
           )}

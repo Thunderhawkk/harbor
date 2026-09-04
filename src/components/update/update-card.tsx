@@ -75,13 +75,12 @@ export function UpdateCard() {
             </span>
             {u.version && (
               <span className="text-[12.5px] text-ink-subtle">
-                {t("update.harborVersion", { version: u.version })}
-              </span>
-            )}
-            {u.channel === "experimental" && (
-              <span className="break-words text-[12px] text-accent">
-                {t("Experimental")}
-                {u.buildId ? ` · ${u.buildId}` : ""}
+                {u.channel === "experimental" && u.experimentalVersion
+                  ? t("Experimental {version} · Build {buildId}", {
+                      version: u.experimentalVersion,
+                      buildId: u.buildId ?? "—",
+                    })
+                  : t("update.harborVersion", { version: u.version })}
               </span>
             )}
           </div>

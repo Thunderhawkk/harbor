@@ -62,6 +62,7 @@ function manifest() {
   return {
     channel: "experimental",
     version: "0.9.123",
+    experimentalVersion: "0.0.1",
     buildId: "abc1234",
     notes: "Test fixes",
     platforms: {
@@ -424,6 +425,8 @@ test("experimental rejects stable fallback, empty feed, missing platforms and ma
     { version: "0.9.123", platforms: manifest().platforms },
     { ...manifest(), channel: "beta" },
     { ...manifest(), buildId: "" },
+    { ...manifest(), experimentalVersion: "0.0.0" },
+    { ...manifest(), experimentalVersion: "1.0.0" },
     { ...manifest(), version: "0.9.123-exp.2" },
     { ...manifest(), platforms: {} },
     { ...manifest(), installer: [] },
@@ -476,6 +479,8 @@ test("manifest validation uses exact architecture, HTTPS, signatures and unchang
   wrongPayload.installer["windows-x86_64"].payloadVersion++;
   assert.equal(experimental.parseExperimentalRelease(wrongPayload, "windows-x86_64"), null);
   assert.equal(experimental.experimentalPayloadVersion("0.9.123"), 9123);
+  assert.equal(experimental.experimentalPayloadVersion("0.999.1"), 999001);
+  assert.equal(experimental.experimentalChannelVersion("0.0.1"), 1);
   for (const version of ["0.1000.1", "0.9.1000", "0.09.123", "0.9.123-beta", "0.9.123.1"]) {
     assert.equal(experimental.experimentalPayloadVersion(version), null);
   }
@@ -607,6 +612,7 @@ test("explicit return verifies the exact approved target, backs up, and does not
   h.updater.setExperimentalUpdates(true);
   h.betaReturn.saveBetaReturnContext(
     "0.9.123",
+    "0.0.1",
     "abc1234",
     "windows-x86_64",
     manifest().returnToBeta,
@@ -633,6 +639,7 @@ test("failed approval, signature, backup or launch never silently switches to be
     h.updater.setExperimentalUpdates(true);
     h.betaReturn.saveBetaReturnContext(
       "0.9.123",
+      "0.0.1",
       "abc1234",
       "windows-x86_64",
       manifest().returnToBeta,
