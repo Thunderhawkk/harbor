@@ -227,6 +227,20 @@ function harness(
           };
         },
       },
+      "@/lib/safe-fetch": {
+        async safeFetch(url: string, init: { headers?: unknown }) {
+          calls.fetchUrls.push(url);
+          calls.fetchHeaders.push(init.headers);
+          if (config.nativeWait) await config.nativeWait;
+          return {
+            ok: config.status >= 200 && config.status < 300,
+            status: config.status,
+            async json() {
+              return config.raw;
+            },
+          };
+        },
+      },
       "@/lib/config/endpoints": { HARBOR_API_BASE: "https://example.test" },
       "@/lib/i18n": { t: (s: string) => s },
       "./channel": channel,
