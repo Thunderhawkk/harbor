@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Download } from "lucide-react";
 import { chapterPages, type MangaChapter } from "@/lib/manga/api";
 import { pageHeadersFor } from "@/lib/manga/plugins/adapter";
 import { t, useT } from "@/lib/i18n";
-import { downloadedPages } from "@/lib/manga-downloads";
+import { downloadedPages, downloadMangaPage } from "@/lib/manga-downloads";
 import { recordMangaProgress, resumePageForChapter } from "@/lib/manga-progress";
 import { clearMangaReading } from "@/lib/manga-reading-state";
 import { activeMangaSourceId, listMangaSources } from "@/lib/manga/sources";
@@ -716,12 +716,33 @@ export function MangaReader({
                 }}
                 className="flex w-full justify-center"
               >
-                <PageImage
-                  url={page.url}
-                  headers={page.headers}
-                  className="mx-auto block"
-                  style={longStyle}
-                />
+                <div className="relative inline-block">
+                  <PageImage
+                    url={page.url}
+                    headers={page.headers}
+                    className="block"
+                    style={longStyle}
+                  />
+                  {i === displayPage && prefs.enablePageDownload && page.url && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void downloadMangaPage(
+                          manga.id,
+                          manga.title,
+                          chapter.chapter,
+                          page.url,
+                          i,
+                          page.headers,
+                        )
+                      }
+                      className="absolute -right-12 top-3 z-10 grid h-9 w-9 place-items-center bg-canvas/85 text-accent shadow-[0_4px_16px_-4px_rgba(0,0,0,0.5)] backdrop-blur-md transition duration-150 hover:bg-accent hover:text-canvas active:scale-90"
+                      aria-label={t("Download current page")}
+                    >
+                      <Download size={17} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             <div className="flex w-full justify-center py-16">{completeCard}</div>
@@ -786,6 +807,23 @@ export function MangaReader({
           <Bookmark size={19} />
         </button>
       )}
+
+      {!disableMangaPersistence &&
+        controlsVisible &&
+        !loading &&
+        !failed &&
+        effMode === "long" && (
+          <button
+            type="button"
+            onClick={() => patchPrefs({ enablePageDownload: !prefs.enablePageDownload })}
+            onMouseDown={(e) => e.preventDefault()}
+            className={`absolute end-6 top-[124px] z-[92] grid h-11 w-11 place-items-center rounded-full bg-canvas/85 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.5)] backdrop-blur-md transition duration-150 hover:text-accent active:scale-90 ${prefs.enablePageDownload ? "text-accent" : "text-ink-muted"}`}
+            aria-label={t("Download page")}
+            aria-pressed={prefs.enablePageDownload}
+          >
+            <Download size={19} />
+          </button>
+        )}
 
       {bookmarksOpen && (
         <BookmarksPanel
