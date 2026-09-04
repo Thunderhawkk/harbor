@@ -822,6 +822,7 @@ export function MangaReader({
           onToggleFullscreen={toggleFullscreen}
           onOpenSettings={() => setSettingsOpen((v) => !v)}
           onExit={onExit}
+          onOpenDetail={onExit}
           flipSound={book ? prefs.flipSound : null}
           onToggleFlipSound={() => patchPrefs({ flipSound: !prefs.flipSound })}
         />
