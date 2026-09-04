@@ -9,7 +9,8 @@ import { recordMangaProgress, resumePageForChapter } from "@/lib/manga-progress"
 import { clearMangaReading } from "@/lib/manga-reading-state";
 import { activeMangaSourceId, listMangaSources } from "@/lib/manga/sources";
 import { useProfiles } from "@/lib/profiles";
-import { readWindowFullscreen, setWindowFullscreen } from "@/lib/window";
+import { toggleWindowFullscreen } from "@/lib/fullscreen-state";
+import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { ReaderBar } from "./manga-reader/reader-bar";
 import { ReaderFooter } from "./manga-reader/reader-footer";
 import { ReaderPageJump } from "./manga-reader/reader-page-jump";
@@ -83,7 +84,7 @@ export function MangaReader({
   useEffect(() => setHintDismissed(false), [index]);
   const [pickBookmark, setPickBookmark] = useState(false);
   const [autoLong, setAutoLong] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
+  const fullscreen = useWindowFullscreen();
   const [edge, setEdge] = useState({ top: false, bottom: false });
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageEls = useRef<Array<HTMLDivElement | null>>([]);
@@ -274,14 +275,8 @@ export function MangaReader({
     return () => window.removeEventListener("mousemove", onMove);
   }, [prefs.focusMode]);
 
-  useEffect(() => {
-    readWindowFullscreen().then(setFullscreen);
-  }, []);
-
   const toggleFullscreen = () => {
-    const nf = !fullscreen;
-    setFullscreen(nf);
-    void setWindowFullscreen(nf);
+    void toggleWindowFullscreen();
   };
 
   useEffect(() => {
