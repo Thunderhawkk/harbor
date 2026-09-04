@@ -201,7 +201,8 @@ export function listMangaDownloadGroups(): MangaDownloadGroup[] {
   const meta = readMeta();
   const groups = new Map<string, MangaDownloadGroup>();
   for (const [chapterId, files] of Object.entries(manifest)) {
-    if (!files?.length) continue;
+    if (!Array.isArray(files) || files.length === 0) continue;
+    if (typeof files[0] !== "string") continue;
     const m = meta[chapterId];
     const parts = files[0].split(/[\\/]/).filter(Boolean);
     const mangaSlug = parts.length >= 3 ? parts[parts.length - 3] : "manga";
