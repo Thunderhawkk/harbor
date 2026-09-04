@@ -1,8 +1,10 @@
 import { Download, FlaskConical, Loader2, RotateCw } from "lucide-react";
+import { useId, useState } from "react";
 import { useSettings } from "@/lib/settings";
+import { readChannelPreference, selectedUpdateChannel } from "@/lib/updater/channel";
 import {
   checkForUpdate,
-  clearStagedUpdate,
+  setUpdateChannel,
   openUpdatePanel,
   updateAvailable,
   useUpdate,
@@ -18,50 +20,86 @@ const QUAL =
 export function BetaChannelRow() {
   const t = useT();
   const { settings, update } = useSettings();
-  const on = settings.betaUpdates;
+  const u = useUpdate();
+  const [error, setError] = useState<string | null>(null);
+  const descriptionId = useId();
+  const preference = readChannelPreference();
+  const on = preference ? preference.normal === "beta" : settings.betaUpdates;
+  const experimental = selectedUpdateChannel() === "experimental";
+  const locked = experimental || u.status === "downloading" || u.status === "installing";
   return (
-    <ToggleRow
-      label={t("Get beta updates")}
-      sub={t(
-        "Receive early builds with the newest fixes before they reach the stable release. Betas can be rough around the edges; switch this off to return to stable at the next update.",
+    <fieldset
+      disabled={locked}
+      className="min-w-0"
+      aria-describedby={locked ? descriptionId : undefined}
+    >
+      <ToggleRow
+        label={t("Get beta updates")}
+        sub={t(
+          "Receive early builds with the newest fixes before they reach the stable release. Betas can be rough around the edges; switch this off to return to stable at the next update.",
+        )}
+        leading={
+          <span
+            className={`flex h-9 w-9 items-center justify-center rounded-md ${
+              on ? "bg-accent-soft text-accent" : "bg-raised text-ink-subtle"
+            }`}
+          >
+            <FlaskConical size={16} strokeWidth={2.2} />
+          </span>
+        }
+        value={on}
+        onChange={(betaUpdates) => {
+          if (!setUpdateChannel(betaUpdates ? "beta" : "stable")) {
+            setError(t("Couldn't save the update channel. Free some storage and try again."));
+            return;
+          }
+          setError(null);
+          update({ betaUpdates });
+        }}
+      />
+      {locked && (
+        <p id={descriptionId} className="px-4 py-2 text-[12px] text-ink-subtle">
+          {experimental
+            ? t("Leave experimental builds before changing your normal update channel.")
+            : t("Finish the current download or installation before changing channels.")}
+        </p>
       )}
-      leading={
-        <FlaskConical
-          size={20}
-          strokeWidth={2.1}
-          className={on ? "text-accent" : "text-ink-subtle"}
-        />
-      }
-      value={on}
-      onChange={(betaUpdates) => {
-        if (!betaUpdates) clearStagedUpdate();
-        update({ betaUpdates });
-      }}
-    />
+      {error && (
+        <p role="alert" className="px-4 py-2 text-[12px] text-danger">
+          {error}
+        </p>
+      )}
+    </fieldset>
   );
 }
 
 export function UpdatesRow() {
   const t = useT();
   const u = useUpdate();
-  const ready = updateAvailable(u);
-  const busy = u.status === "checking";
+  const ready = u.intent !== "return-beta" && updateAvailable(u);
+  const busy = u.intent === "return-beta" || u.status === "checking" || u.status === "installing";
   const status =
-    u.status === "checking"
-      ? t("Checking harbor.site for a newer build.")
-      : u.status === "downloading"
-        ? t("Downloading {pct}%", { pct: Math.round(u.progress * 100) })
-        : u.status === "downloaded"
-          ? t("Downloaded. Ready to install and restart.")
-          : u.status === "installing"
-            ? t("Installing. Harbor will restart.")
-            : u.status === "available"
-              ? t("A new version is ready to download.")
-              : u.status === "uptodate"
-                ? t("You're on the latest version.")
-                : u.status === "error" && u.manualCheck
-                  ? t("Couldn't reach the update server. Try again in a moment.")
-                  : t("Harbor checks automatically every few hours.");
+    u.intent === "return-beta"
+      ? t("Continue the return to beta in Experimental builds below.")
+      : u.status === "checking"
+        ? t("Checking harbor.site for a newer build.")
+        : u.status === "downloading"
+          ? t("Downloading {pct}%", { pct: Math.round(u.progress * 100) })
+          : u.status === "downloaded"
+            ? t("Downloaded. Ready to install and restart.")
+            : u.status === "installing"
+              ? t("Installing. Harbor will restart.")
+              : u.status === "available"
+                ? t("A new version is ready to download.")
+                : u.status === "unavailable"
+                  ? u.error
+                  : u.status === "uptodate"
+                    ? u.channel === "experimental"
+                      ? t("No newer experimental build is available for this device.")
+                      : t("You're on the latest version.")
+                    : u.status === "error" && u.manualCheck
+                      ? t("Couldn't reach the update server. Try again in a moment.")
+                      : t("Harbor checks automatically every few hours.");
   return (
     <SettingRow
       icon={
@@ -78,9 +116,11 @@ export function UpdatesRow() {
               ? t("Harbor {version} available", { version: u.version })
               : `Harbor ${__APP_VERSION__}`}
           </span>
-          {IS_BETA_BUILD && (
+          {u.channel === "experimental" ? (
+            <span className={`${QUAL} bg-accent-soft text-accent`}>{t("Experimental")}</span>
+          ) : IS_BETA_BUILD ? (
             <span className={`${QUAL} bg-accent-soft text-accent`}>{t("Beta")}</span>
-          )}
+          ) : null}
         </span>
       }
       desc={status}
