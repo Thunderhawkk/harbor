@@ -479,6 +479,7 @@ test("manifest validation uses exact architecture, HTTPS, signatures and unchang
   wrongPayload.installer["windows-x86_64"].payloadVersion++;
   assert.equal(experimental.parseExperimentalRelease(wrongPayload, "windows-x86_64"), null);
   assert.equal(experimental.experimentalPayloadVersion("0.9.123"), 9123);
+  assert.equal(experimental.experimentalPayloadVersion("0.999.1"), 999001);
   assert.equal(experimental.experimentalChannelVersion("0.0.1"), 1);
   for (const version of ["0.1000.1", "0.9.1000", "0.09.123", "0.9.123-beta", "0.9.123.1"]) {
     assert.equal(experimental.experimentalPayloadVersion(version), null);

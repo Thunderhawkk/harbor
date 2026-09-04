@@ -55,8 +55,8 @@ export default {
   "Enable experimental updates on this device? This replaces your normal update feed until you leave. It does not install a build now.":
     "Ativar atualizações experimentais neste dispositivo? Isso substitui seu canal normal de atualizações até você sair. Nenhuma versão será instalada agora.",
   "Enable and check": "Ativar e verificar",
-  "Leaving returns you to {channel} updates when a newer version is available. It does not downgrade Harbor.":
-    "Ao sair, você volta às atualizações do canal {channel} quando uma versão mais recente estiver disponível. Isso não reverte o Harbor para uma versão anterior.",
+  "Leaving only turns off experimental checks. Use Return to beta below to replace the experimental app.":
+    "Sair apenas desativa a busca por versões experimentais. Use Voltar para beta abaixo para substituir o aplicativo experimental.",
   "Couldn't save the update channel. Free some storage and try again.":
     "Não foi possível salvar o canal de atualização. Libere espaço de armazenamento e tente novamente.",
   "Finish the current download or installation before changing channels.":

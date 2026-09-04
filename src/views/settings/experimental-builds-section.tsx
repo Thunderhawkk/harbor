@@ -177,8 +177,7 @@ export function ExperimentalBuildsSection() {
           {enabled && (
             <p className="text-[12px] leading-relaxed text-ink-subtle">
               {t(
-                "Leaving returns you to {channel} updates when a newer version is available. It does not downgrade Harbor.",
-                { channel: normal },
+                "Leaving only turns off experimental checks. Use Return to beta below to replace the experimental app.",
               )}
             </p>
           )}
