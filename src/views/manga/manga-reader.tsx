@@ -76,6 +76,7 @@ export function MangaReader({
   const [currentPage, setCurrentPage] = useState(0);
   const [bookSpread, setBookSpread] = useState("");
   const [chromeOpen, setChromeOpen] = useState(true);
+  const [manualHide, setManualHide] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [hintDismissed, setHintDismissed] = useState(false);
@@ -399,9 +400,21 @@ export function MangaReader({
   const dStyle = doublePageStyle(prefs.fit, prefs.zoom);
   const displayPage = Math.min(currentPage, Math.max(0, total - 1));
   const focus = prefs.focusMode;
-  const barVisible = focus ? edge.top : chromeOpen;
-  const footerVisible = focus ? edge.bottom : chromeOpen;
-  const controlsVisible = focus ? edge.top || edge.bottom : chromeOpen;
+  const autoShown = !manualHide && chromeOpen;
+  const barVisible = focus ? edge.top && !manualHide : autoShown;
+  const footerVisible = focus ? edge.bottom && !manualHide : autoShown;
+  const controlsVisible = focus ? (edge.top || edge.bottom) && !manualHide : autoShown;
+  const chromeVisible = (focus ? edge.top || edge.bottom : chromeOpen) && !manualHide;
+  const toggleChrome = () => {
+    if (chromeVisible) {
+      setManualHide(true);
+    } else {
+      setManualHide(false);
+      setChromeOpen(true);
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = window.setTimeout(() => setChromeOpen(false), 2600);
+    }
+  };
   const bookResume = useMemo(
     () =>
       startPage ??
@@ -623,6 +636,12 @@ export function MangaReader({
         className={`absolute inset-0 overscroll-contain ${
           book ? "overflow-hidden" : horizontal ? "overflow-auto" : "overflow-y-auto"
         }`}
+        onClick={(e) => {
+          if (paged) return;
+          const t = e.target as HTMLElement;
+          if (t.closest("button, a, [role='button']")) return;
+          toggleChrome();
+        }}
       >
         {loading ? (
           <ReaderLoading />
