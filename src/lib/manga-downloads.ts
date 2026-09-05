@@ -596,7 +596,17 @@ export async function downloadedPages(chapterId: string): Promise<string[] | nul
 }
 
 function safeName(s: string): string {
-  return s.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "item";
+  const cleaned = s
+    .trim()
+    .replace(/[^\p{L}\p{N}._-]+/gu, "_")
+    .replace(/^[._-]+|[._-]+$/g, "");
+  return cleaned.slice(0, 80) || "item";
+}
+
+/** Folder name for a manga: the sanitized title when meaningful, otherwise the id. */
+function mangaDirName(title: string | undefined, mangaId: string): string {
+  const slug = safeName(title ?? "");
+  return slug === "item" ? safeName(mangaId) : slug;
 }
 
 function chapterDirName(info: MangaDownloadInfo | undefined, chapterId: string): string {
@@ -665,7 +675,7 @@ async function downloadChapterWithControl(
     const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
 
     const base = getMangaDownloadDir() || (await defaultMangaDownloadDir());
-    const dir = await join(base, safeName(info?.title || mangaId), chapterDirName(info, chapterId));
+    const dir = await join(base, mangaDirName(info?.title, mangaId), chapterDirName(info, chapterId));
     await mkdir(dir, { recursive: true });
 
     const fetchBytes = async (url: string): Promise<Uint8Array> => {
