@@ -324,8 +324,24 @@ export function MangaReader({
     if (paged || loading || failed) return;
     const root = scrollRef.current;
     if (!root) return;
+    const vertical = !horizontal;
+    const atStart = () => Math.abs(vertical ? root.scrollTop : root.scrollLeft) <= 2;
+    const atEnd = () =>
+      vertical
+        ? root.scrollTop + root.clientHeight >= root.scrollHeight - 2
+        : Math.abs(root.scrollLeft) + root.clientWidth >= root.scrollWidth - 2;
+    // The middle-band observer below can never register an edge page (its box
+    // never enters the band), so short first/last pages are pinned explicitly.
+    const syncEdge = () => {
+      if (atStart()) setCurrentPage(0);
+      else if (atEnd()) setCurrentPage(Math.max(0, total - 1));
+    };
     const obs = new IntersectionObserver(
       (entries) => {
+        if (atStart() || atEnd()) {
+          syncEdge();
+          return;
+        }
         for (const e of entries) {
           if (e.isIntersecting) {
             const i = Number((e.target as HTMLElement).dataset.page);
@@ -335,9 +351,14 @@ export function MangaReader({
       },
       { root, rootMargin: horizontal ? "0px -45% 0px -45%" : "-45% 0px -45% 0px" },
     );
+    root.addEventListener("scroll", syncEdge, { passive: true });
     pageEls.current.forEach((el) => el && obs.observe(el));
-    return () => obs.disconnect();
-  }, [paged, horizontal, loading, failed, pages]);
+    syncEdge();
+    return () => {
+      root.removeEventListener("scroll", syncEdge);
+      obs.disconnect();
+    };
+  }, [paged, horizontal, loading, failed, pages, total]);
 
   useEffect(
     () => (disableMangaPersistence ? undefined : clearMangaReading),
