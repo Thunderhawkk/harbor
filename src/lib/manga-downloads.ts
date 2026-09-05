@@ -770,10 +770,13 @@ export function downloadChapter(
 }
 
 /**
- * Downloads a single manga page into the manga download directory. Fetches
- * through the same `harbor_fetch` backend the reader uses to display pages (so
- * source-required headers work), falling back to the `/manga-img` proxy.
- * Returns the saved file path, or null on failure.
+ * Downloads a single manga page into the manga download directory. When the
+ * chapter is already downloaded locally, the page is copied from its saved
+ * file (the reader shows `asset.localhost` URLs for those, which cannot be
+ * fetched). Otherwise the page is fetched through the same `harbor_fetch`
+ * backend the reader uses to display pages (so source-required headers work),
+ * falling back to the `/manga-img` proxy. Returns the saved file path, or null
+ * on failure.
  */
 export async function downloadMangaPage(
   mangaId: string,
@@ -782,26 +785,36 @@ export async function downloadMangaPage(
   pageUrl: string,
   pageIndex: number,
   headers?: Record<string, string>,
+  chapterId?: string,
 ): Promise<string | null> {
   if (!/^https?:/i.test(pageUrl)) return null;
   try {
     const { join } = await import("@tauri-apps/api/path");
     const { mkdir, writeFile } = await import("@tauri-apps/plugin-fs");
 
-    const fetchHeaders = { ...IMG_HEADERS, ...headers };
     let bytes: Uint8Array | null = null;
-    try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const resp = (await invoke("harbor_fetch", {
-        args: { url: pageUrl, method: "GET", headers: fetchHeaders, responseType: "base64", timeoutMs: 30000 },
-      })) as { status: number; ok: boolean; body: string; ContentType?: string; headers?: Record<string, string> };
-      if (resp.ok && typeof resp.body === "string" && resp.body) {
-        const bin = atob(resp.body.trim());
-        bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    let ext: string | undefined;
+    const localSrc = chapterId ? readManifest()[chapterId]?.[pageIndex] : undefined;
+    if (localSrc) {
+      const { readFile } = await import("@tauri-apps/plugin-fs");
+      bytes = await readFile(localSrc).catch(() => null);
+      if (bytes) ext = extOf(localSrc);
+    }
+    if (!bytes) {
+      const fetchHeaders = { ...IMG_HEADERS, ...headers };
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const resp = (await invoke("harbor_fetch", {
+          args: { url: pageUrl, method: "GET", headers: fetchHeaders, responseType: "base64", timeoutMs: 30000 },
+        })) as { status: number; ok: boolean; body: string; ContentType?: string; headers?: Record<string, string> };
+        if (resp.ok && typeof resp.body === "string" && resp.body) {
+          const bin = atob(resp.body.trim());
+          bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        }
+      } catch {
+        /* harbor_fetch unavailable - fall through to proxy */
       }
-    } catch {
-      /* harbor_fetch unavailable - fall through to proxy */
     }
 
     if (!bytes) {
@@ -811,12 +824,13 @@ export async function downloadMangaPage(
     }
 
     const base = getMangaDownloadDir() || (await defaultMangaDownloadDir());
-    const mangaDir = safeName(mangaTitle || mangaId);
+    const mangaDir = mangaDirName(mangaTitle, mangaId);
     const dir = await join(base, mangaDir, "Individual Pages");
     await mkdir(dir, { recursive: true });
-    const chapterLabel =
-      chapterNumber != null && chapterNumber !== "" ? String(chapterNumber) : "?";
-    const fileName = `Chapter ${chapterLabel}_Page ${pageIndex + 1}.${extOf(pageUrl)}`;
+    const chapterLabel = safeName(
+      chapterNumber != null && chapterNumber !== "" ? String(chapterNumber) : "unknown",
+    );
+    const fileName = `Chapter ${chapterLabel}_Page ${pageIndex + 1}.${ext ?? extOf(pageUrl)}`;
     const path = await join(dir, fileName);
     await writeFile(path, bytes);
     return path;

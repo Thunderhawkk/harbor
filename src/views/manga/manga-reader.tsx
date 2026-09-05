@@ -803,9 +803,10 @@ export function MangaReader({
                           page.url,
                           i,
                           page.headers,
+                          chapter.id,
                         )
                       }
-                      className="absolute -right-12 top-3 z-10 grid h-9 w-9 place-items-center bg-canvas/85 text-accent shadow-[0_4px_16px_-4px_rgba(0,0,0,0.5)] backdrop-blur-md transition duration-150 hover:bg-accent hover:text-canvas active:scale-90"
+                      className="absolute -right-12 top-16 z-10 grid h-9 w-9 place-items-center bg-canvas/85 text-accent shadow-[0_4px_16px_-4px_rgba(0,0,0,0.5)] backdrop-blur-md transition duration-150 hover:bg-accent hover:text-canvas active:scale-90"
                       aria-label={t("Download current page")}
                     >
                       <Download size={17} />
