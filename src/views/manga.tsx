@@ -1,6 +1,6 @@
-import { ArrowDownToLine, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowDownToLine, BookOpen, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import { CoverImg } from "@/components/cover-img";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { useMangaDownloadsCount } from "@/lib/manga-downloads";
 import { useT } from "@/lib/i18n";
@@ -42,12 +42,15 @@ import { MangaUniverses, UniversesCta } from "./manga/manga-universes";
 import { AnilistMangaRows } from "./manga/anilist-manga-rows";
 import { MangaHiddenRows } from "./manga/manga-row-visibility";
 import { BecauseYouWatched } from "./manga/because-you-watched";
+import { MyListsTab } from "./library/my-lists-tab";
+import { useCustomLists } from "@/lib/custom-lists";
 
 type MangaMeta = { id: string; title: string; cover?: string };
 
 type Mode =
   | { screen: "browse" }
   | { screen: "collections" }
+  | { screen: "lists" }
   | { screen: "universes" }
   | { screen: "sources" }
   | { screen: "downloads"; from?: string }
@@ -289,7 +292,7 @@ export function MangaView() {
             onOpen={openMangaItem}
           />
         </div>
-        <div className="mb-9 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mb-9 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <button
             type="button"
             onClick={() => setMode({ screen: "collections" })}
@@ -324,6 +327,7 @@ export function MangaView() {
             />
           </button>
           <UniversesCta onClick={() => setMode({ screen: "universes" })} />
+          <MyListsCta onClick={() => setMode({ screen: "lists" })} />
         </div>
         <div className="mb-6 mt-3 flex items-center justify-between gap-4">
           <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Browse manga")}</h2>
@@ -403,6 +407,23 @@ export function MangaView() {
         </main>
       )}
 
+      {mode.screen === "lists" && (
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24">
+          <button
+            type="button"
+            onClick={() => setMode({ screen: "browse" })}
+            className="mb-7 inline-flex items-center gap-1.5 rounded-full border border-edge-soft bg-canvas/40 px-4 py-2 text-[14px] text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
+          >
+            <ChevronLeft size={18} />
+            {t("Back")}
+          </button>
+          <h1 className="mb-8 font-display text-[32px] font-medium tracking-tight text-ink">
+            {t("My lists")}
+          </h1>
+          <MyListsTab />
+        </main>
+      )}
+
       {mode.screen === "universes" && (
         <main className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24">
           <MangaUniverses
@@ -455,5 +476,69 @@ function EnableGate({ onEnable }: { onEnable: () => void }) {
       </button>
       </div>
     </main>
+  );
+}
+
+function MyListsCta({ onClick }: { onClick: () => void }) {
+  const t = useT();
+  const lists = useCustomLists();
+  const covers = useMemo(() => {
+    const manga = lists
+      .flatMap((l) => l.items)
+      .filter((it) => it.type === "manga" && it.poster)
+      .map((it) => it.poster!);
+    const any = lists
+      .flatMap((l) => l.items)
+      .filter((it) => it.poster)
+      .map((it) => it.poster!);
+    const seen = new Set<string>();
+    for (const c of [...manga, ...any]) {
+      if (c && !seen.has(c)) seen.add(c);
+      if (seen.size === 3) break;
+    }
+    return [...seen];
+  }, [lists]);
+
+  const [a, b, center] = covers;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex h-full min-h-[84px] items-center gap-4 rounded-2xl border border-edge-soft bg-elevated/40 px-6 py-4 text-start transition-all duration-300 hover:bg-elevated/70 active:scale-[0.99]"
+    >
+      {covers.length > 0 ? (
+        <span className="relative grid h-12 w-16 shrink-0 place-items-center">
+          {a && (
+            <span className="absolute h-10 w-7 -translate-x-2.5 -rotate-[18deg] overflow-hidden rounded-[5px] bg-elevated shadow-[0_4px_10px_-4px_rgba(0,0,0,0.6)] ring-1 ring-edge-soft transition-transform duration-300 ease-out group-hover:-translate-x-4 group-hover:-rotate-[28deg]">
+              <CoverImg src={a} alt="" className="h-full w-full object-cover" />
+            </span>
+          )}
+          {b && (
+            <span className="absolute h-10 w-7 translate-x-2.5 rotate-[18deg] overflow-hidden rounded-[5px] bg-raised shadow-[0_4px_10px_-4px_rgba(0,0,0,0.6)] ring-1 ring-edge-soft transition-transform duration-300 ease-out group-hover:translate-x-4 group-hover:rotate-[28deg]">
+              <CoverImg src={b} alt="" className="h-full w-full object-cover" />
+            </span>
+          )}
+          {center && (
+            <span className="absolute h-10 w-7 overflow-hidden rounded-[5px] bg-gradient-to-br from-accent to-accent/60 shadow-[0_6px_14px_-4px_rgba(0,0,0,0.7)] ring-1 ring-white/10 transition-transform duration-300 ease-out group-hover:-translate-y-1">
+              <CoverImg src={center} alt="" className="h-full w-full object-cover" />
+            </span>
+          )}
+        </span>
+      ) : (
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-elevated ring-1 ring-edge-soft">
+          <Layers size={20} className="text-ink-subtle" />
+        </span>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[15.5px] font-semibold text-ink">{t("My lists")}</span>
+        <span className="truncate text-[13px] text-ink-muted">
+          {t("The lists you created, full of saved manga")}
+        </span>
+      </div>
+      <ChevronRight
+        size={22}
+        className="shrink-0 text-ink-subtle transition-transform group-hover:translate-x-1"
+      />
+    </button>
   );
 }
