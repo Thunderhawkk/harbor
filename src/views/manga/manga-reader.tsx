@@ -37,6 +37,7 @@ import { useReaderPaging } from "./manga-reader/hooks/use-reader-paging";
 import { detectWebtoon } from "./manga-reader/reader-utils";
 import { addMangaBookmark, type MangaBookmark } from "@/lib/manga-bookmarks";
 import { chapterSourceOf } from "./manga-reader/reader-source-menu";
+import { chapterGroupKey, resolveReaderChapters } from "@/lib/manga/chapter-identity";
 import { useMangaRemoteBinding } from "@/lib/remote/use-manga-remote-binding";
 import { useBookTurnQueue } from "./manga-reader/hooks/use-book-turn-queue";
 import {
@@ -138,14 +139,42 @@ export function MangaReader({
 
   const total = pages.length;
   const pageUrls = useMemo(() => pages.map((p) => p.url), [pages]);
+  // The reader collapses provider copies itself: callers pass the raw
+  // interleaved list, and navigation walks one representative per chapter
+  // group - the group's newest winner. When the caller opened a specific
+  // scanlator copy, its group is kept for the whole read session so
+  // consecutive chapters stay on the same provider.
+  const pickedGroup = useMemo(
+    () => (index >= 0 && index < chapters.length ? chapters[index]?.group ?? undefined : undefined),
+    // Captured on mount only - the index changes as the user navigates, but
+    // the intended provider is the one that was picked when the reader opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const collapsed = useMemo(
+    () => resolveReaderChapters(chapters, { group: pickedGroup }),
+    [chapters, pickedGroup],
+  );
   const readingOrder = useMemo(() => {
-    const num = (c: MangaChapter) => parseFloat(c.chapter ?? "") || 0;
-    return chapters.map((_, i) => i).sort((a, b) => num(chapters[a]) - num(chapters[b]) || a - b);
-  }, [chapters]);
-  const orderPos = readingOrder.indexOf(index);
+    const idToIdx = new Map(chapters.map((c, i) => [c.id, i]));
+    return collapsed
+      .map((c) => idToIdx.get(c.id))
+      .filter((i): i is number => i != null);
+  }, [chapters, collapsed]);
+  const orderPos = useMemo(() => {
+    const current = chapters[index];
+    if (!current) return -1;
+    const key = chapterGroupKey(current);
+    const pos = collapsed.findIndex((c) => chapterGroupKey(c) === key);
+    return pos >= 0 ? pos : readingOrder.indexOf(index);
+  }, [chapters, index, collapsed, readingOrder]);
   const prevIndex = orderPos > 0 ? readingOrder[orderPos - 1] : null;
   const nextIndex =
-    orderPos >= 0 && orderPos < readingOrder.length - 1 ? readingOrder[orderPos + 1] : null;
+    orderPos >= 0 && orderPos < readingOrder.length - 1
+      ? readingOrder[orderPos + 1]
+      : orderPos === -1 && readingOrder.length > 0
+        ? readingOrder[0]
+        : null;
   const atFirstChapter = orderPos <= 0;
   const atLastChapter = orderPos === -1 || orderPos === readingOrder.length - 1;
   const effMode = autoLong ? "long" : prefs.mode;
@@ -618,11 +647,11 @@ export function MangaReader({
       const src = known.find((s) => s.provider === id || s.id === id);
       return src?.name ?? id;
     };
-    return chapters.map((c, i) => {
+    return collapsed.map((c, i) => {
       const sourceId = chapterSourceOf(c) || undefined;
       return {
         id: c.id,
-        index: i,
+        index: readingOrder[i] ?? 0,
         label: chapterLabel(c),
         chapter: c.chapter,
         title: c.title,
@@ -632,7 +661,7 @@ export function MangaReader({
         downloaded: c.downloaded,
       };
     });
-  }, [chapters]);
+  }, [collapsed, readingOrder]);
 
   const bookTurn = useBookTurnQueue(bookApi);
 
@@ -864,9 +893,9 @@ export function MangaReader({
       <div className="absolute inset-x-0 top-0 z-40">
         <ReaderBar
           visible={barVisible}
-          chapters={chapters}
-          index={index}
-          onJumpChapter={onChangeIndex}
+          chapters={collapsed}
+          index={orderPos}
+          onJumpChapter={(pos) => onChangeIndex(readingOrder[pos] ?? 0)}
           fullscreen={fullscreen}
           onToggleFullscreen={toggleFullscreen}
           onOpenSettings={() => setSettingsOpen((v) => !v)}

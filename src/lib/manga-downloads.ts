@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { chapterPages } from "@/lib/manga/api";
 
 export type MangaDownloadStatus = "idle" | "downloading" | "paused" | "done" | "error";
@@ -950,6 +950,47 @@ export function useMangaDownload(chapterId: string): MangaDownloadRec {
     sync();
     return subscribeMangaDownloads(sync);
   }, [chapterId]);
+  return rec;
+}
+
+const GROUP_STATUS_RANK: Record<MangaDownloadStatus, number> = {
+  idle: 0,
+  error: 1,
+  paused: 2,
+  downloading: 3,
+  done: 4,
+};
+
+/* Group-aware download status: treats every chapter id that represents the
+   same chapter (across providers) as one download, so the UI shows a single
+   checkmark/progress for the whole group. The most advanced status wins. */
+export function mangaDownloadGroupStatus(chapterIds: string[]): MangaDownloadRec {
+  let best: MangaDownloadRec | null = null;
+  let bestRank = -1;
+  for (const id of chapterIds) {
+    const rec = mangaDownloadStatus(id);
+    const rank = GROUP_STATUS_RANK[rec.status];
+    if (rank > bestRank) {
+      bestRank = rank;
+      best = rec;
+    }
+  }
+  return best ?? { status: "idle", done: 0, total: 0, files: [] };
+}
+
+export function useMangaDownloadGroup(chapterIds: string[]): MangaDownloadRec {
+  const idsRef = useRef(chapterIds);
+  idsRef.current = chapterIds;
+  const [rec, setRec] = useState<MangaDownloadRec>(() => mangaDownloadGroupStatus(chapterIds));
+  useEffect(() => {
+    const sync = (changed?: string) => {
+      if (!changed || idsRef.current.includes(changed)) {
+        setRec(mangaDownloadGroupStatus(idsRef.current));
+      }
+    };
+    sync();
+    return subscribeMangaDownloads(sync);
+  }, []);
   return rec;
 }
 
