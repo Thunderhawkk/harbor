@@ -592,6 +592,25 @@ export async function downloadedPages(chapterId: string): Promise<string[] | nul
   const files = readManifest()[chapterId];
   if (!files?.length) return null;
   const { convertFileSrc } = await import("@tauri-apps/api/core");
+  const { exists } = await import("@tauri-apps/plugin-fs");
+  const present: boolean[] = await Promise.all(
+    files.map((f) =>
+      exists(f).catch(() => {
+        return false;
+      }),
+    ),
+  );
+  // Any missing file means the download was deleted; drop the stale manifest
+  // entry (and cached status) and fall back to the network sources instead of
+  // returning a shifted, partial page list.
+  if (!present.every(Boolean)) {
+    await mutateManifest((m) => {
+      delete m[chapterId];
+    });
+    runtime.delete(chapterId);
+    notify(chapterId);
+    return null;
+  }
   return files.map((f) => convertFileSrc(f));
 }
 
