@@ -241,12 +241,14 @@ export function MangaView() {
     const target = entry.sourceId || activeMangaSourceId();
     if (target && activeMangaSourceId() !== target) setActiveMangaSource(target);
     try {
-      const chs = await resumeChapters(entry.id);
-      const i = chs.findIndex(
-        (c) =>
-          c.id === entry.chapterId ||
-          (entry.chapterNumber != null && c.chapter != null && c.chapter === entry.chapterNumber),
-      );
+      let chs = await resumeChapters(entry.id);
+      let i = chs.findIndex((c) => c.id === entry.chapterId);
+      if (i < 0) {
+        i = chs.findIndex(
+          (c) =>
+            entry.chapterNumber != null && c.chapter != null && c.chapter === entry.chapterNumber,
+        );
+      }
       if (i >= 0) {
         setMode({
           screen: "reader",
