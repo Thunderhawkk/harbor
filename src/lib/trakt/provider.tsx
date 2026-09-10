@@ -27,6 +27,7 @@ import {
   scrobbleStop,
 } from "./scrobble";
 import { pushWatched } from "./history";
+import { armOnlineFlush, flushPendingStops, recordPendingStop } from "./pending-sync";
 import type { DeviceCode, TraktSession, TraktTarget } from "./types";
 
 export type ConnectState =
@@ -137,13 +138,28 @@ export function TraktProvider({ children }: { children: ReactNode }) {
       else if (action === "pause") await scrobblePause(target, progress);
       else {
         const outcome = await scrobbleStop(target, progress);
-        if (outcome !== "recorded" && outcome !== "already-recorded") {
-          await pushWatched(target);
-        }
+        let confirmed = outcome === "recorded" || outcome === "already-recorded";
+        if (!confirmed) confirmed = await pushWatched(target);
+        if (!confirmed) recordPendingStop(args.metaId, args.episode, progress);
       }
     },
     [resolveTarget],
   );
+
+  useEffect(
+    () =>
+      armOnlineFlush({
+        hasSession: () => getSession() != null,
+        resolveTarget,
+        stopScrobble: scrobbleStop,
+        markWatched: pushWatched,
+      }),
+    [resolveTarget],
+  );
+
+  useEffect(() => {
+    if (session) void flushPendingStops().catch(() => {});
+  }, [session]);
 
   const value = useMemo<Value>(
     () => ({
