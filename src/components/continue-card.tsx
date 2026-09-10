@@ -38,6 +38,12 @@ import { resolvePreferredAnimeTitle } from "@/lib/anime-title";
 import { stripFranchiseSuffix } from "@/lib/providers/jikan";
 import { getAnimeCwId } from "@/lib/anime-cw-ids";
 import { aniZipLookupKey, applyAniZipEpisode, needsAniZipSyncIds } from "@/lib/cw-anime-episode";
+import { isSplitFranchiseKitsu } from "@/lib/providers/anime-franchise-root";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import {
+  isForeignSplitSeason,
+  splitFranchiseDisplaySeason,
+} from "@/lib/streams/anime-identity-core";
 import { classifyAnimeNumbering } from "@/lib/subtitles/anime-numbering";
 import { ThreeLiquidGlassSurface } from "@/components/ThreeLiquidGlassSurface";
 
@@ -332,7 +338,15 @@ export const ContinueCard = memo(function ContinueCard({
   const episodeTitle = epTitle ?? kitsuVideo?.title ?? null;
 
   const isAnimeItem = /^(kitsu|mal|anilist|anidb):/.test(item._id);
+  const cardKitsuId = parseKitsuId(item._id) ?? parseKitsuId(kitsuVideo?.id ?? "");
+  const seasonForeignCard = isForeignSplitSeason(
+    isSplitFranchiseKitsu(cardKitsuId),
+    ep?.season,
+    kitsuVideo?.imdbSeason,
+  );
+  const partSeasonCard = splitFranchiseDisplaySeason(cardKitsuId);
   const animeSeasonMapped =
+    !seasonForeignCard &&
     kitsuVideo &&
     kitsuVideo.imdbSeason != null &&
     kitsuVideo.imdbSeason >= 2 &&
@@ -345,7 +359,7 @@ export const ContinueCard = memo(function ContinueCard({
       : animeSeasonMapped
         ? `S${animeSeasonMapped.season} · E${String(animeSeasonMapped.episode).padStart(2, "0")}`
         : ep
-          ? `S${ep.season}E${ep.episode}`
+          ? `S${partSeasonCard ?? ep.season}E${ep.episode}`
           : animeEp && Number.isFinite(animeEp) && animeEp > 0
             ? `Ep ${animeEp}`
             : "";

@@ -7,6 +7,16 @@ import { simklWatchedForId, statusForId, type WatchlistStatus } from "@/lib/simk
 import { episodeFromVideoId, isAnimeCwItem, libraryMetaType, type LibraryItem } from "@/lib/stremio";
 import { isEpisodeHidden } from "@/lib/hidden-episodes";
 import { isNextAired, resurfaceCandidates, type AnimeMode } from "@/lib/cw-resurface";
+import { lastPlayedEpisode } from "@/lib/resume";
+import { getViewedSeason } from "@/lib/season-view-pref";
+import { getAnimeCwId } from "@/lib/anime-cw-ids";
+import {
+  preferredMixedSeason,
+  providerAliasCoords,
+  resolveEffectiveEpisode,
+} from "@/lib/cw-anime-episode";
+import { isSplitFranchiseKitsu } from "@/lib/providers/anime-franchise-root";
+import { parseKitsuId } from "@/lib/providers/kitsu";
 import { franchiseDedupKey } from "@/lib/providers/jikan";
 import { useSettings } from "@/lib/settings";
 
@@ -31,6 +41,10 @@ function currentEpisode(i: LibraryItem): { season: number; episode: number } | n
   const episode = i.state?.episode;
   if (season && episode) return { season, episode };
   return episodeFromVideoId(i.state?.video_id ?? "");
+}
+
+function scopedSplitItem(id: string): boolean {
+  return isSplitFranchiseKitsu(parseKitsuId(id) ?? parseKitsuId(getAnimeCwId(id) ?? ""));
 }
 
 export function shouldDropFinished(
@@ -188,6 +202,8 @@ export function useCwAdvance(
         const orderKey = (s: number, e: number) => s * 100000 + e;
         const origCur = cur;
         let effCur = cur;
+        let remappedMixed = false;
+        const scoped = scopedSplitItem(i._id);
         if (fetchOk && list.length > 0) {
           const maxKey = list.reduce((m, e) => Math.max(m, orderKey(e.season, e.episode)), 0);
           if (
@@ -202,20 +218,39 @@ export function useCwAdvance(
             effCur = { season: abs.season, episode: abs.episode };
           }
           if (!list.some((e) => e.season === effCur.season && e.episode === effCur.episode)) {
-            const mapped = list.find(
-              (e) => e.imdbSeason === effCur.season && e.imdbEpisode === effCur.episode,
-            );
-            if (mapped) effCur = { season: mapped.season, episode: mapped.episode };
+            if (scoped) {
+              const hintSeason = preferredMixedSeason(
+                getViewedSeason(i._id),
+                lastPlayedEpisode(i._id)?.season,
+              );
+              const resolved = resolveEffectiveEpisode(
+                list,
+                effCur.season,
+                effCur.episode,
+                hintSeason,
+              );
+              effCur = { season: resolved.season, episode: resolved.episode };
+              remappedMixed = resolved.remappedMixed;
+            } else {
+              const mapped = list.find(
+                (e) => e.imdbSeason === effCur.season && e.imdbEpisode === effCur.episode,
+              );
+              if (mapped) effCur = { season: mapped.season, episode: mapped.episode };
+            }
           }
         }
-        const watchedCur = watchedPredicate(
+        const checkWatched = watchedPredicate(
           i,
           effCur,
           traktWatched,
           simklWatched,
           anilistWatched,
           simklStatus,
-        )(effCur.season, effCur.episode);
+        );
+        const aliasCur = scoped ? providerAliasCoords(list, effCur.season, effCur.episode) : [];
+        const watchedCur =
+          checkWatched(effCur.season, effCur.episode) ||
+          aliasCur.some((a) => checkWatched(a.season, a.episode));
         if (!watchedCur) continue;
         const nextEp = nextUnwatchedAfter(
           list,
@@ -223,12 +258,20 @@ export function useCwAdvance(
           (s: number, e: number): boolean => {
             if (s === effCur.season && e === effCur.episode) return true;
             const prog = getEpisodeProgress(i._id, s, e, null, null, new Set());
-            return prog.watched;
+            if (prog.watched) return true;
+            if (!scoped) return false;
+            return providerAliasCoords(list, s, e).some(
+              (a) => getEpisodeProgress(i._id, a.season, a.episode, null, null, new Set()).watched,
+            );
           },
           episodeHiding ? (s, e) => isEpisodeHidden(i._id, s, e) : undefined,
         );
         if (nextEp && nextEpAired(list, nextEp, isAnime)) {
-          const displaySeason = origCur.season !== effCur.season ? origCur.season : nextEp.season;
+          const displaySeason = remappedMixed
+            ? nextEp.season
+            : origCur.season !== effCur.season
+              ? origCur.season
+              : nextEp.season;
           next.set(i._id, {
             ...i,
             state: {
