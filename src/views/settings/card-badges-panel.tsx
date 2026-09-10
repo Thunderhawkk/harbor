@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
-import { Bookmark, Eye, Hash, MoveVertical, Popcorn } from "lucide-react";
-import { useHydratedPoster, useSampleArtwork } from "@/lib/sample-artwork";
-import previewPoster3 from "@/assets/preview/poster3.webp";
+import { useState } from "react";
+import { Bookmark, Hash, MoveVertical, Popcorn } from "./icons";
+import { ANIME_PREVIEW, useSampleArtwork } from "@/lib/sample-artwork";
 import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
 import mdblistLogo from "@/assets/addon-logos/mdblist.png";
 import traktLogo from "@/assets/trakt.svg";
@@ -11,7 +10,7 @@ import { ImdbIcon } from "@/components/icons/imdb-icon";
 import { MalLogo } from "@/components/icons/mal-logo";
 import { RtFresh } from "@/components/icons/rt-fresh";
 import type { Settings } from "@/lib/settings";
-import { useT } from "@/lib/i18n";
+import { isRtl, useT, useUiLanguage } from "@/lib/i18n";
 import { Segmented, ToggleRow } from "./shared";
 import { SettingRow, Nested } from "./kit";
 
@@ -31,52 +30,56 @@ export type PreviewFlags = {
 type WatchlistPos = "off" | "topStart" | "topEnd" | "bottomStart" | "bottomEnd";
 
 const WL_PREVIEW_POS: Record<string, string> = {
-  topStart: "top-1.5 start-1.5",
-  topEnd: "top-1.5 end-1.5",
-  bottomStart: "bottom-1.5 start-1.5",
-  bottomEnd: "bottom-1.5 end-1.5",
+  topStart: "top-2 start-2",
+  topEnd: "top-2 end-2",
+  bottomStart: "bottom-2 start-2",
+  bottomEnd: "bottom-2 end-2",
 };
+
+function useIsRtl(): boolean {
+  return isRtl(useUiLanguage());
+}
 
 function previewExtras(f: PreviewFlags): React.ReactNode[] {
   const out: React.ReactNode[] = [];
   if (f.showPopcorn)
     out.push(
       <span className="flex items-center gap-0.5">
-        <Popcorn size={12} strokeWidth={2.4} className="text-accent" />
+        <Popcorn size={15} strokeWidth={2.4} className="text-accent" />
         <span>85%</span>
       </span>,
     );
   if (f.showMetacritic)
     out.push(
-      <span className="flex h-[12px] min-w-[14px] items-center justify-center rounded-[3px] bg-success px-0.5 text-[8px] font-bold text-white">
+      <span className="flex h-[15px] min-w-[18px] items-center justify-center rounded-sm bg-success px-1 text-[10px] font-bold text-canvas">
         78
       </span>,
     );
   if (f.showLetterboxd)
     out.push(
       <span className="flex items-center gap-0.5">
-        <img src={letterboxdLogo} alt="" className="h-[10px] w-[10px] rounded-[2px] object-cover" />
+        <img src={letterboxdLogo} alt="" className="h-[13px] w-[13px] rounded-sm object-cover" />
         <span>4.2</span>
       </span>,
     );
   if (f.showMdblist)
     out.push(
       <span className="flex items-center gap-0.5">
-        <img src={mdblistLogo} alt="" className="h-[10px] w-[10px] rounded-[2px] object-contain" />
+        <img src={mdblistLogo} alt="" className="h-[13px] w-[13px] rounded-sm object-contain" />
         <span>76</span>
       </span>,
     );
   if (f.showTrakt)
     out.push(
       <span className="flex items-center gap-0.5">
-        <img src={traktLogo} alt="" className="h-[10px] w-[10px] object-contain" />
+        <img src={traktLogo} alt="" className="h-[13px] w-[13px] object-contain" />
         <span>88%</span>
       </span>,
     );
   if (f.showSimkl)
     out.push(
       <span className="flex items-center gap-0.5">
-        <img src={simklLogo} alt="" className="h-[10px] w-[10px] rounded-[2px] object-contain" />
+        <img src={simklLogo} alt="" className="h-[13px] w-[13px] rounded-sm object-contain" />
         <span>8.5</span>
       </span>,
     );
@@ -92,12 +95,17 @@ function PreviewBadgeRow({
   badgePos: string;
   visible: boolean;
 }) {
+  const rtl = useIsRtl();
   if (nodes.length === 0) return null;
   const scale = nodes.length <= 3 ? 1 : nodes.length === 4 ? 0.88 : nodes.length === 5 ? 0.78 : 0.7;
   return (
     <div
-      style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: "right" } : undefined}
-      className={`absolute end-1.5 flex items-center gap-1 whitespace-nowrap rounded-md bg-canvas px-1.5 py-0.5 text-[9px] font-semibold text-ink transition-opacity duration-700 ease-in-out ${badgePos} ${
+      style={
+        scale < 1
+          ? { transform: `scale(${scale})`, transformOrigin: rtl ? "left" : "right" }
+          : undefined
+      }
+      className={`absolute end-2 flex items-center gap-1 whitespace-nowrap rounded-sm bg-canvas px-2 py-1 text-[11px] font-semibold text-ink transition-opacity duration-700 ease-in-out ${badgePos} ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
@@ -125,27 +133,27 @@ function PreviewCard({
   limit: number;
 }) {
   const normalPoster = useSampleArtwork().poster;
-  const animePoster = useHydratedPoster("tt0245429", previewPoster3);
+  const animePoster = ANIME_PREVIEW;
   const extras = previewExtras(flags);
   const normal: React.ReactNode[] = [];
   if (flags.showImdb)
     normal.push(
       <span className="flex items-center gap-1">
-        <ImdbIcon className="h-[10px] w-auto rounded-[2px]" />
+        <ImdbIcon className="h-[13px] w-auto" />
         <span>8.4</span>
       </span>,
     );
   else if (flags.showTmdb)
     normal.push(
       <span className="flex items-center gap-1">
-        <img src={tmdbLogo} alt="" className="h-[11px] w-auto object-contain" />
+        <img src={tmdbLogo} alt="" className="h-[14px] w-auto object-contain" />
         <span>7.9</span>
       </span>,
     );
   if (flags.showRt)
     normal.push(
       <span className="flex items-center gap-0.5">
-        <RtFresh className="h-[11px] w-auto" />
+        <RtFresh className="h-[14px] w-auto" />
         <span>92%</span>
       </span>,
     );
@@ -155,14 +163,14 @@ function PreviewCard({
   if (flags.showMal)
     anime.push(
       <span className="flex items-center gap-0.5">
-        <MalLogo className="h-[10px] w-auto text-ink-muted" />
+        <MalLogo className="h-[13px] w-auto text-ink-muted" />
         <span>8.7</span>
       </span>,
     );
   anime.push(...extras);
 
   const cap = Math.max(1, limit);
-  const badgePos = position === "top" ? "top-1.5" : "bottom-1.5";
+  const badgePos = position === "top" ? "top-2" : "bottom-2";
   return (
     <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-raised">
       <img
@@ -185,41 +193,49 @@ function PreviewCard({
       <PreviewBadgeRow nodes={anime.slice(0, cap)} badgePos={badgePos} visible={phase === "anime"} />
       {watchlistBadge !== "off" && (
         <span
-          className={`absolute z-10 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-canvas text-ink ${WL_PREVIEW_POS[watchlistBadge]}`}
+          className={`absolute z-10 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-canvas text-ink ${WL_PREVIEW_POS[watchlistBadge]}`}
         >
-          <Bookmark size={9} strokeWidth={2.6} fill="currentColor" />
+          <Bookmark size={11} strokeWidth={2.6} fill="currentColor" />
         </span>
       )}
     </div>
   );
 }
 
-function Choice({
-  active,
-  disabled,
-  onClick,
-  children,
+function LimitScale({
+  value,
+  max,
+  onChange,
 }: {
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+  value: number;
+  max: number;
+  onChange: (n: number) => void;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`relative z-10 min-w-[34px] rounded-[4px] px-3 py-2 text-[12.5px] font-bold tracking-[0.04em] transition-colors ${
-        disabled
-          ? "cursor-not-allowed text-ink-subtle opacity-40"
-          : active
-            ? "bg-ink text-canvas"
-            : "text-ink-subtle hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
+    <div className="flex min-w-0 items-center gap-0.5 rounded-[10px] bg-canvas p-1">
+      {[2, 3, 4, 5, 6].map((n) => {
+        const disabled = n > max;
+        const active = value === n;
+        return (
+          <button
+            key={n}
+            type="button"
+            disabled={disabled}
+            aria-pressed={active}
+            onClick={() => onChange(n)}
+            className={`h-11 min-w-[44px] rounded-[6px] px-3 text-[16.5px] font-semibold tabular-nums transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              disabled
+                ? "cursor-not-allowed text-ink-subtle opacity-40"
+                : active
+                  ? "bg-ink text-canvas"
+                  : "text-ink-subtle hover:text-ink"
+            }`}
+          >
+            {n}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -231,28 +247,30 @@ export function WatchlistControl({
   onChange: (v: WatchlistPos) => void;
 }) {
   const t = useT();
+  const rtl = useIsRtl();
   const on = value !== "off";
   const [last, setLast] = useState<Exclude<WatchlistPos, "off">>(value !== "off" ? value : "topEnd");
   const corners: Array<{ value: Exclude<WatchlistPos, "off">; label: string }> = [
-    { value: "topStart", label: t("Top left") },
-    { value: "topEnd", label: t("Top right") },
-    { value: "bottomStart", label: t("Bottom left") },
-    { value: "bottomEnd", label: t("Bottom right") },
+    { value: "topStart", label: rtl ? t("Top right") : t("Top left") },
+    { value: "topEnd", label: rtl ? t("Top left") : t("Top right") },
+    { value: "bottomStart", label: rtl ? t("Bottom right") : t("Bottom left") },
+    { value: "bottomEnd", label: rtl ? t("Bottom left") : t("Bottom right") },
   ];
   return (
     <>
       <ToggleRow
         label={t("Watchlist bookmark")}
-        sub={t("Show a bookmark on saved titles")}
-        leading={<Bookmark size={16} strokeWidth={2.2} className="text-ink-muted" />}
+        sub={t("Puts a small bookmark on posters you have already saved.")}
+        leading={<Bookmark size={18} strokeWidth={2.2} className="text-ink-muted" />}
         value={on}
         onChange={(v) => onChange(v ? last : "off")}
       />
       {on && (
         <Nested>
           <SettingRow
+            wide
             label={t("Bookmark corner")}
-            desc={t("Where the bookmark sits on the poster.")}
+            desc={t("Pick which corner of the poster the bookmark sits in.")}
           >
             <Segmented
               value={value}
@@ -270,48 +288,56 @@ export function WatchlistControl({
   );
 }
 
-export function CardBadgesPanel({
+export function CardScoresPreview({
   settings,
-  update,
   flags,
   enabledBadgeCount,
 }: {
   settings: Settings;
-  update: (patch: Partial<Settings>) => void;
   flags: PreviewFlags;
   enabledBadgeCount: number;
 }) {
   const t = useT();
   const [phase, setPhase] = useState<"normal" | "anime">("normal");
-  useEffect(() => {
-    const id = window.setInterval(() => setPhase((p) => (p === "normal" ? "anime" : "normal")), 4000);
-    return () => window.clearInterval(id);
-  }, []);
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-[12px] bg-elevated p-4">
+      <Segmented
+        value={phase}
+        options={[{ value: "normal", label: t("Movies") }, { value: "anime", label: t("Anime") }]}
+        onChange={(v) => setPhase(v as "normal" | "anime")}
+      />
+      <div className="w-[184px] max-w-full">
+        <PreviewCard
+          position={settings.badgePlacement === "top" ? "top" : "bottom"}
+          phase={phase}
+          flags={flags}
+          watchlistBadge={settings.watchlistBadge}
+          limit={Math.min(settings.cardBadgeLimit, Math.max(2, enabledBadgeCount))}
+        />
+      </div>
+      <p className="text-center text-[14px] leading-5 text-ink-muted">{t("Example scores with your settings.")}</p>
+    </div>
+  );
+}
+
+export function CardBadgesPanel({
+  settings,
+  update,
+  enabledBadgeCount,
+}: {
+  settings: Settings;
+  update: (patch: Partial<Settings>) => void;
+  enabledBadgeCount: number;
+}) {
+  const t = useT();
   const placement: "top" | "bottom" = settings.badgePlacement === "top" ? "top" : "bottom";
   const maxN = Math.max(2, enabledBadgeCount);
   const effLimit = Math.min(settings.cardBadgeLimit, maxN);
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <>
       <SettingRow
-        wide
-        icon={<Eye size={16} strokeWidth={2.2} />}
-        label={t("Live preview")}
-        desc={t("A real poster with your scores on it. It swaps to an anime title every few seconds so you can check both sets.")}
-      >
-        <div className="mx-auto w-36">
-          <PreviewCard
-            position={placement}
-            phase={phase}
-            flags={flags}
-            watchlistBadge={settings.watchlistBadge}
-            limit={effLimit}
-          />
-        </div>
-      </SettingRow>
-
-      <SettingRow
-        icon={<MoveVertical size={16} strokeWidth={2.2} />}
+        icon={<MoveVertical size={18} strokeWidth={2.2} />}
         label={t("Score position")}
         desc={t("Which end of the poster the score chip rides on.")}
       >
@@ -326,25 +352,15 @@ export function CardBadgesPanel({
       </SettingRow>
 
       <SettingRow
-        icon={<Hash size={16} strokeWidth={2.2} />}
+        icon={<Hash size={18} strokeWidth={2.2} />}
         label={t("Max scores per card")}
-        desc={t("{n} enabled", { n: enabledBadgeCount })}
-        tip={t("Extra scores are dropped from the end of the chip. Turn scores on or off in the list above.")}
+        desc={t(
+          "Caps how many score chips a poster shows. Extras drop off the end of the chip. You have {n} turned on.",
+          { n: enabledBadgeCount },
+        )}
       >
-        <div className="flex shrink-0 flex-wrap items-center gap-0.5 rounded-md bg-canvas p-1">
-          {[2, 3, 4, 5, 6].map((n) => (
-            <Choice
-              key={n}
-              active={effLimit === n}
-              disabled={n > maxN}
-              onClick={() => update({ cardBadgeLimit: n })}
-            >
-              {n}
-            </Choice>
-          ))}
-        </div>
+        <LimitScale value={effLimit} max={maxN} onChange={(n) => update({ cardBadgeLimit: n })} />
       </SettingRow>
-
-    </div>
+    </>
   );
 }

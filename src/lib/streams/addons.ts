@@ -5,6 +5,8 @@ import { isAddonRanked, isStatusOnlyAddon } from "./addon-detect";
 import type { AddonRankFn } from "./addon-priority";
 import { hasUncachedMarker } from "./cached";
 import { infoHashFromSources, infoHashFromUrl } from "@/lib/torrent/magnet";
+import { isPluginAddon, runPluginAddon } from "./plugins/addon";
+import type { StreamRequestContext } from "./plugins/types";
 import type { Stream } from "./types";
 
 const TIMEOUT_MS_FAST = 8000;
@@ -32,6 +34,7 @@ export type StreamRequest = {
   type: string;
   ids: string[];
   animeIdUnverified?: boolean;
+  context?: StreamRequestContext;
 };
 
 export type AddonProgress = {
@@ -52,11 +55,28 @@ export async function fetchAddonStreams(
   forced?: Array<{ base: string; id: string }>,
 ): Promise<Stream[]> {
   const forcedBases = new Map((forced ?? []).map((f) => [f.base, f.id]));
-  const namedTasks: Array<{ addonId: string; name: string; p: Promise<Stream[]> }> = [];
+  const namedTasks: Array<{ addonId: string; name: string; p: Promise<Stream[]>; plugin?: boolean }> = [];
   const skipped: string[] = [];
   for (let i = 0; i < addons.length; i++) {
     const addon = addons[i];
     const priority = ranks ? ranks(i, addon) : i;
+    if (isPluginAddon(addon)) {
+      const pluginIds = pickIds(addon, req.type, req.ids, req.animeIdUnverified === true);
+      const pluginId = pluginIds[0] ?? pickIdByDeclaredTypes(addon, req.ids)?.id;
+      if (!pluginId) {
+        skipped.push(`${addon.manifest.name}(no-matching-id)`);
+        continue;
+      }
+      namedTasks.push({
+        addonId: addon.manifest.id,
+        name: addon.manifest.name,
+        plugin: true,
+        p: runPluginAddon(addon, req, pluginId, signal, timeoutMs).then((ss) =>
+          ss.map((s, idx) => ({ ...s, addonPriority: priority, addonReturnIdx: idx })),
+        ),
+      });
+      continue;
+    }
     if (isStatusOnlyAddon(addon)) {
       skipped.push(`${addon.manifest.name}(status-addon)`);
       continue;
@@ -109,7 +129,7 @@ export async function fetchAddonStreams(
     `[addons] querying ${namedTasks.length}: ${namedTasks.map((t) => t.name).join(", ")}`,
   );
 
-  const total = namedTasks.length;
+  const total = namedTasks.filter((task) => !task.plugin).length;
   const pendingByAddon = new Map<string, number>();
   for (const task of namedTasks) {
     pendingByAddon.set(task.addonId, (pendingByAddon.get(task.addonId) ?? 0) + 1);
@@ -126,7 +146,7 @@ export async function fetchAddonStreams(
     });
   reportProgress();
   const accumulated: Stream[] = [];
-  const wrapped = namedTasks.map(({ addonId, name, p }) =>
+  const wrapped = namedTasks.map(({ addonId, name, p, plugin }) =>
     p
       .then((streams) => {
         console.info(`[addons] ${name}: ${streams.length} streams`);
@@ -137,7 +157,7 @@ export async function fetchAddonStreams(
         if (!signal.aborted) dwarn(`[addons] ${name} failed`, e);
       })
       .finally(() => {
-        settled += 1;
+        if (!plugin) settled += 1;
         const remaining = (pendingByAddon.get(addonId) ?? 1) - 1;
         if (remaining <= 0) {
           pendingByAddon.delete(addonId);

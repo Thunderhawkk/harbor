@@ -360,23 +360,32 @@ function saveFile(name: string, text: string, type: string) {
   }
 }
 
-function Step({ n, title, body }: { n: number; title: string; body: string }) {
+function Step({ n, title, body, ebook = false }: {
+  n: number;
+  title: string;
+  body: string;
+  ebook?: boolean;
+}) {
   return (
     <div className="flex gap-3.5">
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent/15 text-[13px] font-bold text-accent">
+      <span className={ebook
+        ? "grid h-7 w-7 shrink-0 place-items-center text-[13px] font-semibold text-ink-subtle"
+        : "grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent/15 text-[13px] font-bold text-accent"}>
         {n}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[14.5px] font-semibold text-ink">{title}</span>
+        <span className={ebook ? "text-[15px] font-semibold text-ink" : "text-[14.5px] font-semibold text-ink"}>{title}</span>
         <span className="text-[13.5px] leading-relaxed text-ink-muted">{body}</span>
       </div>
     </div>
   );
 }
 
-function CodeBlock({ code }: { code: string }) {
+function CodeBlock({ code, ebook = false }: { code: string; ebook?: boolean }) {
   return (
-    <div className="max-h-80 overflow-auto rounded-xl bg-canvas p-4 ring-1 ring-edge-soft">
+    <div className={ebook
+      ? "max-h-80 overflow-auto rounded-lg border border-edge-soft bg-canvas p-4"
+      : "max-h-80 overflow-auto rounded-xl bg-canvas p-4 ring-1 ring-edge-soft"}>
       <pre className="whitespace-pre text-[11.5px] leading-relaxed text-ink-muted">
         <code>{code}</code>
       </pre>
@@ -848,22 +857,33 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="mt-2 px-1 text-[12.5px] font-bold uppercase tracking-[0.12em] text-ink-subtle">
+      <p className={ebook
+        ? "mt-2 text-[15px] font-semibold text-ink"
+        : "mt-2 px-1 text-[12.5px] font-bold uppercase tracking-[0.12em] text-ink-subtle"}>
         {t("Make your own source")}
       </p>
-      <div className={`transition-all ${open ? "ring-edge" : "hover:ring-edge"} ${CARD}`}>
+      <div className={ebook
+        ? "ebook-source-card"
+        : `transition-all ${open ? "ring-edge" : "hover:ring-edge"} ${CARD}`}>
         <button
           type="button"
+          aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center gap-4 px-5 py-4 text-start active:scale-[0.99]"
+          className={ebook
+            ? "flex w-full items-center gap-3 py-4 text-start"
+            : "flex w-full items-center gap-4 px-5 py-4 text-start active:scale-[0.99]"}
         >
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-canvas text-ink-muted ring-1 ring-edge-soft">
+          <span className={ebook
+            ? "ebook-source-icon"
+            : "grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-canvas text-ink-muted ring-1 ring-edge-soft"}>
             <Blocks size={20} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[16px] font-semibold text-ink">{t("Build a source plugin")}</span>
-            <span className="truncate text-[13px] text-ink-muted">
-              {t("Write a scraper for any site, host it, and install it like any other plugin")}
+            <span className={ebook ? "text-[15px] font-semibold text-ink" : "text-[16px] font-semibold text-ink"}>{t("Build a source plugin")}</span>
+            <span className={ebook ? "text-[13px] leading-relaxed text-ink-muted" : "truncate text-[13px] text-ink-muted"}>
+              {ebook
+                ? t("Build a source for a library you are authorized to access.")
+                : t("Write a scraper for any site, host it, and install it like any other plugin")}
             </span>
           </span>
           <ChevronDown
@@ -872,9 +892,12 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
           />
         </button>
         {open && (
-          <div className="flex flex-col gap-6 border-t border-edge-soft p-5">
+          <div className={ebook
+            ? "flex flex-col gap-6 border-t border-edge-soft py-4"
+            : "flex flex-col gap-6 border-t border-edge-soft p-5"}>
             <div className="flex flex-col gap-4">
               <Step
+                ebook={ebook}
                 n={1}
                 title={t("Write one JavaScript file")}
                 body={t(
@@ -886,6 +909,7 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
                 )}
               />
               <Step
+                ebook={ebook}
                 n={2}
                 title={t("Use the harbor bridge")}
                 body={
@@ -899,6 +923,7 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
                 }
               />
               <Step
+                ebook={ebook}
                 n={3}
                 title={t("Host it with a repo.json")}
                 body={t(
@@ -906,6 +931,7 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
                 )}
               />
               <Step
+                ebook={ebook}
                 n={4}
                 title={t("Install it in Extensions")}
                 body={t(
@@ -922,17 +948,19 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
                 <button
                   type="button"
                   onClick={() => copy("plugin", examplePlugin)}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-medium text-ink-subtle transition-colors hover:text-ink"
+                  className={ebook
+                    ? "ebook-source-button"
+                    : "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-medium text-ink-subtle transition-colors hover:text-ink"}
                 >
                   {copied === "plugin" ? (
-                    <Check size={14} strokeWidth={2.6} className="text-accent" />
+                    <Check size={14} strokeWidth={2.6} className={ebook ? "text-ink" : "text-accent"} />
                   ) : (
                     <Copy size={13} />
                   )}
                   {copied === "plugin" ? t("Copied") : t("Copy")}
                 </button>
               </div>
-              <CodeBlock code={examplePlugin} />
+              <CodeBlock code={examplePlugin} ebook={ebook} />
             </div>
 
             <div className="flex flex-col gap-2.5">
@@ -943,17 +971,19 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
                 <button
                   type="button"
                   onClick={() => copy("repo", exampleRepo)}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-medium text-ink-subtle transition-colors hover:text-ink"
+                  className={ebook
+                    ? "ebook-source-button"
+                    : "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-medium text-ink-subtle transition-colors hover:text-ink"}
                 >
                   {copied === "repo" ? (
-                    <Check size={14} strokeWidth={2.6} className="text-accent" />
+                    <Check size={14} strokeWidth={2.6} className={ebook ? "text-ink" : "text-accent"} />
                   ) : (
                     <Copy size={13} />
                   )}
                   {copied === "repo" ? t("Copied") : t("Copy")}
                 </button>
               </div>
-              <CodeBlock code={exampleRepo} />
+              <CodeBlock code={exampleRepo} ebook={ebook} />
               {ebook && (
                 <p className="text-[12px] leading-relaxed text-ink-subtle">
                   {t(
@@ -969,7 +999,9 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
                 onClick={() =>
                   saveFile(`harbor-${kind}-plugin-api.md`, apiReference, "text/markdown")
                 }
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-semibold text-canvas transition-all hover:opacity-90 active:scale-95"
+                className={ebook
+                  ? "ebook-source-button ebook-source-button-primary"
+                  : "inline-flex h-11 items-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-semibold text-canvas transition-all hover:opacity-90 active:scale-95"}
               >
                 <Download size={17} strokeWidth={2.2} />
                 {t("Download full API reference")}
@@ -977,7 +1009,9 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
               <button
                 type="button"
                 onClick={() => saveFile("example.plugin.js", examplePlugin, "text/javascript")}
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-raised px-5 text-[14px] font-semibold text-ink-muted ring-1 ring-edge-soft transition-all hover:text-ink active:scale-95"
+                className={ebook
+                  ? "ebook-source-button"
+                  : "inline-flex h-11 items-center gap-2 rounded-xl bg-raised px-5 text-[14px] font-semibold text-ink-muted ring-1 ring-edge-soft transition-all hover:text-ink active:scale-95"}
               >
                 <Download size={16} />
                 example.plugin.js
@@ -985,7 +1019,9 @@ export function PluginGuide({ kind = "manga" }: { kind?: "manga" | "ebook" }) {
               <button
                 type="button"
                 onClick={() => saveFile("repo.json", exampleRepo, "application/json")}
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-raised px-5 text-[14px] font-semibold text-ink-muted ring-1 ring-edge-soft transition-all hover:text-ink active:scale-95"
+                className={ebook
+                  ? "ebook-source-button"
+                  : "inline-flex h-11 items-center gap-2 rounded-xl bg-raised px-5 text-[14px] font-semibold text-ink-muted ring-1 ring-edge-soft transition-all hover:text-ink active:scale-95"}
               >
                 <Download size={16} />
                 repo.json

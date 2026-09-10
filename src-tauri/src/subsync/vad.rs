@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
 use crate::transcode::locate_ffmpeg;
@@ -202,15 +201,18 @@ async fn decode_pcm(
         .arg("-");
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::null());
+    cmd.kill_on_drop(true);
     #[cfg(windows)]
     cmd.creation_flags(0x0800_0000 | 0x0000_4000);
 
-    let mut child = cmd.spawn().map_err(|e| format!("spawn ffmpeg: {}", e))?;
-    let mut stdout = child.stdout.take().ok_or("no stdout")?;
-    let mut raw: Vec<u8> = Vec::new();
-    let read = stdout.read_to_end(&mut raw);
-    let _ = tokio::time::timeout(Duration::from_secs(HARD_TIMEOUT_SECS), read).await;
-    let _ = child.kill().await;
+    let output = tokio::time::timeout(Duration::from_secs(HARD_TIMEOUT_SECS), cmd.output())
+        .await
+        .map_err(|_| "ffmpeg-timeout".to_string())?
+        .map_err(|error| format!("run ffmpeg: {}", error))?;
+    if !output.status.success() {
+        return Err(format!("ffmpeg-exit-status: {}", output.status));
+    }
+    let raw = output.stdout;
 
     let mut pcm = Vec::with_capacity(raw.len() / 4);
     let mut i = 0;

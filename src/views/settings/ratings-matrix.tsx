@@ -1,10 +1,12 @@
-import { AlignLeft, Image as ImageIcon, Popcorn, Sparkles } from "lucide-react";
+import { AlignLeft, Image as ImageIcon, Lock, Popcorn } from "./icons";
 import { HoverTooltip } from "@/components/hover-tooltip";
 import { useKnobAnim } from "@/lib/knob-anim";
-import { InfoTip, SettingRow } from "./kit";
+import { ROW_ACTION, SettingRow } from "./kit";
+import { settingsAnchor, useSettingsActiveContext } from "./shared";
 import tmdbLogo from "@/assets/addon-logos/tmdb.png";
 import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
 import mdblistLogo from "@/assets/addon-logos/mdblist.png";
+import metacriticLogo from "@/assets/service-logos/metacritic.png";
 import traktLogo from "@/assets/trakt.svg";
 import simklLogo from "@/assets/simkl.png";
 import { ImdbIcon } from "@/components/icons/imdb-icon";
@@ -13,6 +15,9 @@ import { RtFresh } from "@/components/icons/rt-fresh";
 import { RtRotten } from "@/components/icons/rt-rotten";
 import type { Settings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
+
+const QUAL =
+  "inline-flex h-[22px] shrink-0 items-center rounded-[6px] bg-elevated px-2 text-[13px] font-bold uppercase leading-[17px] tracking-[0.72px] text-ink-subtle";
 
 export function ImdbBadge({ compact = false }: { compact?: boolean } = {}) {
   return (
@@ -61,11 +66,7 @@ function PopcornBadge() {
 }
 
 function MetacriticBadge() {
-  return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-success text-[13.5px] font-bold text-white">
-      M
-    </span>
-  );
+  return <img src={metacriticLogo} alt="" className="h-7 w-7 shrink-0 rounded-full object-contain" />;
 }
 
 function LetterboxdBadge() {
@@ -118,16 +119,24 @@ function MiniToggle({
       disabled={disabled}
       onClick={onClick}
       aria-label={label}
-      aria-pressed={on}
-      className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
-        disabled ? "cursor-not-allowed bg-canvas opacity-60" : on ? "bg-ink" : "bg-edge"
+      role="switch"
+      aria-checked={on}
+      className={`grid h-11 w-12 shrink-0 place-items-center ${
+        disabled ? "cursor-not-allowed opacity-60" : ""
       }`}
     >
       <span
-        className={`absolute start-[2px] top-0.5 h-5 w-5 rounded-full bg-canvas ${
-          on ? "translate-x-4 rtl:-translate-x-4" : "translate-x-0"
-        } ${knob}`}
-      />
+        aria-hidden
+        className={`relative block h-8 w-12 rounded-full transition-colors ${
+          disabled ? "bg-elevated ring-1 ring-edge" : on ? "bg-ink" : "bg-edge"
+        }`}
+      >
+        <span
+          className={`absolute start-[3px] top-[3px] h-[26px] w-[26px] rounded-full ${disabled ? "bg-ink-subtle" : "bg-canvas"} ${
+            on ? "translate-x-4 rtl:-translate-x-4" : "translate-x-0"
+          } ${knob}`}
+        />
+      </span>
     </button>
   );
 }
@@ -143,9 +152,9 @@ function ColumnHead({
 }) {
   return (
     <HoverTooltip side="top" align="center" label={hint}>
-      <span className="flex w-10 cursor-help flex-col items-center gap-1 text-ink-subtle">
+      <span className="flex w-12 cursor-help flex-col items-center gap-1 text-ink-subtle">
         {icon}
-        <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em]">{label}</span>
+        <span className="text-[13px] font-bold uppercase leading-[17px] tracking-[0.72px]">{label}</span>
       </span>
     </HoverTooltip>
   );
@@ -159,11 +168,12 @@ export function RatingsMatrix({
   update: (patch: Partial<Settings>) => void;
 }) {
   const t = useT();
+  const { setActive } = useSettingsActiveContext();
 
   const lockReason = (key?: "tmdb" | "omdb" | "mdblist"): string | null => {
-    if (key === "tmdb") return settings.tmdbKey ? null : t("Add a TMDB key above to unlock.");
-    if (key === "omdb") return settings.omdbKey ? null : t("Add an OMDb key above to unlock.");
-    if (key === "mdblist") return settings.mdblistKey ? null : t("Add an MDBList key above to unlock.");
+    if (key === "tmdb") return settings.tmdbKey ? null : t("Cards need a TMDB key.");
+    if (key === "omdb") return settings.omdbKey ? null : t("Cards need an OMDb key.");
+    if (key === "mdblist") return settings.mdblistKey ? null : t("Cards need an MDBList key.");
     return null;
   };
 
@@ -186,33 +196,28 @@ export function RatingsMatrix({
   };
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex flex-col gap-1 px-1 pb-0.5">
-        <span className="text-[13.5px] font-semibold text-ink">{t("Where scores appear")}</span>
-        <span className="max-w-[74ch] text-[12.5px] leading-snug text-ink-subtle">
-          {t("Give each score a home: on poster cards, on the detail page, or both. Flip the switch in each column.")}
+    <div className="flex flex-col gap-1.5 [--hset-row-pad-inline:0px]">
+      <div className="flex flex-col items-start gap-3 pb-5">
+        <span className="max-w-[70ch] text-[15.5px] leading-[22px] text-ink-muted">
+          {t("Choose which ratings appear on cards and detail pages. Locked card ratings need a provider key in Metadata.")}
         </span>
-        <span className="mt-0.5 flex items-center gap-1.5 text-[11.5px] leading-snug text-ink-subtle">
-          <Sparkles size={12} strokeWidth={2.2} className="shrink-0" />
-          <span>{t("Native to Harbor. No RPDB or ratings addon needed.")}</span>
-          <InfoTip
-            text={t("These badges are drawn on posters as you browse. RPDB, in the keys above, is a separate option that bakes scores into the poster image itself.")}
-          />
-        </span>
+        <button type="button" className={ROW_ACTION} onClick={() => setActive("library", settingsAnchor("Metadata providers"))}>
+          {t("Set up rating providers")}
+        </button>
       </div>
 
       <div className="flex items-end gap-1.5">
-        <span className="w-[268px] shrink-0 px-4 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
+        <span className="harbor-settings-label min-w-0 flex-1">
           {t("Rating")}
         </span>
-        <div className="flex min-w-0 flex-1 items-end justify-end gap-4 px-4">
+        <div className="flex shrink-0 items-end justify-end gap-2.5">
           <ColumnHead
-            icon={<ImageIcon size={14} strokeWidth={2} />}
+            icon={<ImageIcon size={18} strokeWidth={2} />}
             label={t("Cards")}
             hint={t("The little score chip printed on poster cards across your rows and grids.")}
           />
           <ColumnHead
-            icon={<AlignLeft size={14} strokeWidth={2} />}
+            icon={<AlignLeft size={18} strokeWidth={2} />}
             label={t("Details")}
             hint={t("The ratings row on a title's detail page, next to runtime and genre.")}
           />
@@ -226,24 +231,18 @@ export function RatingsMatrix({
         return (
           <SettingRow
             key={src.id}
-            icon={
-              <span className={`flex w-16 justify-center ${lock ? "saturate-50" : ""}`}>
-                {src.badge}
+            label={
+              <span className="inline-flex min-w-0 flex-wrap items-center gap-2.5">
+                <span className={`flex shrink-0 items-center ${lock ? "saturate-50" : ""}`}>
+                  {src.badge}
+                </span>
+                <span className="min-w-0">{src.name}</span>
+                {lock && <Lock size={13} className="text-ink-subtle" />}
+                {src.anime && <span className={QUAL}>{t("Anime")}</span>}
               </span>
             }
-            label={
-              <>
-                {src.name}
-                {src.anime && (
-                  <span className="rounded-full bg-raised px-1.5 py-[1px] text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">
-                    {t("Anime")}
-                  </span>
-                )}
-              </>
-            }
-            desc={src.note}
+            desc={lock ?? src.note}
             tip={src.tip}
-            lockReason={lock ?? undefined}
           >
             <MiniToggle
               on={cardVal && !lock}
@@ -263,8 +262,8 @@ export function RatingsMatrix({
                 align="center"
                 label={t("This score only appears on cards.")}
               >
-                <span className="flex h-6 w-10 shrink-0 cursor-help items-center justify-center rounded-full bg-canvas">
-                  <span className="h-[3px] w-3 rounded-full bg-ink-subtle" />
+                <span className="grid h-11 w-12 shrink-0 cursor-help place-items-center rounded-full">
+                  <span className="h-[3px] w-4 rounded-full bg-ink-subtle" />
                 </span>
               </HoverTooltip>
             )}

@@ -1,4 +1,4 @@
-import { Check, Crosshair, Info, Languages, Sparkles } from "lucide-react";
+import { Check, Info, Languages } from "lucide-react";
 import type { TrackInfo } from "@/lib/player/bridge";
 import { HoverTooltip } from "@/components/hover-tooltip";
 import { useContextMenu, type ContextMenuTarget } from "@/lib/context-menu";
@@ -9,6 +9,7 @@ import { saveSubtitleToDisk } from "@/lib/subtitles/save-to-disk";
 import { useImportedSubs } from "@/lib/player/imported-subs";
 import { useT } from "@/lib/i18n";
 import { parseRelease } from "@/lib/subtitles/release-match";
+import { subtitleClassificationLabels } from "@/lib/subtitles/classification-labels";
 import { OverflowMarquee } from "./overflow-marquee";
 
 function subExt(track: TrackInfo): string {
@@ -43,9 +44,16 @@ export function VariantRow({
   const { openAt } = useContextMenu();
   const imported = useImportedSubs();
   const isImported = !!track.title && imported.has(track.title);
-  const tags: { label: string; tone: "warn" | "info" | "default" }[] = [];
-  if (track.forced) tags.push({ label: tr("Forced"), tone: "info" });
-  if (track.hearingImpaired) tags.push({ label: tr("HI/SDH"), tone: "warn" });
+  const tags: { label: string; tone: "warn" | "info" | "default" }[] = subtitleClassificationLabels(
+    track,
+    tr,
+  ).map(({ kind, label }) => ({
+    label,
+    tone: kind === "hearingImpaired" || kind === "machineTranslated" ? "warn" : "info",
+  }));
+  if (track.timingStatus === "aligned") {
+    tags.push({ label: tr("Audio verified"), tone: "info" });
+  }
   if (track.default) tags.push({ label: tr("Default"), tone: "default" });
   if (isImageSubTrack(track)) tags.push({ label: tr("Position and size only"), tone: "warn" });
   const sourceLabel = isImported
@@ -60,12 +68,6 @@ export function VariantRow({
   const provider = track.provider?.trim();
   const detailSource = provider && provider !== titleText ? provider : sourceLabel;
   const langName = subtitleTrackLanguageLabel(track);
-  const isSynced = track.external === true && /^Synced \((?:SRT|VTT)\)/i.test(track.title ?? "");
-  const isBestMatch =
-    track.external === true &&
-    (track.matchConfidence === "exact" ||
-      track.matchConfidence === "high" ||
-      (track.matchConfidence == null && (track.matchScore ?? 0) >= 120));
   const releaseTags = parseRelease(`${realRelease ?? ""} ${track.title ?? ""}`);
   const quality = [
     releaseTags.resolution,
@@ -88,8 +90,10 @@ export function VariantRow({
       release: realRelease,
       author: track.author,
       downloads: track.downloads,
-      compatibilityPercent,
-      matchReasons: matchReasons?.length ? matchReasons : track.matchReasons,
+      compatibilityPercent: track.matchExplanation?.compatibilityPercent ?? compatibilityPercent,
+      matchReasons:
+        track.matchExplanation?.reasons ??
+        (matchReasons?.length ? matchReasons : track.matchReasons),
       flags,
     },
     download: track.url
@@ -97,7 +101,8 @@ export function VariantRow({
           saveSubtitleToDisk(track.url!, {
             title: track.title || titleText,
             lang: track.lang,
-            format: subExt(track),
+            format: track.format ?? subExt(track),
+            downloadAuth: track.downloadAuth,
             label: tr("Subtitle"),
           })
       : undefined,
@@ -106,14 +111,8 @@ export function VariantRow({
   return (
     <div
       data-subtitle-row
-      className={`group/row flex items-stretch rounded-lg transition-colors ${
-        selected
-          ? "bg-elevated ring-1 ring-edge"
-          : isSecondary
-            ? "bg-accent/[0.06] ring-1 ring-accent/25"
-            : isImported
-              ? "bg-accent/[0.07] ring-1 ring-accent/30 hover:bg-accent/10"
-              : "hover:bg-canvas/55"
+      className={`group/row flex items-stretch rounded-md transition-colors ${
+        selected || isSecondary ? "bg-raised ring-1 ring-edge" : "hover:bg-raised/60"
       }`}
     >
       <button
@@ -135,18 +134,6 @@ export function VariantRow({
               text={titleText}
               title={realRelease && releaseLabel ? realRelease : undefined}
             />
-            {isImported && (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.12em] text-accent ring-1 ring-accent/30">
-                <Sparkles size={9} strokeWidth={2.6} />
-                {tr("Yours")}
-              </span>
-            )}
-            {!isImported && (isSynced || isBestMatch) && (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.12em] text-accent ring-1 ring-accent/30">
-                <Crosshair size={9} strokeWidth={2.6} />
-                {isSynced ? tr("Synced") : tr("Best match")}
-              </span>
-            )}
           </div>
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10.5px] text-ink-subtle">
             <span className="font-semibold uppercase tracking-[0.1em]">{langName}</span>
@@ -188,7 +175,7 @@ export function VariantRow({
             aria-pressed={isSecondary}
             className={`my-1 me-1 flex shrink-0 items-center gap-1 rounded-md px-2 text-[10px] font-bold uppercase tracking-[0.1em] transition-opacity ${
               isSecondary
-                ? "bg-accent/15 text-accent ring-1 ring-accent/30"
+                ? "bg-elevated text-ink ring-1 ring-edge"
                 : "text-ink-subtle opacity-0 hover:text-ink focus-visible:opacity-100 group-hover/row:opacity-100"
             }`}
           >
@@ -204,35 +191,35 @@ export function VariantRow({
           openAt({ x: rect.right, y: rect.bottom }, contextTarget);
         }}
         title={
-          compatibilityPercent == null
+          (track.matchExplanation?.compatibilityPercent ?? compatibilityPercent) == null
             ? `${tr("Match estimate")}: ${tr("Unknown")}`
-            : `${tr("Match estimate")}: ${compatibilityPercent}%`
+            : `${tr("Match estimate")}: ${track.matchExplanation?.compatibilityPercent ?? compatibilityPercent}%`
         }
         aria-label={
-          compatibilityPercent == null
+          (track.matchExplanation?.compatibilityPercent ?? compatibilityPercent) == null
             ? `${rank}, ${tr("Match estimate")} ${tr("Unknown")}`
-            : `${rank}, ${tr("Match estimate")} ${compatibilityPercent}%`
+            : `${rank}, ${tr("Match estimate")} ${track.matchExplanation?.compatibilityPercent ?? compatibilityPercent}%`
         }
         className="flex w-20 shrink-0 items-center justify-end gap-1.5 rounded-e-lg pe-2 text-[10.5px] font-medium tabular-nums outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
       >
         <span aria-hidden className={selected ? "text-accent" : "text-ink-muted"}>
           {rank}
         </span>
-        {compatibilityPercent != null && (
+        {(track.matchExplanation?.compatibilityPercent ?? compatibilityPercent) != null && (
           <span
             aria-hidden
             className={
-              compatibilityPercent >= 90
+              (track.matchExplanation?.compatibilityPercent ?? compatibilityPercent ?? 0) >= 90
                 ? "text-accent"
-                : compatibilityPercent >= 70
+                : (track.matchExplanation?.compatibilityPercent ?? compatibilityPercent ?? 0) >= 70
                   ? "text-ink"
                   : "text-ink-subtle"
             }
           >
-            {compatibilityPercent}%
+            {track.matchExplanation?.compatibilityPercent ?? compatibilityPercent}%
           </span>
         )}
-        {compatibilityPercent == null && (
+        {(track.matchExplanation?.compatibilityPercent ?? compatibilityPercent) == null && (
           <span aria-hidden className="text-ink-subtle">
             —
           </span>

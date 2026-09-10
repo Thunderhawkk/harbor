@@ -26,10 +26,10 @@ const AWARDS: Array<{ type: AwardType; name: string; sub: string }> = [
   { type: "bifa", name: "BIFA", sub: "British independent film" },
 ];
 
-export function AwardTiles() {
+export function AwardTiles({ title }: { title?: string }) {
   const t = useT();
   return (
-    <Row title={t("Browse by Award")} min={210} shape="tile" alwaysActive>
+    <Row title={title ?? t("Browse by Award")} min={210} shape="tile" alwaysActive>
       {AWARDS.map((a) => (
         <AwardTile key={a.type} type={a.type} name={a.name} sub={a.sub} />
       ))}

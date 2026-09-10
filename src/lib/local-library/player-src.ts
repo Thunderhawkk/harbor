@@ -78,6 +78,8 @@ export function localPlayerSrc(
     subtitles: entry.subtitlePaths?.map((url) => ({
       url,
       lang: subtitleLanguage(entry.path, url),
+      trustedSource: true,
     })),
+    streamRef: { resolvedFilename: entry.filename },
   };
 }

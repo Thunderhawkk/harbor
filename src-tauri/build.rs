@@ -18,6 +18,12 @@ fn main() {
                 libmpv.join("mpv.lib").display()
             );
         }
+        if std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default() == "msvc" {
+            // Only the app binary gets tauri_build's Common-Controls v6 manifest, so a
+            // statically bound comctl32 leaves every cargo test binary unable to start.
+            println!("cargo:rustc-link-arg=delayimp.lib");
+            println!("cargo:rustc-link-arg=/DELAYLOAD:comctl32.dll");
+        }
         if !libmpv.join("libmpv-2.dll").exists() {
             println!("cargo:warning=libmpv-2.dll not found in src-tauri/libmpv. Run `pnpm run setup:libmpv` to fetch it (needed to run and bundle Harbor on Windows).");
         }

@@ -1,4 +1,7 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Sound descriptions": "Deskripsi suara",
+  "Hide sound effects and speaker names": "Sembunyikan efek suara dan nama pembicara",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Menghapus deskripsi dalam kurung siku seperti [pintu berderit] dan nama pembicara berhuruf kapital seperti JOHN: saat subtitle berjalan, sehingga rilis yang hanya menyertakan trek SDH tetap terbaca sebagai dialog biasa. Lirik lagu, tanda kurung biasa, dan aksara non-Latin dibiarkan apa adanya. Dilewati pada trek forced dan trek berbasis gambar.",
   " (you)": " (Anda)",
   " Anything you save also syncs to your Trakt account.":
     " Semua yang Anda simpan juga disinkronkan ke akun Trakt Anda.",
@@ -718,6 +721,31 @@ const coverage: Record<string, string> = {
   "Animation's finest": "Karya animasi terbaik",
   Anime: "Anime",
   "Anime Adaptation": "Adaptasi Anime",
+  "Direct/debrid": "Langsung/debrid",
+  "Audio verified": "Terverifikasi lewat audio",
+  "Watchlist overlaps ({n})": "Item yang sama di daftar tontonan ({n})",
+  "Favorites overlap ({n})": "Item yang sama di favorit ({n})",
+  "Addons overlap ({n})": "Addon yang sama ({n})",
+  "Import selected data?": "Impor data yang dipilih?",
+  "Show direct, debrid, and peer-to-peer sources":
+    "Tampilkan sumber langsung, debrid, dan peer-to-peer",
+  "Prefer direct and debrid sources; keep P2P when only web links are available":
+    "Utamakan sumber langsung dan debrid; pertahankan P2P jika hanya tautan web yang tersedia",
+  "Prefer peer-to-peer torrent sources": "Utamakan sumber torrent peer-to-peer",
+  "Hearing impaired": "Untuk gangguan pendengaran",
+  "Foreign-only": "Hanya bahasa asing",
+  "Machine-translated": "Diterjemahkan mesin",
+  "Direct/debrid only": "Hanya langsung/debrid",
+  "Match subtitles across languages (experimental)":
+    "Cocokkan subtitle lintas bahasa (eksperimental)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "Jika audio dan subtitle menggunakan bahasa berbeda, Harbor membandingkan subtitle yang cocok dengan rilis dalam bahasa audio. Harbor hanya menawarkan perbaikan kecuali semua pemeriksaan keamanan telah diukur.",
+  "New York Times": "New York Times",
+  "Bestseller lists in the eBook section.": "Daftar buku terlaris di bagian eBook.",
+  "New York Times · bestseller lists": "New York Times · daftar buku terlaris",
+  "NYT Books API key": "Kunci API NYT Books",
+  "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
+    "Pilih apakah Harbor mengutamakan sumber langsung dan debrid, torrent peer-to-peer, atau menampilkan keduanya.",
 };
 
 export default coverage;

@@ -1,4 +1,7 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Sound descriptions": "ध्वनि विवरण",
+  "Hide sound effects and speaker names": "ध्वनि प्रभाव और वक्ताओं के नाम छिपाएँ",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "चलते उपशीर्षकों में से [दरवाज़ा चरमराता है] जैसे कोष्ठक वाले विवरण और JOHN: जैसे बड़े लैटिन अक्षरों वाले वक्ता नाम हटा देता है, ताकि केवल SDH ट्रैक वाली रिलीज़ भी सामान्य संवाद की तरह पढ़ी जा सके। गानों के बोल, सामान्य कोष्ठक और ग़ैर-लैटिन लिपियाँ जस की तस रहती हैं। फ़ोर्स्ड और चित्र-आधारित ट्रैक पर लागू नहीं होता।",
   '"Compound" interest is calculated on:': '"चक्रवृद्धि" ब्याज की गणना इस पर होती है:',
   '"{name}" and everything in it will be removed. This cannot be undone.':
     '"{name}" और उसमें मौजूद सब कुछ हटा दिया जाएगा। इसे वापस नहीं लाया जा सकता।',
@@ -1449,6 +1452,30 @@ const coverage: Record<string, string> = {
   days: "दिन",
   "{n} episodes on home servers": "होम सर्वर पर {n} एपिसोड",
   "{voice} could not be generated. {message}": "{voice} तैयार नहीं की जा सकी। {message}",
+  "Direct/debrid": "सीधा/debrid",
+  "Audio verified": "ऑडियो से सत्यापित",
+  "Watchlist overlaps ({n})": "वॉचलिस्ट में समान आइटम ({n})",
+  "Favorites overlap ({n})": "पसंदीदा में समान आइटम ({n})",
+  "Addons overlap ({n})": "ऐडऑन में समान आइटम ({n})",
+  "Import selected data?": "चुना हुआ डेटा आयात करें?",
+  "Show direct, debrid, and peer-to-peer sources": "सीधे, debrid और peer-to-peer स्रोत दिखाएँ",
+  "Prefer direct and debrid sources; keep P2P when only web links are available":
+    "सीधे और debrid स्रोतों को प्राथमिकता दें; केवल वेब लिंक उपलब्ध होने पर P2P बनाए रखें",
+  "Prefer peer-to-peer torrent sources": "peer-to-peer टोरेंट स्रोतों को प्राथमिकता दें",
+  "Hearing impaired": "श्रवण-बाधित",
+  "Foreign-only": "केवल विदेशी भाषा",
+  "Machine-translated": "मशीन द्वारा अनुवादित",
+  "Direct/debrid only": "केवल सीधा/debrid",
+  "Match subtitles across languages (experimental)":
+    "अलग-अलग भाषाओं के उपशीर्षकों का मिलान करें (प्रायोगिक)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "जब ऑडियो और उपशीर्षक अलग भाषाओं में हों, Harbor ऑडियो की भाषा में उसी रिलीज़ से मेल खाने वाले उपशीर्षक की तुलना करता है। सभी सुरक्षा जाँच मापे जाने तक यह केवल सुधार का सुझाव देता है।",
+  "New York Times": "New York Times",
+  "Bestseller lists in the eBook section.": "eBook अनुभाग में बेस्टसेलर सूचियाँ।",
+  "New York Times · bestseller lists": "New York Times · बेस्टसेलर सूचियाँ",
+  "NYT Books API key": "NYT Books API कुंजी",
+  "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
+    "चुनें कि Harbor सीधे और debrid स्रोतों, peer-to-peer टोरेंट को प्राथमिकता दे या दोनों दिखाए।",
 };
 
 export default coverage;

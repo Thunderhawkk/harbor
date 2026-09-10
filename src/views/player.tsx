@@ -35,7 +35,14 @@ import {
   resolvePlaybackDownloadedFraction,
   setPlaybackDownloaded,
 } from "@/lib/player/playback-clock";
-import { isBundledEngineUrl, isLocalEngineUrl } from "@/lib/stremio-server";
+import {
+  awaitCastServerReady,
+  isBundledEngineUrl,
+  isLocalEngineUrl,
+  restartCastServer,
+} from "@/lib/stremio-server";
+import { playbackStartupProfile } from "@/lib/player/startup-profile";
+import { isWeb } from "@/lib/platform";
 import { usePauseOnInactive } from "./player/hooks/use-pause-on-inactive";
 import { spoilerMaskFor } from "@/lib/spoilers";
 import { usePlayerWatched } from "./player/hooks/use-player-watched";
@@ -167,6 +174,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     (isBundledEngineUrl(src.url) || isLocalEngineUrl(src.url)) &&
     !src.url.includes("/hlsv2/") &&
     !!src.streamRef?.infoHash;
+  const isLocalSrc = isLocalUrl(src.url);
   const { stats: engineStats, genuineFailure } = useEngineStats({
     url: src.url,
     infoHash: src.streamRef?.infoHash ?? null,
@@ -184,6 +192,8 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
           streamLen: engineStats?.streamLen ?? 0,
         }),
       );
+    } else if (isLocalSrc) {
+      setPlaybackDownloaded(1);
     } else if (!isLive && !isHls) {
       const dur = snap.durationSec || 0;
       setPlaybackDownloaded(dur > 0 ? Math.min(1, (snap.positionSec + snap.bufferedSec) / dur) : 0);
@@ -195,6 +205,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     engineStats?.streamLen,
     src.url,
     isP2pEngine,
+    isLocalSrc,
     src.isLive,
     src.meta.id,
     snap.positionSec,
@@ -553,7 +564,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
   const stallSrcRef = useRef(src);
   stallSrcRef.current = src;
   useEffect(() => {
-    if (!settings.autoNextStreamOnStall || src.isLive || inRoom) return;
+    if (!settings.autoNextStreamOnStall || !src.autoFired || src.isLive || inRoom) return;
     const timer = window.setTimeout(() => {
       const currentSnap = snapRef.current;
       if (
@@ -582,6 +593,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
   }, [
     src.url,
     src.isLive,
+    src.autoFired,
     settings.autoNextStreamOnStall,
     settings.autoNextStreamOnStallSec,
     inRoom,
@@ -740,6 +752,162 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
   const videoFill = useVideoFill(bridgeRef, src.url, playing);
   useLivePictureEq(bridgeRef, src.url);
   const anime4k = useAnime4k(bridgeRef, src.url, src, snap.videoWidth);
+  const [mouseHoldSpeedActive, setMouseHoldSpeedActive] = useState(false);
+  const mouseHoldRef = useRef<{
+    pointerId: number | null;
+    timer: number | null;
+    engaged: boolean;
+    baseRate: number;
+  }>({ pointerId: null, timer: null, engaged: false, baseRate: 1 });
+  const suppressMouseClickRef = useRef(false);
+  const suppressMouseClickTimerRef = useRef<number | null>(null);
+
+  const releaseMouseHoldSpeed = useCallback(
+    (suppressClick: boolean) => {
+      const hold = mouseHoldRef.current;
+      if (hold.pointerId == null) return;
+      if (hold.timer != null) {
+        window.clearTimeout(hold.timer);
+        hold.timer = null;
+      }
+      const wasEngaged = hold.engaged;
+      hold.pointerId = null;
+      hold.engaged = false;
+      if (!wasEngaged) return;
+
+      bridgeRef.current?.setRate(hold.baseRate);
+      setMouseHoldSpeedActive(false);
+      if (!suppressClick) return;
+
+      suppressMouseClickRef.current = true;
+      if (suppressMouseClickTimerRef.current != null) {
+        window.clearTimeout(suppressMouseClickTimerRef.current);
+      }
+      suppressMouseClickTimerRef.current = window.setTimeout(() => {
+        suppressMouseClickRef.current = false;
+        suppressMouseClickTimerRef.current = null;
+      }, 0);
+    },
+    [bridgeRef],
+  );
+
+  useEffect(() => {
+    return () => {
+      const hold = mouseHoldRef.current;
+      if (hold.timer != null) window.clearTimeout(hold.timer);
+      if (hold.engaged) {
+        bridgeRef.current?.setRate(hold.baseRate);
+        setMouseHoldSpeedActive(false);
+      }
+      hold.pointerId = null;
+      hold.timer = null;
+      hold.engaged = false;
+      suppressMouseClickRef.current = false;
+      if (suppressMouseClickTimerRef.current != null) {
+        window.clearTimeout(suppressMouseClickTimerRef.current);
+      }
+    };
+  }, [bridgeRef, src.url]);
+
+  useEffect(() => {
+    const clear = (e: PointerEvent) => {
+      const hold = mouseHoldRef.current;
+      if (hold.pointerId == null || hold.pointerId !== e.pointerId) return;
+      if (hold.timer != null) {
+        window.clearTimeout(hold.timer);
+        hold.timer = null;
+      }
+      if (hold.engaged) {
+        bridgeRef.current?.setRate(hold.baseRate);
+        setMouseHoldSpeedActive(false);
+      }
+      hold.pointerId = null;
+      hold.engaged = false;
+    };
+    window.addEventListener("pointerup", clear);
+    window.addEventListener("pointercancel", clear);
+    return () => {
+      window.removeEventListener("pointerup", clear);
+      window.removeEventListener("pointercancel", clear);
+    };
+  }, [bridgeRef]);
+
+  const reloadBusyRef = useRef(false);
+  const reloadSource = useCallback(() => {
+    const b = bridgeRef.current;
+    if (!b || reloadBusyRef.current) return;
+    const swapped = liveUrl !== src.url;
+    const url = swapped ? liveUrl : (transcodedUrl ?? src.url);
+    if (!url) return;
+    reloadBusyRef.current = true;
+    const wasPlaying = snapRef.current.status === "playing";
+    const resumeAt = isLiveLike ? 0 : Math.max(0, getPlaybackPosition());
+    showSyncToast("ok", t("Reloading the stream…"));
+    void b
+      .load({
+        url,
+        startupProfile: playbackStartupProfile(liveStreamRef ?? src.streamRef),
+        subtitles: src.subtitles,
+        notWebReady: src.notWebReady,
+        isLive: isLiveLike,
+        headers: swapped ? undefined : src.headers,
+        startAtSec: resumeAt > 5 ? resumeAt : undefined,
+      })
+      .then(() => {
+        if (wasPlaying) return b.play().catch(() => {});
+      })
+      .catch(() => {
+        showSyncToast("error", t("Couldn't reload the stream. Try picking another source."));
+      })
+      .finally(() => {
+        reloadBusyRef.current = false;
+      });
+  }, [
+    bridgeRef,
+    isLiveLike,
+    liveStreamRef,
+    liveUrl,
+    showSyncToast,
+    src.headers,
+    src.notWebReady,
+    src.streamRef,
+    src.subtitles,
+    src.url,
+    t,
+    transcodedUrl,
+  ]);
+
+  const serverRestartBusyRef = useRef(false);
+  const restartStreamServer = useCallback(() => {
+    if (serverRestartBusyRef.current) return;
+    if (isWeb()) {
+      showSyncToast("error", t("Harbor's streaming server only runs in the desktop app."));
+      return;
+    }
+    serverRestartBusyRef.current = true;
+    showSyncToast("ok", t("Restarting the streaming server…"));
+    void (async () => {
+      const failure = await restartCastServer();
+      if (failure) {
+        serverRestartBusyRef.current = false;
+        showSyncToast("error", t("Couldn't restart the streaming server."));
+        return;
+      }
+      const ready = await awaitCastServerReady(10_000);
+      serverRestartBusyRef.current = false;
+      if (!ready) {
+        showSyncToast("error", t("The streaming server didn't come back up."));
+        return;
+      }
+      const url = liveUrl !== src.url ? liveUrl : (transcodedUrl ?? src.url);
+      if (isBundledEngineUrl(url) || isLocalEngineUrl(url)) {
+        reloadSource();
+        return;
+      }
+      showSyncToast("ok", t("Streaming server restarted."));
+    })();
+  }, [liveUrl, reloadSource, showSyncToast, src.url, t, transcodedUrl]);
+
   const { holdSpeedActive, showStats, subtitleOffsetSec } = usePlayerHotkeys({
     bridgeRef,
     snap,
@@ -783,6 +951,8 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     onAnime4kOff: () => {
       anime4k.setMode("off");
     },
+    onReloadSource: reloadSource,
+    onRestartServer: restartStreamServer,
     gif,
     clip,
     videoFill,
@@ -874,7 +1044,6 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     exitPlayer,
   });
 
-  const isLocalSrc = isLocalUrl(src.url);
   const cancelToPicker = useCallback(() => {
     if (isLocalSrc || src.meta.id?.startsWith("iptv:")) {
       void closePlayer();
@@ -962,7 +1131,12 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
   // The desktop play-picker is a mouse surface, so while it is up the ten-foot
   // chrome stands aside rather than layering a D-pad surface over something a
   // remote cannot drive. PiP and draw are mouse modes for the same reason.
-  const tenFoot = bigPictureActive && !picker && !pipMode && !drawMode;
+  const tenFoot =
+    bigPictureActive &&
+    settings.bigPicturePlayerUi !== "desktop" &&
+    !picker &&
+    !pipMode &&
+    !drawMode;
   // One lever. showChrome feeds the transport, the quick tools, the ad-report
   // button, the X-ray overlay and the P2P chip, and none of them belong on a
   // television. Big Picture renders its own.
@@ -1026,7 +1200,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     subShowInPip: settings.subShowInPip,
     subAssNative,
     showStats,
-    holdSpeedActive,
+    holdSpeedActive: holdSpeedActive || mouseHoldSpeedActive,
     subtitleOffsetSec,
     volumeIndicator,
     volumeHudPosition: settings.playerVolumeHudPosition,
@@ -1192,9 +1366,63 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
       <div
         ref={videoMountRef}
         className="absolute inset-0"
+        onPointerDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (
+            e.pointerType !== "mouse" ||
+            !e.isPrimary ||
+            e.button !== 0 ||
+            drawMode ||
+            pipMode ||
+            screenLocked
+          ) {
+            return;
+          }
+          const hold = mouseHoldRef.current;
+          if (hold.pointerId != null) return;
+          const pointerId = e.pointerId;
+          hold.pointerId = pointerId;
+          hold.baseRate = snapRef.current.rate;
+          const stage = e.currentTarget;
+          hold.timer = window.setTimeout(() => {
+            hold.timer = null;
+            if (hold.pointerId !== pointerId || snapRef.current.status !== "playing") return;
+            hold.engaged = true;
+            try {
+              stage.setPointerCapture(pointerId);
+            } catch {
+              hold.pointerId = null;
+              hold.engaged = false;
+              return;
+            }
+            setMouseHoldSpeedActive(true);
+            bridgeRef.current?.setRate(Math.max(2, hold.baseRate));
+          }, 350);
+        }}
+        onPointerUp={(e) => {
+          if (mouseHoldRef.current.pointerId !== e.pointerId) return;
+          releaseMouseHoldSpeed(true);
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }
+        }}
+        onPointerCancel={(e) => {
+          if (mouseHoldRef.current.pointerId === e.pointerId) releaseMouseHoldSpeed(false);
+        }}
+        onLostPointerCapture={(e) => {
+          if (mouseHoldRef.current.pointerId === e.pointerId) releaseMouseHoldSpeed(false);
+        }}
         onClick={(e) => {
           if (e.target !== e.currentTarget) return;
           if (drawMode || pipMode) return;
+          if (suppressMouseClickRef.current) {
+            suppressMouseClickRef.current = false;
+            if (suppressMouseClickTimerRef.current != null) {
+              window.clearTimeout(suppressMouseClickTimerRef.current);
+              suppressMouseClickTimerRef.current = null;
+            }
+            return;
+          }
           if (dismissedJustNow()) {
             clearOverlayDismiss();
             return;

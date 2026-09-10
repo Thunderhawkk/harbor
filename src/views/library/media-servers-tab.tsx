@@ -537,6 +537,7 @@ const ServerCard = memo(function ServerCard({
             id: track.id,
             url: track.url,
             lang: track.language,
+            trustedSource: true,
           })),
           title: card.meta.name,
           subtitle: `${connection.name} · ${source.direct ? "Direct play" : "Transcode"}`,

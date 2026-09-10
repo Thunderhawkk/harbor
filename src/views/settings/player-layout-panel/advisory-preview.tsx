@@ -1,6 +1,6 @@
 import { ContentAdvisoryToast, type Advisory } from "@/components/player/content-advisory-toast";
-import { useSampleArtwork } from "@/lib/sample-artwork";
 import { useT } from "@/lib/i18n";
+import { useSampleArtwork } from "@/lib/sample-artwork";
 
 const SAMPLE: Advisory[] = [
   { category: "Violence", severity: "Severe" },
@@ -11,6 +11,7 @@ const SAMPLE: Advisory[] = [
 export function AdvisoryPreview() {
   const t = useT();
   const art = useSampleArtwork();
+
   return (
     <div className="flex w-full flex-col gap-2">
       <div className="relative aspect-video w-full overflow-hidden rounded-md bg-canvas">
@@ -27,7 +28,7 @@ export function AdvisoryPreview() {
           <ContentAdvisoryToast preview categories={SAMPLE} playKey="advisory-preview" />
         </div>
       </div>
-      <span className="text-[11.5px] font-medium text-ink-subtle">{t("Live preview")}</span>
+      <span className="harbor-settings-label">{t("Live preview")}</span>
     </div>
   );
 }

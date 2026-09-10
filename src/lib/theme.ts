@@ -4,6 +4,7 @@ import crunchPreview from "@/assets/theme-previews/crunchy.png";
 import draculaPreview from "@/assets/theme-previews/dracula.png";
 import forestPreview from "@/assets/theme-previews/forest.png";
 import harborPreview from "@/assets/theme-previews/harbor.png";
+import kawaiiPreview from "@/assets/theme-previews/kawaii.jpg";
 import minuiPreview from "@/assets/theme-previews/minui.png";
 import noirPreview from "@/assets/theme-previews/noir.png";
 import nordPreview from "@/assets/theme-previews/nord.png";
@@ -1425,32 +1426,6 @@ function buildFeishinJs(): string {
 
 export const BETA_THEMES: ThemePreset[] = [
   {
-    id: "kawaii" as ThemePresetId,
-    name: "Kawaii",
-    blurb: "Pink gingham over cream, white cards, rounded Japanese type. Sweet and soft.",
-    swatch: ["#fdefe0", "#fbd8e2", "#f090ae"],
-    tokens: {
-      "--color-canvas": "#fdefe0",
-      "--color-surface": "#ffffff",
-      "--color-elevated": "#ffffff",
-      "--color-raised": "#fdeef3",
-      "--color-ink": "#7d5c4e",
-      "--color-ink-muted": "#a5867a",
-      "--color-ink-subtle": "#c3a89c",
-      "--color-edge": "rgba(240,144,174,0.45)",
-      "--color-edge-soft": "rgba(240,144,174,0.22)",
-      "--color-accent": "#f090ae",
-      "--color-accent-soft": "rgba(240,144,174,0.20)",
-      "--color-danger": "#e2607a",
-    },
-    background: { image: "none", dim: 0 },
-    layout: "topdock",
-    cardStyle: "flat",
-    buttonStyle: "flat",
-    bokeh: false,
-    css: kawaiiCss,
-  },
-  {
     id: "elegantfin" as ThemePresetId,
     name: "ElegantFin",
     blurb:
@@ -1521,6 +1496,33 @@ const PARKED_THEMES: ThemePreset[] = [
 ];
 
 export const FEATURED_CUSTOM_THEMES: ThemePreset[] = [
+  {
+    id: "kawaii" as ThemePresetId,
+    name: "Kawaii",
+    blurb: "Pink gingham over cream, white cards, rounded Japanese type. Sweet and soft.",
+    swatch: ["#fdefe0", "#fbd8e2", "#f090ae"],
+    tokens: {
+      "--color-canvas": "#fdefe0",
+      "--color-surface": "#ffffff",
+      "--color-elevated": "#ffffff",
+      "--color-raised": "#fdeef3",
+      "--color-ink": "#7d5c4e",
+      "--color-ink-muted": "#a5867a",
+      "--color-ink-subtle": "#c3a89c",
+      "--color-edge": "rgba(240,144,174,0.45)",
+      "--color-edge-soft": "rgba(240,144,174,0.22)",
+      "--color-accent": "#f090ae",
+      "--color-accent-soft": "rgba(240,144,174,0.20)",
+      "--color-danger": "#e2607a",
+    },
+    background: { image: "none", dim: 0 },
+    layout: "topdock",
+    cardStyle: "flat",
+    buttonStyle: "flat",
+    bokeh: false,
+    css: kawaiiCss,
+    previewImage: kawaiiPreview,
+  },
   {
     id: "aurora" as ThemePresetId,
     name: "Aurora",
@@ -1768,11 +1770,37 @@ function resolveTokens(theme: ThemeSettings): Record<string, string> {
   return THEME_PRESETS["cool-grey"].tokens;
 }
 
+export function isLightColor(value: string | undefined): boolean {
+  const s = (value ?? "").trim();
+  const oklch = /^oklch\(\s*([\d.]+)(%?)/i.exec(s);
+  if (oklch) return (oklch[2] ? Number(oklch[1]) / 100 : Number(oklch[1])) > 0.55;
+  const rgb = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i.exec(s);
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(s);
+  let r: number;
+  let g: number;
+  let b: number;
+  if (rgb) {
+    r = Number(rgb[1]);
+    g = Number(rgb[2]);
+    b = Number(rgb[3]);
+  } else if (hex) {
+    const h = hex[1].length === 3 ? hex[1].replace(/./g, (c) => c + c) : hex[1];
+    r = parseInt(h.slice(0, 2), 16);
+    g = parseInt(h.slice(2, 4), 16);
+    b = parseInt(h.slice(4, 6), 16);
+  } else {
+    return false;
+  }
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55;
+}
+
 export function applyTheme(theme: ThemeSettings): void {
   const root = document.documentElement;
-  for (const [k, v] of Object.entries(resolveTokens(theme))) {
+  const tokens = resolveTokens(theme);
+  for (const [k, v] of Object.entries(tokens)) {
     root.style.setProperty(k, v);
   }
+  root.dataset.themeMode = isLightColor(tokens["--color-canvas"]) ? "light" : "dark";
   const preset = theme.preset !== "custom" ? getThemeById(theme.preset) : null;
   const fontPairId = preset?.fontPair ?? theme.fontPair;
   const pair = FONT_PAIRS[fontPairId] ?? FONT_PAIRS["sentient-switzer"];

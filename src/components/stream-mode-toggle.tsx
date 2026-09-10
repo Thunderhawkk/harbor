@@ -1,8 +1,13 @@
 import { useT } from "@/lib/i18n";
+import type { StreamMode } from "@/lib/streams/mode";
 
-export type StreamMode = "both" | "addons" | "p2p";
+export type { StreamMode } from "@/lib/streams/mode";
 
-const MODES: StreamMode[] = ["both", "addons", "p2p"];
+const MODES: Array<{ v: StreamMode; label: string }> = [
+  { v: "both", label: "Both" },
+  { v: "addons", label: "Direct/debrid" },
+  { v: "p2p", label: "P2P" },
+];
 
 export function StreamModeToggle({
   mode,
@@ -22,22 +27,22 @@ export function StreamModeToggle({
     >
       {MODES.map((m) => (
         <button
-          key={m}
+          key={m.v}
           type="button"
-          onClick={() => onChange(m)}
-          aria-pressed={mode === m}
+          onClick={() => onChange(m.v)}
+          aria-pressed={mode === m.v}
           title={
-            m === "both"
-              ? t("Use debrid/addon sources and fall back to peer-to-peer")
-              : m === "addons"
-                ? t("Only addon/debrid sources, never peer-to-peer")
-                : t("Only peer-to-peer torrent sources")
+            m.v === "both"
+              ? t("Show direct, debrid, and peer-to-peer sources")
+              : m.v === "addons"
+                ? t("Prefer direct and debrid sources; keep P2P when only web links are available")
+                : t("Prefer peer-to-peer torrent sources")
           }
           className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-colors ${
-            mode === m ? "bg-accent text-canvas" : "text-ink-muted hover:text-ink"
+            mode === m.v ? "bg-accent text-canvas" : "text-ink-muted hover:text-ink"
           }`}
         >
-          {m === "both" ? t("Both") : m === "addons" ? t("Addons") : t("P2P")}
+          {t(m.label)}
         </button>
       ))}
     </div>

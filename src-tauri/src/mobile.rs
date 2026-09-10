@@ -17,7 +17,7 @@
 use crate::{
     crash_report, diagnostics, download, ebook_tts, fonts, gamepad, http_fetch, local_lib,
     media_server, power, proc_mem, settings_store, stream_proxy, streams, stremio_auth,
-    temp_prune, torrent_engine, transcode, web_server,
+    subtitle_credentials, temp_prune, torrent_engine, transcode, web_server,
 };
 
 // Desktop answers this from dlna.rs, but that module is #[cfg(desktop)] because
@@ -94,10 +94,13 @@ pub fn run() {
             media_server::media_server_request,
             http_fetch::harbor_fetch,
             http_fetch::harbor_upload,
+            subtitle_credentials::subtitle_credential_bind,
+            subtitle_credentials::subtitle_credentials_clear,
             stream_proxy::proxy_register,
             stream_proxy::proxy_unregister,
             stream_proxy::proxy_gc_idle,
             torrent_engine::torrent_engine_status,
+            torrent_engine::torrent_engine_set_enabled,
             torrent_engine::torrent_engine_add,
             torrent_engine::torrent_engine_select,
             torrent_engine::torrent_engine_select_set,

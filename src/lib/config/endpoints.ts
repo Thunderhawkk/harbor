@@ -31,3 +31,8 @@ export const HARBOR_RELAY_BASE = resolveBase(
   import.meta.env.VITE_HARBOR_RELAY_BASE,
   "https://app.harbor.site",
 );
+
+export const HARBOR_DISCORD_INVITE = resolveBase(
+  import.meta.env.VITE_HARBOR_DISCORD_INVITE,
+  "https://discord.gg/harbor",
+);

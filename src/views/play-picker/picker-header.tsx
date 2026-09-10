@@ -68,7 +68,9 @@ export function PickerHeader({
               : `${meta.name} · Season ${episode.imdbSeason ?? episode.season} · Episode ${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`}
           </p>
           <h1 className="font-display text-[64px] font-medium leading-[0.96] tracking-tight text-ink">
-            {episode.name || `Episode ${absoluteEpisode ?? episode.episode}`}
+            {episode.name ||
+              metaEpisodeName(meta, episode) ||
+              `Episode ${absoluteEpisode ?? episode.episode}`}
           </h1>
           {episode.overview && <CollapsibleOverview text={episode.overview} />}
         </>
@@ -126,4 +128,11 @@ function CollapsibleOverview({ text }: { text: string }) {
       )}
     </div>
   );
+}
+
+function metaEpisodeName(meta: Meta, episode: PlayEpisode): string | undefined {
+  const match = meta.videos?.find(
+    (v) => (v.season ?? 1) === episode.season && (v.episode ?? v.number) === episode.episode,
+  );
+  return match?.name || match?.title || undefined;
 }

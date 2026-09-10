@@ -1,4 +1,7 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Sound descriptions": "소리 설명",
+  "Hide sound effects and speaker names": "효과음과 화자 이름 숨기기",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "재생 중인 자막에서 [문이 삐걱거린다] 같은 대괄호 설명과 JOHN: 처럼 대문자로 쓴 화자 이름을 지웁니다. SDH 자막만 들어 있는 릴리스도 일반 대사처럼 읽을 수 있습니다. 가사, 일반 괄호, 라틴 문자가 아닌 문자는 그대로 둡니다. 강제 자막과 이미지 자막에는 적용되지 않습니다.",
   "nav.home": "홈",
   "nav.discover": "둘러보기",
   "nav.catalogs": "카탈로그",
@@ -641,6 +644,29 @@ const coverage: Record<string, string> = {
     "커뮤니티 자막 소스입니다. Subsource API 키를 추가하기 전까지 꺼져 있습니다.",
   "A compact upright slider that boosts past 100 percent.":
     "100%를 넘어 증폭할 수 있는 세로형 콤팩트 슬라이더입니다.",
+  "Direct/debrid": "직접/debrid",
+  "Audio verified": "오디오로 확인됨",
+  "Watchlist overlaps ({n})": "관심 목록 중복 ({n})",
+  "Favorites overlap ({n})": "즐겨찾기 중복 ({n})",
+  "Addons overlap ({n})": "애드온 중복 ({n})",
+  "Import selected data?": "선택한 데이터를 가져올까요?",
+  "Show direct, debrid, and peer-to-peer sources": "직접, debrid 및 P2P 소스 표시",
+  "Prefer direct and debrid sources; keep P2P when only web links are available":
+    "직접 및 debrid 소스를 우선하고 웹 링크만 있을 때는 P2P 유지",
+  "Prefer peer-to-peer torrent sources": "P2P 토렌트 소스 우선",
+  "Hearing impaired": "청각 장애인용",
+  "Foreign-only": "외국어 구간만",
+  "Machine-translated": "기계 번역",
+  "Direct/debrid only": "직접/debrid만",
+  "Match subtitles across languages (experimental)": "서로 다른 언어의 자막 맞추기(실험적)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "오디오와 자막의 언어가 다르면 Harbor는 같은 릴리스에 맞는 오디오 언어 자막과 비교합니다. 모든 안전 검사가 측정되지 않으면 수정안을 제안만 합니다.",
+  "New York Times": "New York Times",
+  "Bestseller lists in the eBook section.": "eBook 섹션의 베스트셀러 목록입니다.",
+  "New York Times · bestseller lists": "New York Times · 베스트셀러 목록",
+  "NYT Books API key": "NYT Books API 키",
+  "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
+    "Harbor가 직접 및 debrid 소스, P2P 토렌트를 우선할지 또는 둘 다 표시할지 선택합니다.",
 };
 
 export default coverage;

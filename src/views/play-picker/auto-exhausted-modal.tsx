@@ -1,5 +1,6 @@
 import type { Meta } from "@/lib/cinemeta";
 import { useView, type PlayEpisode } from "@/lib/view";
+import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 
 export function AutoExhaustedModal({
@@ -16,6 +17,7 @@ export function AutoExhaustedModal({
   onBrowseManually: () => void;
 }) {
   const { goBack } = useView();
+  const t = useT();
   const title = meta.name ?? "this title";
   const epSuffix = episode
     ? absoluteEpisode != null
@@ -29,7 +31,7 @@ export function AutoExhaustedModal({
     `Streams tried: ${triedCount}\n` +
     `\nWhat happened: Harbor could not find a working stream automatically.\n` +
     `\n(Add any extra detail here)`;
-  const mailto = `mailto:bugs@harbor.site?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const reportUrl = `https://github.com/harborstremio/harbor/issues/new?title=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   return (
     <main className="fixed inset-0 z-[120] flex items-center justify-center overflow-hidden bg-black px-6">
       <div className="w-full max-w-md rounded-2xl bg-elevated p-8 ring-1 ring-edge-soft">
@@ -59,10 +61,10 @@ export function AutoExhaustedModal({
             Browse streams manually
           </button>
           <button
-            onClick={() => openUrl(mailto)}
+            onClick={() => openUrl(reportUrl)}
             className="flex h-11 items-center justify-center rounded-full bg-elevated text-[13.5px] font-medium text-ink ring-1 ring-edge-soft transition-colors hover:bg-raised"
           >
-            Send a bug report
+            {t("Report a bug")}
           </button>
           <button
             onClick={goBack}

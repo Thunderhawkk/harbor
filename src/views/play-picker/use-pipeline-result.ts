@@ -10,6 +10,7 @@ import {
 } from "@/lib/picker-cache";
 import { useSettings } from "@/lib/settings";
 import type { AddonProgress } from "@/lib/streams/addons";
+import { pluginCacheTokens } from "@/lib/streams/plugins";
 import { runPipeline, type PipelineResult } from "@/lib/streams/pipeline";
 import { buildEpisodePipelineInput } from "@/lib/streams/episode-pipeline-input";
 import type { PlayEpisode } from "@/lib/view";
@@ -65,7 +66,7 @@ export function usePipelineResult({
       buildPickerConfigHash({
         addonTransportUrls: (addons ?? []).map((a) => a.transportUrl),
         debridSlugs: debrids.map((d) => d.slug),
-        scraperKeys: [],
+        scraperKeys: pluginCacheTokens(),
         filterMode: filterDisabled ? "off" : strictMode ? "strict" : "balanced",
       }),
     [addons, debrids, filterDisabled, strictMode],

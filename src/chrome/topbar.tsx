@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { WindowControlButton as Control, WindowControlGlyph } from "./window-control-button";
 import { Search } from "@/components/icons/search-icon";
 import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useId, useRef, useState } from "react";
@@ -32,6 +33,42 @@ import { close, minimize, toggleMaximize, useMaximized } from "@/lib/window";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+function PresenceAvatar({ name, src, color }: { name: string; src: string | null; color: string }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (src && !failed) {
+    return (
+      <span
+        title={name}
+        className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full ring-2 ring-elevated"
+        style={{ boxShadow: `inset 0 0 0 1.5px ${color}` }}
+      >
+        <img
+          src={src}
+          alt=""
+          draggable={false}
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      title={name}
+      className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold text-canvas ring-2 ring-elevated"
+      style={{ backgroundColor: color }}
+    >
+      {(name.trim()[0] || "?").toUpperCase()}
+    </span>
+  );
+}
+
 export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   const { chromeHidden, canGoBack, view, setView, topKind } = useView();
   const { settings } = useSettings();
@@ -60,7 +97,8 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   const layout = kid ? "sidebar" : preview ? preview.layout : activeLayout(settings.theme);
   const onLiveRoot = topKind === "live";
   const sidebarHidden = connecting || view === "settings" || onLiveRoot || topKind === "picker";
-  const hideSearch = view === "addons" || connecting || topKind === "picker";
+  const inSettings = view === "settings";
+  const hideSearch = view === "addons" || connecting || topKind === "picker" || inSettings;
   const sidebarOffset =
     layout === "stremio"
       ? "ps-[80px]"
@@ -78,7 +116,7 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
       data-cleannav={settings.topbarAppearance === "transparent" ? "on" : undefined}
       className={`pointer-events-none fixed inset-x-0 top-0 ${topKind === "picker" || connecting ? "z-[130]" : "z-[55]"} h-20`}
     >
-      {settings.topbarScrollBlur && settings.topbarAppearance !== "transparent" && (
+      {!inSettings && settings.topbarScrollBlur && settings.topbarAppearance !== "transparent" && (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 transition-opacity duration-[350ms] ease-out"
@@ -136,37 +174,26 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
             {...dragProps}
             className="pointer-events-auto flex h-full items-center justify-end gap-2"
           >
-          <div className="hidden items-center gap-2 min-[900px]:flex">
-          <RecordingPill />
-          {settings.navbarSleepTimer && <SleepTimerButton />}
-          <DownloadsButton />
-          {!kid && <NotificationCenter />}
-          {!kid && <BookmarksButton />}
-          {!onLiveRoot && !kid && <TogetherButton />}
-          </div>
+          {!inSettings && (
+            <div className="hidden items-center gap-2 min-[900px]:flex">
+              <RecordingPill />
+              {settings.navbarSleepTimer && <SleepTimerButton />}
+              <DownloadsButton />
+              {!kid && <NotificationCenter />}
+              {!kid && <BookmarksButton />}
+              {!onLiveRoot && !kid && <TogetherButton />}
+            </div>
+          )}
             {IS_TAURI && !settings.useNativeTitleBar && !settings.hybridTitleBar && (
             <div className="ms-1 flex shrink-0 items-center gap-2">
               <Control label={t("chrome.minimize")} onClick={minimize}>
-                <svg width="18" height="18" viewBox="0 0 13 13" fill="none">
-                  <path d="M3 6.5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
+                <WindowControlGlyph kind="minimize" />
               </Control>
               <Control label={maxed ? t("chrome.restore") : t("chrome.maximize")} onClick={() => void toggleMaximize()}>
-                <svg width="18" height="18" viewBox="0 0 13 13" fill="none">
-                  {maxed ? (
-                    <>
-                      <rect x="2.5" y="4.5" width="6" height="6" stroke="currentColor" strokeWidth="1.4" rx="1" />
-                      <path d="M5 4.5V3a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-.5.5H9" stroke="currentColor" strokeWidth="1.4" fill="none" />
-                    </>
-                  ) : (
-                    <rect x="3" y="3" width="7" height="7" stroke="currentColor" strokeWidth="1.4" rx="1.2" />
-                  )}
-                </svg>
+                <WindowControlGlyph kind="maximize" maximized={maxed} />
               </Control>
               <Control label={t("common.close")} onClick={kid ? () => setCloseConfirm(true) : close} danger>
-                <svg width="18" height="18" viewBox="0 0 13 13" fill="none">
-                  <path d="M3.5 3.5l6 6M9.5 3.5l-6 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
+                <WindowControlGlyph kind="close" />
               </Control>
             </div>
             )}
@@ -310,29 +337,13 @@ export function TogetherButton({
             {visible.map((p) => {
               const self = p.id === clientId;
               const fallbackColor = `oklch(0.78 0.13 ${nameHue(p.name)})`;
-              const avatarSrc = self ? selfAvatar : p.avatar ?? null;
-              const color = self ? selfColor ?? fallbackColor : p.color ?? fallbackColor;
-              if (avatarSrc) {
-                return (
-                  <span
-                    key={p.id}
-                    title={p.name}
-                    className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full ring-2 ring-elevated"
-                    style={{ boxShadow: `inset 0 0 0 1.5px ${color}` }}
-                  >
-                    <img src={avatarSrc} alt="" draggable={false} className="h-full w-full object-cover" />
-                  </span>
-                );
-              }
               return (
-                <span
+                <PresenceAvatar
                   key={p.id}
-                  title={p.name}
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold text-canvas ring-2 ring-elevated"
-                  style={{ backgroundColor: color }}
-                >
-                  {(p.name.trim()[0] || "?").toUpperCase()}
-                </span>
+                  name={p.name}
+                  src={self ? selfAvatar : p.avatar ?? null}
+                  color={self ? selfColor ?? fallbackColor : p.color ?? fallbackColor}
+                />
               );
             })}
             {overflow > 0 && (
@@ -438,61 +449,5 @@ function SearchPill() {
     >
       {pill}
     </ThreeLiquidGlassSurface>
-  );
-}
-
-function Control({
-  label,
-  onClick,
-  danger = false,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  const { settings } = useSettings();
-  const glassControls = settings.topbarAppearance === "glass";
-  const button = (
-    <button
-      type="button"
-      data-tauri-drag-region="false"
-      aria-label={label}
-      onClick={onClick}
-      className={`harbor-win-control ${danger ? "harbor-win-close" : ""} flex h-full w-full items-center justify-center rounded-[inherit] bg-transparent text-ink-muted outline-none transition-colors duration-150 ${
-        danger ? "hover:bg-[#e5484d] hover:text-white" : "hover:bg-white/[0.06] hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
-  );
-
-  if (glassControls) {
-    return (
-      <ThreeLiquidGlassSurface
-        radius="12px"
-        shaderRadius={0.48}
-        intensity={0.9}
-        className="h-11 w-12 shrink-0 border border-white/[0.10]"
-        contentClassName="h-full w-full"
-      >
-        {button}
-      </ThreeLiquidGlassSurface>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      data-tauri-drag-region="false"
-      aria-label={label}
-      onClick={onClick}
-      className={`harbor-win-control ${danger ? "harbor-win-close" : ""} flex h-11 w-12 items-center justify-center rounded-xl bg-elevated/70 text-ink-muted transition-colors duration-150 ${
-        danger ? "hover:bg-[#e5484d] hover:text-white" : "hover:bg-elevated hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

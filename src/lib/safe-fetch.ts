@@ -1,6 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetch as tauriFetchImpl } from "@tauri-apps/plugin-http";
 import { TrackerBlockedError, isBlockedUrl, noteBlocked } from "./privacy/blocklist";
+import { hasSensitiveRequestHeaders, shouldFallbackToPluginHttp } from "./fetch-fallback-policy";
+import {
+  isSafeProviderSubtitleUrl,
+  SUBTITLE_PUBLIC_NETWORK_HEADER,
+} from "./subtitles/provider-url";
+
+const SUBTITLE_CREDENTIAL_HEADER = "x-harbor-subtitle-credential";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -213,12 +220,23 @@ async function tauriHarborFetch(
   init?: RequestInit,
   responseType?: "base64",
   timeoutMs = 30000,
+  maxResponseBytes?: number,
 ): Promise<Response> {
   countCrossing("harborFetch", input);
   const headers: Record<string, string> = {};
+  let credentialHandle: string | undefined;
+  let publicNetworkOnly = false;
   if (init?.headers) {
     const h = new Headers(init.headers as HeadersInit);
     h.forEach((v, k) => {
+      if (k.toLowerCase() === SUBTITLE_CREDENTIAL_HEADER) {
+        credentialHandle = v;
+        return;
+      }
+      if (k.toLowerCase() === SUBTITLE_PUBLIC_NETWORK_HEADER.toLowerCase()) {
+        publicNetworkOnly = v === "1" || v.toLowerCase() === "true";
+        return;
+      }
       headers[k] = v;
     });
   }
@@ -246,6 +264,9 @@ async function tauriHarborFetch(
       timeoutMs: 30000,
       ...(timeoutMs === 30000 ? {} : { timeoutMs }),
       responseType,
+      maxResponseBytes,
+      credentialHandle,
+      publicNetworkOnly,
     },
   });
   return new Response(responseType === "base64" ? base64ToBytes(resp.body) : resp.body, {
@@ -273,6 +294,33 @@ function normalizeAbort(p: Promise<Response>): Promise<Response> {
 function pluginHttpFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   countCrossing("pluginHttp", urlOf(input));
   return normalizeAbort(tauriFetchImpl(input, init) as Promise<Response>);
+}
+
+async function materializeRequest(
+  input: Request,
+  init?: RequestInit,
+): Promise<{ url: string; init: RequestInit }> {
+  const request = new Request(input, init);
+  const method = request.method.toUpperCase();
+  const body =
+    method !== "GET" && method !== "HEAD" && request.body ? await request.arrayBuffer() : undefined;
+  return {
+    url: request.url,
+    init: {
+      method: request.method,
+      headers: new Headers(request.headers),
+      body,
+      signal: request.signal,
+      cache: request.cache,
+      credentials: request.credentials,
+      integrity: request.integrity,
+      keepalive: request.keepalive,
+      mode: request.mode,
+      redirect: request.redirect,
+      referrer: request.referrer,
+      referrerPolicy: request.referrerPolicy,
+    },
+  };
 }
 
 const HARBOR_FETCH_DEADLINE_MS = 35000;
@@ -310,9 +358,41 @@ function withDeadline(
   });
 }
 
+function tauriStringFetch(input: string, init?: RequestInit): Promise<Response> {
+  const directHost = hasSensitiveRequestHeaders(init?.headers) ? null : tauriDirectHost(input);
+  if (directHost) {
+    countCrossing("direct", input);
+    const attempt = fetch(input, init)
+      .then((res) => {
+        directFailures.delete(directHost);
+        return res;
+      })
+      .catch((e: unknown) => {
+        if (isCancellation(e)) throw e;
+        countCrossing("directFail", input);
+        noteDirectFailure(directHost);
+        return tauriHarborFetch(input, init);
+      });
+    return withDeadline(attempt, init?.signal);
+  }
+  const exec = isIdempotent(init?.method)
+    ? tauriHarborFetch(input, init).catch((e: unknown) => {
+        if (isCancellation(e)) throw e;
+        if (!shouldFallbackToPluginHttp(e, init)) throw e;
+        return pluginHttpFetch(input, init);
+      })
+    : tauriHarborFetch(input, init);
+  return withDeadline(exec, init?.signal);
+}
+
+function webStringFetch(input: string, init?: RequestInit): Promise<Response> {
+  const rewritten = rewriteForWeb(input, init);
+  return fetch(rewritten.url, rewritten.init);
+}
+
 export const safeFetch: typeof fetch = (input, init) => {
-  const target = typeof input === "string" ? input : input instanceof URL ? input.href : null;
-  if (target && isBlockedUrl(target)) {
+  const target = urlOf(input);
+  if (isBlockedUrl(target)) {
     noteBlocked();
     let host = target;
     try {
@@ -321,38 +401,17 @@ export const safeFetch: typeof fetch = (input, init) => {
     return Promise.reject(new TrackerBlockedError(host));
   }
   if (isTauri) {
-    if (typeof input === "string") {
-      const directHost = tauriDirectHost(input);
-      if (directHost) {
-        countCrossing("direct", input);
-        const attempt = fetch(input, init)
-          .then((res) => {
-            directFailures.delete(directHost);
-            return res;
-          })
-          .catch((e: unknown) => {
-            if (isCancellation(e)) throw e;
-            countCrossing("directFail", input);
-            noteDirectFailure(directHost);
-            return tauriHarborFetch(input, init);
-          });
-        return withDeadline(attempt, init?.signal);
-      }
-      const exec = isIdempotent(init?.method)
-        ? tauriHarborFetch(input, init).catch((e: unknown) => {
-            if (isCancellation(e)) throw e;
-            return pluginHttpFetch(input, init);
-          })
-        : tauriHarborFetch(input, init);
-      return withDeadline(exec, init?.signal);
-    }
-    return pluginHttpFetch(input, init);
+    if (typeof input === "string") return tauriStringFetch(input, init);
+    if (input instanceof URL) return tauriStringFetch(input.href, init);
+    return materializeRequest(input, init).then((request) =>
+      tauriStringFetch(request.url, request.init),
+    );
   }
-  if (typeof input === "string") {
-    const r = rewriteForWeb(input, init);
-    return fetch(r.url, r.init);
-  }
-  return fetch(input, init);
+  if (typeof input === "string") return webStringFetch(input, init);
+  if (input instanceof URL) return webStringFetch(input.href, init);
+  return materializeRequest(input, init).then((request) =>
+    webStringFetch(request.url, request.init),
+  );
 };
 
 export const safeFetchStream: typeof fetch = (input, init) => {
@@ -376,15 +435,37 @@ export function safeFetchBytes(
   input: RequestInfo | URL,
   init?: RequestInit,
   timeoutMs = 30000,
+  maxResponseBytes?: number,
 ): Promise<Response> {
   const target = typeof input === "string" ? input : input instanceof URL ? input.href : null;
-  if (!isTauri || !target) return safeFetch(input, init);
+  const policyHeaders = new Headers(init?.headers as HeadersInit | undefined);
+  const publicNetworkOnly = policyHeaders.get(SUBTITLE_PUBLIC_NETWORK_HEADER) === "1";
+  policyHeaders.delete(SUBTITLE_PUBLIC_NETWORK_HEADER);
+  const cleanInit = init
+    ? {
+        ...init,
+        headers: policyHeaders,
+      }
+    : undefined;
+  if (publicNetworkOnly && (!target || !isSafeProviderSubtitleUrl(target))) {
+    return Promise.reject(new TypeError("blocked non-public provider subtitle target"));
+  }
+  if (!isTauri || !target) {
+    let redirect = cleanInit?.redirect;
+    if (
+      publicNetworkOnly &&
+      (hasSensitiveRequestHeaders(cleanInit?.headers) || /[?&]api_key=/iu.test(target ?? ""))
+    ) {
+      redirect = "error";
+    }
+    return safeFetch(input, cleanInit ? { ...cleanInit, redirect } : cleanInit);
+  }
   if (isBlockedUrl(target)) {
     noteBlocked();
     return Promise.reject(new TrackerBlockedError(new URL(target).hostname));
   }
   return withDeadline(
-    tauriHarborFetch(target, init, "base64", timeoutMs),
+    tauriHarborFetch(target, init, "base64", timeoutMs, maxResponseBytes),
     init?.signal,
     timeoutMs + 5_000,
   );

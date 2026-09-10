@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, type CSSProperties } from "react";
+import { Spinner } from "@/components/spinner";
 import { VOYAGE_THEMES, THEME_PALETTE } from "@/lib/voyage/themes";
 import { startVoyage } from "@/lib/voyage/store";
 import type { VoyageTheme } from "@/lib/voyage/types";
@@ -109,16 +109,22 @@ function ThemeTile({
       style={{ background: `linear-gradient(150deg, ${pal.from}, ${pal.to})` }}
     >
       {theme.backdrop && (
-        <img
-          src={theme.backdrop}
-          alt=""
-          draggable={false}
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          className={`harbor-tile-art absolute inset-0 h-full w-full object-cover object-[center_30%] brightness-[0.55] group-hover:brightness-[0.72] ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-        />
+        <>
+          <img
+            src={theme.backdrop}
+            alt=""
+            draggable={false}
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            className={`harbor-tile-art absolute inset-0 h-full w-full object-cover object-[center_30%] ${
+              loaded ? "opacity-100" : "opacity-0"
+            }`}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 bg-canvas opacity-[0.45] transition-opacity duration-[340ms] ease-in-out group-hover:opacity-[0.28]"
+          />
+        </>
       )}
       <span
         aria-hidden
@@ -135,15 +141,18 @@ function ThemeTile({
         style={{ background: theme.accent }}
       />
       <span className="absolute inset-x-4 bottom-3.5 flex min-w-0 flex-col gap-0.5">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.accent }}>
+        <span
+          className="harbor-tile-genre text-[10px] font-semibold uppercase tracking-[0.18em]"
+          style={{ "--tile-accent": theme.accent } as CSSProperties}
+        >
           {theme.genre ?? "Wildcard"}
         </span>
-        <span className="font-display text-[16px] font-medium leading-tight text-ink [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">{theme.label}</span>
-        <span className="line-clamp-1 text-[12px] text-ink-muted [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">{theme.tagline}</span>
+        <span className="font-display text-[16px] font-medium leading-tight text-ink [text-shadow:0_1px_8px_var(--color-canvas),0_1px_3px_var(--color-canvas)]">{theme.label}</span>
+        <span className="line-clamp-1 text-[12px] text-ink-muted [text-shadow:0_1px_6px_var(--color-canvas),0_1px_2px_var(--color-canvas)]">{theme.tagline}</span>
       </span>
       {busy && (
         <span className="absolute inset-0 z-10 grid place-items-center bg-canvas/50">
-          <Loader2 size={20} className="animate-spin text-ink motion-reduce:animate-none" />
+          <Spinner size={20} className="text-ink" />
         </span>
       )}
     </button>

@@ -58,9 +58,18 @@ export function buildStreamIds(
   } else if (metaId.startsWith("tt") && !episode) {
     push(metaId);
   } else if (metaId.startsWith("tmdb:")) {
+    // Some stream addons (and AIOMetadata) use the bare `tmdb:{id}` scheme
+    // without the movie/tv segment. Emit it first so addons that match the bare
+    // prefix (they also match the scoped form) are queried with it; they index
+    // by the bare id and return nothing for the scoped form.
+    const bareBase = metaId.replace(/^tmdb:(movie|tv):/, "tmdb:");
     if (episode) {
-      if (!animeMeta) push(`${metaId}:${episode.season}:${episode.episode}`);
+      if (!animeMeta) {
+        if (bareBase !== metaId) push(`${bareBase}:${episode.season}:${episode.episode}`);
+        push(`${metaId}:${episode.season}:${episode.episode}`);
+      }
     } else {
+      if (bareBase !== metaId) push(bareBase);
       push(metaId);
     }
   } else {

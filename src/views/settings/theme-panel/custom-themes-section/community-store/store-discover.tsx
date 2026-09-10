@@ -8,7 +8,7 @@ import {
   Sun,
   Zap,
   type LucideIcon,
-} from "lucide-react";
+} from "../../../icons";
 import { t as translate, useT } from "@/lib/i18n";
 import type { StoreTheme } from "@/lib/theme-store";
 import type { Mood } from "./color-rank";
@@ -16,7 +16,6 @@ import type { StoreData } from "./use-store-themes";
 import { StoreHero } from "./store-hero";
 import { StoreRail } from "./store-rail";
 import { StoreCategoryChips } from "./store-category-chips";
-import { StoreTopCharts } from "./store-top-charts";
 import { StoreFeatureCards } from "./store-feature-cards";
 import { TopAuthors } from "./top-authors";
 
@@ -85,13 +84,6 @@ export function StoreDiscover({
         scrollKey="themestore:fresh"
         onOpen={onOpen}
         onViewAll={onBrowseAll}
-      />
-
-      <StoreTopCharts
-        trending={data.topRated}
-        popular={data.popular}
-        fresh={data.fresh}
-        onOpen={onOpen}
       />
 
       {data.moodRails.map((r) => {

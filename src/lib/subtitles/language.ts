@@ -246,6 +246,8 @@ const NAME_TO_CODE: Record<string, string> = (() => {
   m["jp"] = "ja";
   m["mandarin"] = "zh";
   m["cantonese"] = "zh";
+  m["العربية"] = "ar";
+  m["عربي"] = "ar";
   return m;
 })();
 

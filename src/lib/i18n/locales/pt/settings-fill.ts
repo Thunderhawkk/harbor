@@ -14,6 +14,8 @@ const settingsFill: Record<string, string> = {
     "Qualquer ID de modelo de console.groq.com/docs/models funciona aqui.",
   "Any model id from openrouter.ai/models works here, including :free variants.":
     "Qualquer ID de modelo de openrouter.ai/models funciona aqui, incluindo as variantes :free.",
+  ". Works without a key at low volume; add a key for higher quotas.":
+    ". Funciona sem chave em baixo volume; adicione uma chave para cotas maiores.",
   "SVP's files are here but its VapourSynth engine won't load ({err}). This usually means a stale VapourSynth entry or a missing Microsoft VC++ runtime. Reinstall SVP, or install the latest \"Visual C++ Redistributable (x64)\" from Microsoft, then reopen Harbor.":
     'Os arquivos do SVP estão aqui, mas o mecanismo VapourSynth dele não carrega ({err}). Isso geralmente indica uma entrada obsoleta do VapourSynth ou a ausência do runtime Microsoft VC++. Reinstale o SVP ou instale a versão mais recente do "Visual C++ Redistributable (x64)" da Microsoft e reabra o Harbor.',
   "Smooth motion runs on the bundled mpv engine in the Harbor desktop app. It has no effect in the browser.":
@@ -33,6 +35,10 @@ const settingsFill: Record<string, string> = {
   "Smart resync with speech recognition": "Ressincronização inteligente com reconhecimento de fala",
   "For the hardest files and the Try again button, Harbor transcribes a little speech on your device and lines the subtitle up to the actual words. Needs a build with the asr-whisper feature and downloads a small model the first time you use it.":
     "Para os arquivos mais difíceis e o botão Tentar novamente, o Harbor transcreve um trecho da fala no seu dispositivo e alinha a legenda às palavras reais. Requer uma compilação com o recurso asr-whisper e baixa um modelo pequeno na primeira vez que você o usa.",
+  "Match subtitles across languages (experimental)":
+    "Comparar legendas entre idiomas (experimental)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "Quando o áudio e a legenda estão em idiomas diferentes, o Harbor compara uma legenda da mesma versão no idioma do áudio. Ele só sugere uma correção, a menos que todas as verificações de segurança tenham sido medidas.",
   "Community sync": "Sincronização da comunidade",
   "A good correction only has to be found once. Harbor can share verified fixes so the next person with the same file and subtitle gets an instant result. Records are keyed by salted fingerprints, never your files or anything personal.":
     "Uma boa correção só precisa ser encontrada uma vez. O Harbor pode compartilhar correções verificadas para que a próxima pessoa com o mesmo arquivo e a mesma legenda obtenha um resultado instantâneo. Os registros são indexados por impressões digitais salgadas, nunca pelos seus arquivos nem por nada pessoal.",
@@ -466,6 +472,9 @@ const settingsFill: Record<string, string> = {
   "Performance notice": "Aviso de desempenho",
   "Live face scanning loads on-device AI models and can significantly increase RAM, CPU, and GPU usage while playback is active. Turn it off if Harbor slows down or your device gets hot.":
     "A detecção facial ao vivo carrega modelos de IA no dispositivo e pode aumentar significativamente o uso de RAM, CPU e GPU durante a reprodução. Desative-a se o Harbor ficar lento ou se o dispositivo aquecer.",
+  "Borderless window": "Janela sem bordas",
+  "True fullscreen covers the whole screen and hides the taskbar, but switching apps can flicker. Borderless window covers the same area with a frameless window, so alt-tab and overlays stay instant. Maximize fills the screen but keeps the taskbar and title bar.":
+    "A tela cheia real ocupa toda a tela e oculta a barra de tarefas, mas alternar entre aplicativos pode piscar. A janela sem bordas ocupa a mesma área com uma janela sem moldura, então o alt-tab e as sobreposições continuam instantâneos. Maximizar preenche a tela, mas mantém a barra de tarefas e a barra de título.",
 };
 
 export default settingsFill;

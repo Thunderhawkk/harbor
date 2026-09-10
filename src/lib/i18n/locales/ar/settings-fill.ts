@@ -14,6 +14,8 @@ const settingsFill: Record<string, string> = {
     "أي معرّف نموذج من console.groq.com/docs/models يعمل هنا.",
   "Any model id from openrouter.ai/models works here, including :free variants.":
     "أي معرّف نموذج من openrouter.ai/models يعمل هنا، بما في ذلك متغيّرات :free.",
+  ". Works without a key at low volume; add a key for higher quotas.":
+    ". يعمل دون مفتاح عند الاستخدام المنخفض؛ أضِف مفتاحًا للحصول على حصص أعلى.",
   "SVP's files are here but its VapourSynth engine won't load ({err}). This usually means a stale VapourSynth entry or a missing Microsoft VC++ runtime. Reinstall SVP, or install the latest \"Visual C++ Redistributable (x64)\" from Microsoft, then reopen Harbor.":
     'ملفات SVP موجودة هنا لكن يتعذّر تحميل محرّك VapourSynth الخاص به ({err}). يعني هذا عادةً وجود إدخال قديم لـ VapourSynth أو فقدان وقت تشغيل Microsoft VC++. أعِد تثبيت SVP، أو ثبّت أحدث إصدار من "Visual C++ Redistributable (x64)" من Microsoft، ثم أعِد فتح Harbor.',
   "Smooth motion runs on the bundled mpv engine in the Harbor desktop app. It has no effect in the browser.":
@@ -33,6 +35,9 @@ const settingsFill: Record<string, string> = {
   "Smart resync with speech recognition": "إعادة مزامنة ذكية مع التعرّف على الكلام",
   "For the hardest files and the Try again button, Harbor transcribes a little speech on your device and lines the subtitle up to the actual words. Needs a build with the asr-whisper feature and downloads a small model the first time you use it.":
     "بالنسبة إلى أصعب الملفات وزر إعادة المحاولة، يفرّغ Harbor القليل من الكلام على جهازك ويحاذي الترجمة مع الكلمات الفعلية. يتطلّب ذلك نسخة مبنيّة تتضمّن ميزة asr-whisper، ويُنزّل نموذجًا صغيرًا عند أول استخدام.",
+  "Match subtitles across languages (experimental)": "مطابقة الترجمات بين اللغات (تجريبي)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "عندما يكون الصوت والترجمة بلغتين مختلفتين، يقارن Harbor ترجمة مطابقة للإصدار بلغة الصوت. ولا يقترح سوى إصلاح، ما لم تُقَس جميع فحوص السلامة.",
   "Community sync": "مزامنة المجتمع",
   "A good correction only has to be found once. Harbor can share verified fixes so the next person with the same file and subtitle gets an instant result. Records are keyed by salted fingerprints, never your files or anything personal.":
     "يكفي أن يُعثَر على التصحيح الجيّد مرّة واحدة فقط. يمكن لـ Harbor مشاركة الإصلاحات المُتحقَّق منها ليحصل الشخص التالي الذي لديه الملف والترجمة نفسهما على نتيجة فوريّة. تُفهرَس السجلّات ببصمات مُملَّحة، وليس بملفّاتك أو بأي شيء شخصي إطلاقًا.",

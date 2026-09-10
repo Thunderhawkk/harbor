@@ -120,7 +120,7 @@ export function FiltersMenu({ filters }: { filters: SwitcherFilters }) {
               {(
                 [
                   ["both", t("Both")],
-                  ["addons", t("Addons")],
+                  ["addons", t("Direct/debrid")],
                   ["p2p", t("P2P")],
                 ] as Array<[StreamMode, string]>
               ).map(([v, label]) => (
@@ -330,7 +330,9 @@ function ToggleRow({
       className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-start transition-colors hover:bg-raised"
     >
       <span className="flex min-w-0 flex-col">
-        <span className={`text-[12.5px] ${on ? "font-semibold text-ink" : "text-ink-muted"}`}>{label}</span>
+        <span className={`text-[12.5px] ${on ? "font-semibold text-ink" : "text-ink-muted"}`}>
+          {label}
+        </span>
         <span className="truncate text-[10.5px] text-ink-subtle">{hint}</span>
       </span>
       <span

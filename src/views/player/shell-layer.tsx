@@ -3,7 +3,7 @@ import type { Meta } from "@/lib/cinemeta";
 import type { PlayerBridge, PlayerSnapshot } from "@/lib/player/bridge";
 import { getPlayerShell, type PlayerShellProps } from "@/lib/player-shells/registry";
 import { writePlayerPrefs } from "@/lib/player-prefs";
-import type { SubChoiceInput } from "@/lib/subtitles/subtitle-memory";
+import { rememberedChoiceFromLoad, type SubChoiceInput } from "@/lib/subtitles/subtitle-memory";
 import { writePlayerVolume } from "@/lib/player-volume";
 import type { useVideoDownload } from "./hooks/use-video-download";
 
@@ -181,16 +181,7 @@ export const ShellLayer = memo(function ShellLayer({
           bridgeRef.current?.addSubtitle(url, lang, title2, true, metadata) ??
           Promise.resolve(false);
         void p.then((ok) => {
-          if (ok)
-            rememberSubChoice({
-              lang,
-              title: title2,
-              url,
-              source: url,
-              external: true,
-              format: metadata?.format,
-              encoding: metadata?.encoding,
-            });
+          if (ok) rememberSubChoice(rememberedChoiceFromLoad(url, lang, title2, metadata));
         });
         return p;
       }}

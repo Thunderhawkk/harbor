@@ -9,6 +9,8 @@ export function downloadPlayerSrc(
   item: DownloadItem,
   opts?: { imdbId?: string | null; isAnime?: boolean },
 ): PlayerSrc {
+  const cut = Math.max(item.path.lastIndexOf("/"), item.path.lastIndexOf("\\"));
+  const filename = cut >= 0 ? item.path.slice(cut + 1) : item.path;
   return {
     meta,
     imdbId: opts?.imdbId ?? undefined,
@@ -18,6 +20,7 @@ export function downloadPlayerSrc(
     subtitle: item.subtitle ?? undefined,
     notWebReady: true,
     isAnime: opts?.isAnime,
+    streamRef: { resolvedFilename: filename },
   };
 }
 

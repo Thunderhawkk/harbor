@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
 use super::asr_match::{cue_tokens, score_window};
@@ -118,15 +117,18 @@ pub async fn pcm_window(
         .arg("-");
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::null());
+    cmd.kill_on_drop(true);
     #[cfg(windows)]
     cmd.creation_flags(0x0800_0000 | 0x0000_4000);
 
-    let mut child = cmd.spawn().map_err(|e| format!("spawn ffmpeg: {}", e))?;
-    let mut stdout = child.stdout.take().ok_or("no stdout")?;
-    let mut buf = Vec::new();
-    let read = async { stdout.read_to_end(&mut buf).await };
-    let _ = tokio::time::timeout(Duration::from_secs(PCM_TIMEOUT_SECS), read).await;
-    let _ = child.kill().await;
+    let output = tokio::time::timeout(Duration::from_secs(PCM_TIMEOUT_SECS), cmd.output())
+        .await
+        .map_err(|_| "ffmpeg-timeout".to_string())?
+        .map_err(|error| format!("run ffmpeg: {}", error))?;
+    if !output.status.success() {
+        return Err(format!("ffmpeg-exit-status: {}", output.status));
+    }
+    let buf = output.stdout;
 
     let mut pcm = Vec::with_capacity(buf.len() / 4);
     let mut i = 0;

@@ -131,3 +131,24 @@ function readLegacy(): string | null {
     return null;
   }
 }
+
+const PICKER_BG_KEY = "bg_picker";
+const PICKER_DIM_KEY = "bg_picker_dim";
+
+export async function loadPickerBg(): Promise<{ image: string | null; dim: number }> {
+  const [image, dim] = await Promise.all([
+    themeKvGet(PICKER_BG_KEY).catch(() => null),
+    themeKvGet(PICKER_DIM_KEY).catch(() => null),
+  ]);
+  const parsed = dim === null ? NaN : Number(dim);
+  return { image, dim: Number.isFinite(parsed) ? parsed : 55 };
+}
+
+export async function savePickerBg(data: string | null): Promise<boolean> {
+  if (data == null) return themeKvDelete(PICKER_BG_KEY);
+  return themeKvPut(PICKER_BG_KEY, data);
+}
+
+export async function savePickerBgDim(dim: number): Promise<boolean> {
+  return themeKvPut(PICKER_DIM_KEY, String(dim));
+}

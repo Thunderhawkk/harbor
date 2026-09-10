@@ -1,4 +1,7 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Sound descriptions": "Geräuschbeschreibungen",
+  "Hide sound effects and speaker names": "Geräusche und Sprechernamen ausblenden",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Entfernt Beschreibungen in eckigen Klammern wie [Tür knarrt] und in Großbuchstaben gesetzte Sprechernamen wie JOHN: während der Wiedergabe, damit eine Veröffentlichung mit reiner SDH-Spur weiterhin als normaler Dialog lesbar bleibt. Liedtexte, gewöhnliche runde Klammern und nicht-lateinische Schriften bleiben unangetastet. Bei erzwungenen und bildbasierten Spuren wird nichts entfernt.",
   '"{name}" and everything in it will be removed. This cannot be undone.':
     "„{name}“ und alle darin enthaltenen Elemente werden entfernt. Dies kann nicht rückgängig gemacht werden.",
   "A full screen, couch friendly Harbor for TVs, handhelds and big monitors.":
@@ -881,6 +884,31 @@ const coverage: Record<string, string> = {
   days: "Tage",
   "{n} episodes on home servers": "{n} Folgen auf Heimservern",
   "{voice} could not be generated. {message}": "{voice} konnte nicht erzeugt werden. {message}",
+  "Direct/debrid": "Direkt/Debrid",
+  "Audio verified": "Per Audio verifiziert",
+  "Watchlist overlaps ({n})": "Überschneidungen in der Merkliste ({n})",
+  "Favorites overlap ({n})": "Überschneidungen bei Favoriten ({n})",
+  "Addons overlap ({n})": "Überschneidungen bei Add-ons ({n})",
+  "Import selected data?": "Ausgewählte Daten importieren?",
+  "Show direct, debrid, and peer-to-peer sources":
+    "Direkte, Debrid- und Peer-to-Peer-Quellen anzeigen",
+  "Prefer direct and debrid sources; keep P2P when only web links are available":
+    "Direkte und Debrid-Quellen bevorzugen; P2P beibehalten, wenn nur Weblinks verfügbar sind",
+  "Prefer peer-to-peer torrent sources": "Peer-to-Peer-Torrentquellen bevorzugen",
+  "Hearing impaired": "Für Hörgeschädigte",
+  "Foreign-only": "Nur fremdsprachige Passagen",
+  "Machine-translated": "Maschinell übersetzt",
+  "Direct/debrid only": "Nur direkt/Debrid",
+  "Match subtitles across languages (experimental)":
+    "Untertitel sprachübergreifend abgleichen (experimentell)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "Wenn Audio und Untertitel unterschiedliche Sprachen verwenden, vergleicht Harbor einen zur Veröffentlichung passenden Untertitel in der Audiosprache. Harbor bietet nur eine Korrektur an, solange nicht jede Sicherheitsprüfung gemessen wurde.",
+  "New York Times": "New York Times",
+  "Bestseller lists in the eBook section.": "Bestsellerlisten im eBook-Bereich.",
+  "New York Times · bestseller lists": "New York Times · Bestsellerlisten",
+  "NYT Books API key": "API-Schlüssel für NYT Books",
+  "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
+    "Wähle, ob Harbor direkte und Debrid-Quellen oder Peer-to-Peer-Torrents bevorzugt oder beides anzeigt.",
 };
 
 export default coverage;

@@ -159,7 +159,7 @@ pub fn tray_set_custom_themes(app: AppHandle, themes: Vec<CustomThemeEntry>) {
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "tray_show", "Show Harbor", true, None::<&str>)?;
-    let themes: [(&str, &str); 13] = [
+    let themes: [(&str, &str); 14] = [
         ("cool-grey", "Harbor default"),
         ("nord", "Nord"),
         ("stremio", "Stremio"),
@@ -168,6 +168,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         ("dracula", "Dracula"),
         ("forest", "Forest"),
         ("noir", "Noir"),
+        ("kawaii", "Kawaii"),
         ("elegantfin", "ElegantFin"),
         ("feishin", "Feishin"),
         ("aurora", "Aurora"),

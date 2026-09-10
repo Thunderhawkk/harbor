@@ -62,6 +62,11 @@ const player: Record<string, string> = {
   "Forced only": "Somente forçadas",
   "Forced subs with native audio": "Legendas forçadas com áudio original",
   "HI/SDH": "HI/SDH",
+  "Hearing impaired": "Para pessoas com deficiência auditiva",
+  "Foreign-only": "Somente trechos estrangeiros",
+  "Machine-translated": "Tradução automática",
+  MT: "MT",
+  "Audio verified": "Verificada pelo áudio",
   "No styling": "Sem estilo",
   "Position and size only": "Apenas posição e tamanho",
   "Show HI/SDH": "Mostrar HI/SDH",
@@ -459,6 +464,20 @@ const player: Record<string, string> = {
   "Couldn't save the synced subtitle. Try again.":
     "Não foi possível salvar a legenda sincronizada. Tente novamente.",
   "Saving...": "Salvando...",
+  "Reloading the stream…": "Recarregando o stream…",
+  "Couldn't reload the stream. Try picking another source.":
+    "Não foi possível recarregar o stream. Tente escolher outra fonte.",
+  "Harbor's streaming server only runs in the desktop app.":
+    "O servidor de streaming do Harbor só funciona no app para computador.",
+  "Restarting the streaming server…": "Reiniciando o servidor de streaming…",
+  "Couldn't restart the streaming server.":
+    "Não foi possível reiniciar o servidor de streaming.",
+  "The streaming server didn't come back up.":
+    "O servidor de streaming não voltou a funcionar.",
+  "Streaming server restarted.": "Servidor de streaming reiniciado.",
+  "Ignore this title": "Ignorar este título",
+  "Never show the content advisory for this title again":
+    "Nunca mais mostrar o aviso de conteúdo deste título",
 };
 
 export default player;

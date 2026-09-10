@@ -110,7 +110,11 @@ export function MagnetCard({ raw, onClose }: { raw: string; onClose: () => void 
       url,
       title: m?.meta.name ?? name ?? label,
       subtitle: episodeLine(m, t),
-      streamRef: { infoHash: parsed.infoHash, fileIdx: fileIdx ?? null },
+      streamRef: {
+        resolvedFilename: name ?? null,
+        infoHash: parsed.infoHash,
+        fileIdx: fileIdx ?? null,
+      },
     };
     pendingEngineRef.current = null;
     onClose();

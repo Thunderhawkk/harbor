@@ -1,16 +1,16 @@
 {
   "name": "harbor-setup",
-  "version": "0.9.120",
+  "version": "0.9.124",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node serve.mjs 4500",
     "tauri": "tauri"
   },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.10.1"
-  },
   "dependencies": {
     "@tauri-apps/api": "^2.9.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1"
   }
 }

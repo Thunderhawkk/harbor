@@ -8,6 +8,12 @@ import {
 } from "@/lib/addons";
 import { applyOrderToItems, loadDisplayOrder } from "@/lib/addons-store/reorder";
 import type { useSettings } from "@/lib/settings";
+import {
+  loadStreamPlugins,
+  pluginAddons,
+  setStreamPluginConfig,
+  subscribeStreamPlugins,
+} from "@/lib/streams/plugins";
 
 type Settings = ReturnType<typeof useSettings>["settings"];
 
@@ -37,6 +43,8 @@ export function useAddons(authKey: string | null, settings: Settings): {
 } {
   const [addons, setAddons] = useState<Addon[] | null>(null);
   const [userHasStreamAddons, setUserHasStreamAddons] = useState(false);
+  const [pluginTick, setPluginTick] = useState(0);
+  useEffect(() => subscribeStreamPlugins(() => setPluginTick((n) => n + 1)), []);
   useEffect(() => {
     let cancelled = false;
     const debridKeys = {
@@ -99,6 +107,15 @@ export function useAddons(authKey: string | null, settings: Settings): {
           list.push(torbox);
         }
       }
+      if (settings.pluginsEnabled) {
+        await loadStreamPlugins();
+        if (cancelled) return;
+        setStreamPluginConfig({ tmdbKey: settings.tmdbKey });
+        list.push(...pluginAddons({ enabled: true, groupByRepo: settings.pluginsGroupByRepo }));
+        void import("@/lib/plugins/auto-check").then((m) =>
+          m.schedulePluginAutoCheck(settings.pluginsAutoCheck),
+        );
+      }
       console.info(
         `[picker] final addon list (${list.length}): ${list.map((a) => a.manifest.name).join(", ")}`,
       );
@@ -107,7 +124,18 @@ export function useAddons(authKey: string | null, settings: Settings): {
     return () => {
       cancelled = true;
     };
-  }, [authKey, settings.rdKey, settings.tbKey, settings.adKey, settings.pmKey, settings.dlKey]);
+  }, [
+    authKey,
+    settings.rdKey,
+    settings.tbKey,
+    settings.adKey,
+    settings.pmKey,
+    settings.dlKey,
+    settings.tmdbKey,
+    settings.pluginsEnabled,
+    settings.pluginsGroupByRepo,
+    pluginTick,
+  ]);
 
   return { addons, userHasStreamAddons };
 }

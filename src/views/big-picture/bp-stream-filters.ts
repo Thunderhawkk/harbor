@@ -8,12 +8,12 @@ import {
 import type { DebridStore } from "@/lib/debrid/types";
 import { useSettings } from "@/lib/settings";
 import { isAddonRanked } from "@/lib/streams/addon-detect";
-import { isP2pStream } from "@/lib/streams/cached";
 import {
   isFilterEmpty,
   matchesCustomFilter,
   type CustomStreamFilter,
 } from "@/lib/streams/custom-filters";
+import { filterStreamsByMode } from "@/lib/streams/mode";
 import type { PipelineResult } from "@/lib/streams/pipeline";
 import type { ScoredStream } from "@/lib/streams/types";
 import {
@@ -129,14 +129,7 @@ export function useBpStreamFilters(params: {
 
   const base = useMemo(() => {
     const candidatePool = result?.picker.all ?? [];
-    let all = candidatePool;
-    if (settings.streamMode === "addons") {
-      const addonsOnly = all.filter((s) => !isP2pStream(s));
-      if (addonsOnly.length > 0) all = addonsOnly;
-    } else if (settings.streamMode === "p2p") {
-      const p2pOnly = all.filter((s) => isP2pStream(s));
-      if (p2pOnly.length > 0) all = p2pOnly;
-    }
+    let all = filterStreamsByMode(candidatePool, settings.streamMode);
     if (langFilter && preferredLangs.length > 0) {
       const langFiltered = all.filter((s) => streamMatchesLangs(s, preferredLangs));
       if (langFiltered.length > 0) all = langFiltered;

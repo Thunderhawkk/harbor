@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { emptySnapshot, type PlayerBridge, type PlayerSnapshot } from "@/lib/player/bridge";
+import {
+  emptySnapshot,
+  initialPlayerSnapshot,
+  type PlayerBridge,
+  type PlayerSnapshot,
+} from "@/lib/player/bridge";
 import { probeMpv } from "@/lib/player/mpv";
 import { mergeMpvOptions } from "@/lib/player/mpv-tuning";
 import { metaIsAnime } from "@/lib/player/anime-src";
@@ -33,6 +38,8 @@ function snapChangedIgnoringClock(a: PlayerSnapshot, b: PlayerSnapshot): boolean
     a.audioDelaySec !== b.audioDelaySec ||
     a.subText !== b.subText ||
     a.subStartSec !== b.subStartSec ||
+    a.secondarySubText !== b.secondarySubText ||
+    a.noAudio !== b.noAudio ||
     a.audioNormalize !== b.audioNormalize ||
     a.videoWidth !== b.videoWidth ||
     a.videoHeight !== b.videoHeight ||
@@ -50,7 +57,7 @@ export function usePlayerBridge(params: {
 }) {
   const { bridgeRef, videoMountRef, src, settings } = params;
 
-  const [snap, setSnap] = useState<PlayerSnapshot>(emptySnapshot);
+  const [snap, setSnap] = useState<PlayerSnapshot>(initialPlayerSnapshot);
   const prevSnapRef = useRef<PlayerSnapshot>(emptySnapshot);
   const [engine, setEngine] = useState<"html5" | "mpv">("html5");
   const [autoFallbackTried, setAutoFallbackTried] = useState(false);
@@ -122,6 +129,8 @@ export function usePlayerBridge(params: {
         rtxVsr: settings.playerRtxVsr && !svpOn,
         embed: embedActive,
         d3d11Flip: settings.playerD3d11Flip,
+        renderer: settings.mpvRenderer,
+        forceYuv420p: settings.mpvForceYuv420p,
         anime4kShaders: [
           ...anime4kShadersFor(
             settings,

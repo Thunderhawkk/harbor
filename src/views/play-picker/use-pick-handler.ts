@@ -360,7 +360,9 @@ export function usePickHandler({
             : undefined,
         url: playUrl,
         title: episode
-          ? episode.name || `Episode ${absoluteEpisode ?? episode.episode}`
+          ? episode.name ||
+            metaEpisodeName(meta, episode) ||
+            `Episode ${absoluteEpisode ?? episode.episode}`
           : meta.name,
         subtitle: episode
           ? absoluteEpisode != null
@@ -376,6 +378,11 @@ export function usePickHandler({
         proxySessionId,
         historyUrl: r.data.url,
         streamRef: {
+          resolvedFilename:
+            r.data.filename ??
+            stream.behaviorHints?.filename ??
+            stream.behaviorHints?.fileName ??
+            null,
           infoHash: stream.infoHash ?? null,
           fileIdx: r.data.fileIdx ?? stream.fileIdx ?? null,
           addonId: stream.addonId ?? null,
@@ -556,4 +563,14 @@ export function usePickHandler({
     confirmP2p,
     cancelP2p,
   };
+}
+
+function metaEpisodeName(
+  meta: { videos?: Array<{ season?: number; episode?: number; number?: number; name?: string; title?: string }> },
+  episode: { season: number; episode: number },
+): string | undefined {
+  const match = meta.videos?.find(
+    (v) => (v.season ?? 1) === episode.season && (v.episode ?? v.number) === episode.episode,
+  );
+  return match?.name || match?.title || undefined;
 }

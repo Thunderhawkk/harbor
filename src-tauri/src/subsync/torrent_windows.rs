@@ -15,7 +15,7 @@ pub struct Geometry {
     pub file_len: u64,
 }
 
-#[derive(Clone, Copy, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Window {
     pub start_sec: f32,
@@ -131,6 +131,27 @@ fn near_future(w: &Window, position: f32) -> bool {
 
 fn overlaps(a: &Window, b: &Window) -> bool {
     a.start_sec < b.start_sec + b.len_sec && b.start_sec < a.start_sec + a.len_sec
+}
+
+pub fn windows_available(
+    bytes: &[u8],
+    geo: &Geometry,
+    duration_sec: f32,
+    requested: &[Window],
+) -> bool {
+    if requested.is_empty() {
+        return false;
+    }
+    let spans = available_byte_spans(bytes, geo);
+    let safe = safe_intervals(&spans, geo.file_len, duration_sec.max(1.0));
+    requested.iter().all(|window| {
+        let end = window.start_sec + window.len_sec;
+        window.start_sec >= 0.0
+            && window.len_sec > 0.0
+            && safe
+                .iter()
+                .any(|&(start, safe_end)| window.start_sec >= start && end <= safe_end)
+    })
 }
 
 fn place_windows(safe: &[(f32, f32)], want_late: bool, position: f32) -> Vec<Window> {
@@ -277,5 +298,30 @@ mod tests {
         assert_eq!(endpoints_ready(&have, &g), (true, false));
         have[1] |= 0b0100_0000;
         assert_eq!(endpoints_ready(&have, &g), (true, true));
+    }
+
+    #[test]
+    fn explicit_windows_must_be_fully_inside_downloaded_safe_ranges() {
+        let g = geo(10, 100_000, 0, 1_000_000);
+        let full = [0xffu8, 0xc0u8];
+        assert!(windows_available(
+            &full,
+            &g,
+            1_000.0,
+            &[Window {
+                start_sec: 400.0,
+                len_sec: 60.0,
+            }]
+        ));
+        let head_only = [0xf0u8, 0x00u8];
+        assert!(!windows_available(
+            &head_only,
+            &g,
+            1_000.0,
+            &[Window {
+                start_sec: 700.0,
+                len_sec: 60.0,
+            }]
+        ));
     }
 }

@@ -1,4 +1,7 @@
+import settingsRefinements from "./en/settings-refinements";
+
 const en: Record<string, string> = {
+  "Build identity. Useful when filing a bug report.": "Build identity. Useful when filing a bug report.",
   "nav.home": "Home",
   "nav.discover": "Discover",
   "nav.catalogs": "Catalogs",
@@ -10,6 +13,7 @@ const en: Record<string, string> = {
   "nav.manga": "Manga",
   "nav.ebook": "eBook",
   "nav.live": "Live TV",
+  "nav.sports": "Sports",
   "nav.playlists": "Playlists",
   "nav.calendar": "Calendar",
   "nav.library": "My Library",
@@ -288,6 +292,7 @@ const en: Record<string, string> = {
   "update.keepUsing": "Keep using Harbor while it downloads",
   "update.of": "{downloaded} of {total}",
   "mpv.conf": "mpv.conf",
+  ...settingsRefinements,
 };
 
 export default en;

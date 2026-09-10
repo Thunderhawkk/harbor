@@ -8,9 +8,13 @@ import { useSettings } from "@/lib/settings";
 import { markAddedSub, useAddedSubs } from "@/lib/subtitles/added-subs";
 import { gatherSubtitleAddons } from "@/lib/subtitles/addon-source";
 import { languageName } from "@/lib/subtitles/language";
-import { providerLabel, releaseOf } from "@/lib/subtitles/provider-label";
+import { providerLabel, releaseOf, subtitleLoadMetadataOf } from "@/lib/subtitles/provider-label";
 import { searchSubtitles, type SearchOptions } from "@/lib/subtitles/search";
-import { bestCandidate, parseTitleQuery, searchTitleCandidates } from "@/lib/subtitles/title-search";
+import {
+  bestCandidate,
+  parseTitleQuery,
+  searchTitleCandidates,
+} from "@/lib/subtitles/title-search";
 import type { SubResult } from "@/lib/subtitles/types";
 import { useBpT } from "../bp-i18n";
 import { BpKeyboard } from "../bp-keyboard";
@@ -276,15 +280,12 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
               title={releaseOf(r) || r.title || lang}
               detail={resultDetail(r, t)}
               badges={added ? [t("Added"), ...tagsOf(r, t)] : tagsOf(r, t)}
-              icon={added ? <Check size={22} strokeWidth={3} /> : <Plus size={22} strokeWidth={2.4} />}
+              icon={
+                added ? <Check size={22} strokeWidth={3} /> : <Plus size={22} strokeWidth={2.4} />
+              }
               onPress={() => {
                 markAddedSub(r.url);
-                void onAddSubtitle(r.url, r.lang, providerLabel(r), {
-                  format: r.format,
-                  encoding: r.encoding,
-                  release: releaseOf(r),
-                  provider: providerLabel(r),
-                });
+                void onAddSubtitle(r.url, r.lang, providerLabel(r), subtitleLoadMetadataOf(r));
               }}
             />
           </div>

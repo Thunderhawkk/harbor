@@ -1,4 +1,11 @@
-import { CircleHelp, LoaderCircle, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import {
+  LoaderCircle,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "../icons";
+import { UiIcon } from "@/components/ui-icon";
 import {
   useCallback,
   useEffect,
@@ -6,6 +13,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { activeProfileId } from "@/lib/active-profile-id";
@@ -28,17 +36,72 @@ import { MEDIA_SERVER_QUALITIES } from "@/lib/media-server/quality";
 import { signInWithPlex } from "@/lib/media-server/plex-auth";
 import { useT } from "@/lib/i18n";
 import { Dropdown } from "@/components/dropdown";
-import { MediaServerBrand } from "@/components/media-server-brand";
+import { MediaServerBrand, mediaServerProviderName } from "@/components/media-server-brand";
 import { openUrl } from "@/lib/window";
 import { useMediaServerHealth } from "@/hooks/use-media-server-health";
 import { markMediaServerInactive } from "@/lib/media-server/health";
-import { Section } from "../shared";
-import { SettingGroup, SettingRow } from "../kit";
+import { advanceFocus, tvFocus } from "@/lib/keyboard-navigation";
+import { isBackKey, navOwnsFocus } from "@/lib/keyboard-navigation/geometry";
+import { ROW_DESC, ROW_TITLE, RowNote, Section } from "../shared";
+import { ROW_ACTION, ROW_ACTION_PRIMARY, SettingRow, SettingsModal } from "../kit";
+import { SButton } from "../ui";
 
-const inputClass =
-  "h-9 w-full rounded-md bg-canvas px-3 text-[12.5px] text-ink ring-1 ring-edge-soft outline-none focus:ring-edge";
-const actionClass =
-  "rounded-md bg-canvas px-3 py-2 text-[12px] font-semibold text-ink-muted transition-colors hover:text-ink disabled:opacity-50";
+const QUAL =
+  "inline-flex h-[22px] shrink-0 items-center rounded-[6px] px-2 text-[13px] font-bold uppercase leading-[17px] tracking-[0.72px]";
+
+const FIELD_BASE =
+  "h-11 min-w-0 rounded-[10px] border border-edge-soft bg-elevated px-4 text-[16.5px] text-ink outline-none placeholder:text-ink-subtle/55 focus-visible:border-edge focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
+const FIELD = `${FIELD_BASE} w-full max-w-[520px]`;
+
+const DROPDOWN_SLOT = "w-[280px] max-w-full";
+
+const TOKEN_HELP_MIN_H = 240;
+
+function FieldBlock({
+  label,
+  htmlLabel = true,
+  children,
+}: {
+  label: string;
+  htmlLabel?: boolean;
+  children: ReactNode;
+}) {
+  const body = (
+    <>
+      <span className="harbor-settings-label">{label}</span>
+      {children}
+    </>
+  );
+  if (!htmlLabel) return <div className="flex flex-col gap-2">{body}</div>;
+  return <label className="flex flex-col gap-2">{body}</label>;
+}
+
+function BusyButton({
+  busy,
+  variant = "secondary",
+  disabled,
+  onClick,
+  children,
+}: {
+  busy: boolean;
+  variant?: "secondary" | "primary";
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      onClick={onClick}
+      className={variant === "primary" ? ROW_ACTION_PRIMARY : ROW_ACTION}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function HomeServersTab() {
   const t = useT();
@@ -46,223 +109,280 @@ export function HomeServersTab() {
   const [editing, setEditing] = useState<MediaServerConnection | null | "new">(null);
   const [syncingIds, setSyncingIds] = useState<Set<string>>(() => new Set());
   const [removeTarget, setRemoveTarget] = useState<MediaServerConnection | null>(null);
+  const addServer = useRef<HTMLSpanElement>(null);
   const connections = useMemo(() => mediaServerConnections(), [revision]);
   const reachability = useMediaServerHealth(connections);
   useEffect(() => subscribeMediaServerConnections(() => setRevision((value) => value + 1)), []);
-  const sync = useCallback(async (connection: MediaServerConnection) => {
-    setSyncingIds((current) => new Set(current).add(connection.id));
-    try {
-      await synchronizeMediaServer(connection);
-    } catch (cause) {
-      const at = Date.now();
-      markMediaServerInactive(connection.id);
-      updateMediaServerConnection(connection.id, {
-        lastSyncResult: {
-          ok: false,
-          message: cause instanceof Error ? cause.message : String(cause),
-          at,
-        },
-      });
-    } finally {
-      setSyncingIds((current) => {
-        const next = new Set(current);
-        next.delete(connection.id);
-        return next;
-      });
-    }
-  }, []);
+  const sync = useCallback(
+    async (connection: MediaServerConnection) => {
+      if (syncingIds.has(connection.id)) return;
+      setSyncingIds((current) => new Set(current).add(connection.id));
+      try {
+        await synchronizeMediaServer(connection);
+      } catch (cause) {
+        const at = Date.now();
+        markMediaServerInactive(connection.id);
+        updateMediaServerConnection(connection.id, {
+          lastSyncResult: {
+            ok: false,
+            message: cause instanceof Error ? cause.message : String(cause),
+            at,
+          },
+        }, connection.profileId);
+      } finally {
+        setSyncingIds((current) => {
+          const next = new Set(current);
+          next.delete(connection.id);
+          return next;
+        });
+      }
+    },
+    [syncingIds],
+  );
   return (
     <>
       <Section
         title={t("Home servers")}
         subtitle={t(
-          "Connect Jellyfin, Emby, and Plex libraries on this device. Credentials stay in native secret storage.",
+          "Connect Jellyfin, Emby, and Plex libraries on this device. Credentials stay in native secret storage. Each server keeps its own refresh schedule, and cached titles stay available while a server is offline.",
         )}
       >
-        <SettingGroup label={t("Refresh policy")}>
-          <SettingRow
-            label={t("Automatic refresh")}
-            desc={t(
-              "Applied separately to each connection. Cached titles remain available when a server is offline.",
-            )}
-          >
-            <span className="text-[12px] text-ink-subtle">{t("Set per server below")}</span>
-          </SettingRow>
-        </SettingGroup>
-        <SettingGroup label={t("Connections")}>
-          {connections.map((connection) => {
-            const status = !connection.enabled
-              ? "inactive"
-              : (reachability[connection.id] ?? "checking");
-            const statusLabel =
-              status === "active"
-                ? t("Active")
-                : status === "inactive"
-                  ? t("Not active")
-                  : t("Checking…");
-            const syncSummary = connection.lastSyncResult?.ok
-              ? connection.lastSyncResult.message
-              : null;
-            return (
-              <div key={connection.id} className="relative">
-                <span
-                  className="group absolute end-3.5 top-3.5 z-10 inline-flex h-4 w-4 items-center justify-center"
-                  aria-label={statusLabel}
-                  tabIndex={0}
-                >
-                  <span
-                    className={`h-3 w-3 rounded-full transition-colors ${status === "active" ? "bg-accent" : status === "checking" ? "animate-pulse bg-ink-subtle" : "border-2 border-ink-subtle bg-transparent"}`}
-                  />
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none absolute end-0 top-6 w-max translate-y-1 rounded-lg bg-elevated px-2.5 py-1.5 text-[11.5px] font-medium text-ink opacity-0 shadow-[0_12px_35px_rgba(0,0,0,.5)] ring-1 ring-edge transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus:translate-y-0 group-focus:opacity-100"
-                  >
+        {connections.map((connection) => {
+          const status = !connection.enabled
+            ? "inactive"
+            : (reachability[connection.id] ?? "checking");
+          const statusLabel =
+            status === "active"
+              ? t("Active")
+              : status === "inactive"
+                ? t("Not active")
+                : t("Checking…");
+          const statusDot =
+            status === "active"
+              ? "bg-success"
+              : status === "checking"
+                ? "animate-pulse bg-ink-subtle"
+                : "bg-edge";
+          const syncSummary = connection.lastSyncResult?.ok
+            ? connection.lastSyncResult.message
+            : null;
+          const syncing = syncingIds.has(connection.id);
+          const legacyDays = connection.refreshInterval === "daily" ? 1
+            : connection.refreshInterval === "three-days" ? 3
+              : connection.refreshInterval === "weekly" ? 7 : null;
+          const refreshInterval = legacyDays == null ? connection.refreshInterval : "custom";
+          const refreshDays = legacyDays ?? connection.refreshEveryDays ?? 1;
+          return (
+            <div key={connection.id} role="group" aria-label={connection.name} className="mb-8">
+              {[
+            <SettingRow
+              key={connection.id}
+              wide
+              label={
+                <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+                  <MediaServerBrand provider={connection.provider} name={connection.name} />
+                  <span className={`${QUAL} bg-elevated text-ink-subtle`}>
+                    {mediaServerProviderName(connection.provider)}
+                  </span>
+                  <span className={`inline-flex items-center gap-2 ${ROW_DESC}`}>
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot}`} />
                     {statusLabel}
                   </span>
                 </span>
-                <SettingRow
-                  wide
-                  label={
-                    <span className="flex items-center gap-2">
-                      <MediaServerBrand provider={connection.provider} name={connection.name} />
-                      <span className="rounded bg-canvas px-1.5 py-0.5 text-[10px] uppercase text-ink-subtle">
-                        {connection.provider}
-                      </span>
+              }
+              desc={
+                <>
+                  <span className="block">{connection.origin}</span>
+                  {syncSummary && (
+                    <span className="block">
+                      {syncSummary}
+                      {connection.lastSyncAt
+                        ? ` · ${new Date(connection.lastSyncAt).toLocaleString()}`
+                        : ""}
                     </span>
-                  }
-                  desc={
-                    <>
-                      <span>{connection.origin}</span>
-                      {syncSummary && (
-                        <>
-                          <br />
-                          <span>
-                            {syncSummary}
-                            {connection.lastSyncAt
-                              ? ` · ${new Date(connection.lastSyncAt).toLocaleString()}`
-                              : ""}
-                          </span>
-                        </>
-                      )}
-                    </>
+                  )}
+                </>
+              }
+              warn={connection.lastSyncResult?.ok === false ? connection.lastSyncResult.message : undefined}
+            >
+              <div className="flex flex-wrap items-center gap-2.5">
+                <BusyButton busy={syncing} onClick={() => void sync(connection)}>
+                  {syncing ? (
+                    <LoaderCircle className="animate-spin" size={18} />
+                  ) : (
+                    <RefreshCw size={18} />
+                  )}
+                  {t("Sync now")}
+                </BusyButton>
+                <SButton onClick={() => setEditing(connection)}>
+                  <Pencil size={18} />
+                  {t("Edit")}
+                </SButton>
+                <SButton
+                  onClick={() =>
+                    updateMediaServerConnection(connection.id, { enabled: !connection.enabled })
                   }
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-2 text-[12px] text-ink-muted">
-                      <span>{t("Quality")}</span>
-                      <Dropdown
-                        size="sm"
-                        className="w-44"
-                        value={connection.preferredQuality}
-                        onChange={(value) =>
+                  {connection.enabled ? t("Disable") : t("Enable")}
+                </SButton>
+                <SButton variant="danger" disabled={syncing} onClick={() => setRemoveTarget(connection)}>
+                  <Trash2 size={18} />
+                  {t("Remove")}
+                </SButton>
+              </div>
+            </SettingRow>,
+            <SettingRow
+              key={`${connection.id}-quality`}
+              label={t("Streaming quality")}
+              desc={t(
+                "Caps what Harbor asks {name} to send. Original streams the file exactly as it is stored.",
+                { name: connection.name },
+              )}
+            >
+              <div className={DROPDOWN_SLOT}>
+                <Dropdown
+                  size="md"
+                  ariaLabel={`${t("Streaming quality")}: ${connection.name}`}
+                  value={connection.preferredQuality}
+                  onChange={(value) =>
+                    updateMediaServerConnection(connection.id, {
+                      preferredQuality: value as MediaServerConnection["preferredQuality"],
+                    })
+                  }
+                  options={MEDIA_SERVER_QUALITIES.map((quality) => ({
+                    value: quality.id,
+                    label: t(quality.label),
+                  }))}
+                />
+              </div>
+            </SettingRow>,
+            <SettingRow
+              key={`${connection.id}-refresh`}
+              label={t("Refresh this library")}
+              desc={t(
+                "How often Harbor re-reads the library index from {name}. Manual only refreshes when you press Sync now.",
+                { name: connection.name },
+              )}
+            >
+              <div className={DROPDOWN_SLOT}>
+                <Dropdown
+                  size="md"
+                  ariaLabel={`${t("Refresh this library")}: ${connection.name}`}
+                  value={refreshInterval}
+                  onChange={(value) =>
+                    updateMediaServerConnection(connection.id, {
+                      refreshInterval: value as MediaServerRefreshInterval,
+                      ...(value === "custom" ? { refreshEveryDays: refreshDays } : {}),
+                    })
+                  }
+                  options={[
+                    { value: "launch", label: t("Every launch") },
+                    { value: "custom", label: t("Every…") },
+                    { value: "manual", label: t("Manual") },
+                  ]}
+                />
+              </div>
+            </SettingRow>,
+            ...(refreshInterval === "custom"
+              ? [
+                  <SettingRow
+                    key={`${connection.id}-days`}
+                    label={t("Refresh every")}
+                    desc={t("Days to wait between automatic refreshes of this library.")}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <RefreshDaysField
+                        value={refreshDays}
+                        onChange={(days) =>
                           updateMediaServerConnection(connection.id, {
-                            preferredQuality: value as MediaServerConnection["preferredQuality"],
+                            refreshInterval: "custom",
+                            refreshEveryDays: days,
                           })
                         }
-                        options={MEDIA_SERVER_QUALITIES.map((quality) => ({
-                          value: quality.id,
-                          label: t(quality.label),
-                        }))}
                       />
-                    </label>
-                    <Dropdown
-                      size="sm"
-                      className="min-w-48 flex-1"
-                      value={connection.refreshInterval}
-                      onChange={(value) =>
-                        updateMediaServerConnection(connection.id, {
-                          refreshInterval: value as MediaServerRefreshInterval,
-                        })
-                      }
-                      options={[
-                        { value: "launch", label: t("Every launch") },
-                        { value: "custom", label: t("Every…") },
-                        { value: "manual", label: t("Manual") },
-                      ]}
-                    />
-                    {connection.refreshInterval === "custom" && (
-                      <label className="flex items-center gap-2 text-[12px] text-ink-muted">
-                        <input
-                          aria-label={t("Refresh interval in days")}
-                          type="number"
-                          min={1}
-                          max={365}
-                          className={`${inputClass} w-20`}
-                          value={connection.refreshEveryDays ?? 1}
-                          onChange={(event) =>
-                            updateMediaServerConnection(connection.id, {
-                              refreshEveryDays: Math.max(1, Number(event.target.value) || 1),
-                            })
-                          }
-                        />
-                        {t("days")}
-                      </label>
-                    )}
-                    <button
-                      className={actionClass}
-                      disabled={syncingIds.has(connection.id)}
-                      onClick={() => void sync(connection)}
-                    >
-                      {syncingIds.has(connection.id) ? (
-                        <LoaderCircle className="inline animate-spin" size={13} />
-                      ) : (
-                        <RefreshCw className="inline" size={13} />
-                      )}{" "}
-                      {t("Sync now")}
-                    </button>
-                    <button className={actionClass} onClick={() => setEditing(connection)}>
-                      <Pencil className="inline" size={13} /> {t("Edit")}
-                    </button>
-                    <button
-                      className={actionClass}
-                      onClick={() =>
-                        updateMediaServerConnection(connection.id, { enabled: !connection.enabled })
-                      }
-                    >
-                      {connection.enabled ? t("Disable") : t("Enable")}
-                    </button>
-                    <button
-                      className={`${actionClass} text-danger`}
-                      onClick={() => setRemoveTarget(connection)}
-                    >
-                      <Trash2 className="inline" size={13} /> {t("Remove")}
-                    </button>
-                  </div>
-                </SettingRow>
-              </div>
-            );
-          })}
-          {connections.length === 0 && (
-            <SettingRow
-              wide
-              label={t("No home servers connected")}
-              desc={t("Add as many Jellyfin, Emby, or Plex servers as you use.")}
-            />
-          )}
-        </SettingGroup>
-        <button
-          type="button"
-          onClick={() => setEditing("new")}
-          className="mt-2 inline-flex h-9 w-fit items-center gap-2 rounded-md bg-ink px-4 text-[12.5px] font-semibold text-canvas"
+                      <span className={ROW_DESC}>{t("days")}</span>
+                    </div>
+                  </SettingRow>,
+                ]
+              : []),
+              ]}
+            </div>
+          );
+        })}
+        <SettingRow
+          label={
+            connections.length === 0 ? t("No home servers connected") : t("Add another home server")
+          }
+          desc={t("Add as many Jellyfin, Emby, or Plex servers as you use.")}
         >
-          <Plus size={14} />
-          {t("Connect server")}
-        </button>
+          <span ref={addServer} className="contents">
+            <SButton variant="primary" onClick={() => setEditing("new")}>
+              <Plus size={18} />
+              {t("Connect server")}
+            </SButton>
+          </span>
+        </SettingRow>
       </Section>
-      {editing != null && <ConnectionEditor value={editing} onClose={() => setEditing(null)} />}
+      {editing != null && (
+        <ConnectionEditor
+          value={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(connection) => {
+            setEditing(null);
+            void sync(connection);
+          }}
+        />
+      )}
       {removeTarget && (
         <HomeServerRemoveDialog
           connection={removeTarget}
           onCancel={() => setRemoveTarget(null)}
           onConfirm={async () => {
             const target = removeTarget;
-            setRemoveTarget(null);
-            removeMediaServerConnection(target.id);
+            const active = document.activeElement;
+            const ring = active instanceof HTMLElement && navOwnsFocus(active);
             await removeMediaServerItems(target.id);
+            removeMediaServerConnection(target.id, target.profileId);
+            setRemoveTarget(null);
+            const to = addServer.current?.querySelector("button");
+            if (ring && to) tvFocus(to);
           }}
         />
       )}
     </>
+  );
+}
+
+function RefreshDaysField({ value, onChange }: { value: number; onChange: (days: number) => void }) {
+  const t = useT();
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const parsed = Number(draft);
+    const next = draft.trim() && Number.isFinite(parsed)
+      ? Math.min(365, Math.max(1, Math.round(parsed)))
+      : value;
+    setDraft(String(next));
+    if (next !== value) onChange(next);
+  };
+  return (
+    <input
+      aria-label={t("Refresh interval in days")}
+      type="number"
+      min={1}
+      max={365}
+      step={1}
+      className={`${FIELD_BASE} w-[96px] px-3 text-center tabular-nums`}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+        }
+      }}
+    />
   );
 }
 
@@ -273,64 +393,55 @@ function HomeServerRemoveDialog({
 }: {
   connection: MediaServerConnection;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void>;
 }) {
   const t = useT();
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
-      if (event.key === "Enter") onConfirm();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [onCancel, onConfirm]);
-  return createPortal(
-    <div
-      role="presentation"
-      className="fixed inset-0 z-[10000] grid place-items-center bg-black/65 p-5 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const pending = useRef(false);
+  const remove = async () => {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await onConfirm();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  };
+  return (
+    <SettingsModal
+      open
+      onClose={onCancel}
+      dismissible={!busy}
+      width={520}
+      title={t("Remove {name}?", { name: connection.name })}
+      sub={t(
+        "Cached titles from this server will also be removed. Your media on the server will not be changed.",
+      )}
+      actions={
+        <>
+          <SButton disabled={busy} onClick={onCancel}>{t("Cancel")}</SButton>
+          <SButton variant="danger" disabled={busy} onClick={() => void remove()}>
+            {busy && <LoaderCircle className="animate-spin" size={18} />}
+            {busy ? t("Removing…") : t("Remove server")}
+          </SButton>
+        </>
+      }
     >
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="remove-server-title"
-        className="w-full max-w-md animate-menu-in rounded-2xl bg-elevated p-5 text-ink shadow-[0_28px_90px_rgba(0,0,0,.65)] ring-1 ring-edge"
-      >
-        <div className="flex items-start gap-3">
-          <MediaServerBrand provider={connection.provider} name={connection.name} />
-          <button
-            aria-label={t("Cancel")}
-            onClick={onCancel}
-            className="ms-auto rounded-md p-1 text-ink-subtle hover:bg-raised hover:text-ink"
-          >
-            <X size={17} />
-          </button>
-        </div>
-        <h3 id="remove-server-title" className="mt-5 text-[17px] font-semibold">
-          {t("Remove {name}?", { name: connection.name })}
-        </h3>
-        <p className="mt-2 text-[13px] leading-5 text-ink-muted">
-          {t(
-            "Cached titles from this server will also be removed. Your media on the server will not be changed.",
-          )}
-        </p>
-        <div className="mt-6 flex justify-end gap-2">
-          <button className={actionClass} onClick={onCancel}>
-            {t("Cancel")}
-          </button>
-          <button
-            autoFocus
-            className="rounded-md bg-danger px-4 py-2 text-[12px] font-semibold text-white"
-            onClick={onConfirm}
-          >
-            {t("Remove server")}
-          </button>
-        </div>
+      <div className={`flex flex-wrap items-center gap-2.5 ${ROW_TITLE}`}>
+        <MediaServerBrand provider={connection.provider} name={connection.name} />
+        <span className={`${QUAL} bg-elevated text-ink-subtle`}>
+          {mediaServerProviderName(connection.provider)}
+        </span>
       </div>
-    </div>,
-    document.body,
+      <p className={`max-w-[70ch] ${ROW_DESC}`}>{connection.origin}</p>
+      {error && <div role="alert"><RowNote>{error}</RowNote></div>}
+    </SettingsModal>
   );
 }
 
@@ -339,7 +450,7 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
   const anchor = useRef<HTMLButtonElement>(null);
   const closeTimer = useRef<number | null>(null);
   const pointer = useRef<{ x: number; y: number } | null>(null);
-  const [box, setBox] = useState<{ top: number; left: number } | null>(null);
+  const [box, setBox] = useState<{ top: number; left: number; below: boolean } | null>(null);
   const place = (x?: number, y?: number) => {
     const rect = anchor.current?.getBoundingClientRect();
     const point = x != null && y != null ? { x, y } : pointer.current;
@@ -349,12 +460,18 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
       Math.max(12, (point?.x ?? rect!.left) - width / 2),
       window.innerWidth - width - 12,
     );
-    const desiredTop = (point?.y ?? rect!.top) - 12;
-    setBox({ top: Math.max(12, desiredTop), left });
+    const anchorY = point?.y ?? rect!.top;
+    const below = anchorY - 12 < TOKEN_HELP_MIN_H;
+    setBox({ top: below ? anchorY + 20 : Math.max(12, anchorY - 12), left, below });
   };
-  const show = (event?: ReactMouseEvent) => {
+  const dismissed = useRef(false);
+  const cancelHide = () => {
     if (closeTimer.current != null) window.clearTimeout(closeTimer.current);
     closeTimer.current = null;
+  };
+  const show = (event?: ReactMouseEvent) => {
+    if (dismissed.current) return;
+    cancelHide();
     if (event) {
       pointer.current = { x: event.clientX, y: event.clientY };
       place(event.clientX, event.clientY);
@@ -362,7 +479,7 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
     setOpen(true);
   };
   const hideSoon = () => {
-    if (closeTimer.current != null) window.clearTimeout(closeTimer.current);
+    cancelHide();
     closeTimer.current = window.setTimeout(() => setOpen(false), 140);
   };
   useEffect(
@@ -382,6 +499,26 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
       window.removeEventListener("scroll", update, true);
     };
   }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (!isBackKey(event)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(false);
+      const active = document.activeElement;
+      const trigger = anchor.current;
+      if (trigger && active instanceof HTMLElement && active.closest("[data-plex-token-help]")) {
+        dismissed.current = true;
+        advanceFocus(trigger);
+        dismissed.current = false;
+      }
+      cancelHide();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, setOpen]);
+  const host = anchor.current?.closest<HTMLElement>('[role="dialog"]') ?? document.body;
   return (
     <>
       <button
@@ -397,9 +534,9 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
           pointer.current = { x: event.clientX, y: event.clientY };
         }}
         onMouseLeave={hideSoon}
-        className="rounded-full text-ink-subtle transition-colors hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-subtle transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        <CircleHelp size={15} />
+        <UiIcon name="help" className="h-5 w-5" />
       </button>
       {open &&
         box &&
@@ -408,28 +545,33 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
             data-plex-token-help
             role="tooltip"
             tabIndex={-1}
-            onFocus={() => show()}
+            onFocus={cancelHide}
             onBlur={hideSoon}
             onMouseEnter={() => show()}
             onMouseLeave={hideSoon}
             style={{
               position: "fixed",
               left: box.left,
-              bottom: Math.max(12, window.innerHeight - box.top),
               width: Math.min(340, window.innerWidth - 24),
+              ...(box.below
+                ? { top: box.top, maxHeight: Math.max(120, window.innerHeight - box.top - 12) }
+                : { bottom: Math.max(12, window.innerHeight - box.top) }),
             }}
-            className="z-[10000] origin-bottom animate-menu-in rounded-xl bg-elevated p-4 text-[12px] leading-5 text-ink-muted shadow-[0_18px_55px_rgba(0,0,0,.6)] ring-1 ring-edge"
+            className={`z-[10000] overflow-y-auto animate-menu-in rounded-[10px] bg-elevated p-4 text-[15.5px] leading-[22px] text-ink-muted ring-1 ring-edge ${
+              box.below ? "origin-top" : "origin-bottom"
+            }`}
           >
-            <ol className="list-decimal ps-4">
+            <ol className="list-decimal space-y-1 ps-5">
               <li>{t("Sign in to Plex Web.")}</li>
               <li>{t("Open a library item and view its XML.")}</li>
               <li>{t("Copy the X-Plex-Token value from the XML page URL.")}</li>
             </ol>
-            <p className="mt-2">
+            <p className="mt-2.5">
               {t("This token can be temporary. Sign in with Plex is recommended.")}
             </p>
             <button
-              className="mt-2 text-accent underline"
+              type="button"
+              className="mt-2.5 flex h-11 items-center text-[15.5px] text-accent underline underline-offset-4"
               onClick={() =>
                 openUrl(
                   "https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/",
@@ -439,7 +581,7 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
               {t("Official Plex token instructions")}
             </button>
           </div>,
-          document.body,
+          host,
         )}
     </>
   );
@@ -448,9 +590,11 @@ function TokenHelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boo
 function ConnectionEditor({
   value,
   onClose,
+  onSaved,
 }: {
   value: MediaServerConnection | "new";
   onClose: () => void;
+  onSaved: (connection: MediaServerConnection) => void;
 }) {
   const t = useT();
   const existing = value !== "new" ? value : null;
@@ -465,6 +609,17 @@ function ConnectionEditor({
   const [error, setError] = useState("");
   const [plexStatus, setPlexStatus] = useState<"idle" | "opening" | "waiting" | "ready">("idle");
   const plexAbort = useRef<AbortController | null>(null);
+  const connectionAbort = useRef<AbortController | null>(null);
+  const profileId = useRef(activeProfileId());
+  const close = () => {
+    connectionAbort.current?.abort();
+    plexAbort.current?.abort();
+    onClose();
+  };
+  useEffect(() => () => {
+    connectionAbort.current?.abort();
+    plexAbort.current?.abort();
+  }, []);
   useEffect(() => {
     setProvider(existing?.provider ?? "jellyfin");
     setOrigin(existing?.origin ?? "");
@@ -475,25 +630,29 @@ function ConnectionEditor({
     setError("");
   }, [existing, value]);
   const save = async () => {
+    if (connectionAbort.current || !origin.trim()) return;
+    const abort = new AbortController();
+    connectionAbort.current = abort;
     setBusy(true);
     setError("");
     try {
       let connection: MediaServerConnection;
       let secret: string | undefined;
       if (existing) {
-        const discoveredOrigin = await discoverExistingConnection(existing, origin);
+        const discoveredOrigin = await discoverExistingConnection(existing, origin, abort.signal);
         connection = { ...existing, origin: discoveredOrigin, name: name.trim() || existing.name };
       } else {
         const found = await discoverAndAuthenticate(
           provider,
           origin,
           provider === "plex" ? { token } : { username, password },
+          abort.signal,
         );
         const auth = found.auth;
         secret = auth.token;
         connection = {
           id: crypto.randomUUID(),
-          profileId: activeProfileId(),
+          profileId: profileId.current,
           provider,
           name: name.trim() || auth.userName || provider,
           origin: found.origin,
@@ -511,84 +670,112 @@ function ConnectionEditor({
           refreshInterval: "launch",
         };
       }
+      if (abort.signal.aborted || profileId.current !== activeProfileId()) return;
       saveMediaServerConnection(connection, secret);
-      await synchronizeMediaServer(connection);
-      onClose();
+      onSaved(connection);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setBusy(false);
+      if (connectionAbort.current === abort) {
+        connectionAbort.current = null;
+        if (!abort.signal.aborted) setBusy(false);
+      }
     }
   };
   const addressHint =
     provider === "plex"
-      ? "plex.local or 192.168.1.20:32400"
+      ? "plex.local:32400"
       : provider === "emby"
-        ? "emby.local or 192.168.1.20:8096"
-        : "home.local or 192.168.1.20:8096";
+        ? "emby.local:8096"
+        : "home.local:8096";
   const browserSignIn = async () => {
+    if (plexStatus === "opening" || plexStatus === "waiting") return;
     plexAbort.current?.abort();
     const abort = new AbortController();
     plexAbort.current = abort;
     setError("");
     setPlexStatus("opening");
     try {
-      const servers = await signInWithPlex(abort.signal, () => setPlexStatus("waiting"));
+      const servers = await signInWithPlex(abort.signal, () => {
+        if (!abort.signal.aborted) setPlexStatus("waiting");
+      });
+      if (abort.signal.aborted || plexAbort.current !== abort) return;
       const credential = servers.find((server) => server.available)?.token ?? servers[0]?.token;
       if (credential) setToken(credential);
-      setPlexStatus("ready");
+      setPlexStatus(credential ? "ready" : "idle");
       if (!credential)
         setError(t("Plex sign-in succeeded, but no server credential was returned."));
     } catch (cause) {
+      if (abort.signal.aborted || plexAbort.current !== abort) return;
       if ((cause as Error).name !== "AbortError")
         setError(cause instanceof Error ? cause.message : String(cause));
       setPlexStatus("idle");
     }
   };
   return (
-    <div className="mt-4 grid gap-4 rounded-xl border border-edge-soft bg-raised/40 p-4">
-      <div>
-        <h3 className="text-[14px] font-semibold text-ink">
-          {existing ? t("Edit home server") : t("Connect home server")}
-        </h3>
-        <p className="text-[12px] text-ink-muted">
-          {t(
-            "Harbor tries HTTP, HTTPS, reverse proxies, and the provider’s default port. Credentials are stored separately.",
-          )}
-        </p>
-      </div>
+    <SettingsModal
+      open
+      onClose={close}
+      width={640}
+      title={existing ? t("Edit home server") : t("Connect home server")}
+      sub={t(
+        "Harbor tries HTTP, HTTPS, reverse proxies, and the provider's default port. Credentials are stored separately.",
+      )}
+      actions={
+        <>
+          <SButton onClick={close}>{t("Cancel")}</SButton>
+          <BusyButton
+            variant="primary"
+            busy={busy}
+            disabled={!origin.trim() || (!existing && provider === "plex" && !token)}
+            onClick={() => void save()}
+          >
+            {busy ? t("Connecting…") : existing ? t("Save and sync") : t("Connect and sync")}
+          </BusyButton>
+        </>
+      }
+    >
       {!existing && (
-        <label className="grid gap-1 text-[12px] text-ink-muted">
-          {t("Provider")}
-          <Dropdown
-            value={provider}
-            onChange={(value) => setProvider(value as MediaServerProvider)}
-            options={[
-              { value: "jellyfin", label: "Jellyfin" },
-              { value: "emby", label: "Emby" },
-              { value: "plex", label: "Plex" },
-            ]}
-          />
-        </label>
+        <FieldBlock label={t("Provider")} htmlLabel={false}>
+          <div className="w-full max-w-[420px]">
+            <select
+              aria-label={t("Provider")}
+              className={`${FIELD} appearance-auto`}
+              disabled={busy}
+              value={provider}
+              onChange={(event) => {
+                plexAbort.current?.abort();
+                setProvider(event.target.value as MediaServerProvider);
+                setUsername("");
+                setPassword("");
+                setToken("");
+                setTokenHelp(false);
+                setPlexStatus("idle");
+                setError("");
+              }}
+            >
+              <option value="jellyfin">Jellyfin</option>
+              <option value="emby">Emby</option>
+              <option value="plex">Plex</option>
+            </select>
+          </div>
+        </FieldBlock>
       )}
       {!existing && provider === "plex" && (
-        <div className="grid gap-3 rounded-lg border border-accent/30 bg-accent/5 p-3">
-          <div>
-            <p className="text-[12.5px] font-semibold text-ink">
-              {t("Sign in with Plex — Recommended")}
-            </p>
-            <p className="text-[12px] text-ink-muted">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <p className={ROW_TITLE}>{t("Recommended: sign in with Plex")}</p>
+            <p className={`max-w-[66ch] ${ROW_DESC}`}>
               {t(
                 "Harbor opens Plex in your browser. Your Plex password is never entered in Harbor.",
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={plexStatus === "opening" || plexStatus === "waiting"}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <BusyButton
+              busy={plexStatus === "opening" || plexStatus === "waiting"}
+              disabled={busy}
               onClick={() => void browserSignIn()}
-              className={actionClass}
             >
               {plexStatus === "opening"
                 ? t("Opening browser…")
@@ -597,108 +784,93 @@ function ConnectionEditor({
                   : plexStatus === "ready"
                     ? t("Sign in again")
                     : t("Sign in with Plex")}
-            </button>
-            {plexStatus === "waiting" && (
-              <button
-                type="button"
-                className={actionClass}
+            </BusyButton>
+            {(plexStatus === "opening" || plexStatus === "waiting") && (
+              <SButton
                 onClick={() => {
                   plexAbort.current?.abort();
                   setPlexStatus("idle");
                 }}
               >
                 {t("Cancel")}
-              </button>
+              </SButton>
             )}
             {plexStatus === "ready" && (
-              <span className="text-[12px] font-semibold text-accent">
-                {t("Signed in — enter your server address below")}
+              <span className="text-[15.5px] font-medium leading-[22px] text-accent">
+                {t("Signed in. Enter your server address below.")}
               </span>
             )}
           </div>
         </div>
       )}
-      <label className="grid gap-1 text-[12px] text-ink-muted">
-        {t("Server address")}
+      <FieldBlock label={t("Server address")}>
         <input
           placeholder={addressHint}
-          className={inputClass}
+          className={FIELD}
           value={origin}
+          readOnly={busy}
+          dir="ltr"
+          autoComplete="off"
+          spellCheck={false}
           onChange={(event) => setOrigin(event.target.value)}
         />
-      </label>
-      <label className="grid gap-1 text-[12px] text-ink-muted">
-        {t("Display name")}
+      </FieldBlock>
+      <FieldBlock label={t("Display name")}>
         <input
-          placeholder={
-            provider === "plex"
-              ? "Living room Plex"
-              : provider === "emby"
-                ? "Home Emby"
-                : "Home Jellyfin"
-          }
-          className={inputClass}
+          placeholder={mediaServerProviderName(provider)}
+          className={FIELD}
           value={name}
+          readOnly={busy}
           onChange={(event) => setName(event.target.value)}
         />
-      </label>
+      </FieldBlock>
       {!existing &&
         (provider === "plex" ? (
-          <div className="grid gap-2 rounded-lg border border-edge-soft p-3">
-            <p className="text-[12.5px] font-semibold text-ink">
-              {t("Use access token — Advanced")}
-            </p>
-            <label className="grid gap-1 text-[12px] text-ink-muted">
+          <div className="flex flex-col gap-3">
+            <p className={ROW_TITLE}>{t("Advanced: use an access token")}</p>
+            <div className="flex flex-col gap-2">
               <span className="flex items-center gap-1">
-                {t("Plex access token")}
+                <span className="harbor-settings-label">{t("Plex access token")}</span>
                 <TokenHelpButton open={tokenHelp} setOpen={setTokenHelp} />
               </span>
               <input
+                aria-label={t("Plex access token")}
                 placeholder={t("Paste your Plex token")}
                 type="password"
-                className={inputClass}
+                className={FIELD}
                 value={token}
+                readOnly={busy}
+                autoComplete="off"
                 onChange={(event) => setToken(event.target.value)}
               />
-            </label>
+            </div>
           </div>
         ) : (
           <>
-            <label className="grid gap-1 text-[12px] text-ink-muted">
-              {t("Username")}
+            <FieldBlock label={t("Username")}>
               <input
                 placeholder={t("Server username")}
-                className={inputClass}
+                className={FIELD}
                 value={username}
+                readOnly={busy}
+                autoComplete="username"
                 onChange={(event) => setUsername(event.target.value)}
               />
-            </label>
-            <label className="grid gap-1 text-[12px] text-ink-muted">
-              {t("Password")}
+            </FieldBlock>
+            <FieldBlock label={t("Password")}>
               <input
                 placeholder={t("Server password")}
                 type="password"
-                className={inputClass}
+                className={FIELD}
                 value={password}
+                readOnly={busy}
+                autoComplete="current-password"
                 onChange={(event) => setPassword(event.target.value)}
               />
-            </label>
+            </FieldBlock>
           </>
         ))}
-      {error && <p className="rounded-md bg-danger/10 p-3 text-[12px] text-danger">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <button className={actionClass} onClick={onClose}>
-          {t("Cancel")}
-        </button>
-        <button
-          type="button"
-          disabled={busy || !origin.trim() || (!existing && provider === "plex" && !token)}
-          onClick={() => void save()}
-          className="h-9 rounded-md bg-ink px-4 text-[12.5px] font-semibold text-canvas disabled:opacity-40"
-        >
-          {busy ? t("Connecting…") : existing ? t("Save and sync") : t("Connect and sync")}
-        </button>
-      </div>
-    </div>
+      {error && <div role="alert"><RowNote>{error}</RowNote></div>}
+    </SettingsModal>
   );
 }

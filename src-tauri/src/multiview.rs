@@ -168,7 +168,7 @@ fn client_scale(_parent: isize, _css_view_w: f64, _css_view_h: f64) -> (f64, f64
     (1.0, 1.0, 0, 0)
 }
 
-fn css_to_physical(
+pub(crate) fn css_to_physical(
     parent: isize,
     css_left: f64,
     css_top: f64,
@@ -259,7 +259,7 @@ fn find_child_by_pid_and_title(_parent: isize, _want_pid: u32, _title: &str) -> 
 }
 
 #[cfg(windows)]
-fn place_child(hwnd_raw: isize, _parent_raw: isize, x: i32, y: i32, w: i32, h: i32) {
+pub(crate) fn place_child(hwnd_raw: isize, _parent_raw: isize, x: i32, y: i32, w: i32, h: i32) {
     use windows::Win32::Foundation::HWND;
     use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
     use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOP, SWP_NOACTIVATE};
@@ -296,7 +296,7 @@ fn move_child_only(hwnd_raw: isize, x: i32, y: i32) {
 }
 
 #[cfg(not(windows))]
-fn place_child(_hwnd_raw: isize, _parent_raw: isize, _x: i32, _y: i32, _w: i32, _h: i32) {}
+pub(crate) fn place_child(_hwnd_raw: isize, _parent_raw: isize, _x: i32, _y: i32, _w: i32, _h: i32) {}
 
 #[cfg(not(windows))]
 fn move_child_only(_hwnd_raw: isize, _x: i32, _y: i32) {}

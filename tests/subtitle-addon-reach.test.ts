@@ -129,7 +129,7 @@ test("an enriched addon timeout still falls back to the standard subtitle endpoi
 });
 
 test("automatic subtitle loading limits each preferred language independently", () => {
-  assert.match(fetchIntoPlayer, /const EXTRA_TRACKS_PER_LANGUAGE = 6/);
+  assert.match(fetchIntoPlayer, /const EXTRA_TRACKS_PER_LANGUAGE = 15/);
   assert.match(fetchIntoPlayer, /spreadBySourcePerLanguage\(/);
   assert.match(
     fetchIntoPlayer,
@@ -172,11 +172,12 @@ test("the configured languages reach the separate subtitle popup", () => {
 test("subtitle popup fills compact players while staying above the controls", () => {
   assert.match(subtitleMenu, /fixed end-14 bottom-\[150px\]/);
   assert.match(subtitleModal, /mb-\[84px\] me-\[56px\]/);
-  assert.match(subtitleMenu, /w-\[560px\] max-w-\[calc\(100vw-72px\)\]/);
+  assert.match(subtitleMenu, /<ResizableSubtitlePanel className="fixed end-14/);
   assert.match(
     subtitlePanelSize,
     /DEFAULT_SUBTITLE_PANEL_SIZE[^=]*= \{ width: 560, height: 460 \}/,
   );
+  assert.doesNotMatch(subtitleMenu, /flex h-\[460px\].*w-\[560px\]/);
   assert.doesNotMatch(subtitleModal, /me-\[120px\]/);
 });
 

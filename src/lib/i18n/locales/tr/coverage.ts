@@ -1,4 +1,7 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Sound descriptions": "Ses açıklamaları",
+  "Hide sound effects and speaker names": "Ses efektlerini ve konuşan adlarını gizle",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Altyazılar akarken [kapı gıcırdıyor] gibi köşeli parantez içindeki açıklamaları ve JOHN: gibi büyük harfle yazılmış konuşan adlarını kaldırır; böylece yalnızca SDH altyazısı olan bir sürüm de düz diyalog gibi okunur. Şarkı sözleri, normal parantezler ve Latin dışı yazılar olduğu gibi kalır. Zorunlu ve görüntü tabanlı altyazılarda uygulanmaz.",
   '"{name}" and everything in it will be removed. This cannot be undone.':
     '"{name}" ve içindeki her şey kaldırılacak. Bu işlem geri alınamaz.',
   "A full screen, couch friendly Harbor for TVs, handhelds and big monitors.":
@@ -879,6 +882,31 @@ const coverage: Record<string, string> = {
   days: "gün",
   "{n} episodes on home servers": "Ev sunucularında {n} bölüm",
   "{voice} could not be generated. {message}": "{voice} oluşturulamadı. {message}",
+  "Direct/debrid": "Doğrudan/debrid",
+  "Audio verified": "Sesle doğrulandı",
+  "Watchlist overlaps ({n})": "İzleme listesindeki ortak öğeler ({n})",
+  "Favorites overlap ({n})": "Favorilerdeki ortak öğeler ({n})",
+  "Addons overlap ({n})": "Ortak eklentiler ({n})",
+  "Import selected data?": "Seçili veriler içe aktarılsın mı?",
+  "Show direct, debrid, and peer-to-peer sources":
+    "Doğrudan, debrid ve eşler arası kaynakları göster",
+  "Prefer direct and debrid sources; keep P2P when only web links are available":
+    "Doğrudan ve debrid kaynaklarını tercih et; yalnızca web bağlantıları varsa P2P'yi koru",
+  "Prefer peer-to-peer torrent sources": "Eşler arası torrent kaynaklarını tercih et",
+  "Hearing impaired": "İşitme engelliler için",
+  "Foreign-only": "Yalnızca yabancı dil",
+  "Machine-translated": "Makine çevirisi",
+  "Direct/debrid only": "Yalnızca doğrudan/debrid",
+  "Match subtitles across languages (experimental)":
+    "Farklı dillerdeki altyazıları eşleştir (deneysel)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "Ses ve altyazı farklı dillerde olduğunda Harbor, ses dilindeki aynı sürümle eşleşen bir altyazıyla karşılaştırır. Tüm güvenlik kontrolleri ölçülmedikçe yalnızca bir düzeltme önerir.",
+  "New York Times": "New York Times",
+  "Bestseller lists in the eBook section.": "eBook bölümündeki çok satanlar listeleri.",
+  "New York Times · bestseller lists": "New York Times · çok satanlar listeleri",
+  "NYT Books API key": "NYT Books API anahtarı",
+  "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
+    "Harbor'ın doğrudan ve debrid kaynaklarını mı, eşler arası torrentleri mi tercih edeceğini veya ikisini birden mi göstereceğini seçin.",
 };
 
 export default coverage;

@@ -1,4 +1,5 @@
 import {
+  EyeOff,
   Ghost,
   Heart,
   Info,
@@ -8,137 +9,86 @@ import {
   Wine,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type FocusEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
+import { ignoreAdvisory } from "@/lib/player/content-advisory-ignore";
 import { usePlaybackPosition } from "@/lib/player/playback-clock";
 import { useSettings } from "@/lib/settings";
 
 export type Advisory = { category: string; severity: string };
+export type ContentAdvisoryPosition = "top-start" | "top-end" | "top-center";
 
 const SEV_RANK: Record<string, number> = { None: 0, Mild: 1, Moderate: 2, Severe: 3 };
 
-type SeverityStyle = {
-  text: string;
-  meter: string;
-  label: string;
-};
+type SeverityStyle = { text: string; bar: string };
 
 const SEV_STYLE_COLORED: Record<string, SeverityStyle> = {
-  Severe: {
-    text: "text-rose-300",
-    meter: "bg-rose-400",
-    label: "Severe",
-  },
-  Moderate: {
-    text: "text-amber-300",
-    meter: "bg-amber-300",
-    label: "Moderate",
-  },
-  Mild: {
-    text: "text-emerald-300",
-    meter: "bg-emerald-300",
-    label: "Mild",
-  },
-  None: {
-    text: "text-white/45",
-    meter: "bg-white/30",
-    label: "None",
-  },
+  Severe: { text: "text-danger", bar: "bg-danger" },
+  Moderate: { text: "text-accent", bar: "bg-accent" },
+  Mild: { text: "text-white/45", bar: "bg-white/45" },
+  None: { text: "text-white/35", bar: "bg-white/30" },
 };
 
 const SEV_STYLE_MONO: Record<string, SeverityStyle> = {
-  Severe: {
-    text: "text-white",
-    meter: "bg-white",
-    label: "Severe",
-  },
-  Moderate: {
-    text: "text-white/80",
-    meter: "bg-white/80",
-    label: "Moderate",
-  },
-  Mild: {
-    text: "text-white/65",
-    meter: "bg-white/60",
-    label: "Mild",
-  },
-  None: {
-    text: "text-white/45",
-    meter: "bg-white/30",
-    label: "None",
-  },
+  Severe: { text: "text-white/90", bar: "bg-white/90" },
+  Moderate: { text: "text-white/65", bar: "bg-white/65" },
+  Mild: { text: "text-white/45", bar: "bg-white/45" },
+  None: { text: "text-white/35", bar: "bg-white/30" },
 };
 
-function metaFor(
-  category: string,
-  isMono: boolean,
-): { Icon: typeof Info; label: string; iconColor: string } {
-  const c = category.toLowerCase();
-  if (c.includes("violence") || c.includes("gore")) {
-    return {
-      Icon: Swords,
-      label: "Violence & Gore",
-      iconColor: isMono ? "text-white/70" : "text-rose-300",
-    };
+function metaFor(category: string): { Icon: typeof Info; label: string } {
+  const normalized = category.toLowerCase();
+  if (normalized.includes("sex") || normalized.includes("nudity")) {
+    return { Icon: Heart, label: "Sex & Nudity" };
   }
-  if (c.includes("sex") || c.includes("nudity")) {
-    return {
-      Icon: Heart,
-      label: "Sex & Nudity",
-      iconColor: isMono ? "text-white/70" : "text-pink-300",
-    };
+  if (normalized.includes("violence") || normalized.includes("gore")) {
+    return { Icon: Swords, label: "Violence & Gore" };
   }
-  if (c.includes("profanity") || c.includes("language")) {
-    return {
-      Icon: MessageSquareWarning,
-      label: "Profanity",
-      iconColor: isMono ? "text-white/70" : "text-amber-300",
-    };
+  if (normalized.includes("profanity") || normalized.includes("language")) {
+    return { Icon: MessageSquareWarning, label: "Profanity" };
   }
-  if (c.includes("alcohol") || c.includes("drug") || c.includes("smoking")) {
-    return {
-      Icon: Wine,
-      label: "Alcohol, Drugs & Smoking",
-      iconColor: isMono ? "text-white/70" : "text-violet-300",
-    };
+  if (
+    normalized.includes("alcohol") ||
+    normalized.includes("drug") ||
+    normalized.includes("smoking")
+  ) {
+    return { Icon: Wine, label: "Alcohol, Drugs & Smoking" };
   }
-  if (c.includes("frighten") || c.includes("intense")) {
-    return {
-      Icon: Ghost,
-      label: "Frightening & Intense Scenes",
-      iconColor: isMono ? "text-white/70" : "text-indigo-300",
-    };
+  if (normalized.includes("frighten") || normalized.includes("intense")) {
+    return { Icon: Ghost, label: "Frightening & Intense Scenes" };
   }
-  return {
-    Icon: Info,
-    label: category,
-    iconColor: "text-white/60",
-  };
+  return { Icon: Info, label: category };
 }
 
-const HOLD_MS = 14_000;
-const HOVER_TAIL_MS = 3_000;
+const HOLD_MS = 10_000;
+const HOVER_TAIL_MS = 2_500;
+const EXIT_MS = 500;
+const CARD_CLASS =
+  "w-[264px] overflow-hidden rounded-[14px] bg-black/45 px-3.5 py-3 ring-1 ring-white/10 backdrop-blur-xl";
 
 type Phase = "idle" | "holding" | "collapsing" | "done";
 
 export function ContentAdvisoryToast({
   categories,
   playKey,
+  titleId,
   mpaRating,
+  position = "top-start",
   preview = false,
 }: {
   categories: Advisory[];
   playKey: string;
+  titleId?: string | null;
   mpaRating?: string | null;
+  position?: ContentAdvisoryPosition;
   preview?: boolean;
 }) {
   const t = useT();
   const { settings } = useSettings();
-  const isMono = settings.contentAdvisoryTheme === "monochrome";
-  const severityStyles = isMono ? SEV_STYLE_MONO : SEV_STYLE_COLORED;
+  const severityStyles =
+    settings.contentAdvisoryTheme === "monochrome" ? SEV_STYLE_MONO : SEV_STYLE_COLORED;
   const positionSec = usePlaybackPosition();
   const hasPlaybackStarted = preview || positionSec > 0.3;
-
   const rated = useMemo(
     () =>
       (categories ?? [])
@@ -149,7 +99,7 @@ export function ContentAdvisoryToast({
   const hasContent = rated.length > 0 || !!mpaRating;
   const [active, setActive] = useState(preview);
   const [phase, setPhase] = useState<Phase>(preview ? "holding" : "idle");
-  const [hovered, setHovered] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(1);
   const [hasTriggered, setHasTriggered] = useState(preview);
   const startTimeRef = useRef(0);
@@ -164,30 +114,34 @@ export function ContentAdvisoryToast({
       setHasTriggered(true);
       return;
     }
+
     setActive(false);
     setPhase("idle");
+    setPaused(false);
     setProgress(1);
     setHasTriggered(false);
     startTimeRef.current = 0;
+    durationRef.current = HOLD_MS;
     window.cancelAnimationFrame(rafRef.current);
   }, [playKey, preview]);
 
   useEffect(() => {
-    if (preview || !hasPlaybackStarted || !hasContent || hasTriggered) return;
+    if (preview || !playKey || !hasPlaybackStarted || !hasContent || hasTriggered) return;
     setHasTriggered(true);
     setActive(true);
     setPhase("holding");
     setProgress(1);
     startTimeRef.current = performance.now();
     durationRef.current = HOLD_MS;
-  }, [hasPlaybackStarted, hasContent, hasTriggered, preview]);
+  }, [hasPlaybackStarted, hasContent, hasTriggered, playKey, preview]);
 
   useEffect(() => {
     if (preview || phase !== "holding") return;
-    if (hovered) {
+    if (paused) {
       window.cancelAnimationFrame(rafRef.current);
       return;
     }
+
     const tick = () => {
       const elapsed = performance.now() - startTimeRef.current;
       const remaining = Math.max(0, 1 - elapsed / durationRef.current);
@@ -195,16 +149,17 @@ export function ContentAdvisoryToast({
       if (remaining <= 0) setPhase("collapsing");
       else rafRef.current = window.requestAnimationFrame(tick);
     };
+
     rafRef.current = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(rafRef.current);
-  }, [hovered, phase, preview]);
+  }, [paused, phase, preview]);
 
   useEffect(() => {
     if (preview || phase !== "collapsing") return;
     const timer = window.setTimeout(() => {
       setPhase("done");
       setActive(false);
-    }, 160);
+    }, EXIT_MS);
     return () => window.clearTimeout(timer);
   }, [phase, preview]);
 
@@ -212,113 +167,141 @@ export function ContentAdvisoryToast({
 
   const isCardExiting = phase === "collapsing";
   const countdownWidth = Math.max(0, Math.min(1, 1 - progress)) * 100;
-  const handleMouseLeave = () => {
-    setHovered(false);
+  const handleInteractionEnd = () => {
+    setPaused(false);
     if (phase === "holding") {
       durationRef.current = HOVER_TAIL_MS;
       startTimeRef.current = performance.now();
     }
   };
+  const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    handleInteractionEnd();
+  };
+  const canIgnore = !preview && !!titleId;
+  const handleIgnore = () => {
+    if (titleId) ignoreAdvisory(titleId);
+    setPhase("collapsing");
+  };
+  const positionClass =
+    position === "top-end"
+      ? "end-6 top-20"
+      : position === "top-center"
+        ? "start-1/2 top-20 -translate-x-1/2 rtl:translate-x-1/2"
+        : "start-6 top-20";
 
   return (
     <>
       {!preview && (
         <style>{`
           @keyframes harborAdvisoryIn {
-            from { opacity: 0; transform: translateY(-6px); }
-            to { opacity: 1; transform: translateY(0); }
+            0% { opacity: 0; transform: translateY(-10px) scale(0.965); }
+            60% { opacity: 1; }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
           }
           @keyframes harborAdvisoryOut {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(-4px); }
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+          }
+          @keyframes harborAdvisoryRow {
+            0% { opacity: 0; transform: translateY(5px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          .harbor-content-advisory-row {
+            animation: harborAdvisoryRow 260ms var(--ease-out) both;
           }
           @media (prefers-reduced-motion: reduce) {
-            .harbor-content-advisory { animation-duration: 1ms !important; }
+            .harbor-content-advisory,
+            .harbor-content-advisory-row { animation-duration: 1ms !important; }
           }
         `}</style>
       )}
       <div
-        role="status"
-        aria-label={t("Content Advisory")}
-        onMouseEnter={preview ? undefined : () => setHovered(true)}
-        onMouseLeave={preview ? undefined : handleMouseLeave}
+        role={preview ? undefined : "status"}
+        aria-label={preview ? undefined : t("Content advisory")}
+        onMouseEnter={preview ? undefined : () => setPaused(true)}
+        onMouseLeave={preview ? undefined : handleInteractionEnd}
+        onFocusCapture={preview ? undefined : () => setPaused(true)}
+        onBlurCapture={preview ? undefined : handleBlur}
         className={`${
-          preview ? "relative" : "pointer-events-auto absolute start-4 top-44 z-50"
-        } harbor-content-advisory w-[286px] overflow-hidden rounded-xl bg-black/80 text-white ring-1 ring-inset ring-white/[0.12] backdrop-blur-sm`}
+          preview
+            ? "relative"
+            : `${isCardExiting ? "pointer-events-none" : "pointer-events-auto"} absolute ${positionClass} z-30`
+        } harbor-content-advisory ${CARD_CLASS}`}
         style={
           preview
             ? undefined
             : {
                 animation: isCardExiting
-                  ? "harborAdvisoryOut 140ms ease-in forwards"
-                  : "harborAdvisoryIn 180ms cubic-bezier(0.16, 1, 0.3, 1) both",
+                  ? `harborAdvisoryOut ${EXIT_MS}ms var(--ease-out) forwards`
+                  : "harborAdvisoryIn 420ms var(--ease-out) both",
               }
         }
       >
         <div
-          className={`flex min-h-10 items-center justify-between gap-3 px-3 ${
-            rated.length > 0 ? "border-b border-white/10" : ""
+          className={`flex min-h-6 items-center justify-between gap-2.5 ${
+            rated.length > 0 ? "mb-2.5" : ""
           }`}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <ShieldAlert
-              size={14}
-              strokeWidth={2}
-              className={isMono ? "shrink-0 text-white/65" : "shrink-0 text-amber-300"}
-            />
-            <span className="truncate text-xs font-semibold text-white/90">
-              {t("Content Advisory")}
+          <span className="flex min-w-0 items-center gap-1.5 text-white/45">
+            <ShieldAlert size={12} strokeWidth={2.2} className="shrink-0" />
+            <span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] rtl:tracking-normal">
+              {t("Content advisory")}
             </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
             {mpaRating && (
-              <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white/90">
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white/70">
                 {mpaRating}
               </span>
             )}
             {!preview && (
               <button
                 type="button"
-                onClick={() => setPhase("collapsing")}
+                onClick={(event) => {
+                  event.currentTarget.blur();
+                  setPhase("collapsing");
+                }}
                 aria-label={t("Dismiss")}
-                className="flex h-6 w-6 items-center justify-center rounded-md text-white/45 transition-colors duration-150 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-white/45 transition-[color,background-color,transform] duration-150 hover:bg-white/10 hover:text-white active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
               >
                 <X size={13} strokeWidth={2} />
               </button>
             )}
-          </div>
+          </span>
         </div>
 
         {rated.length > 0 && (
-          <ul className="divide-y divide-white/[0.08] px-3">
-            {rated.map((category) => {
-              const { Icon, label, iconColor } = metaFor(category.category, isMono);
+          <ul className="flex flex-col gap-2.5">
+            {rated.map((category, index) => {
+              const { Icon, label } = metaFor(category.category);
               const style = severityStyles[category.severity] ?? severityStyles.Mild;
               const rank = SEV_RANK[category.severity] ?? 1;
               return (
                 <li
                   key={category.category}
-                  className="flex min-h-9 items-center justify-between gap-3 py-1.5"
+                  className={`flex items-center justify-between gap-3 ${
+                    preview ? "" : "harbor-content-advisory-row"
+                  }`}
+                  style={preview ? undefined : { animationDelay: `${110 + index * 50}ms` }}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <Icon size={13} strokeWidth={1.9} className={`shrink-0 ${iconColor}`} />
-                    <span className="truncate text-[11px] font-medium text-white/85">
-                      {t(label)}
-                    </span>
+                    <Icon size={14} strokeWidth={2} className={`shrink-0 ${style.text}`} />
+                    <span className="truncate text-[12.5px] text-white/85">{t(label)}</span>
                   </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <span className="flex items-center gap-[3px]" aria-hidden="true">
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span className="flex gap-[3px]" aria-hidden="true">
                       {[1, 2, 3].map((level) => (
                         <span
                           key={level}
-                          className={`h-1 w-2 rounded-full ${
-                            level <= rank ? style.meter : "bg-white/15"
+                          className={`h-2.5 w-1 rounded-full ${
+                            level <= rank ? style.bar : "bg-ink-subtle/25"
                           }`}
                         />
                       ))}
                     </span>
-                    <span className={`w-[50px] text-end text-[10px] font-medium ${style.text}`}>
-                      {t(style.label)}
+                    <span className={`w-[54px] text-end text-[11px] font-semibold ${style.text}`}>
+                      {t(category.severity)}
                     </span>
                   </span>
                 </li>
@@ -327,16 +310,33 @@ export function ContentAdvisoryToast({
           </ul>
         )}
 
+        {canIgnore && (
+          <div className={rated.length > 0 ? "mt-2.5" : "mt-2"}>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.currentTarget.blur();
+                handleIgnore();
+              }}
+              title={t("Never show the content advisory for this title again")}
+              className="flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-white/[0.07] px-3 py-2 text-[11.5px] font-semibold text-white/60 transition-[color,background-color,transform] duration-150 hover:bg-white/[0.12] hover:text-white active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
+            >
+              <EyeOff size={12} strokeWidth={2.2} className="shrink-0" />
+              {t("Ignore this title")}
+            </button>
+          </div>
+        )}
+
         {!preview && phase === "holding" && (
           <div
             dir="ltr"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/10"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-white/10"
           >
             <div
-              className="h-full bg-white/60"
+              className="h-full bg-white/35"
               style={{
                 width: `${countdownWidth}%`,
-                transition: hovered ? "none" : "width 60ms linear",
+                transition: paused ? "none" : "width 60ms linear",
               }}
             />
           </div>

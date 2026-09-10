@@ -33,10 +33,10 @@ export function ServiceView({ service }: { service: StreamingService }) {
 
   return (
     <main ref={scrollRef} className="absolute inset-0 overflow-y-auto pb-14">
-      <div className="relative px-12 pt-28 pb-12">
+      <div className="relative px-12 pt-28 pb-6">
         <div
           aria-hidden
-          className="harbor-bleed-stremio pointer-events-none absolute inset-0"
+          className="harbor-service-glow harbor-bleed-stremio pointer-events-none absolute inset-0"
           style={{
             backgroundImage: `radial-gradient(ellipse 90% 100% at 30% 0%, ${meta.tint}38 0%, transparent 65%)`,
           }}
@@ -198,7 +198,7 @@ function CategoryPills({
   };
 
   return (
-    <div className="px-12 pt-8">
+    <div className="px-12 pt-4">
       <div className="group/pills relative">
         <div
           ref={trackRef}

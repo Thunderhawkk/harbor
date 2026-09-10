@@ -158,8 +158,8 @@ const catalog02: Record<string, string> = {
     "Crea un pacchetto con uno di questi strumenti, esporta il JSON, pubblicalo come gist e incolla qui sotto il link raw.",
   "Build a source plugin": "Crea un plugin per le fonti",
   "Build from source": "Compila dal codice sorgente",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "Identificativo della build. Utile quando segnali un bug a bugs@harbor.site.",
+  "Build identity. Useful when filing a bug report.":
+    "Identificativo della build. Utile quando segnali un bug.",
   "Build one in the studio or import a theme file first, then come back to share it.":
     "Creane uno nello studio o importa prima un file di tema, poi torna qui per condividerlo.",
   "Build your own": "Crea il tuo",

@@ -8,7 +8,7 @@ import { useSettings } from "@/lib/settings";
 import type { SkipSegment } from "@/lib/skip-intro";
 import type { SpoilerMask } from "@/lib/spoilers";
 import type { ScoredStream } from "@/lib/streams/types";
-import type { SubChoiceInput } from "@/lib/subtitles/subtitle-memory";
+import { rememberedChoiceFromLoad, type SubChoiceInput } from "@/lib/subtitles/subtitle-memory";
 import type { EngineStats } from "@/lib/torrent/engine-stats";
 import { useView, type PlayerSrc, type PlayEpisode } from "@/lib/view";
 import { MEDIA_SERVER_QUALITIES } from "@/lib/media-server/quality";
@@ -106,15 +106,7 @@ function BpTenFoot(props: BpTenFootProps) {
         bridgeRef.current?.addSubtitle(url, lang, title, true, metadata) ?? Promise.resolve(false);
       void p.then((ok) => {
         if (!ok) return;
-        rememberSubChoice({
-          lang,
-          title,
-          url,
-          source: url,
-          external: true,
-          format: metadata?.format,
-          encoding: metadata?.encoding,
-        });
+        rememberSubChoice(rememberedChoiceFromLoad(url, lang, title, metadata));
       });
       return p;
     },

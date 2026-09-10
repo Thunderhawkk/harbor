@@ -1,4 +1,4 @@
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Inspector } from "./theme-studio/inspector";
@@ -26,6 +26,8 @@ import {
   type ThemePreset,
 } from "@/lib/theme";
 import { useSettings } from "@/lib/settings";
+import { captureFocusReturn, tvFocus } from "@/lib/keyboard-navigation";
+import { isBackKey } from "@/lib/keyboard-navigation/geometry";
 import { pushOverlayPin } from "@/lib/overlay-pin";
 import { pushActivityHint } from "@/lib/discord/activity-hint";
 import { useT } from "@/lib/i18n";
@@ -37,15 +39,19 @@ const STUDIO_AUTHORITY_ID = "harbor-studio-authority-css";
 export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: () => void }) {
   const t = useT();
   const { settings, update } = useSettings();
-  const { draft, setDraft, undo, redo, canUndo, canRedo } = useDraftHistory(() => emptyDraft(seed));
+  const [initialDraft] = useState(() => emptyDraft(seed, settings.navCustomization));
+  const { draft, setDraft, undo, redo, canUndo, canRedo } = useDraftHistory(() => initialDraft);
   const drag = usePanelDrag();
   const restoreRef = useState(() => settings.theme.preset)[0];
   const liveThemeRef = useRef(settings.theme);
   liveThemeRef.current = settings.theme;
   const [popoutTab, setPopoutTab] = useState<CodeLang | null>(null);
-  const { inspectorHidden, setInspectorHidden } = useStudioPreview(draft.layout, draft.bokeh);
-  const [initialJson] = useState(() => JSON.stringify(emptyDraft(seed)));
+  const { inspectorHidden, setInspectorHidden } = useStudioPreview(draft.layout, draft.bokeh, draft.navCustomization);
+  const [initialJson] = useState(() => JSON.stringify(initialDraft));
   const [confirmClose, setConfirmClose] = useState(false);
+  const minimizeRef = useRef<HTMLButtonElement>(null);
+  const editThemeRef = useRef<HTMLButtonElement>(null);
+  const keepEditingRef = useRef<HTMLButtonElement>(null);
   const activityName = draft.name.trim();
   const activityDetails = activityName
     ? t('Designing "{name}"', { name: activityName })
@@ -130,6 +136,7 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
       overlay = document.createElement("div");
       overlay.id = STUDIO_HTML_ID;
       overlay.style.cssText = "position:fixed;inset:0;z-index:59;pointer-events:none;";
+      overlay.setAttribute("data-tv-skip", "");
       document.body.appendChild(overlay);
     }
     overlay.innerHTML = draft.layout === "custom" ? draft.html : "";
@@ -146,7 +153,11 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (isBackKey(e)) {
+        if (e.defaultPrevented) return;
+        if (document.querySelector("[data-search-editing]")) return;
+        e.preventDefault();
+        e.stopPropagation();
         if (confirmClose) setConfirmClose(false);
         else if (popoutTab) setPopoutTab(null);
         else if (inspectorHidden) setInspectorHidden(false);
@@ -165,6 +176,18 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, inspectorHidden, setInspectorHidden, popoutTab, confirmClose, dirty, undo, redo]);
+
+  useEffect(() => {
+    const el = inspectorHidden ? editThemeRef.current : minimizeRef.current;
+    if (el) tvFocus(el);
+  }, [inspectorHidden]);
+
+  useEffect(() => {
+    if (!confirmClose) return;
+    const restore = captureFocusReturn();
+    if (keepEditingRef.current) tvFocus(keepEditingRef.current);
+    return restore;
+  }, [confirmClose]);
 
   const runJs = () => {
     const code = draft.js.trim();
@@ -189,7 +212,7 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
       }
       return next;
     });
-  const onSeed = (t: ThemePreset) => setDraft(emptyDraft(t));
+  const onSeed = (t: ThemePreset) => setDraft(emptyDraft(t, draft.navCustomization));
 
   const onChromeChange = (config: ChromeConfig) =>
     setDraft((d) => {
@@ -215,7 +238,7 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
         .slice(0, 40) || "theme";
-    const nav = settings.navCustomization;
+    const nav = draft.navCustomization;
     const hasNav =
       nav.order.length > 0 || nav.hidden.length > 0 || Object.keys(nav.renamed).length > 0;
     return {
@@ -254,6 +277,7 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
     const image = nextBackgroundImage(settings.theme.backgroundImage, previous, theme);
     saveCustomTheme(theme);
     update({
+      navCustomization: draft.navCustomization,
       theme: {
         ...settings.theme,
         preset: theme.id as ActiveThemeId,
@@ -272,11 +296,14 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
   };
 
   return createPortal(
-    <>
+    <div
+      className="pointer-events-none fixed inset-0 z-[210]"
+    >
       {!inspectorHidden && (
         <StudioShell cardRef={drag.ref} position={drag.position} dragging={drag.dragging}>
           <StudioHeader
             name={trimmedName}
+            minimizeRef={minimizeRef}
             onCancel={requestClose}
             onHidePanel={() => setInspectorHidden(true)}
             onUndo={undo}
@@ -317,9 +344,10 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
       {inspectorHidden && (
         <button
           type="button"
+          ref={editThemeRef}
           onClick={() => setInspectorHidden(false)}
           style={STABLE_CHROME}
-          className="pointer-events-auto fixed bottom-6 end-6 z-[242] flex h-12 items-center gap-2 rounded-md bg-elevated px-5 text-[13px] font-semibold text-ink harbor-float transition-colors hover:bg-raised"
+          className="pointer-events-auto fixed bottom-6 end-6 z-[242] flex h-12 items-center gap-2 rounded-md bg-elevated px-5 text-[15px] font-semibold text-ink harbor-float transition-colors hover:bg-raised"
         >
           <SlidersHorizontal size={16} strokeWidth={2.2} />
           {t("Edit theme")}
@@ -349,6 +377,9 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
           onClick={() => setConfirmClose(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("Leave without saving?")}
             style={STABLE_CHROME}
             onClick={(e) => e.stopPropagation()}
             className="animate-in zoom-in-95 fade-in w-[340px] max-w-full overflow-hidden rounded-md ring-1 ring-edge bg-elevated harbor-float duration-150"
@@ -357,7 +388,7 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
               <h2 className="text-[17px] font-semibold tracking-tight text-ink">
                 {t("Leave without saving?")}
               </h2>
-              <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-muted">
+              <p className="mt-1.5 max-w-[66ch] text-[15.5px] leading-[22px] text-ink-muted">
                 {t(
                   "Your changes to this theme aren't saved yet. They'll be lost if you leave now.",
                 )}
@@ -369,15 +400,16 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
                     setConfirmClose(false);
                     onClose();
                   }}
-                  className="h-10 rounded-md px-4 text-[13.5px] font-semibold text-ink-subtle transition-colors hover:bg-danger/25 hover:text-danger"
+                  className="h-11 rounded-md px-4 text-[15px] font-semibold text-ink-subtle transition-colors hover:bg-danger/25 hover:text-danger"
                 >
                   {t("Discard")}
                 </button>
                 <button
                   type="button"
-                  autoFocus
+                  ref={keepEditingRef}
+                  data-tv-initial-focus
                   onClick={() => setConfirmClose(false)}
-                  className="h-10 rounded-md bg-ink px-5 text-[13.5px] font-semibold text-canvas transition-opacity hover:opacity-90"
+                  className="h-11 rounded-md bg-ink px-5 text-[15px] font-semibold text-canvas transition-opacity hover:opacity-90"
                 >
                   {t("Keep editing")}
                 </button>
@@ -386,7 +418,7 @@ export function ThemeStudio({ seed, onClose }: { seed?: ThemePreset; onClose: ()
           </div>
         </div>
       )}
-    </>,
+    </div>,
     document.body,
   );
 }

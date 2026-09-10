@@ -1,6 +1,12 @@
 import { safeFetch, safeFetchBytes } from "@/lib/safe-fetch";
 import { isBlockedUrl } from "@/lib/privacy/blocklist";
+import { SUBTITLE_PUBLIC_NETWORK_HEADER } from "@/lib/subtitles/provider-url";
 import type { PluginGrpcOpts, PluginGrpcResult, PluginHttpOpts, PluginHttpResult } from "./types";
+
+export type PluginHttpPolicy = {
+  publicOnly?: boolean;
+  maxBytes?: number;
+};
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_TIMEOUT = 45_000;
@@ -314,7 +320,11 @@ function parseGrpcFrames(bytes: Uint8Array): {
   return { messages, trailers };
 }
 
-export async function runPluginHttp(url: string, opts: PluginHttpOpts): Promise<PluginHttpResult> {
+export async function runPluginHttp(
+  url: string,
+  opts: PluginHttpOpts,
+  policy?: PluginHttpPolicy,
+): Promise<PluginHttpResult> {
   const target = assertSafeUrl(url);
   const method = (opts.method || "GET").toUpperCase();
   const timeout = Math.min(Math.max(opts.timeoutMs || DEFAULT_TIMEOUT, 1_000), MAX_TIMEOUT);
@@ -334,7 +344,14 @@ export async function runPluginHttp(url: string, opts: PluginHttpOpts): Promise<
     signal: AbortSignal.timeout(timeout),
   };
   if (typeof opts.body === "string" && method !== "GET" && method !== "HEAD") init.body = opts.body;
-  const res = await safeFetch(target, init);
+  const res = policy?.publicOnly
+    ? await safeFetchBytes(
+        target,
+        { ...init, headers: { ...headers, [SUBTITLE_PUBLIC_NETWORK_HEADER]: "1" } },
+        timeout,
+        Math.min(policy.maxBytes ?? MAX_BYTES, MAX_BYTES),
+      )
+    : await safeFetch(target, init);
   const bytes = await readCapped(res);
   const body = opts.responseType === "base64" ? toBase64(bytes) : new TextDecoder().decode(bytes);
   return { status: res.status, ok: res.ok, headers: pickHeaders(res.headers), body };

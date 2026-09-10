@@ -61,7 +61,7 @@ export function PeopleHero({
   const showSecondary = source === "harbor" || source === "consensus";
 
   return (
-    <section className="relative isolate min-h-[360px] overflow-hidden sm:min-h-[440px] lg:min-h-[560px]">
+    <section className="harbor-people-hero relative isolate min-h-[360px] overflow-hidden sm:min-h-[440px] lg:min-h-[560px]">
       <PeopleHeroBackdrop stills={person.stills ?? []} fallback={bg} seed={String(person.id)} />
 
       <div className="hero-reveal relative max-w-[46rem] px-12 pb-10 pt-40">

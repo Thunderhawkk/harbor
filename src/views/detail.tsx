@@ -183,6 +183,9 @@ import { AnilistComments } from "./detail/anilist-comments";
 import { stremioIdToTraktTarget } from "@/lib/trakt/ids";
 import type { IdResolution } from "@/lib/trakt/ids";
 import { searchAnime } from "@/lib/search";
+import { useTraktRelated } from "@/lib/providers/trakt-related";
+
+const NO_METAS: Meta[] = [];
 
 function parseYear(v: string | number | undefined | null): number {
   if (v == null) return 0;
@@ -979,8 +982,23 @@ export function DetailView({
   const rating = isAnime ? malRating : (imdbRatingValue ?? detail?.rating ?? meta.imdbRating);
   const runtime = detail?.runtime;
   const genres = detail?.genres ?? meta.genres ?? [];
-  const recommendations = detail?.recommendations ?? [];
-  const similar = detail?.similar ?? [];
+  const tmdbRecommendations = detail?.recommendations ?? NO_METAS;
+  const similar = detail?.similar ?? NO_METAS;
+  const relatedSeedId = detail?.imdbId ?? (meta.id.startsWith("tt") ? meta.id : null);
+  const wantsRelatedFallback =
+    !isAnime && !detectingAnime && !addonNative && !loading && tmdbRecommendations.length === 0;
+  const relatedFallback = useTraktRelated(
+    wantsRelatedFallback ? relatedSeedId : null,
+    meta.type === "series" ? "show" : "movie",
+  );
+  const recommendations = useMemo(() => {
+    if (tmdbRecommendations.length > 0) return tmdbRecommendations;
+    if (relatedFallback.length === 0) return NO_METAS;
+    const taken = new Set(similar.map((m) => m.id));
+    taken.add(meta.id);
+    const rest = relatedFallback.filter((m) => !taken.has(m.id));
+    return rest.length > 0 ? rest : NO_METAS;
+  }, [tmdbRecommendations, relatedFallback, similar, meta.id]);
   const shownRecommendations = useHideAnimeMetas(recommendations);
   const shownSimilar = useHideAnimeMetas(similar);
   const liveAwards = useAwards(detail?.imdbId ?? undefined, meta.type === "series");
@@ -1229,6 +1247,17 @@ export function DetailView({
     prefetchSegments(playMeta, targetEp);
   }, [loading, isSeries, isAnime, lastPlay, animeEpisodes, cinemetaFull?.videos, playMeta]);
 
+  const episodeName = useCallback(
+    (season: number, episode: number): string | undefined => {
+      const videos = playMeta.videos ?? cinemetaFull?.videos;
+      const match = videos?.find(
+        (v) => (v.season ?? 1) === season && (v.episode ?? v.number) === episode,
+      );
+      return match?.name || match?.title || undefined;
+    },
+    [playMeta.videos, cinemetaFull?.videos],
+  );
+
   const smartPlay = useCallback(
     async (forcePicker = false) => {
       if (inSession) claimHost(true);
@@ -1338,7 +1367,11 @@ export function DetailView({
         return;
       }
       if (lastPlay) {
-        await launch({ season: lastPlay.season, episode: lastPlay.episode });
+        await launch({
+          season: lastPlay.season,
+          episode: lastPlay.episode,
+          name: episodeName(lastPlay.season, lastPlay.episode),
+        });
         return;
       }
       if (authKey) {
@@ -1361,14 +1394,14 @@ export function DetailView({
               season >= 1 &&
               episode >= 1
             ) {
-              await launch({ season, episode });
+              await launch({ season, episode, name: episodeName(season, episode) });
               return;
             }
           }
           if (item) break;
         }
       }
-      await launch({ season: 1, episode: 1 });
+      await launch({ season: 1, episode: 1, name: episodeName(1, 1) });
     },
     [
       isSeries,
@@ -1388,6 +1421,7 @@ export function DetailView({
       authKey,
       meta.id,
       detail?.imdbId,
+      episodeName,
     ],
   );
   const smartPlayLabel =

@@ -1,3 +1,5 @@
+import ebookSources from "./de/ebook-sources";
+import settingsRefinements from "./de/settings-refinements";
 import sweep from "./de/sweep";
 import used from "./de/used";
 import surfaces from "./de/surfaces";
@@ -33,8 +35,11 @@ import awards from "./de/awards";
 import bpSources from "./de/bp-sources";
 import together from "./de/together";
 import coverage from "./de/coverage";
+import plugins from "./de/plugins";
+import brands from "./de/brands";
 
 const de: Record<string, string> = {
+  ...ebookSources,
   ...sweep,
   ...used,
   ...surfaces,
@@ -70,6 +75,9 @@ const de: Record<string, string> = {
   ...bpSources,
   ...together,
   ...coverage,
+  ...settingsRefinements,
+  ...plugins,
+  ...brands,
 };
 
 export default de;

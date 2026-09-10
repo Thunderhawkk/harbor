@@ -1,5 +1,6 @@
 .ebook-library-hero {
   position: relative;
+  display: grid;
   min-height: 520px;
   overflow: hidden;
   isolation: isolate;
@@ -82,20 +83,15 @@
 }
 
 .ebook-hero-copy h1 {
-  display: -webkit-box;
   max-width: 600px;
-  overflow: hidden;
   margin: 19px 0 0;
-  margin-bottom: -0.16em;
-  padding-bottom: 0.16em;
   font-family: var(--font-book);
   font-size: clamp(38px, 3vw, 58px);
   font-weight: 400;
   letter-spacing: -0.01em;
   line-height: 1.02;
   text-wrap: wrap;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
 }
 
 .ebook-hero-byline {
@@ -292,4 +288,69 @@
   .ebook-hero-stepper button {
     transition: none;
   }
+}
+
+.ebook-hero-skeleton {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ebook-hero-skeleton span {
+  position: relative;
+  display: block;
+  border-radius: 8px;
+}
+
+.ebook-hero-sk-title {
+  height: clamp(38px, 3vw, 58px);
+  width: min(100%, 520px);
+  margin-top: 19px;
+}
+
+.ebook-hero-sk-title.is-short {
+  width: min(100%, 340px);
+  margin-top: 12px;
+}
+
+.ebook-hero-sk-byline {
+  height: 16px;
+  width: 190px;
+  margin-top: 20px;
+}
+
+.ebook-hero-sk-line {
+  height: 12px;
+  width: min(100%, 540px);
+  margin-top: 18px;
+}
+
+.ebook-hero-sk-line.is-short {
+  width: min(100%, 400px);
+  margin-top: 12px;
+}
+
+.ebook-hero-sk-meta {
+  height: 13px;
+  width: 230px;
+  margin-top: 22px;
+}
+
+.ebook-hero-skeleton .ebook-hero-sk-button {
+  height: 48px;
+  width: 168px;
+  margin-top: 24px;
+  border-radius: 999px;
+}
+
+.ebook-hero-showcase .ebook-hero-sk-book {
+  position: absolute;
+  z-index: 2;
+  top: 3%;
+  right: 8%;
+  bottom: 6%;
+  left: 8%;
+  border-radius: 6px 12px 12px 6px;
+  transform: rotateY(-14deg) rotateZ(2.5deg);
 }

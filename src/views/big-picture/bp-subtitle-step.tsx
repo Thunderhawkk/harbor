@@ -4,6 +4,8 @@ import { Play } from "@/components/icons/play-filled";
 import { Flag } from "@/components/flag";
 import { SFX } from "@/lib/sfx";
 import { languageName } from "@/lib/subtitles/language";
+import { subtitleLoadMetadataOf } from "@/lib/subtitles/provider-label";
+import { subtitleClassificationLabels } from "@/lib/subtitles/classification-labels";
 import type { SubResult } from "@/lib/subtitles/types";
 import type { PlayerSrc } from "@/lib/view";
 import { useSubtitleChoices } from "@/views/play-picker/hooks/use-subtitle-choices";
@@ -77,6 +79,7 @@ export function BpSubtitleStep({
           url: r.url,
           lang: r.lang,
           title: r.title || languageName(r.lang),
+          metadata: subtitleLoadMetadataOf(r),
         },
       });
       return;
@@ -166,7 +169,11 @@ export function BpSubtitleStep({
         </div>
         {loading && (
           <p className="flex items-center gap-[clamp(8px,0.8vw,15px)] px-[clamp(4px,0.4vw,8px)] text-[clamp(13px,1.8vh,20px)] font-medium text-ink-subtle">
-            <Loader2 size={20} className="animate-spin motion-reduce:[animation-duration:2.4s]" strokeWidth={2.2} />
+            <Loader2
+              size={20}
+              className="animate-spin motion-reduce:[animation-duration:2.4s]"
+              strokeWidth={2.2}
+            />
             {t("Finding subtitles…")}
           </p>
         )}
@@ -248,8 +255,7 @@ export function BpSubtitleStep({
 function trackDetail(r: SubResult, t: (k: string) => string): string {
   const parts: string[] = [r.source];
   if (r.format) parts.push(r.format.toUpperCase());
-  if (r.hearingImpaired) parts.push(t("HI/SDH"));
-  if (r.forced) parts.push(t("Forced"));
+  parts.push(...subtitleClassificationLabels(r, t, "compact").map(({ label }) => label));
   return parts.filter(Boolean).join(" · ");
 }
 

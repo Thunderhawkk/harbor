@@ -1,9 +1,8 @@
-import { Waves } from "lucide-react";
+import { Info } from "./icons";
 import { useState } from "react";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { Section, ToggleRow } from "./shared";
-import { SettingRow } from "./kit";
+import { ROW_DESC, Section, ToggleRow } from "./shared";
 import { isTauri } from "./player-panel/internals";
 import { SvpSection } from "./anime-panel/svp-section";
 import { MotionCompare } from "./anime-panel/motion-compare";
@@ -18,7 +17,7 @@ export function AnimePanel() {
   useSubTabs(
     isTauri
       ? [
-          { id: "smooth", label: t("Smooth motion") },
+          { id: "smooth", label: t("Motion") },
           { id: "svp", label: t("SVP") },
         ]
       : [],
@@ -32,8 +31,11 @@ export function AnimePanel() {
         title={t("Desktop only")}
         subtitle={t("Smooth motion runs on the bundled mpv engine in the Harbor desktop app. It has no effect in the browser.")}
       >
-        <div className="rounded-md bg-elevated px-4 py-3.5 text-[13px] leading-relaxed text-ink-subtle">
-          {t("Download the desktop app to use anime enhancements.")}
+        <div className="flex items-start gap-2.5 rounded-[10px] bg-elevated px-4 py-3">
+          <Info size={18} className="mt-[2px] shrink-0 text-ink-subtle" />
+          <p className={`max-w-[66ch] ${ROW_DESC}`}>
+            {t("Download the desktop app to use anime enhancements.")}
+          </p>
         </div>
       </Section>
     );
@@ -47,29 +49,20 @@ export function AnimePanel() {
         <>
       <Section
         title={t("Smooth motion")}
-        subtitle={t("Anime is drawn on twos and threes, so fast pans can judder. Smoothing fills in the gaps so motion glides.")}
       >
         <ToggleRow
           label={t("Motion smoothing")}
-          sub={t("Harbor's built-in frame interpolation. Smooths panning, best on anime. Needs a display refresh rate above the video's frame rate, and can stutter on weak GPUs. Lighter than SVP.")}
+          sub={t("Smooths camera movement using Harbor's player. Works best when your screen refreshes faster than the video's frame rate.")}
           value={settings.playerMotionInterp}
           onChange={(v) => update({ playerMotionInterp: v })}
           lockReason={
             svpDriving
-              ? t("SVP is already handling frame interpolation. Turn off SVP below to use this instead. Running both delays the audio.")
+              ? t("SVP is handling motion smoothing. Turn it off on the SVP page to use Harbor's smoothing instead.")
               : undefined
           }
         />
 
-        <SettingRow
-          wide
-          icon={<Waves size={16} />}
-          label={t("Before and after")}
-          desc={t("The same camera pan on each setting. The lit lane is what you get right now.")}
-          tip={t("Interpolation invents frames between the drawn ones, so a pan travels in many small moves instead of a few big jumps.")}
-        >
-          <MotionCompare smoothed={svpDriving || settings.playerMotionInterp} />
-        </SettingRow>
+        <MotionCompare />
       </Section>
         </>
       )}

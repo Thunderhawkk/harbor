@@ -147,8 +147,13 @@ export function useStreamSwitcher(params: {
       setLiveUrl(playUrl);
       setLiveHistoryUrl(r.data.url);
       setLiveStreamRef({
+        resolvedFilename:
+          r.data.filename ??
+          stream.behaviorHints?.filename ??
+          stream.behaviorHints?.fileName ??
+          null,
         infoHash: stream.infoHash ?? null,
-        fileIdx: stream.fileIdx ?? null,
+        fileIdx: r.data.fileIdx ?? stream.fileIdx ?? null,
         addonId: stream.addonId ?? null,
         title: stream.title ?? null,
         parsedTitle: stream.parsedTitle ?? null,
@@ -166,7 +171,7 @@ export function useStreamSwitcher(params: {
           src.meta.id,
           {
             infoHash: stream.infoHash ?? null,
-            fileIdx: stream.fileIdx ?? null,
+            fileIdx: r.data.fileIdx ?? stream.fileIdx ?? null,
             addonId: stream.addonId ?? null,
             url: r.data.url,
             title: src.meta.name,

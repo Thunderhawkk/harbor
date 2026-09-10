@@ -1,39 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { AudioLines, Server } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { Section, ToggleRow } from "./shared";
-import { ModalButton, SettingGroup, SettingRow, SettingsModal, Nested } from "./kit";
-
-const SPEECH: ReadonlyArray<readonly [number, number]> = [
-  [1, 12],
-  [19, 8],
-  [32, 16],
-  [55, 10],
-  [70, 7],
-  [82, 14],
-];
-const DRIFT = 5;
-
-function SyncTrack({ label, shift, lit }: { label: string; shift: number; lit?: boolean }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-[52px] shrink-0 text-[10.5px] font-bold uppercase tracking-[0.16em] text-ink-subtle">
-        {label}
-      </span>
-      <span className="relative h-2.5 min-w-0 flex-1">
-        {SPEECH.map(([left, width], i) => (
-          <span
-            key={i}
-            aria-hidden
-            className={`absolute top-0 h-full rounded-full ${lit ? "bg-ink" : "bg-raised"}`}
-            style={{ insetInlineStart: `${left + shift}%`, width: `${width}%` }}
-          />
-        ))}
-      </span>
-    </div>
-  );
-}
+import { ROW_DESC, Section, ToggleRow } from "./shared";
+import { ModalButton, ROW_ACTION, SettingGroup, SettingRow, SettingsModal, Nested } from "./kit";
 
 export function AutoSyncPanel() {
   const t = useT();
@@ -45,6 +14,7 @@ export function AutoSyncPanel() {
   const [urlDraft, setUrlDraft] = useState(settings.communitySyncUrl);
   const [urlSaved, setUrlSaved] = useState(false);
   const [serverOpen, setServerOpen] = useState(false);
+  const [urlError, setUrlError] = useState(false);
   const savedTimer = useRef<number | null>(null);
   const flashSaved = () => {
     setUrlSaved(true);
@@ -60,10 +30,20 @@ export function AutoSyncPanel() {
 
   const openServer = () => {
     setUrlDraft(settings.communitySyncUrl);
+    setUrlError(false);
     setServerOpen(true);
   };
-  const closeServer = () => {
+  const saveServer = () => {
     const next = urlDraft.trim();
+    if (next) {
+      try {
+        const url = new URL(next);
+        if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) throw new Error('Invalid URL');
+      } catch {
+        setUrlError(true);
+        return;
+      }
+    }
     if (next !== storedUrl) {
       update({ communitySyncUrl: next });
       flashSaved();
@@ -71,12 +51,17 @@ export function AutoSyncPanel() {
     setServerOpen(false);
   };
 
+  const serverDesc = urlSaved
+    ? t("Saved.")
+    : storedUrl ||
+      t("Harbor uses its own community server. You can point it at a server you run yourself.");
+
   return (
-    <>
+    <div className="hset-form-page">
       <Section
         title={t("Subtitle auto-sync")}
         subtitle={t(
-          "Harbor times out-of-sync subtitles to the audio for you, on any external subtitle. It works on the mpv player and leaves embedded tracks alone, since those are already in sync.",
+          "Match downloaded subtitles to the audio in the mpv player. Embedded subtitle tracks keep their existing timing.",
         )}
       >
         <ToggleRow
@@ -88,28 +73,13 @@ export function AutoSyncPanel() {
           onChange={(v) => update({ subtitleAutoSync: v })}
         />
 
-        <SettingRow
-          wide
-          icon={<AudioLines size={16} />}
-          label={t("How it works")}
-          desc={t(
-            "Harbor reads the speech in the audio, then slides the subtitle track until the two line up.",
-          )}
-        >
-          <div className="flex w-full flex-col gap-2.5 rounded-md bg-canvas px-4 py-4">
-            <SyncTrack label={t("Speech")} shift={0} />
-            <SyncTrack label={t("Before")} shift={DRIFT} />
-            <SyncTrack label={t("After")} shift={0} lit />
-          </div>
-        </SettingRow>
-
         {master && (
           <Nested>
             <SettingGroup label={t("While auto-sync is on")}>
               <ToggleRow
-                label={t("Let structural tiers auto-apply")}
+                label={t("Apply audio-based corrections automatically")}
                 sub={t(
-                  "Identity matches from content hashing and the community database always apply on their own. Timing worked out from the audio only offers a fix until it has earned trust. Turn this on to let those audio-derived fixes apply automatically too.",
+                  "Apply timing corrections estimated from the audio automatically. Leave off to review these suggestions yourself. Verified exact matches still apply automatically.",
                 )}
                 value={settings.autoSyncApplyStructural}
                 onChange={(v) => update({ autoSyncApplyStructural: v })}
@@ -130,6 +100,14 @@ export function AutoSyncPanel() {
                 value={settings.subtitleAutoSyncAsr}
                 onChange={(v) => update({ subtitleAutoSyncAsr: v })}
               />
+              <ToggleRow
+                label={t("Match subtitles across languages (experimental)")}
+                sub={t(
+                  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.",
+                )}
+                value={settings.subtitleAutoSyncPivot}
+                onChange={(v) => update({ subtitleAutoSyncPivot: v })}
+              />
             </SettingGroup>
           </Nested>
         )}
@@ -138,7 +116,7 @@ export function AutoSyncPanel() {
       <Section
         title={t("Community sync")}
         subtitle={t(
-          "A good correction only has to be found once. Harbor can share verified fixes so the next person with the same file and subtitle gets an instant result. Records are keyed by salted fingerprints, never your files or anything personal.",
+          "Find and share verified timing corrections for matching video and subtitle files. Turn on Private mode to stop community lookups and contributions.",
         )}
       >
         <ToggleRow
@@ -155,66 +133,65 @@ export function AutoSyncPanel() {
           }
         />
 
-        <SettingGroup label={t("Server and privacy")}>
-          <SettingRow
-            icon={<Server size={16} />}
-            label={t("Community sync server")}
-            desc={urlSaved ? t("Saved") : storedUrl || t("Harbor's own community server")}
-            tip={t(
-              "Leave blank to use Harbor's own community server. Enter a URL to point at your own server instead. Private mode below stops all contact either way.",
-            )}
-          >
-            <button
-              type="button"
-              onClick={openServer}
-              className="harbor-press-pop flex h-9 shrink-0 items-center rounded-md bg-raised px-3.5 text-[12.5px] font-medium text-ink-muted transition-colors hover:text-ink"
-            >
-              {storedUrl ? t("Change server") : t("Use my own server")}
-            </button>
-          </SettingRow>
-          <ToggleRow
-            label={t("Private mode")}
-            sub={t(
-              "Never contact the community server in either direction. Nothing is looked up and nothing is contributed from this device.",
-            )}
-            value={priv}
-            onChange={(v) => update({ communitySyncOptOut: v })}
-          />
-        </SettingGroup>
+        <SettingRow
+          label={t("Community sync server")}
+          desc={serverDesc}
+          tip={t(
+            "Leave blank to use Harbor's own community server. Enter a URL to point at your own server instead. Private mode below stops all contact either way.",
+          )}
+        >
+          <button type="button" onClick={openServer} className={ROW_ACTION}>
+            {storedUrl ? t("Change server") : t("Use my own server")}
+          </button>
+        </SettingRow>
+        <ToggleRow
+          label={t("Private mode")}
+          sub={t(
+            "Never contact the community server in either direction. Nothing is looked up and nothing is contributed from this device.",
+          )}
+          value={priv}
+          onChange={(v) => update({ communitySyncOptOut: v })}
+        />
 
         <SettingsModal
           open={serverOpen}
-          onClose={closeServer}
+          onClose={() => setServerOpen(false)}
           title={t("Community sync server")}
           sub={t(
             "Leave this blank to use Harbor's own community server, or enter the address of a server you run yourself.",
           )}
-          actions={<ModalButton onClick={closeServer}>{t("Save")}</ModalButton>}
+          actions={<>
+            <ModalButton ghost onClick={() => setServerOpen(false)}>{t("Cancel")}</ModalButton>
+            <ModalButton onClick={saveServer}>{t("Save")}</ModalButton>
+          </>}
         >
-          <SettingRow
-            wide
-            icon={<Server size={16} />}
-            label={t("Server address")}
-            desc={t("Private mode stops all contact with this server in either direction.")}
-          >
+          <div className="flex flex-col gap-2.5">
             <input
               type="url"
+              aria-label={t("Server address")}
+              aria-invalid={urlError}
               value={urlDraft}
-              onChange={(e) => setUrlDraft(e.target.value)}
+              onChange={(e) => { setUrlDraft(e.target.value); setUrlError(false); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  closeServer();
+                  saveServer();
                 }
               }}
               placeholder={t("https://sync.harbor.site")}
               spellCheck={false}
               autoComplete="off"
-              className="h-11 w-full min-w-0 rounded-md bg-canvas px-3.5 text-[13px] text-ink outline-none transition-colors placeholder:text-ink-subtle focus:bg-surface"
+              className="h-11 w-full min-w-0 max-w-[520px] rounded-[10px] border border-edge-soft bg-elevated px-4 text-[16.5px] text-ink outline-none placeholder:text-ink-subtle/55 focus-visible:border-edge focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             />
-          </SettingRow>
+            {urlError && <p role="alert" className="text-[15px] text-danger">
+              {t("Enter a full http:// or https:// address, or leave blank to use Harbor's server.")}
+            </p>}
+            <p className={`max-w-[70ch] ${ROW_DESC}`}>
+              {t("Private mode stops all contact with this server in either direction.")}
+            </p>
+          </div>
         </SettingsModal>
       </Section>
-    </>
+    </div>
   );
 }

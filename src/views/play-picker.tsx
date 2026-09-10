@@ -25,7 +25,7 @@ import { buildMatchScores, matchBadge, MATCH_CLOSE } from "@/lib/together/source
 import { HostSourceBanner } from "@/components/host-source-banner";
 import { HoverTooltip } from "@/components/hover-tooltip";
 import { StreamModeToggle } from "@/components/stream-mode-toggle";
-import { isP2pStream } from "@/lib/streams/cached";
+import { filterStreamsByMode } from "@/lib/streams/mode";
 import { consumeRecentStubEvent } from "@/lib/dead-streams";
 import { peekCachedLogo, resolveLogo } from "@/lib/logo";
 import {
@@ -341,14 +341,7 @@ export function PlayPicker({
           /^(kitsu|mal|anilist|anidb):/.test(meta.id) ? null : (episode?.season ?? null),
         )
       : result.picker.all;
-    let all = candidatePool;
-    if (settings.streamMode === "addons") {
-      const addonsOnly = all.filter((s) => !isP2pStream(s));
-      if (addonsOnly.length > 0) all = addonsOnly;
-    } else if (settings.streamMode === "p2p") {
-      const p2pOnly = all.filter((s) => isP2pStream(s));
-      if (p2pOnly.length > 0) all = p2pOnly;
-    }
+    let all = filterStreamsByMode(candidatePool, settings.streamMode);
     if (langFilter && preferredLangs.length > 0) {
       const langFiltered = all.filter((s) => streamMatchesLangs(s, preferredLangs));
       if (langFiltered.length > 0) all = langFiltered;
@@ -1079,6 +1072,15 @@ export function PlayPicker({
           />
         )}
 
+        {!isDownload && result && result.picker.all.length > 0 && (
+          <div className="flex justify-end">
+            <StreamModeToggle
+              mode={settings.streamMode}
+              onChange={(mode) => update({ streamMode: mode })}
+            />
+          </div>
+        )}
+
         {(settings.pickerLayout === "stremio" || isDownload) &&
         filteredPicker &&
         filteredPicker.all.length > 0 ? (
@@ -1132,10 +1134,6 @@ export function PlayPicker({
                 debrids={debrids}
                 langFilterSlot={
                   <div className="ml-auto flex items-center gap-2">
-                    <StreamModeToggle
-                      mode={settings.streamMode}
-                      onChange={(m) => update({ streamMode: m })}
-                    />
                     {uncachedHiddenCount > 0 && (
                       <CachedFilterPill
                         on={cachedOnly}

@@ -1,4 +1,7 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Sound descriptions": "Mô tả âm thanh",
+  "Hide sound effects and speaker names": "Ẩn hiệu ứng âm thanh và tên người nói",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Xóa các mô tả trong ngoặc vuông như [tiếng cửa kẽo kẹt] và tên người nói viết hoa như JOHN: khi phụ đề đang chạy, để một bản chỉ có phụ đề SDH vẫn đọc như hội thoại bình thường. Lời bài hát, ngoặc đơn thông thường và chữ viết không phải Latinh được giữ nguyên. Không áp dụng cho phụ đề bắt buộc và phụ đề dạng ảnh.",
   "Play from": "Phát từ",
   end: "kết thúc",
   "m:ss": "m:ss",
@@ -631,6 +634,29 @@ const coverage: Record<string, string> = {
   "On the poster": "Trên áp phích",
   Scores: "Điểm số",
   "Episode order": "Thứ tự tập",
+  "Direct/debrid": "Trực tiếp/debrid",
+  "Audio verified": "Đã xác minh bằng âm thanh",
+  "Watchlist overlaps ({n})": "Mục trùng trong danh sách xem ({n})",
+  "Favorites overlap ({n})": "Mục yêu thích trùng nhau ({n})",
+  "Addons overlap ({n})": "Tiện ích bổ sung trùng nhau ({n})",
+  "Import selected data?": "Nhập dữ liệu đã chọn?",
+  "Show direct, debrid, and peer-to-peer sources": "Hiển thị nguồn trực tiếp, debrid và ngang hàng",
+  "Prefer direct and debrid sources; keep P2P when only web links are available":
+    "Ưu tiên nguồn trực tiếp và debrid; giữ P2P khi chỉ có liên kết web",
+  "Prefer peer-to-peer torrent sources": "Ưu tiên nguồn torrent ngang hàng",
+  "Hearing impaired": "Dành cho người khiếm thính",
+  "Foreign-only": "Chỉ phần tiếng nước ngoài",
+  "Machine-translated": "Dịch bằng máy",
+  "Direct/debrid only": "Chỉ trực tiếp/debrid",
+  "Match subtitles across languages (experimental)": "Khớp phụ đề giữa các ngôn ngữ (thử nghiệm)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "Khi âm thanh và phụ đề dùng ngôn ngữ khác nhau, Harbor so sánh với phụ đề cùng bản phát hành bằng ngôn ngữ âm thanh. Harbor chỉ đề xuất bản sửa trừ khi mọi kiểm tra an toàn đều đã được đo.",
+  "New York Times": "New York Times",
+  "Bestseller lists in the eBook section.": "Danh sách sách bán chạy trong mục eBook.",
+  "New York Times · bestseller lists": "New York Times · danh sách bán chạy",
+  "NYT Books API key": "Khóa API NYT Books",
+  "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
+    "Chọn Harbor ưu tiên nguồn trực tiếp và debrid, torrent ngang hàng hay hiển thị cả hai.",
 };
 
 export default coverage;

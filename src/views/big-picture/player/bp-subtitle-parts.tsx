@@ -4,6 +4,7 @@ import { providerLabel, releaseOf } from "@/lib/subtitles/provider-label";
 import { subtitleTrackLanguageLabel } from "@/lib/subtitles/track-label";
 import type { SubResult } from "@/lib/subtitles/types";
 import { SFX } from "@/lib/sfx";
+import { subtitleClassificationLabels } from "@/lib/subtitles/classification-labels";
 
 export type BpSubT = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -17,21 +18,27 @@ export const ROW_FIX = {
   containIntrinsicSize: "auto 92px",
 } as const;
 
-export const HIDE_BAR = "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+export const HIDE_BAR =
+  "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 const RAIL = `flex shrink-0 items-center gap-[clamp(8px,0.75vw,15px)] overflow-x-auto py-[clamp(10px,1.3vh,20px)] ${HIDE_BAR}`;
-const CHIP = "flex h-[clamp(44px,5vh,60px)] shrink-0 items-center gap-[clamp(6px,0.5vw,10px)] rounded-full px-[clamp(15px,1.3vw,25px)] text-[clamp(14px,1.95vh,23px)] font-bold transition-colors duration-[var(--bp-dur-fast)]";
+const CHIP =
+  "flex h-[clamp(44px,5vh,60px)] shrink-0 items-center gap-[clamp(6px,0.5vw,10px)] rounded-full px-[clamp(15px,1.3vw,25px)] text-[clamp(14px,1.95vh,23px)] font-bold transition-colors duration-[var(--bp-dur-fast)]";
 const CHIP_ON = "bg-[var(--bp-on)] text-ink";
 const CHIP_OFF = "border border-[var(--bp-edge-2)] text-ink";
-export const LABEL = "shrink-0 pe-[clamp(6px,0.6vw,12px)] text-[clamp(11.5px,1.5vh,17px)] font-bold uppercase tracking-[0.16em] text-ink-subtle";
+export const LABEL =
+  "shrink-0 pe-[clamp(6px,0.6vw,12px)] text-[clamp(11.5px,1.5vh,17px)] font-bold uppercase tracking-[0.16em] text-ink-subtle";
 export const MUTED = "text-[clamp(13px,1.8vh,20px)] font-medium text-ink-subtle";
 // line-clamp sets display:-webkit-box, so it can never share a class with the
 // flex status lines. Two consts, never one.
 export const NOTE = `flex items-center gap-[clamp(8px,0.8vw,15px)] ${MUTED}`;
-const LINE = "group flex min-w-0 flex-1 items-center gap-[clamp(13px,1.3vw,24px)] rounded-[var(--bp-r-md)] border px-[clamp(15px,1.4vw,26px)] py-[clamp(12px,1.5vh,20px)] text-start text-ink transition-colors duration-[var(--bp-dur-fast)]";
+const LINE =
+  "group flex min-w-0 flex-1 items-center gap-[clamp(13px,1.3vw,24px)] rounded-[var(--bp-r-md)] border px-[clamp(15px,1.4vw,26px)] py-[clamp(12px,1.5vh,20px)] text-start text-ink transition-colors duration-[var(--bp-dur-fast)]";
 const LINE_ON = "border-transparent bg-[var(--bp-glass)]";
 const LINE_OFF = "border-[var(--bp-edge)] bg-[var(--bp-panel)]";
-const DISC = "flex h-[clamp(44px,5vh,60px)] w-[clamp(44px,5vh,60px)] shrink-0 items-center justify-center rounded-full bg-[var(--bp-panel-2)] group-data-[bp-focus=true]:bg-[var(--bp-void)]/25";
-const BADGE = "shrink-0 rounded-full bg-[var(--bp-glass)] px-[clamp(8px,0.7vw,13px)] py-[3px] text-[clamp(10.5px,1.35vh,15px)] font-bold uppercase tracking-[0.12em] group-data-[bp-focus=true]:bg-[var(--bp-void)]/25";
+const DISC =
+  "flex h-[clamp(44px,5vh,60px)] w-[clamp(44px,5vh,60px)] shrink-0 items-center justify-center rounded-full bg-[var(--bp-panel-2)] group-data-[bp-focus=true]:bg-[var(--bp-void)]/25";
+const BADGE =
+  "shrink-0 rounded-full bg-[var(--bp-glass)] px-[clamp(8px,0.7vw,13px)] py-[3px] text-[clamp(10.5px,1.35vh,15px)] font-bold uppercase tracking-[0.12em] group-data-[bp-focus=true]:bg-[var(--bp-void)]/25";
 export const SPIN = "animate-spin motion-reduce:animate-none";
 
 export function Row({ children }: { children: React.ReactNode }) {
@@ -96,7 +103,11 @@ export function Stepper({
   return (
     <>
       <span className={LABEL}>{label}</span>
-      <Chip label="-" ariaLabel={t("Decrease {name}", { name: label })} onPress={() => onStep(-1)} />
+      <Chip
+        label="-"
+        ariaLabel={t("Decrease {name}", { name: label })}
+        onPress={() => onStep(-1)}
+      />
       <Chip label={value} ariaLabel={t("Reset {name}", { name: label })} onPress={onReset} />
       <Chip label="+" ariaLabel={t("Increase {name}", { name: label })} onPress={() => onStep(1)} />
     </>
@@ -177,11 +188,16 @@ export function resultDetail(r: SubResult, t: BpSubT): string {
   return parts.join(" · ");
 }
 
-export function tagsOf(x: { hearingImpaired?: boolean; forced?: boolean }, t: BpSubT): string[] {
-  const out: string[] = [];
-  if (x.forced) out.push(t("Forced"));
-  if (x.hearingImpaired) out.push(t("HI/SDH"));
-  return out;
+export function tagsOf(
+  x: {
+    hearingImpaired?: boolean;
+    forced?: boolean;
+    foreignOnly?: boolean;
+    machineTranslated?: boolean;
+  },
+  t: BpSubT,
+): string[] {
+  return subtitleClassificationLabels(x, t, "compact").map(({ label }) => label);
 }
 
 export function offsetLabel(delaySec: number, t: BpSubT): string {

@@ -1,4 +1,4 @@
-import { Music } from "lucide-react";
+import { Music } from "./icons";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
 import type { ProfileAudioMode } from "@/lib/settings/types";
@@ -20,7 +20,8 @@ export function ProfileAudioSetting() {
       subtitle={t("People can pin a track to their profile. This controls what happens when you visit one.")}
     >
       <SettingRow
-        icon={<Music size={16} strokeWidth={2} />}
+        wide
+        icon={<Music size={18} strokeWidth={2} />}
         label={t("When you open a profile")}
         desc={
           settings.profileAudio === "off"

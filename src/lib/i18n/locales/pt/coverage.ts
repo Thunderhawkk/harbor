@@ -1,4 +1,7 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Sound descriptions": "Descrições de som",
+  "Hide sound effects and speaker names": "Ocultar efeitos sonoros e nomes de personagens",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Remove descrições entre colchetes como [porta a ranger] e nomes de personagens em maiúsculas como JOHN: enquanto as legendas passam, para que um lançamento que só traz uma faixa SDH continue a ler-se como diálogo normal. Letras de músicas, parênteses normais e escritas não latinas ficam intactos. Não se aplica a faixas forçadas nem a faixas de imagem.",
   "Play from": "Tocar de",
   end: "fim",
   "m:ss": "m:ss",
@@ -632,6 +635,20 @@ const coverage: Record<string, string> = {
   "On the poster": "Na capa",
   Scores: "Notas",
   "Episode order": "Ordem dos episódios",
+  "Watchlist overlaps ({n})": "Itens em comum na lista para assistir ({n})",
+  "Favorites overlap ({n})": "Favoritos em comum ({n})",
+  "Addons overlap ({n})": "Addons em comum ({n})",
+  "Import selected data?": "Importar os dados selecionados?",
+  "Show direct, debrid, and peer-to-peer sources": "Mostrar fontes diretas, debrid e ponto a ponto",
+  "Prefer direct and debrid sources; keep P2P when only web links are available":
+    "Preferir fontes diretas e debrid; manter P2P quando apenas links da web estiverem disponíveis",
+  "Prefer peer-to-peer torrent sources": "Preferir fontes de torrent ponto a ponto",
+  "New York Times": "New York Times",
+  "Bestseller lists in the eBook section.": "Listas de best-sellers na seção de eBooks.",
+  "New York Times · bestseller lists": "New York Times · listas de best-sellers",
+  "NYT Books API key": "Chave da API NYT Books",
+  "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
+    "Escolha se o Harbor prefere fontes diretas e debrid, torrents ponto a ponto ou mostra ambos.",
 };
 
 export default coverage;

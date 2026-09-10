@@ -198,7 +198,7 @@ export function SpotlightSection({
         onClick={() => personId != null && openPerson(personId)}
         disabled={personId == null}
         style={{ gridColumn: "span 2" }}
-        className="group relative h-[216px] w-[280px] shrink-0 overflow-hidden rounded-xl border border-edge-soft text-start transition-transform duration-300 hover:-translate-y-0.5"
+        className="harbor-spot-card group relative h-[var(--row-poster-height,216px)] w-full min-w-[280px] shrink-0 overflow-hidden rounded-xl border border-edge-soft text-start transition-transform duration-300 hover:-translate-y-0.5"
       >
         {profileUrl ? (
           <img
@@ -206,7 +206,7 @@ export function SpotlightSection({
             alt={spotlight.name}
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="harbor-spot-art absolute inset-0 h-full w-full object-cover"
             style={{ objectPosition: "center 22%" }}
           />
         ) : (
@@ -214,17 +214,17 @@ export function SpotlightSection({
         )}
         <div
           aria-hidden
-          className="absolute inset-0"
+          className="harbor-spot-scrim absolute inset-0"
           style={{
             background:
               "linear-gradient(to top, oklch(0.10 0.02 260) 0%, oklch(0.10 0.02 260 / 0.65) 36%, transparent 78%)",
           }}
         />
         <div className="absolute inset-x-4 bottom-3.5 flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
+          <span className="harbor-spot-sub text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
             {t(spotlight.sub)}
           </span>
-          <span className="font-display text-[26px] font-medium leading-[0.98] tracking-tight text-ink drop-shadow-[0_2px_18px_rgba(0,0,0,0.4)]">
+          <span className="harbor-spot-name font-display text-[26px] font-medium leading-[0.98] tracking-tight text-ink drop-shadow-[0_2px_18px_rgba(0,0,0,0.4)]">
             {spotlight.name}
           </span>
         </div>

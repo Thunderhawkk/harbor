@@ -89,6 +89,7 @@ const catalog02: Record<string, string> = {
   "Books you save will appear here": "저장한 도서가 여기에 표시됩니다",
   "Boost SDR video toward HDR": "SDR 영상을 HDR 수준으로 향상",
   Border: "테두리",
+  "Borderless window": "테두리 없는 창",
   Born: "출생",
   "Born {date}": "{date} 출생",
   "Bot token": "봇 토큰",
@@ -187,6 +188,7 @@ const catalog02: Record<string, string> = {
   "Budget exhausted, resets at midnight UTC.": "한도를 모두 사용했습니다. UTC 자정에 초기화됩니다.",
   "Buffer fill": "버퍼 채움",
   "Buffer fill brightness": "버퍼 채움 밝기",
+  "Buffer size": "버퍼 크기",
   Buffering: "버퍼링 중",
   "Buffers the whole file in the background as you watch, even while paused, so big remuxes pre-load and you can scrub a cached file with no re-buffering. Works for debrid and torrent streams. Uses more disk and bandwidth; cleared when you switch or close.":
     "시청 중이거나 일시 정지한 동안에도 전체 파일을 백그라운드에서 버퍼링합니다. 대용량 리먹스를 미리 불러오고 캐시된 파일을 재버퍼링 없이 탐색할 수 있습니다. 디브리드 및 토렌트 스트림에서 작동합니다. 디스크 공간과 대역폭을 더 사용하며, 전환하거나 닫으면 삭제됩니다.",
@@ -206,8 +208,8 @@ const catalog02: Record<string, string> = {
   "Build a source plugin": "소스 플러그인 만들기",
   "Build a theme": "테마 만들기",
   "Build from source": "소스에서 빌드",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "빌드 식별 정보입니다. bugs@harbor.site에 버그를 신고할 때 유용합니다.",
+  "Build identity. Useful when filing a bug report.":
+    "빌드 식별 정보입니다. 버그를 신고할 때 유용합니다.",
   "Build one in the studio or import a theme file first, then come back to share it.":
     "먼저 스튜디오에서 테마를 만들거나 테마 파일을 가져온 다음 다시 공유해 보세요.",
   "Build or import the updated theme first, then come back to push it as a new version.":
@@ -704,6 +706,7 @@ const catalog02: Record<string, string> = {
     "컴퓨터의 Harbor에서 AniList를 연결하면 여기서 목록을 볼 수 있습니다.",
   "Connect Discord or Telegram and Harbor posts a message when something you follow is about to drop. Hit Test to send yourself a sample first.":
     "Discord 또는 Telegram을 연결하면 팔로우한 콘텐츠의 공개가 임박했을 때 Harbor가 메시지를 보냅니다. 먼저 테스트를 눌러 샘플 메시지를 보내 보세요.",
+  "Connect Letterboxd": "Letterboxd 연결",
   "Connect MyAnimeList": "MyAnimeList 연결",
   "Connect MyAnimeList in Harbor on your computer to see your lists here.":
     "컴퓨터의 Harbor에서 MyAnimeList를 연결하면 여기서 목록을 볼 수 있습니다.",

@@ -1,3 +1,5 @@
+import ebookSources from "./es/ebook-sources";
+import settingsRefinements from "./es/settings-refinements";
 import sweep from "./es/sweep";
 import used from "./es/used";
 import extra from "./es/extra";
@@ -27,8 +29,11 @@ import manga from "./es/manga";
 import controllers from "./es/controllers";
 import bpSources from "./es/bp-sources";
 import coverage from "./es/coverage";
+import plugins from "./es/plugins";
+import brands from "./es/brands";
 
 const es: Record<string, string> = {
+  ...ebookSources,
   ...sweep,
   ...used,
   ...extra,
@@ -58,6 +63,9 @@ const es: Record<string, string> = {
   ...controllers,
   ...bpSources,
   ...coverage,
+  ...settingsRefinements,
+  ...plugins,
+  ...brands,
 };
 
 export default es;

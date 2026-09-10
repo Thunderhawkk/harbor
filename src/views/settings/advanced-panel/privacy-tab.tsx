@@ -1,8 +1,7 @@
 import harborDiscord from "@/assets/harbor-discord.svg";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { Section, ToggleRow } from "../shared";
-import { SettingGroup } from "../kit";
+import { ROW_DESC, Section, ToggleRow } from "../shared";
 import { PrivacyRow } from "../privacy-row";
 import { isTauri } from "../player-panel/internals";
 
@@ -13,7 +12,7 @@ export function PrivacyTab() {
       <Section
         title={t("Privacy")}
         subtitle={t(
-          "Harbor sends no telemetry. This also drops outbound ad, analytics, and tracker requests that addons or metadata providers try to make, before they leave your machine.",
+          "Choose whether to block requests to known advertising, analytics, and tracking services.",
         )}
       >
         <PrivacyRow />
@@ -23,7 +22,7 @@ export function PrivacyTab() {
         <Section
           title={t("Discord Rich Presence")}
           subtitle={t(
-            "Let your Discord friends see what you are watching, with the show poster and a live progress bar. Desktop only, and only your own Discord client is involved (nothing touches a Harbor server).",
+            "Control what appears on your Discord profile while you use Harbor.",
           )}
         >
           <DiscordPresenceRow />
@@ -38,7 +37,7 @@ function DiscordPresenceRow() {
   const { settings, update } = useSettings();
   const on = settings.discordRichPresence;
   return (
-    <SettingGroup>
+    <>
       <ToggleRow
         label={t("Show on Discord")}
         sub={t(
@@ -49,7 +48,7 @@ function DiscordPresenceRow() {
             src={harborDiscord}
             alt=""
             draggable={false}
-            className="h-9 w-auto shrink-0 object-contain"
+            className="h-5 w-5 shrink-0 object-contain"
           />
         }
         value={on}
@@ -75,31 +74,31 @@ function DiscordPresenceRow() {
             value={settings.discordShowWhenBrowsing}
             onChange={(discordShowWhenBrowsing) => update({ discordShowWhenBrowsing })}
           />
-          <ToggleRow
+          {!settings.discordHideTitle && <ToggleRow
             label={t("Show poster")}
             sub={t("Reveal the show or movie artwork. Off keeps the title but hides the poster.")}
             value={settings.discordShowPoster}
             onChange={(discordShowPoster) => update({ discordShowPoster })}
-          />
-          <ToggleRow
+          />}
+          {!settings.discordHideTitle && <ToggleRow
             label={t("Show elapsed time")}
             sub={t("Display the live progress bar showing how far into the title you are.")}
             value={settings.discordShowTimestamp}
             onChange={(discordShowTimestamp) => update({ discordShowTimestamp })}
-          />
+          />}
           <ToggleRow
             label={t("Watch party join button")}
             sub={t("Add a Join button with your room link while you're in a watch party.")}
             value={settings.discordShowPartyJoin}
             onChange={(discordShowPartyJoin) => update({ discordShowPartyJoin })}
           />
-          <p className="px-1 pt-1 text-[11.5px] leading-snug text-ink-subtle">
+          <p className={`max-w-[70ch] ${ROW_DESC}`}>
             {t(
-              "And for the naughty ones: browsing or rating an adult addon never shows on Discord.",
+              "Activity from adult addons is never shown on Discord.",
             )}
           </p>
         </>
       )}
-    </SettingGroup>
+    </>
   );
 }

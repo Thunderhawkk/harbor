@@ -30,7 +30,7 @@ export function BpStreamChips({
   const qualityLabel = (k: QualityKey) => (k === "all" ? t("All") : QUALITY_LABEL[k]);
   const modeLabel: Record<BpStreamMode, string> = {
     both: t("All sources"),
-    addons: t("Addons only"),
+    addons: t("Direct/debrid only"),
     p2p: t("P2P only"),
   };
   const sourceLabel =
@@ -43,7 +43,7 @@ export function BpStreamChips({
     { id: "all", label: t("All sources") },
     { id: "local", label: t("Local Library"), count: s.localFiles.length },
     { id: "media-server", label: t("Media servers"), count: s.homeServerCopies.length },
-    { id: "addons", label: t("Addons only"), count: s.total },
+    { id: "addons", label: t("Direct/debrid only"), count: s.total },
     { id: "p2p", label: t("P2P only") },
   ];
   const activeFilterName = s.customFilters.find((f) => f.id === s.activeFilterId)?.name.trim();

@@ -1,3 +1,5 @@
+import ebookSources from "./zh/ebook-sources";
+import settingsRefinements from "./zh/settings-refinements";
 import coverage from "./zh/coverage";
 import sweepA from "./zh/sweep-a";
 import sweepB from "./zh/sweep-b";
@@ -15,8 +17,11 @@ import social from "./zh/social";
 import live from "./zh/live";
 import books from "./zh/books";
 import system from "./zh/system";
+import plugins from "./zh/plugins";
+import brands from "./zh/brands";
 
 const zh: Record<string, string> = {
+  ...ebookSources,
   ...coverage,
   ...sweepA,
   ...sweepB,
@@ -34,6 +39,9 @@ const zh: Record<string, string> = {
   ...live,
   ...books,
   ...system,
+  ...settingsRefinements,
+  ...plugins,
+  ...brands,
 };
 
 export default zh;

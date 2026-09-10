@@ -181,9 +181,9 @@ export function QueueView() {
   }, [onNext, onPrev]);
 
   return (
-    <main ref={rootRef} className="min-w-0 flex-1 overflow-hidden pb-12 pt-20">
+    <main ref={rootRef} className="harbor-queue-page min-w-0 flex-1 overflow-hidden pb-12 pt-20">
       <div className="mx-auto flex h-full min-w-0 max-w-[1180px] flex-col gap-5 px-6 sm:px-12">
-        <header className="flex shrink-0 items-baseline gap-3">
+        <header className="harbor-queue-head flex shrink-0 items-baseline gap-3">
           <h1 className="font-display text-[20px] font-medium tracking-tight text-ink">
             {t("Discovery Queue")}
           </h1>
@@ -250,7 +250,7 @@ function NavArrow({
       onClick={onClick}
       disabled={disabled}
       aria-label={side === "left" ? t("Previous") : t("Next")}
-      className={`absolute top-1/2 ${
+      className={`harbor-queue-arrow absolute top-1/2 ${
         side === "left" ? "-start-5" : "-end-5"
       } z-20 grid h-20 w-20 -translate-y-1/2 place-items-center text-white/85 drop-shadow-[0_2px_9px_rgba(0,0,0,0.8)] transition-[transform,color,opacity] duration-200 ease-out hover:scale-110 hover:text-white active:scale-95 disabled:pointer-events-none disabled:opacity-20 motion-reduce:transition-none motion-reduce:hover:scale-100`}
     >
@@ -283,7 +283,7 @@ function Strip({
 
   return (
     <div className="flex flex-col gap-3">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-subtle">
+      <span className="harbor-queue-striplabel text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-subtle">
         {t("Queue")}
       </span>
       <div
@@ -299,7 +299,7 @@ function Strip({
               type="button"
               data-active={isActive}
               onClick={() => onJump(i)}
-              className={`group relative h-[112px] w-[200px] shrink-0 rounded-md transition-all duration-200 hover:z-10 hover:scale-[1.02] ${
+              className={`harbor-queue-tile group relative h-[112px] w-[200px] shrink-0 rounded-md transition-all duration-200 hover:z-10 hover:scale-[1.02] ${
                 isPast ? "opacity-50" : ""
               }`}
             >

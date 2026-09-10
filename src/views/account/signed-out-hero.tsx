@@ -1,77 +1,73 @@
-import { Palette, RefreshCw, UserRound } from "lucide-react";
-import { HarborMark } from "@/components/icons/harbor-mark";
-import { DeviceScene } from "./device-scene";
+import harborScreenshot from "@/assets/settings-preview/harbor-profile.png";
+import stremioLogo from "@/assets/stremio.png";
 import { useT } from "@/lib/i18n";
+import { Section, settingsAnchor, useSettingsActiveContext } from "@/views/settings/shared";
+import { ROW_ACTION, ROW_ACTION_PRIMARY } from "@/views/settings/kit";
 
-const PERKS = [
-  {
-    icon: <UserRound size={15} strokeWidth={2} />,
-    title: "Your handle",
-    body: "One @name that finds you across Harbor.",
-  },
-  {
-    icon: <Palette size={15} strokeWidth={2} />,
-    title: "Publish themes",
-    body: "Share what you build and see who is using it.",
-  },
-  {
-    icon: <RefreshCw size={15} strokeWidth={2} />,
-    title: "Sync everywhere",
-    body: "Settings, lists and progress follow you between machines.",
-  },
-];
-
-export function SignedOutHero({ onSignIn }: { onSignIn: () => void }) {
+export function SignedOutHero({ onSignIn }: { onSignIn: (mode: "register" | "signin") => void }) {
   const t = useT();
+  const { setActive } = useSettingsActiveContext();
   return (
-    <div className="harbor-cascade flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-6 rounded-md bg-elevated px-7 py-8">
-        <div className="flex min-w-[260px] max-w-[34ch] flex-1 flex-col items-start gap-5">
-          <span className="grid h-14 w-14 place-items-center rounded-md bg-canvas text-ink">
-            <HarborMark className="h-8 w-8" />
-          </span>
-          <div className="flex flex-col gap-2">
-            <h3 className="font-display text-[28px] font-medium leading-[1.1] tracking-tight text-ink">
-              {t("One Harbor, every screen.")}
+    <Section title={t("Harbor account")}>
+      <div className="hset-account-welcome">
+        <div className="flex min-w-0 flex-col items-start gap-6">
+          <div className="flex flex-col gap-3">
+            <h3 className="text-[28px] font-semibold leading-[34px] tracking-[-0.65px] text-ink">
+              {t("A little more you.")}
             </h3>
-            <p className="text-[13.5px] leading-relaxed text-ink-subtle">
-              {t("Your handle, your themes, your settings. Signed in once, waiting on the next machine you open.")}
+            <p className="max-w-[34ch] text-[16px] leading-[25px] text-ink-muted">
+              {t("Claim your @handle, share your themes, and make a profile of your own.")}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={onSignIn}
-              className="harbor-press-pop flex h-11 items-center rounded-md bg-ink px-5 text-[13.5px] font-semibold text-canvas"
+              onClick={() => onSignIn("register")}
+              className={ROW_ACTION_PRIMARY}
             >
               {t("Create your account")}
             </button>
             <button
               type="button"
-              onClick={onSignIn}
-              className="harbor-press-pop flex h-11 items-center rounded-md bg-canvas px-5 text-[13.5px] font-medium text-ink-muted transition-colors hover:text-ink"
+              onClick={() => onSignIn("signin")}
+              className={ROW_ACTION}
             >
-              {t("I already have one")}
+              {t("Sign in")}
             </button>
           </div>
         </div>
-        <DeviceScene />
-      </div>
-
-      <div className="grid gap-1.5 sm:grid-cols-3">
-        {PERKS.map((perk) => (
-          <div
-            key={perk.title}
-            className="harbor-perk flex flex-col gap-2.5 rounded-md bg-elevated px-4 py-4 transition-colors hover:bg-raised"
-          >
-            <span className="harbor-perk__icon grid h-9 w-9 place-items-center rounded-md bg-canvas text-ink-muted">
-              {perk.icon}
-            </span>
-            <span className="text-[13px] font-medium text-ink">{t(perk.title)}</span>
-            <span className="text-[12.5px] leading-relaxed text-ink-subtle">{t(perk.body)}</span>
+        <figure className="m-0 min-w-0">
+          <div className="relative aspect-[1005/405] overflow-hidden rounded-[12px] bg-canvas">
+            <img
+              src={harborScreenshot}
+              alt={t("Harbor profile showing watch statistics")}
+              width={1221}
+              height={849}
+              draggable={false}
+              className="pointer-events-none absolute left-[-21.4925%] top-[-15.8025%] block h-auto w-[121.4925%] max-w-none select-none"
+            />
           </div>
-        ))}
+          <figcaption className="mt-3 text-[15px] leading-[22px] text-ink-muted">
+            {t("Your profile")}
+          </figcaption>
+        </figure>
       </div>
-    </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-4 border-t border-edge-soft py-6">
+        <img src={stremioLogo} alt="" className="h-8 w-8 shrink-0 object-contain" />
+        <div className="min-w-[220px] flex-1">
+          <p className="text-[15.5px] font-medium leading-[23px] text-ink">{t("Bringing your Stremio library?")}</p>
+          <p className="mt-1 text-[15px] leading-[22px] text-ink-muted">
+            {t("Connect Stremio to bring in your library and addons.")}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={ROW_ACTION}
+          onClick={() => setActive("account", settingsAnchor("Stremio"))}
+        >
+          {t("Open Stremio settings")}
+        </button>
+      </div>
+    </Section>
   );
 }

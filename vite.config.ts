@@ -52,6 +52,7 @@ export default defineConfig(({ mode }) => {
   const android = mode === "android" || process.env.HARBOR_TARGET === "android";
   const devHost = process.env.TAURI_DEV_HOST;
   return {
+    staged: { "*": "vp check --fix" },
     plugins: [react(), tailwindcss(), silenceMediapipeSourcemap(), servePublicMediapipe()],
     clearScreen: false,
     define: {

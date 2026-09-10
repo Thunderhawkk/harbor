@@ -3,7 +3,6 @@ export type LockableTab =
   | "movies"
   | "shows"
   | "anime"
-  | "sports"
   | "liveTv"
   | "calendar"
   | "library"
@@ -17,7 +16,6 @@ export type LockableTabMeta = {
     | "movies"
     | "shows"
     | "anime"
-    | "sports"
     | "liveTv"
     | "calendar"
     | "library"
@@ -29,7 +27,6 @@ export const LOCKABLE_TABS: LockableTabMeta[] = [
   { key: "movies", label: "Movies", iconKey: "movies" },
   { key: "shows", label: "Shows", iconKey: "shows" },
   { key: "anime", label: "Anime", iconKey: "anime" },
-  { key: "sports", label: "Sports", iconKey: "sports" },
   { key: "liveTv", label: "Live TV", iconKey: "liveTv" },
   { key: "calendar", label: "Calendar", iconKey: "calendar" },
   { key: "library", label: "My Library", iconKey: "library" },
@@ -43,7 +40,6 @@ export const DEFAULT_HIDDEN: HiddenTabs = {
   movies: false,
   shows: false,
   anime: false,
-  sports: false,
   liveTv: false,
   calendar: false,
   library: false,
@@ -52,5 +48,5 @@ export const DEFAULT_HIDDEN: HiddenTabs = {
 
 export function anyTabLocked(tabs: HiddenTabs | null | undefined): boolean {
   if (!tabs) return false;
-  return Object.values(tabs).some(Boolean);
+  return LOCKABLE_TABS.some(({ key }) => Boolean(tabs[key]));
 }

@@ -4,7 +4,7 @@ import { fetchRankList, peekRankSnapshot, type HarborRankExplanation } from "@/l
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
 
-export function TopPeopleCta() {
+export function TopPeopleCta({ title }: { title?: string }) {
   const { openPeople } = useView();
   const t = useT();
   const [people, setPeople] = useState<HarborRankExplanation[]>([]);
@@ -31,7 +31,7 @@ export function TopPeopleCta() {
       <button type="button" onClick={() => openPeople({ focusSource: true })} className="group block w-full text-start">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="font-display text-[28px] font-medium leading-tight tracking-tight text-ink">
-            {t("Top People")}
+            {title ?? t("Top People")}
           </h2>
           <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-muted transition-colors group-hover:text-ink motion-reduce:transition-none">
             {t("The all-time greats")}

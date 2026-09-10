@@ -13,6 +13,8 @@ const settingsFill: Record<string, string> = {
     "Подойдёт любой id модели с console.groq.com/docs/models.",
   "Any model id from openrouter.ai/models works here, including :free variants.":
     "Подойдёт любой id модели с openrouter.ai/models, включая варианты :free.",
+  ". Works without a key at low volume; add a key for higher quotas.":
+    ". Работает без ключа при небольших объёмах; добавьте ключ для увеличения квот.",
   "SVP's files are here but its VapourSynth engine won't load ({err}). This usually means a stale VapourSynth entry or a missing Microsoft VC++ runtime. Reinstall SVP, or install the latest \"Visual C++ Redistributable (x64)\" from Microsoft, then reopen Harbor.":
     "Файлы SVP на месте, но его движок VapourSynth не загружается ({err}). Обычно это устаревшая запись VapourSynth или отсутствие среды выполнения Microsoft VC++. Переустановите SVP или установите последний «Visual C++ Redistributable (x64)» от Microsoft, затем перезапустите Harbor.",
   "Smooth motion runs on the bundled mpv engine in the Harbor desktop app. It has no effect in the browser.":
@@ -32,6 +34,10 @@ const settingsFill: Record<string, string> = {
   "Smart resync with speech recognition": "Умная пересинхронизация по распознаванию речи",
   "For the hardest files and the Try again button, Harbor transcribes a little speech on your device and lines the subtitle up to the actual words. Needs a build with the asr-whisper feature and downloads a small model the first time you use it.":
     "Для самых сложных файлов и кнопки «Повторить» Harbor распознаёт немного речи прямо на устройстве и выравнивает субтитры по реальным словам. Нужна сборка с функцией asr-whisper; при первом использовании загружается небольшая модель.",
+  "Match subtitles across languages (experimental)":
+    "Сопоставлять субтитры на разных языках (экспериментально)",
+  "When the audio and subtitle use different languages, Harbor compares a release-matched subtitle in the audio language. It only offers a fix unless every safety check is measured.":
+    "Когда язык звука и субтитров различается, Harbor сравнивает их с субтитрами для того же релиза на языке звука. Исправление лишь предлагается, пока не измерены все проверки безопасности.",
   "Community sync": "Синхронизация сообщества",
   "A good correction only has to be found once. Harbor can share verified fixes so the next person with the same file and subtitle gets an instant result. Records are keyed by salted fingerprints, never your files or anything personal.":
     "Хорошую поправку достаточно найти один раз. Harbor может делиться проверенными исправлениями, чтобы следующий человек с тем же файлом и субтитрами получил результат мгновенно. Записи привязаны к отпечаткам с солью, а не к вашим файлам или личным данным.",
@@ -279,6 +285,9 @@ const settingsFill: Record<string, string> = {
     "Настоящий полноэкранный режим занимает весь экран и скрывает панель задач. Режим «Развернуть» заполняет экран, но оставляет панель задач и заголовок окна, поэтому можно переключаться между приложениями.",
   "True fullscreen": "Настоящий полноэкранный режим",
   Maximize: "Развернуть",
+  "Borderless window": "Окно без рамки",
+  "True fullscreen covers the whole screen and hides the taskbar, but switching apps can flicker. Borderless window covers the same area with a frameless window, so alt-tab and overlays stay instant. Maximize fills the screen but keeps the taskbar and title bar.":
+    "Настоящий полноэкранный режим занимает весь экран и скрывает панель задач, но при переключении между приложениями возможно мерцание. Окно без рамки закрывает ту же область, оставаясь обычным окном, поэтому alt-tab и оверлеи срабатывают мгновенно. Режим «Развернуть» заполняет экран, но оставляет панель задач и заголовок окна.",
   "Dual subtitles": "Двойные субтитры",
   "Show a second subtitle in another language at the same time. Handy when you are learning a language: keep the one you are learning as your main subtitle, and put your own language here.":
     "Показывать одновременно вторые субтитры на другом языке. Удобно при изучении языка: оставьте изучаемый язык основными субтитрами, а родной укажите здесь.",

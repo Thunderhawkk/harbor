@@ -15,8 +15,41 @@ fn is_orphan_dir(name: &str) -> bool {
         || name == "harbor-castsubs"
 }
 
+fn sweep_prepared_subtitles_at(temp_dir: &std::path::Path, now: SystemTime) {
+    let prepared = temp_dir.join("harbor-subs").join("prepared");
+    let Ok(entries) = std::fs::read_dir(&prepared) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        let age = meta
+            .modified()
+            .ok()
+            .and_then(|modified| now.duration_since(modified).ok())
+            .unwrap_or_default();
+        if age <= ORPHAN_MAX_AGE {
+            continue;
+        }
+        if meta.is_dir() {
+            let _ = std::fs::remove_dir_all(entry.path());
+        } else {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+    let _ = std::fs::remove_dir(&prepared);
+}
+
+fn sweep_prepared_subtitles(temp_dir: &std::path::Path) {
+    sweep_prepared_subtitles_at(temp_dir, SystemTime::now());
+}
+
 pub fn sweep_temp() {
     let dir = std::env::temp_dir();
+    // Crash leftovers contain plaintext dialogue, so bound their recovery life
+    // while preserving recent files that another Harbor instance may still use.
+    sweep_prepared_subtitles(&dir);
     let entries = match std::fs::read_dir(&dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -130,6 +163,38 @@ mod tests {
         assert!(is_orphan_dir("harbor-update-0.9.121"));
         assert!(!is_orphan_dir("harbor-trailers"));
         assert!(!is_orphan_dir("hls-cache"));
+    }
+
+    #[test]
+    fn startup_sweep_removes_only_prepared_subtitle_recovery_files() {
+        let root = std::env::temp_dir().join(format!(
+            "harbor-temp-prune-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let prepared = root.join("harbor-subs").join("prepared").join("private");
+        let saved = root.join("harbor-subs").join("saved");
+        std::fs::create_dir_all(&prepared).unwrap();
+        std::fs::create_dir_all(&saved).unwrap();
+        std::fs::write(prepared.join("subtitle.srt"), b"private dialogue").unwrap();
+        std::fs::write(saved.join("kept.srt"), b"user export").unwrap();
+
+        sweep_prepared_subtitles_at(&root, SystemTime::now());
+
+        assert!(prepared.join("subtitle.srt").exists());
+        assert!(saved.join("kept.srt").exists());
+
+        sweep_prepared_subtitles_at(
+            &root,
+            SystemTime::now() + ORPHAN_MAX_AGE + Duration::from_secs(1),
+        );
+
+        assert!(!root.join("harbor-subs").join("prepared").exists());
+        assert!(saved.join("kept.srt").exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
 

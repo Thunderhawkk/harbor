@@ -18,3 +18,11 @@ test("Continue Watching keeps source selection, direct play, and details as sepa
   assert.match(continueCardSource, /const onPlay[\s\S]*?openAvailableSources\(episode, false\)/);
   assert.match(continueCardSource, /onClick=\{onOpenDetails\}/);
 });
+
+test("Continue Watching re-resolves addon metadata when authentication changes", () => {
+  assert.match(continueCardSource, /resolveMeta\(authKey,/);
+  assert.match(
+    continueCardSource,
+    /\}, \[item\._id, item\.type, item\.state\?\.video_id, authKey\]\);/,
+  );
+});

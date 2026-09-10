@@ -27,7 +27,7 @@ export {
   tmdbResolveKeywordIds,
 } from "./tmdb/tmdb-keywords";
 
-export { tmdbCompanyIdByName } from "./tmdb/tmdb-companies";
+export { tmdbCompanyIdByName, tmdbCompanyArt, type CompanyArt } from "./tmdb/tmdb-companies";
 
 export {
   tmdbMovieRow,
@@ -90,3 +90,13 @@ export {
   tmdbEpisodeGroup,
   type StoryArc,
 } from "./tmdb/tmdb-episode-groups";
+
+export { tmdbEpisodeNames } from "./tmdb/tmdb-episode-names";
+
+export {
+  applyTmdbEpisodeNames,
+  needsTmdbEpisodeNames,
+  pickEpisodeName,
+  type NamedEpisode,
+  type TmdbEpisodeText,
+} from "./tmdb/tmdb-episode-name-merge";

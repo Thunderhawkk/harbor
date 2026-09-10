@@ -55,6 +55,8 @@ pub struct MpvStartArgs {
     pub startup_profile: Option<String>,
     pub headers: Option<HashMap<String, String>>,
     pub extra_options: Option<String>,
+    pub renderer: Option<String>,
+    pub force_yuv420p: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -621,8 +623,17 @@ pub async fn mpv_start(
     }
     let use_render_api = (cfg!(target_os = "macos") || cfg!(target_os = "linux")) && want_embed;
     if !use_render_api {
-        if let Err(e) = mpv.set_property("vo", "gpu-next,") {
+        let vo = match args.renderer.as_deref() {
+            Some("gpu") => "gpu,",
+            _ => "gpu-next,",
+        };
+        if let Err(e) = mpv.set_property("vo", vo) {
             eprintln!("[harbor::mpv] vo set FAILED: {:?}", e);
+        }
+        if args.force_yuv420p.unwrap_or(false) {
+            if let Err(e) = mpv.set_property("vf-append", "format=yuv420p") {
+                eprintln!("[harbor::mpv] vf yuv420p rejected: {:?}", e);
+            }
         }
     } else {
         if let Err(e) = mpv.set_property("vo", "libmpv") {
@@ -1805,6 +1816,11 @@ pub async fn mpv_clip_save(
     } else {
         None
     };
+    let sub_filter_sdh = with_subs
+        && mpv
+            .get_property::<String>("sub-filter-sdh")
+            .map(|v| v.trim() == "yes")
+            .unwrap_or(false);
 
     let mpv_bin = crate::thumbs::locate_mpv().ok_or_else(|| "mpv binary not found".to_string())?;
     if let Some(parent) = std::path::Path::new(&out_path).parent() {
@@ -1834,6 +1850,9 @@ pub async fn mpv_clip_save(
             cmd.arg(format!("--sid={}", id));
         }
         cmd.arg("--sub-visibility=yes");
+        if sub_filter_sdh {
+            cmd.arg("--sub-filter-sdh=yes");
+        }
     } else {
         cmd.arg("--sid=no").arg("--no-sub");
     }
@@ -2049,29 +2068,77 @@ fn normalize_subtitle_bytes(
     text.trim_start_matches('\u{feff}').as_bytes().to_vec()
 }
 
-fn extract_subtitle_from_zip(bytes: &[u8]) -> Option<Vec<u8>> {
+const SUBTITLE_NETWORK_LIMIT: usize = 12 * 1024 * 1024;
+const SUBTITLE_ARCHIVE_LIMIT: u64 = 32 * 1024 * 1024;
+const SUBTITLE_ENTRY_LIMIT: u64 = 4 * 1024 * 1024;
+const SUBTITLE_ARCHIVE_ENTRIES: usize = 100;
+
+fn is_zip_magic(bytes: &[u8]) -> bool {
+    bytes.len() >= 4
+        && (&bytes[..4] == b"PK\x03\x04"
+            || &bytes[..4] == b"PK\x05\x06"
+            || &bytes[..4] == b"PK\x07\x08")
+}
+
+fn extract_subtitle_from_zip(bytes: &[u8]) -> Result<Vec<u8>, String> {
     const SUB_EXTS: &[&str] = &["srt", "ass", "ssa", "vtt", "sub"];
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).ok()?;
-    let mut best: Option<(usize, u64)> = None;
+    const ARCHIVE_EXTS: &[&str] = &["zip", "rar", "7z", "gz", "tgz", "bz2", "xz", "tar"];
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|_| "invalid subtitle archive".to_string())?;
+    if archive.len() > SUBTITLE_ARCHIVE_ENTRIES {
+        return Err("subtitle archive has too many entries".to_string());
+    }
+    let mut best: Option<(usize, u64, String)> = None;
+    let mut total_size = 0u64;
     for i in 0..archive.len() {
-        let entry = archive.by_index(i).ok()?;
+        let entry = archive
+            .by_index(i)
+            .map_err(|_| "invalid subtitle archive entry")?;
+        let safe_path = entry
+            .enclosed_name()
+            .ok_or_else(|| "unsafe subtitle archive path".to_string())?;
+        if safe_path.is_absolute() {
+            return Err("unsafe absolute subtitle archive path".to_string());
+        }
         if entry.is_dir() {
             continue;
         }
-        let name = entry.name().to_ascii_lowercase();
+        total_size = total_size.saturating_add(entry.size());
+        if total_size > SUBTITLE_ARCHIVE_LIMIT {
+            return Err("subtitle archive inflated size limit exceeded".to_string());
+        }
+        let name = safe_path.to_string_lossy().to_ascii_lowercase();
         let ext = name.rsplit('.').next().unwrap_or("");
+        if ARCHIVE_EXTS.contains(&ext) {
+            return Err("nested subtitle archive rejected".to_string());
+        }
         if SUB_EXTS.contains(&ext) {
             let size = entry.size();
-            if best.is_none_or(|(_, best_size)| size > best_size) {
-                best = Some((i, size));
+            if size > SUBTITLE_ENTRY_LIMIT {
+                return Err("subtitle archive entry size limit exceeded".to_string());
+            }
+            if best.as_ref().is_none_or(|(_, best_size, best_name)| {
+                size > *best_size || (size == *best_size && name < *best_name)
+            }) {
+                best = Some((i, size, name));
             }
         }
     }
-    let (idx, _) = best?;
-    let mut file = archive.by_index(idx).ok()?;
+    let (idx, _, _) = best.ok_or_else(|| "subtitle archive is empty".to_string())?;
+    let mut file = archive
+        .by_index(idx)
+        .map_err(|_| "invalid subtitle archive entry")?;
     let mut out = Vec::with_capacity(file.size() as usize);
-    std::io::Read::read_to_end(&mut file, &mut out).ok()?;
-    Some(out)
+    let mut limited = std::io::Read::take(&mut file, SUBTITLE_ENTRY_LIMIT + 1);
+    std::io::Read::read_to_end(&mut limited, &mut out)
+        .map_err(|_| "subtitle archive extraction failed".to_string())?;
+    if out.len() as u64 > SUBTITLE_ENTRY_LIMIT {
+        return Err("subtitle archive entry size limit exceeded".to_string());
+    }
+    if is_zip_magic(&out) {
+        return Err("nested subtitle archive rejected".to_string());
+    }
+    Ok(out)
 }
 
 fn prepare_subtitle_download(
@@ -2089,7 +2156,25 @@ fn prepare_subtitle_download(
 
 #[cfg(test)]
 mod subtitle_download_tests {
-    use super::{normalize_subtitle_bytes, prepare_subtitle_download, subtitle_extension};
+    use super::{
+        extract_subtitle_from_zip, normalize_subtitle_bytes, prepare_subtitle_download,
+        subtitle_extension, SUBTITLE_ARCHIVE_ENTRIES,
+    };
+    use std::io::{Cursor, Write};
+
+    fn make_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut archive = zip::ZipWriter::new(&mut cursor);
+            let options = zip::write::SimpleFileOptions::default();
+            for (name, body) in entries {
+                archive.start_file(*name, options).unwrap();
+                archive.write_all(body).unwrap();
+            }
+            archive.finish().unwrap();
+        }
+        cursor.into_inner()
+    }
 
     #[test]
     fn uses_explicit_ass_format_when_download_url_has_no_extension() {
@@ -2176,6 +2261,52 @@ mod subtitle_download_tests {
         assert_eq!(extension, "ass");
         assert_eq!(String::from_utf8(normalized).unwrap(), text);
     }
+
+    #[test]
+    fn safe_zip_rejects_traversal_and_nested_archives() {
+        let traversal = make_zip(&[("../escape.srt", b"subtitle")]);
+        assert!(extract_subtitle_from_zip(&traversal)
+            .unwrap_err()
+            .contains("unsafe subtitle archive path"));
+
+        let nested = make_zip(&[("nested.zip", b"PK\x03\x04")]);
+        assert!(extract_subtitle_from_zip(&nested)
+            .unwrap_err()
+            .contains("nested subtitle archive"));
+
+        let disguised = make_zip(&[("nested.srt", b"PK\x03\x04")]);
+        assert!(extract_subtitle_from_zip(&disguised)
+            .unwrap_err()
+            .contains("nested subtitle archive"));
+    }
+
+    #[test]
+    fn safe_zip_caps_entries_and_requires_a_subtitle() {
+        let names: Vec<String> = (0..=SUBTITLE_ARCHIVE_ENTRIES)
+            .map(|index| format!("file-{index}.txt"))
+            .collect();
+        let entries: Vec<(&str, &[u8])> = names
+            .iter()
+            .map(|name| (name.as_str(), b"x".as_slice()))
+            .collect();
+        assert!(extract_subtitle_from_zip(&make_zip(&entries))
+            .unwrap_err()
+            .contains("too many entries"));
+
+        let empty = make_zip(&[("readme.txt", b"nothing")]);
+        assert!(extract_subtitle_from_zip(&empty)
+            .unwrap_err()
+            .contains("archive is empty"));
+    }
+
+    #[test]
+    fn safe_zip_extracts_a_supported_subtitle_deterministically() {
+        let archive = make_zip(&[("b.srt", b"large subtitle"), ("a.srt", b"large subtitle")]);
+        assert_eq!(
+            extract_subtitle_from_zip(&archive).unwrap(),
+            b"large subtitle"
+        );
+    }
 }
 
 #[tauri::command]
@@ -2191,7 +2322,7 @@ pub async fn sub_download(
         .gzip(true)
         .build()
         .map_err(|e| format!("client: {}", e))?;
-    let res = client
+    let mut res = client
         .get(&url)
         .header(
             "User-Agent",
@@ -2204,24 +2335,43 @@ pub async fn sub_download(
     if !res.status().is_success() {
         return Err(format!("status {}", res.status()));
     }
+    if res
+        .content_length()
+        .is_some_and(|size| size > SUBTITLE_NETWORK_LIMIT as u64)
+    {
+        return Err("subtitle download size limit exceeded".to_string());
+    }
     let ct = res
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_lowercase());
-    let raw = res.bytes().await.map_err(|e| format!("read: {}", e))?;
-    let unpacked: Vec<u8> = if raw.len() >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
+    let mut raw = Vec::new();
+    while let Some(chunk) = res.chunk().await.map_err(|e| format!("read: {}", e))? {
+        if raw.len().saturating_add(chunk.len()) > SUBTITLE_NETWORK_LIMIT {
+            return Err("subtitle download size limit exceeded".to_string());
+        }
+        raw.extend_from_slice(&chunk);
+    }
+    let was_gzip = raw.len() >= 2 && raw[0] == 0x1f && raw[1] == 0x8b;
+    let unpacked: Vec<u8> = if was_gzip {
         let mut decoder = flate2::read::GzDecoder::new(&raw[..]);
         let mut decoded = Vec::with_capacity(raw.len() * 4);
-        decoder
+        std::io::Read::take(&mut decoder, SUBTITLE_ARCHIVE_LIMIT + 1)
             .read_to_end(&mut decoded)
             .map_err(|e| format!("gunzip: {}", e))?;
+        if decoded.len() as u64 > SUBTITLE_ARCHIVE_LIMIT {
+            return Err("subtitle archive inflated size limit exceeded".to_string());
+        }
         decoded
     } else {
         raw.to_vec()
     };
-    let unpacked = if unpacked.len() >= 4 && &unpacked[..4] == b"PK\x03\x04" {
-        extract_subtitle_from_zip(&unpacked).unwrap_or(unpacked)
+    if was_gzip && is_zip_magic(&unpacked) {
+        return Err("nested subtitle archive rejected".to_string());
+    }
+    let unpacked = if is_zip_magic(&unpacked) {
+        extract_subtitle_from_zip(&unpacked)?
     } else {
         unpacked
     };
@@ -2561,6 +2711,11 @@ fn position_embedded_mpv_child(app: &AppHandle, css: MpvGeometry) -> Result<(), 
     }
 
     let found = state.mpv_hwnds;
+    // A silent no-op here looks identical to a video that is playing but hidden, so say when
+    // there was nothing to position at all.
+    if found.is_empty() {
+        eprintln!("[harbor::mpv] no mpv child window to position");
+    }
     if let Some(&first) = found.first() {
         for &leftover in found.iter().skip(1) {
             let target = HWND(leftover as *mut _);

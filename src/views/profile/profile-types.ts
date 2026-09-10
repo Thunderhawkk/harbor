@@ -2,6 +2,7 @@ import type { FeaturedList } from "@/lib/social/featured-lists";
 import type { SocialKey } from "@/lib/social/socials";
 import type { RatingsSummary } from "@/lib/ratings/types";
 import type { FavoriteMedia } from "@/lib/providers/favorites-types";
+import type { PresenceStatus } from "@/lib/social/presence";
 
 export type SocialEntry = { service: SocialKey; value: string };
 
@@ -71,6 +72,7 @@ export type ProfileSummary = {
   pronouns?: string;
   customUrl?: string;
   online: boolean;
+  presence?: PresenceStatus;
   watching?: ProfileWatching;
   memberSince: string;
   counts: ProfileCounts;
@@ -85,6 +87,7 @@ export type ProfileSummary = {
     music?: FavoriteMedia[];
   };
   simkl?: SimklPublished | null;
+  letterboxd?: LetterboxdPublished | null;
   socials?: ResolvedSocial[];
   audioUrl?: string;
   minecraftName?: string;
@@ -125,13 +128,28 @@ export type SimklPublished = {
   } | null;
 };
 
+export type LetterboxdPublishedList = {
+  id: string;
+  name: string;
+  filmCount?: number;
+};
+
+export type LetterboxdPublished = {
+  username: string | null;
+  displayName: string | null;
+  profileUrl: string | null;
+  listCount: number;
+  filmCount: number;
+  lists: LetterboxdPublishedList[];
+};
+
 export type Friend = {
   handle: string;
   alias: string;
   avatarUrl?: string;
   slogan?: string;
   online: boolean;
-  presence?: string;
+  presence?: PresenceStatus;
   status?: string;
   mutual?: boolean;
 };

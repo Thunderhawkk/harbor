@@ -9,6 +9,7 @@ import { buildDebridClients } from "@/lib/debrid/registry";
 import type { DebridStore } from "@/lib/debrid/types";
 import { loadEffective } from "@/lib/settings/profile-store";
 import type { Settings } from "@/lib/settings";
+import { loadStreamPlugins, pluginAddons, setStreamPluginConfig } from "@/lib/streams/plugins";
 
 export type AutoDlContext = {
   settings: Settings;
@@ -91,6 +92,11 @@ async function gatherStreamAddons(authKey: string | null, settings: Settings): P
     } else {
       list.push(torbox);
     }
+  }
+  if (settings.pluginsEnabled && settings.pluginsBackground) {
+    await loadStreamPlugins();
+    setStreamPluginConfig({ tmdbKey: settings.tmdbKey });
+    list.push(...pluginAddons({ enabled: true, groupByRepo: settings.pluginsGroupByRepo }));
   }
   return list;
 }
