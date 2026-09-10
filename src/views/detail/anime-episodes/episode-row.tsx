@@ -8,12 +8,18 @@ import type { KitsuEpisode } from "@/lib/providers/kitsu";
 import { useSettings } from "@/lib/settings";
 import { SPOILER_TEXT_CLASS, SPOILER_THUMB_CLASS, type SpoilerMask } from "@/lib/spoilers";
 import { animeSeasonKey } from "./anime-season-key";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useView } from "@/lib/view";
 import { useT } from "@/lib/i18n";
 import { FillerBadge, UpcomingBadge } from "../badges";
 import { EpisodeRatingBadge } from "../episode-rating-badge";
 import { EpisodeDownloadButton } from "../episode-download-button";
 import { isUpcomingDate } from "../helpers";
+
+function partDisplaySeason(metaId: string, sourceMetaId?: string): number | null {
+  return splitFranchiseDisplaySeason(parseKitsuId(sourceMetaId ?? metaId));
+}
 
 export function AnimeEpisodeRow({
   meta,
@@ -117,7 +123,7 @@ export function AnimeEpisodeRow({
             <span>
               {[
                 showSeason
-                  ? `S${ep.imdbSeason ?? ep.seasonNumber ?? 1} · E${ep.number}`
+                  ? `S${partDisplaySeason(meta.id, ep.sourceMetaId) ?? (ep.imdbSeason ?? ep.seasonNumber ?? 1)} · E${ep.number}`
                   : `E${ep.number}`,
                 ep.absoluteNumber && ep.absoluteNumber !== ep.number ? `Abs E${ep.absoluteNumber}` : null,
                 ep.length ? t("{n} min", { n: ep.length }) : null,

@@ -18,6 +18,8 @@ import {
   type QueueItem,
 } from "@/lib/queue";
 import type { PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 
 function runtimeMinutes(item: QueueItem): number {
   if (item.episode?.runtime) return item.episode.runtime;
@@ -39,6 +41,8 @@ function fmtTotal(mins: number): string {
 
 function episodeLabel(ep?: PlayEpisode): string | null {
   if (!ep) return null;
+  const partSeason = splitFranchiseDisplaySeason(parseKitsuId(ep.kitsuStreamId ?? ""));
+  if (partSeason != null) return `S${partSeason} · E${String(ep.episode).padStart(2, "0")}`;
   return `S${ep.imdbSeason ?? ep.season} · E${String(ep.imdbEpisode ?? ep.episode).padStart(2, "0")}`;
 }
 

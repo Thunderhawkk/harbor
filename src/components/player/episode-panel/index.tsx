@@ -18,6 +18,8 @@ import {
 } from "@/lib/perf/playback-trace";
 import type { ScoredStream } from "@/lib/streams/types";
 import { useView, type PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useQueue } from "@/lib/queue";
 import { QueueUpNext } from "./queue-up-next";
 import { playLocalAware } from "@/lib/local-library/playback";
@@ -29,6 +31,12 @@ import { StreamsView } from "./streams-view";
 import { useSeasonBrowser } from "./use-season-browser";
 
 const RESOLVE_TIMEOUT_MS = 150_000;
+
+function displayEpLabel(ep: PlayEpisode): string {
+  const part = splitFranchiseDisplaySeason(parseKitsuId(ep.kitsuStreamId ?? ""));
+  if (part != null) return `S${part} · E${String(ep.episode).padStart(2, "0")}`;
+  return `S${ep.imdbSeason ?? ep.season} · E${String(ep.imdbEpisode ?? ep.episode).padStart(2, "0")}`;
+}
 
 function sameEpisode(a: PlayEpisode, b: PlayEpisode): boolean {
   if (a.kitsuStreamId && b.kitsuStreamId) return a.kitsuStreamId === b.kitsuStreamId;
@@ -227,13 +235,13 @@ export function EpisodePanel({
       {resolvingFor && (
         <div className="pointer-events-auto absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/82 backdrop-blur-md animate-in fade-in duration-150">
           <HarborLoader size="md" caption={t("Connecting")} />
-          <p className="text-[13px] text-white/75">
-            {t("Loading {label}", {
-              label: `S${resolvingFor.imdbSeason ?? resolvingFor.season} · E${String(resolvingFor.imdbEpisode ?? resolvingFor.episode).padStart(2, "0")}${
-                resolvingFor.name ? ` · ${resolvingFor.name}` : ""
-              }`,
-            })}
-          </p>
+            <p className="text-[13px] text-white/75">
+              {t("Loading {label}", {
+                label: `${displayEpLabel(resolvingFor)}${
+                  resolvingFor.name ? ` · ${resolvingFor.name}` : ""
+                }`,
+              })}
+            </p>
           <button
             onClick={() => {
               resolveAcRef.current?.abort();
@@ -329,7 +337,7 @@ export function EpisodePanel({
                 {currentEpisode ? (
                   <p className="min-w-0 truncate text-[12.5px] text-ink-subtle">
                     {t("Now playing: {label}", {
-                      label: `S${currentEpisode.imdbSeason ?? currentEpisode.season} · E${String(currentEpisode.imdbEpisode ?? currentEpisode.episode).padStart(2, "0")}${
+                      label: `${displayEpLabel(currentEpisode)}${
                         currentEpisode.name ? ` · ${currentEpisode.name}` : ""
                       }`,
                     })}

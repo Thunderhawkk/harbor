@@ -3,6 +3,8 @@ import { Play } from "@/components/icons/play-filled";
 import type { Meta } from "@/lib/cinemeta";
 import { queueClear, queueIndexOf, queueItemAfter, queueRemove, useQueue } from "@/lib/queue";
 import { useView, type PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useT } from "@/lib/i18n";
 
 export function QueueUpNext({
@@ -43,6 +45,15 @@ export function QueueUpNext({
       {queue.map((item, i) => {
         const isCurrent = item.id === currentId;
         const isNextUp = !isCurrent && item.id === nextId;
+        const partSeason = item.episode
+          ? splitFranchiseDisplaySeason(parseKitsuId(item.episode.kitsuStreamId ?? ""))
+          : null;
+        const queueEpLabel =
+          item.episode != null
+            ? partSeason != null
+              ? `S${partSeason} · E${item.episode.episode}`
+              : `S${item.episode.imdbSeason ?? item.episode.season} · E${item.episode.imdbEpisode ?? item.episode.episode}`
+            : null;
         return (
           <div
             key={item.id}
@@ -97,9 +108,7 @@ export function QueueUpNext({
                       {t("Now Playing")}
                     </span>
                   )}
-                  {item.episode && (
-                    <span>{`S${item.episode.imdbSeason ?? item.episode.season} · E${item.episode.imdbEpisode ?? item.episode.episode}`}</span>
-                  )}
+                  {queueEpLabel && <span>{queueEpLabel}</span>}
                 </span>
               </div>
             </button>

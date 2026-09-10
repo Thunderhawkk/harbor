@@ -6,6 +6,8 @@ import { useEpisodeOrder } from "../series-episodes/use-episode-order";
 import type { PickerItem } from "../series-episodes/season-arc-picker";
 import { buildSoloAnimeOrder, buildAnimeOrder } from "./anime-order-utils";
 import { foreignAnimeProviderSeasons } from "@/lib/streams/anime-identity";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 
 export type AnimeOrder = {
   items: PickerItem[];
@@ -27,13 +29,16 @@ export function useAnimeOrder(
 ): AnimeOrder | null {
   const t = useT();
   const ordering = useEpisodeOrder(imdbId, metaId, provider, seasonType, tvdbKey, !solo);
+  const partSeason = solo ? splitFranchiseDisplaySeason(parseKitsuId(metaId)) : null;
   const built = useMemo(
     // pickLocalizedText keys its script tests by ISO-1 ("ko"), not TVDB codes ("kor").
     () =>
       solo
-        ? buildSoloAnimeOrder(episodes, t("Specials"), (s) => t("Season {n}", { n: s }))
+        ? buildSoloAnimeOrder(episodes, t("Specials"), (s) =>
+            t("Season {n}", { n: partSeason ?? s }),
+          )
         : buildAnimeOrder(ordering, episodes, t("Specials"), tmdbLanguageIso()),
-    [solo, ordering, episodes, t],
+    [solo, ordering, episodes, t, partSeason, metaId],
   );
   const [sel, setSel] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);

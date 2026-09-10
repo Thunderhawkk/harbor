@@ -3,6 +3,8 @@ import { Check, ChevronDown, Hourglass, RotateCcw } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import { SPOILER_TEXT_CLASS, SPOILER_THUMB_CLASS, type SpoilerMask } from "@/lib/spoilers";
 import type { PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useSettings } from "@/lib/settings";
 import { EpisodeRatingBadge } from "@/views/detail/episode-rating-badge";
 import { useT } from "@/lib/i18n";
@@ -38,7 +40,11 @@ export function EpisodeRow({
   const tmdbVal = episode.rating != null && episode.rating > 0 ? episode.rating : null;
   const ratingVal = imdbVal ?? tmdbVal;
   const hasMeta = !!episode.airDate || episode.runtime != null;
-  const epLabel = `S${episode.imdbSeason ?? episode.season} · E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`;
+  const partSeason = splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? ""));
+  const epLabel =
+    partSeason != null
+      ? `S${partSeason} · E${String(episode.episode).padStart(2, "0")}`
+      : `S${episode.imdbSeason ?? episode.season} · E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`;
   const hasStill = !!episode.still;
   const [imgFailed, setImgFailed] = useState(false);
   return (

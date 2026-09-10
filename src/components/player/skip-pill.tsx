@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import type { SkipSegment } from "@/lib/skip-intro";
 import type { SpoilerMask } from "@/lib/spoilers";
 import type { PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useT } from "@/lib/i18n";
 import { ThreeLiquidGlassSurface } from "@/components/ThreeLiquidGlassSurface";
 
@@ -234,9 +236,12 @@ function UpNextCard({
   const t = useT();
   const seconds = Math.max(0, Math.ceil(remainingSec));
   const progress = Math.min(1, Math.max(0, 1 - remainingSec / leadSec));
+  const partSeason = splitFranchiseDisplaySeason(parseKitsuId(ep.kitsuStreamId ?? ""));
   const epLabel =
     typeof ep.season === "number" && typeof ep.episode === "number"
-      ? `S${ep.imdbSeason ?? ep.season} · E${ep.imdbEpisode ?? ep.episode}`
+      ? partSeason != null
+        ? `S${partSeason} · E${ep.episode}`
+        : `S${ep.imdbSeason ?? ep.season} · E${ep.imdbEpisode ?? ep.episode}`
       : t("Up Next");
   const title = mask?.title ? epLabel : ep.name?.trim() || epLabel;
   const hideStill = mask?.thumb === true;

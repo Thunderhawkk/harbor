@@ -87,9 +87,10 @@ export function buildAnimeOrder(
 }
 
 // Season order for a standalone split-franchise entry (e.g. Bleach TYBW opened
-// as its own page): bucket the entry's own episodes by their AniZip provider
-// season (imdbSeason), so the cours appear as seasons without pulling in the
-// franchise root's (Bleach 2004) provider order.
+// as its own page): bucket the entry's own episodes by native season, so the
+// picker, rows and play params stay in the entry's numbering without pulling
+// in the franchise root's (Bleach 2004) provider order. Provider ids remain on
+// each episode for stream queries.
 export function buildSoloAnimeOrder(
   episodes: KitsuEpisode[],
   specialsLabel: string,
@@ -98,7 +99,7 @@ export function buildSoloAnimeOrder(
   const bySeason = new Map<number, KitsuEpisode[]>();
   const specials: KitsuEpisode[] = [];
   for (const ep of episodes) {
-    const s = ep.imdbSeason;
+    const s = ep.seasonNumber ?? ep.imdbSeason;
     if (s == null || s < 1) {
       specials.push(ep);
       continue;

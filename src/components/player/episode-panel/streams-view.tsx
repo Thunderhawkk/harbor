@@ -9,6 +9,8 @@ import { useSettings } from "@/lib/settings";
 import type { ScoredStream } from "@/lib/streams/types";
 import { hasCachedMarker } from "@/lib/streams/cached";
 import type { PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useAddons } from "@/views/play-picker/use-addons";
 import { useAnimeAltTitles } from "@/views/play-picker/use-anime-alt-titles";
 import { useImdbId } from "@/views/play-picker/use-imdb-id";
@@ -90,7 +92,11 @@ export function StreamsView({
   }, [result, addons, isCached]);
 
   const totalStreams = result?.picker.all.length ?? 0;
-  const epLabel = `S${episode.imdbSeason ?? episode.season} · E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`;
+  const partSeason = splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? ""));
+  const epLabel =
+    partSeason != null
+      ? `S${partSeason} · E${String(episode.episode).padStart(2, "0")}`
+      : `S${episode.imdbSeason ?? episode.season} · E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`;
 
   return (
     <>

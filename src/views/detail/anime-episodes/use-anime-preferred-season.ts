@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { getEpisodeProgress } from "@/lib/episode-progress";
 import { manualWatchedState } from "@/lib/manual-watched";
 import type { KitsuEpisode } from "@/lib/providers/kitsu";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { lastPlayedEpisode } from "@/lib/resume";
 import { animeSeasonKey } from "./anime-season-key";
 
@@ -24,9 +26,14 @@ export function useAnimePreferredSeason({
 }): string | null {
   return useMemo(() => {
     if (episodes.length === 0) return null;
+    const partScoped =
+      splitFranchiseDisplaySeason(parseKitsuId(metaId)) != null ||
+      (trackId ? splitFranchiseDisplaySeason(parseKitsuId(trackId)) != null : false);
     const played = lastPlayedEpisode(metaId) ?? (trackId ? lastPlayedEpisode(trackId) : null);
     const playedEp = played != null ? episodes.find((e) => e.number === played.episode) : undefined;
-    const playedSeason = playedEp?.imdbSeason ?? playedEp?.seasonNumber ?? null;
+    const playedSeason = partScoped
+      ? (playedEp?.seasonNumber ?? playedEp?.imdbSeason ?? null)
+      : (playedEp?.imdbSeason ?? playedEp?.seasonNumber ?? null);
     let maxSeason = 1;
     for (const ep of episodes) {
       const isCurrent = ep.sourceMetaId == null;
@@ -67,7 +74,9 @@ export function useAnimePreferredSeason({
         );
         if (alt.watched) progress = alt;
       }
-      const seasonNo = ep.imdbSeason ?? ep.seasonNumber ?? 1;
+      const seasonNo = partScoped
+        ? (ep.seasonNumber ?? ep.imdbSeason ?? 1)
+        : (ep.imdbSeason ?? ep.seasonNumber ?? 1);
       if (seasonNo > maxSeason) maxSeason = seasonNo;
       if (!progress.watched) {
         if (playedSeason != null && seasonNo < playedSeason) continue;
