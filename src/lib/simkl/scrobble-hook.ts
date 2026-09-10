@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useSimkl } from "./provider";
 import { simklScrobble, buildBody, type ScrobbleInfo } from "./scrobble";
-import { addToHistory, markEpisodesWatched } from "./history";
-import { resolveSimklEpisodeTarget, stremioIdToSimklTarget } from "./ids";
+import { recordPendingWatch } from "./pending-sync";
+import { recordWatchedFallback } from "./record-watched";
 import { getPlaybackPosition } from "@/lib/player/playback-clock";
 import { useSettings } from "@/lib/settings";
 import type { PlayerSrc } from "@/lib/view";
@@ -71,6 +71,9 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
       const progress = Math.min(100, Math.max(0, progressRef.current, live));
       const action = progress >= WATCHED_MARK_PCT ? "stop" : "pause";
       sendBeacon(a.metaId, a.episode, action === "stop" ? 100 : progress, action, a.info);
+      if (action === "stop") {
+        recordPendingWatch(a.metaId, a.episode, a.info?.imdb);
+      }
       lastActionRef.current = action;
     };
     window.addEventListener("pagehide", onPageHide);
@@ -84,7 +87,9 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
       if (enabled && lastActionRef.current !== "stop") {
         if (prevProgress >= WATCHED_MARK_PCT) {
           sendBeacon(prev.metaId, prev.episode, 100, "stop", prev.info);
-          void recordWatchedFallback(prev.metaId, prev.episode, prev.info);
+          void recordWatchedFallback(prev.metaId, prev.episode, prev.info).then((ok) => {
+            if (!ok) recordPendingWatch(prev.metaId, prev.episode, prev.info?.imdb);
+          });
         } else if (prevProgress > 0) {
           void simklScrobble("pause", prev.metaId, prev.episode, prevProgress, prev.info);
         }
@@ -113,7 +118,11 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
             : 100;
         sendBeacon(metaId, src.episode, endPct, "stop", infoRef.current);
         if (endPct >= WATCHED_MARK_PCT) {
-          void recordWatchedFallback(metaId, src.episode, infoRef.current);
+          const ep = src.episode;
+          const info = infoRef.current;
+          void recordWatchedFallback(metaId, ep, info).then((ok) => {
+            if (!ok) recordPendingWatch(metaId, ep, info?.imdb);
+          });
         }
         lastActionRef.current = "stop";
       }
@@ -156,6 +165,9 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
         const progress = Math.min(100, Math.max(progressRef.current, live));
         const action = progress >= WATCHED_MARK_PCT ? "stop" : "pause";
         sendBeacon(a.metaId, a.episode, action === "stop" ? 100 : progress, action, a.info);
+        if (action === "stop") {
+          recordPendingWatch(a.metaId, a.episode, a.info?.imdb);
+        }
         lastActionRef.current = action;
       } else {
         lastActionRef.current = "pause";
@@ -199,24 +211,4 @@ function sendBeacon(
   }
 }
 
-/**
- * Directly records the finished item in Simkl's watch history as a fallback,
- * because the beacon is fire-and-forget and would otherwise leave the item
- * stuck in "watching" if its request is ever lost.
- */
-async function recordWatchedFallback(
-  metaId: string,
-  episode: PlayerSrc["episode"] | undefined,
-  info?: ScrobbleInfo,
-): Promise<void> {
-  const r = stremioIdToSimklTarget(metaId, episode);
-  const t = r.ok
-    ? r.target
-    : episode
-      ? await resolveSimklEpisodeTarget(metaId, episode, info?.imdb)
-      : null;
-  if (!t) return;
-  if (t.kind === "episode") await markEpisodesWatched(t.show.ids, t.season, [t.number]);
-  else if (t.kind === "anime-episode") await markEpisodesWatched(t.anime.ids, t.season, [t.number]);
-  else await addToHistory(t);
-}
+

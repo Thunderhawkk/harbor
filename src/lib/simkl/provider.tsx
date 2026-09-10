@@ -18,6 +18,9 @@ import {
 import { getSession, setSession, subscribeSession } from "./session";
 import { stremioIdToSimklTarget } from "./ids";
 import { addToHistory } from "./history";
+import { armOnlineFlush, flushPendingWatches } from "./pending-sync";
+import { recordWatchedFallback } from "./record-watched";
+import { simklScrobble } from "./scrobble";
 import type { SimklPin, SimklSession, SimklTarget } from "./types";
 
 export type ConnectState =
@@ -65,6 +68,21 @@ export function SimklProvider({ children }: { children: ReactNode }) {
       pollHandleRef.current?.cancel();
     };
   }, []);
+
+  useEffect(
+    () =>
+      armOnlineFlush({
+        hasSession: () => getSession() != null,
+        stopScrobble: (metaId, episode) => simklScrobble("stop", metaId, episode, 100),
+        recordWatched: (metaId, episode, imdb) =>
+          recordWatchedFallback(metaId, episode, imdb ? { imdb } : undefined),
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    if (session) void flushPendingWatches().catch(() => {});
+  }, [session]);
 
   const beginConnect = useCallback(async () => {
     pollHandleRef.current?.cancel();

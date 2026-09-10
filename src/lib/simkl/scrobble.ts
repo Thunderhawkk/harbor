@@ -10,12 +10,14 @@ export async function simklScrobble(
   episode: EpisodeRef,
   progress: number,
   info?: ScrobbleInfo,
-): Promise<void> {
+): Promise<boolean> {
   const body = buildBody(metaId, episode, progress, info);
-  if (!body) return;
+  if (!body) return false;
   try {
     await simklRequest(`/scrobble/${action}`, { method: "POST", body });
+    return true;
   } catch {
-    /* swallow: scrobbling is best-effort */
+    // Background-safe: live scrobble failures must never break playback.
+    return false;
   }
 }
