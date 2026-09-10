@@ -118,6 +118,29 @@ export function isScopedSplitFranchiseRoot(rootKitsuId: number | null | undefine
   return rootKitsuId === 244;
 }
 
+const SPLIT_PART_SEASON: Record<number, number> = {
+  43078: 1,
+  46903: 2,
+  48015: 3,
+  49444: 4,
+};
+
+export function splitFranchiseDisplaySeason(kitsuId: number | null | undefined): number | null {
+  if (kitsuId == null || !Number.isFinite(kitsuId)) return null;
+  return SPLIT_PART_SEASON[kitsuId] ?? null;
+}
+
+export function isForeignSplitSeason(
+  scopedSplit: boolean,
+  nativeSeason: number | null | undefined,
+  providerSeason: number | null | undefined,
+): boolean {
+  if (!scopedSplit) return false;
+  if (nativeSeason == null || nativeSeason < 1) return false;
+  if (providerSeason == null || providerSeason < 1) return false;
+  return providerSeason !== nativeSeason;
+}
+
 /**
  * One anime-lists claim: an AniDB entry occupying `season` of a shared
  * provider series, shifted by `offset` episodes within that season.

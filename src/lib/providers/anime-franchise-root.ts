@@ -2,6 +2,7 @@ import { getAnimeCwId } from "@/lib/anime-cw-ids";
 import { registerCache } from "@/lib/memory-profiler";
 import { externalToKitsu, imdbToKitsu } from "./anime-mapping";
 import { kitsuRelated, parseKitsuId } from "./kitsu";
+import { isScopedSplitFranchiseRoot } from "@/lib/streams/anime-identity-core";
 
 const MAX_WALK = 8;
 const rootCache = new Map<string, string>();
@@ -129,6 +130,13 @@ export async function franchiseRoot(id: string): Promise<string> {
 
 export function franchiseRootSync(id: string): string | null {
   return rootCache.get(id) ?? null;
+}
+
+export function isSplitFranchiseKitsu(kitsuId: number | null | undefined): boolean {
+  if (kitsuId == null || !Number.isFinite(kitsuId)) return false;
+  const root = franchiseRootSync(`kitsu:${kitsuId}`);
+  const n = root ? Number(root.split(":")[1]) : NaN;
+  return isScopedSplitFranchiseRoot(Number.isFinite(n) ? n : null);
 }
 
 export function prefetchFranchiseRoot(id: string): void {
