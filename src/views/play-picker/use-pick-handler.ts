@@ -29,6 +29,8 @@ import type { ScoredStream } from "@/lib/streams/types";
 import type { PlayInvite } from "@/lib/together/protocol";
 import { buildPlayInvite } from "@/lib/together/build-invite";
 import { type PlayEpisode, type PlayerSrc } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { openInAppBrowser, openUrl } from "@/lib/window";
 import { enqueueDownload } from "@/lib/download/downloads-store";
 import { downloadSeasonFromPack } from "@/lib/download/season-download";
@@ -42,6 +44,14 @@ import {
 } from "./picker-utils";
 
 export type ResolvingSelection = { stream: ScoredStream; p2p: boolean };
+
+function mediaSubtitle(meta: Meta, episode: PlayEpisode): string {
+  const part =
+    splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? "")) ??
+    splitFranchiseDisplaySeason(parseKitsuId(meta.id));
+  if (part != null) return `${meta.name} · S${part} · E${episode.episode}`;
+  return `${meta.name} · S${episode.imdbSeason ?? episode.season} · E${episode.imdbEpisode ?? episode.episode}`;
+}
 
 function playbackSourceClass(
   stream: ScoredStream,
@@ -367,7 +377,7 @@ export function usePickHandler({
         subtitle: episode
           ? absoluteEpisode != null
             ? `${meta.name} · E${absoluteEpisode}`
-            : `${meta.name} · S${episode.imdbSeason ?? episode.season} · E${episode.imdbEpisode ?? episode.episode}`
+            : mediaSubtitle(meta, episode)
           : meta.releaseInfo,
         notWebReady: r.data.notWebReady,
         subtitles: r.data.subtitles,

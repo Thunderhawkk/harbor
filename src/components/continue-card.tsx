@@ -338,7 +338,10 @@ export const ContinueCard = memo(function ContinueCard({
   const episodeTitle = epTitle ?? kitsuVideo?.title ?? null;
 
   const isAnimeItem = /^(kitsu|mal|anilist|anidb):/.test(item._id);
-  const cardKitsuId = parseKitsuId(item._id) ?? parseKitsuId(kitsuVideo?.id ?? "");
+  const cardKitsuId =
+    parseKitsuId(item._id) ??
+    parseKitsuId(kitsuVideo?.id ?? "") ??
+    parseKitsuId(getAnimeCwId(item._id) ?? "");
   const seasonForeignCard = isForeignSplitSeason(
     isSplitFranchiseKitsu(cardKitsuId),
     ep?.season,

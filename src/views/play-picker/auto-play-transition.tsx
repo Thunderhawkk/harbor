@@ -4,6 +4,8 @@ import type { Meta } from "@/lib/cinemeta";
 import { consumeRecentStubEvent } from "@/lib/dead-streams";
 import { useActiveKid } from "@/lib/profiles";
 import { type PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { LogoOrText } from "./logo-or-text";
 import { useT } from "@/lib/i18n";
 
@@ -59,6 +61,18 @@ export function AutoPlayTransition({
         : attemptIdx && attemptIdx > 0
           ? t("Trying source {n}", { n: attemptIdx + 1 })
           : t("Connecting");
+  const partSeason =
+    episode != null
+      ? splitFranchiseDisplaySeason(
+          parseKitsuId(episode.kitsuStreamId ?? "") ?? parseKitsuId(meta.id),
+        )
+      : null;
+  const epLabel =
+    episode != null
+      ? partSeason != null
+        ? `S${partSeason} · E${String(episode.episode).padStart(2, "0")}`
+        : `S${episode.imdbSeason ?? episode.season} · E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`
+      : null;
   return (
     <main className={`harbor-connecting fixed inset-0 z-[120] overflow-hidden ${kid ? "bg-[#0c4a6e]" : "bg-black"}`}>
       <div data-tauri-drag-region className="absolute inset-x-0 top-0 z-20 h-16" />
@@ -123,10 +137,9 @@ export function AutoPlayTransition({
           imgClass="max-h-44 w-auto max-w-[72%] animate-loader-pulse object-contain drop-shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
           textClass="animate-loader-pulse font-display text-[64px] font-medium leading-[0.96] tracking-tight text-white drop-shadow-[0_18px_45px_rgba(0,0,0,0.7)]"
         />
-        {episode && (
+        {episode && epLabel && (
           <p className="text-[12.5px] font-semibold uppercase tracking-[0.32em] text-white/70">
-            S{episode.imdbSeason ?? episode.season} · E
-            {String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}
+            {epLabel}
             {episode.name ? ` · ${episode.name}` : ""}
           </p>
         )}

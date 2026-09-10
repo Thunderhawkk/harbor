@@ -92,7 +92,9 @@ export function StreamsView({
   }, [result, addons, isCached]);
 
   const totalStreams = result?.picker.all.length ?? 0;
-  const partSeason = splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? ""));
+  const partSeason =
+    splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? "")) ??
+    splitFranchiseDisplaySeason(parseKitsuId(meta.id));
   const epLabel =
     partSeason != null
       ? `S${partSeason} · E${String(episode.episode).padStart(2, "0")}`

@@ -32,8 +32,10 @@ import { useSeasonBrowser } from "./use-season-browser";
 
 const RESOLVE_TIMEOUT_MS = 150_000;
 
-function displayEpLabel(ep: PlayEpisode): string {
-  const part = splitFranchiseDisplaySeason(parseKitsuId(ep.kitsuStreamId ?? ""));
+function displayEpLabel(ep: PlayEpisode, metaId?: string): string {
+  const part =
+    splitFranchiseDisplaySeason(parseKitsuId(ep.kitsuStreamId ?? "")) ??
+    splitFranchiseDisplaySeason(parseKitsuId(metaId ?? ""));
   if (part != null) return `S${part} · E${String(ep.episode).padStart(2, "0")}`;
   return `S${ep.imdbSeason ?? ep.season} · E${String(ep.imdbEpisode ?? ep.episode).padStart(2, "0")}`;
 }
@@ -237,7 +239,7 @@ export function EpisodePanel({
           <HarborLoader size="md" caption={t("Connecting")} />
             <p className="text-[13px] text-white/75">
               {t("Loading {label}", {
-                label: `${displayEpLabel(resolvingFor)}${
+                label: `${displayEpLabel(resolvingFor, meta.id)}${
                   resolvingFor.name ? ` · ${resolvingFor.name}` : ""
                 }`,
               })}
@@ -337,7 +339,7 @@ export function EpisodePanel({
                 {currentEpisode ? (
                   <p className="min-w-0 truncate text-[12.5px] text-ink-subtle">
                     {t("Now playing: {label}", {
-                      label: `${displayEpLabel(currentEpisode)}${
+                      label: `${displayEpLabel(currentEpisode, meta.id)}${
                         currentEpisode.name ? ` · ${currentEpisode.name}` : ""
                       }`,
                     })}
@@ -394,6 +396,7 @@ export function EpisodePanel({
                             <EpisodeRow
                               key={key}
                               episode={ep}
+                              metaId={meta.id}
                               imdbRating={imdbRatings.get(`${ep.season}:${ep.episode}`)}
                               expanded={expandedEp === key}
                               onToggle={() => setExpandedEp((cur) => (cur === key ? null : key))}

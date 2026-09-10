@@ -1,5 +1,7 @@
 import type { Meta } from "@/lib/cinemeta";
 import { useView, type PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 
@@ -19,10 +21,16 @@ export function AutoExhaustedModal({
   const { goBack } = useView();
   const t = useT();
   const title = meta.name ?? "this title";
+  const partSeason = episode
+    ? (splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? "")) ??
+      splitFranchiseDisplaySeason(parseKitsuId(meta.id)))
+    : null;
   const epSuffix = episode
     ? absoluteEpisode != null
       ? ` E${absoluteEpisode}`
-      : ` S${episode.imdbSeason ?? episode.season}E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`
+      : partSeason != null
+        ? ` S${partSeason}E${String(episode.episode).padStart(2, "0")}`
+        : ` S${episode.imdbSeason ?? episode.season}E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`
     : "";
   const subject = `Harbor: no working stream for ${title}${epSuffix}`;
   const body =

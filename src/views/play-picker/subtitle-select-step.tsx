@@ -10,6 +10,8 @@ import type { SubResult } from "@/lib/subtitles/types";
 import { useT } from "@/lib/i18n";
 import { subtitleClassificationLabels } from "@/lib/subtitles/classification-labels";
 import type { PlayEpisode, PlayerSrc } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { BackdropLayer } from "./backdrop-layer";
 import { useSubtitleChoices } from "./hooks/use-subtitle-choices";
@@ -80,7 +82,7 @@ export function SubtitleSelectStep({
     activeLang === "all"
       ? (results ?? [])
       : (groups.find((g) => g.langKey === activeLang)?.items ?? []);
-  const context = episodeContext(src.episode, src.meta.name, absoluteEpisode);
+  const context = episodeContext(src.episode, src.meta.name, absoluteEpisode, src.meta.id);
   const total = results?.length ?? 0;
 
   return (
@@ -211,12 +213,18 @@ function episodeContext(
   episode: PlayEpisode | undefined,
   name: string,
   absoluteEpisode?: number | null,
+  metaId?: string,
 ): string {
   if (!episode) return name;
+  const partSeason = splitFranchiseDisplaySeason(
+    parseKitsuId(episode.kitsuStreamId ?? "") ?? parseKitsuId(metaId ?? ""),
+  );
   const label =
     absoluteEpisode != null
       ? `E${absoluteEpisode}`
-      : `S${episode.imdbSeason ?? episode.season} · E${episode.imdbEpisode ?? episode.episode}`;
+      : partSeason != null
+        ? `S${partSeason} · E${episode.episode}`
+        : `S${episode.imdbSeason ?? episode.season} · E${episode.imdbEpisode ?? episode.episode}`;
   return episode.name ? `${name} · ${label} · ${episode.name}` : `${name} · ${label}`;
 }
 

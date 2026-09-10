@@ -24,6 +24,7 @@ export function EpisodeRow({
   watched = false,
   spoiler,
   imdbRating,
+  metaId,
 }: {
   episode: PlayEpisode;
   expanded: boolean;
@@ -33,6 +34,7 @@ export function EpisodeRow({
   watched?: boolean;
   spoiler?: SpoilerMask;
   imdbRating?: number;
+  metaId?: string;
 }) {
   const t = useT();
   const { settings } = useSettings();
@@ -40,7 +42,9 @@ export function EpisodeRow({
   const tmdbVal = episode.rating != null && episode.rating > 0 ? episode.rating : null;
   const ratingVal = imdbVal ?? tmdbVal;
   const hasMeta = !!episode.airDate || episode.runtime != null;
-  const partSeason = splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? ""));
+  const partSeason =
+    splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? "")) ??
+    splitFranchiseDisplaySeason(parseKitsuId(metaId ?? ""));
   const epLabel =
     partSeason != null
       ? `S${partSeason} · E${String(episode.episode).padStart(2, "0")}`

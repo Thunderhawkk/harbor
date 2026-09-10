@@ -46,7 +46,8 @@ export function QueueUpNext({
         const isCurrent = item.id === currentId;
         const isNextUp = !isCurrent && item.id === nextId;
         const partSeason = item.episode
-          ? splitFranchiseDisplaySeason(parseKitsuId(item.episode.kitsuStreamId ?? ""))
+          ? (splitFranchiseDisplaySeason(parseKitsuId(item.episode.kitsuStreamId ?? "")) ??
+            splitFranchiseDisplaySeason(parseKitsuId(item.meta.id)))
           : null;
         const queueEpLabel =
           item.episode != null

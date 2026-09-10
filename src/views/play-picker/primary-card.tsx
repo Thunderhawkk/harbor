@@ -72,7 +72,7 @@ export function PrimaryCard({
       ? t("{n} seeds", { n: stream.seeders })
       : part,
   );
-  const title = displayTitle(stream, meta.name, episode, absoluteEpisode);
+  const title = displayTitle(stream, meta.name, episode, absoluteEpisode, meta.id);
   const fname = settings.pickerShowFilename ? torrentFilename(stream) : "";
   const badges = settings.showQualityBadge ? streamBadges(stream) : [];
   const knownLanguages = stream.audioLanguages.filter((l) => l && l.toLowerCase() !== "unknown");

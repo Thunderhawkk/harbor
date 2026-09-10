@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronLeft, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
 import type { PlayEpisode } from "@/lib/view";
@@ -58,6 +60,11 @@ export function PickerHeader({
   episode?: PlayEpisode;
   absoluteEpisode?: number | null;
 }) {
+  const partSeason = episode
+    ? splitFranchiseDisplaySeason(
+        parseKitsuId(episode.kitsuStreamId ?? "") ?? parseKitsuId(meta.id),
+      )
+    : null;
   return (
     <header className="flex flex-col gap-3">
       {episode ? (
@@ -65,7 +72,9 @@ export function PickerHeader({
           <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-ink-subtle">
             {absoluteEpisode != null
               ? `${meta.name} · Episode ${absoluteEpisode}`
-              : `${meta.name} · Season ${episode.imdbSeason ?? episode.season} · Episode ${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`}
+              : partSeason != null
+                ? `${meta.name} · Season ${partSeason} · Episode ${String(episode.episode).padStart(2, "0")}`
+                : `${meta.name} · Season ${episode.imdbSeason ?? episode.season} · Episode ${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`}
           </p>
           <h1 className="font-display text-[64px] font-medium leading-[0.96] tracking-tight text-ink">
             {episode.name ||

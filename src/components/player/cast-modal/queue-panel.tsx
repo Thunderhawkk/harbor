@@ -39,9 +39,11 @@ function fmtTotal(mins: number): string {
   return `${m}m`;
 }
 
-function episodeLabel(ep?: PlayEpisode): string | null {
+function episodeLabel(ep?: PlayEpisode, metaId?: string): string | null {
   if (!ep) return null;
-  const partSeason = splitFranchiseDisplaySeason(parseKitsuId(ep.kitsuStreamId ?? ""));
+  const partSeason =
+    splitFranchiseDisplaySeason(parseKitsuId(ep.kitsuStreamId ?? "")) ??
+    splitFranchiseDisplaySeason(parseKitsuId(metaId ?? ""));
   if (partSeason != null) return `S${partSeason} · E${String(ep.episode).padStart(2, "0")}`;
   return `S${ep.imdbSeason ?? ep.season} · E${String(ep.imdbEpisode ?? ep.episode).padStart(2, "0")}`;
 }
@@ -228,7 +230,7 @@ export function QueuePanel({
                     <span className="line-clamp-1 text-[14px] font-medium text-white/90">
                       {ep.name || t("Episode {n}", { n: ep.episode })}
                     </span>
-                    <span className="text-[12px] text-white/45">{episodeLabel(ep)}</span>
+                    <span className="text-[12px] text-white/45">{episodeLabel(ep, currentMeta?.id)}</span>
                   </div>
                   <Play size={16} className="shrink-0 text-white/40 group-hover:text-white" fill="currentColor" />
                 </button>
@@ -289,7 +291,7 @@ export function QueuePanel({
       <div className="flex flex-col gap-2">
         {queue.map((item, i) => {
           const mins = runtimeMinutes(item);
-          const epLabel = episodeLabel(item.episode);
+          const epLabel = episodeLabel(item.episode, item.meta.id);
           return (
             <div key={item.id} className="flex flex-col gap-2">
               {dragId != null && dragId !== item.id && dropIndex === i && (

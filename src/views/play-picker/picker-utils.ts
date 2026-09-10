@@ -12,6 +12,8 @@ import type { Addon } from "@/lib/addons";
 import type { DebridSlug, ScoredStream, Stream, Tier } from "@/lib/streams/types";
 import { hasCachedMarker, hasUncachedMarker } from "@/lib/streams/cached";
 import type { PlayEpisode } from "@/lib/view";
+import { parseKitsuId } from "@/lib/providers/kitsu";
+import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 
 export async function cinemetaImdbFallback(
   name: string,
@@ -338,6 +340,7 @@ export function displayTitle(
   showName: string,
   episode?: PlayEpisode,
   absoluteEpisode?: number | null,
+  metaId?: string,
 ): string {
   const raw = s.name?.trim();
   if (raw) return raw;
@@ -350,10 +353,15 @@ export function displayTitle(
     return filename || firstLine || s.name || showName || s.parsedTitle || "";
   }
   const parts = [showName || s.parsedTitle];
+  const partSeason =
+    splitFranchiseDisplaySeason(parseKitsuId(episode.kitsuStreamId ?? "")) ??
+    splitFranchiseDisplaySeason(parseKitsuId(metaId ?? ""));
   parts.push(
     absoluteEpisode != null
       ? `E${absoluteEpisode}`
-      : `S${String(episode.imdbSeason ?? episode.season).padStart(2, "0")}E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`,
+      : partSeason != null
+        ? `S${String(partSeason).padStart(2, "0")}E${String(episode.episode).padStart(2, "0")}`
+        : `S${String(episode.imdbSeason ?? episode.season).padStart(2, "0")}E${String(episode.imdbEpisode ?? episode.episode).padStart(2, "0")}`,
   );
   if (episode.name) parts.push(episode.name);
   else if (s.episodeTitle) parts.push(s.episodeTitle);
