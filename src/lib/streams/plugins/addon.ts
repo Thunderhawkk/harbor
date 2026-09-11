@@ -99,6 +99,13 @@ export function pluginsForAddon(addon: Pick<Addon, "transportUrl">): InstalledSt
   return runnableStreamPlugins().filter((p) => p.id === id);
 }
 
+export function pluginListKey(): string {
+  return installedStreamPluginsSync()
+    .filter((p) => p.enabled && !p.repoDisabled && !p.incompatible && p.listed)
+    .map((p) => `${p.id}@${p.hash}@${settingsFingerprint(p)}`)
+    .join("|");
+}
+
 export function pluginCacheTokens(): string[] {
   return [
     `prelude:${PRELUDE_VERSION}`,

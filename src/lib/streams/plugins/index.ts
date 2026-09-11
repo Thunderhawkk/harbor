@@ -47,6 +47,7 @@ export {
   isPluginAddon,
   pluginAddons,
   pluginCacheTokens,
+  pluginListKey,
   pluginsForAddon,
   runPluginAddon,
   runnableStreamPlugins,

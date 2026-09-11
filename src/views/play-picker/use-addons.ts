@@ -11,7 +11,7 @@ import type { useSettings } from "@/lib/settings";
 import {
   loadStreamPlugins,
   pluginAddons,
-  pluginCacheTokens,
+  pluginListKey,
   setStreamPluginConfig,
   subscribeStreamPluginList,
 } from "@/lib/streams/plugins";
@@ -46,9 +46,9 @@ export function useAddons(authKey: string | null, settings: Settings): {
   const [userHasStreamAddons, setUserHasStreamAddons] = useState(false);
   const [pluginTick, setPluginTick] = useState(0);
   useEffect(() => {
-    let last = pluginCacheTokens().join("|");
+    let last = pluginListKey();
     return subscribeStreamPluginList(() => {
-      const next = pluginCacheTokens().join("|");
+      const next = pluginListKey();
       if (next === last) return;
       last = next;
       setPluginTick((n) => n + 1);

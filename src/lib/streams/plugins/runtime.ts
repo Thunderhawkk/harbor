@@ -14,7 +14,7 @@ import type {
 
 const IDLE_MS = 5 * 60_000;
 const MAX_IDLE_WORKERS = 4;
-const GLOBAL_CONCURRENCY = 12;
+const GLOBAL_CONCURRENCY = 8;
 const LOG_MAX = 200;
 const AUTO_PAUSE_FAILURES = 3;
 const READY_TIMEOUT = 10_000;

@@ -28,6 +28,9 @@ export type PluginWorkerOptions = {
 };
 
 const MAX_CONCURRENT_HTTP = 6;
+const MAX_GLOBAL_HTTP = 16;
+let globalHttpInflight = 0;
+const globalHttpQueue: Array<() => void> = [];
 const MAX_HTML_BYTES = 6 * 1024 * 1024;
 const CANCEL_ACK_MS = 250;
 
@@ -231,18 +234,22 @@ export class PluginWorker {
     }
   }
 
-  private acquireHttp(): Promise<void> {
-    if (this.httpInflight < MAX_CONCURRENT_HTTP) {
-      this.httpInflight++;
-      return Promise.resolve();
+  private async acquireHttp(): Promise<void> {
+    if (this.httpInflight >= MAX_CONCURRENT_HTTP) {
+      await new Promise<void>((resolve) => this.httpQueue.push(resolve));
     }
-    return new Promise((resolve) => this.httpQueue.push(resolve));
+    this.httpInflight++;
+    if (globalHttpInflight >= MAX_GLOBAL_HTTP) {
+      await new Promise<void>((resolve) => globalHttpQueue.push(resolve));
+    }
+    globalHttpInflight++;
   }
 
   private releaseHttp(): void {
-    const next = this.httpQueue.shift();
-    if (next) next();
-    else this.httpInflight--;
+    globalHttpInflight--;
+    globalHttpQueue.shift()?.();
+    this.httpInflight--;
+    this.httpQueue.shift()?.();
   }
 
   private onParse(id: string, html: string): void {

@@ -1,4 +1,4 @@
-import { FINAL_URL_HEADER, safeFetch, safeFetchBytes } from "@/lib/safe-fetch";
+import { FINAL_URL_HEADER, safeFetch, safeFetchBase64, safeFetchBytes } from "@/lib/safe-fetch";
 import { isBlockedUrl } from "@/lib/privacy/blocklist";
 import { SUBTITLE_PUBLIC_NETWORK_HEADER } from "@/lib/subtitles/provider-url";
 import type { PluginGrpcOpts, PluginGrpcResult, PluginHttpOpts, PluginHttpResult } from "./types";
@@ -261,6 +261,14 @@ function filterHeaders(
   return out;
 }
 
+function pickHeaderRecord(h: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(h)) {
+    if (ALLOW_RESPONSE_HEADERS.has(k.toLowerCase())) out[k] = v;
+  }
+  return out;
+}
+
 function pickHeaders(h: Headers): Record<string, string> {
   const out: Record<string, string> = {};
   h.forEach((v, k) => {
@@ -354,6 +362,18 @@ export async function runPluginHttp(
     signal: AbortSignal.timeout(timeout),
   };
   if (typeof opts.body === "string" && method !== "GET" && method !== "HEAD") init.body = opts.body;
+  if (opts.responseType === "base64" && policy?.publicOnly) {
+    const raw = safeFetchBase64(
+      target,
+      { ...init, headers: { ...headers, [SUBTITLE_PUBLIC_NETWORK_HEADER]: "1" } },
+      timeout,
+      Math.min(policy.maxBytes ?? MAX_BYTES, MAX_BYTES),
+    );
+    if (raw) {
+      const r = await raw;
+      return { status: r.status, ok: r.ok, headers: pickHeaderRecord(r.headers), body: r.body, url: r.url };
+    }
+  }
   const res = policy?.publicOnly
     ? await safeFetchBytes(
         target,

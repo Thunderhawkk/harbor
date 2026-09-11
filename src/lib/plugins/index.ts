@@ -4,6 +4,7 @@ import { assertSafeUrl } from "@/lib/manga/plugins/host-http";
 import { PluginWorker } from "@/lib/manga/plugins/worker-host";
 import { normalizeRepoUrl } from "@/lib/streams/plugins/manifest";
 import { PluginError } from "@/lib/streams/plugins/types";
+import { looksLikeAndroidExtensionRepo, looksLikeStremioAddon } from "@/lib/streams/plugins/manifest";
 import { ebookKind } from "./kinds/ebook";
 import { mangaKind } from "./kinds/manga";
 import { streamKind } from "./kinds/stream";
@@ -124,6 +125,8 @@ export async function detectRepoKind(rawUrl: string): Promise<{ kind: PluginKind
     throw new PluginError("not-a-repo");
   }
   const json = (parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}) as Record<string, unknown>;
+  if (looksLikeAndroidExtensionRepo(json, parsed)) throw new PluginError("android-extensions");
+  if (looksLikeStremioAddon(json)) throw new PluginError("stremio-addon");
   if (Array.isArray(json.scrapers)) return { kind: "stream", url };
   if (Array.isArray(parsed) && parsed.some((e) => e && typeof e === "object" && "filename" in e)) {
     return { kind: "stream", url };

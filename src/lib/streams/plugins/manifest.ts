@@ -198,6 +198,27 @@ function providerEntry(v: unknown, manifestUrl: string): StreamRepoEntry | null 
   };
 }
 
+export function looksLikeAndroidExtensionRepo(json: Record<string, unknown>, parsed: unknown): boolean {
+  if (Array.isArray(json.pluginLists)) return true;
+  const arr = Array.isArray(parsed) ? parsed : Array.isArray(json.plugins) ? json.plugins : null;
+  if (!arr) return false;
+  return arr.some((e) => {
+    if (!e || typeof e !== "object") return false;
+    const o = e as Record<string, unknown>;
+    if (typeof o.url === "string" && /\.cs3(\?|#|$)/i.test(o.url)) return true;
+    return typeof o.internalName === "string" && typeof o.apiVersion === "number";
+  });
+}
+
+export function looksLikeStremioAddon(json: Record<string, unknown>): boolean {
+  return (
+    typeof json.id === "string" &&
+    typeof json.version === "string" &&
+    Array.isArray(json.resources) &&
+    Array.isArray(json.types)
+  );
+}
+
 function looksLikeMangaRepo(json: Record<string, unknown>, parsed: unknown): boolean {
   if (str(json.type) === "manga" || str(json.type) === "ebook") return true;
   const arr = Array.isArray(parsed)
@@ -246,6 +267,8 @@ export function parseStreamRepoManifest(parsed: unknown, manifestUrl: string): P
       entries,
     };
   }
+  if (looksLikeAndroidExtensionRepo(json, parsed)) throw new PluginError("android-extensions");
+  if (looksLikeStremioAddon(json)) throw new PluginError("stremio-addon");
   if (looksLikeMangaRepo(json, parsed)) throw new PluginError("manga-repo");
   throw new PluginError("not-a-repo");
 }
