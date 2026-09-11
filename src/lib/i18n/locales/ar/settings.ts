@@ -1124,8 +1124,8 @@ const settings: Record<string, string> = {
   "Scans your Stremio library and rewrites any item whose shape doesn't match Stremio's exact schema.":
     "يفحص مكتبة Stremio ويُعيد كتابة أي عنصر لا يطابق مخطط Stremio الدقيق.",
   About: "حول",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "معلومات البناء. مفيدة عند تقديم تقرير خطأ على bugs@harbor.site.",
+  "Build identity. Useful when filing a bug report.":
+    "معلومات البناء. مفيدة عند تقديم تقرير خطأ.",
   "Reveal the show or movie artwork.": "إظهار صورة العرض أو الفيلم.",
   Legal: "إشعار قانوني",
   "Made with": "صُنع بـ",

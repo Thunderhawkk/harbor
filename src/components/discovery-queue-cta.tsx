@@ -9,7 +9,7 @@ import { useView } from "@/lib/view";
 
 const DEPTH = [12, 21, 9, 23, 14, 17];
 
-export function DiscoveryQueueCta({ items }: { items: FeedItem[] }) {
+export function DiscoveryQueueCta({ items, title }: { items: FeedItem[]; title?: string }) {
   const { settings } = useSettings();
   const { openQueue } = useView();
   const t = useT();
@@ -44,7 +44,7 @@ export function DiscoveryQueueCta({ items }: { items: FeedItem[] }) {
     <section className="flex flex-col gap-3.5">
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-[28px] font-medium leading-tight tracking-tight text-ink">
-          {t("Your Discovery Queue")}
+          {title ?? t("Your Discovery Queue")}
         </h2>
         <span className="text-[12.5px] uppercase tracking-[0.2em] text-ink-subtle">
           {t("{count} picks ready", { count: items.length })}

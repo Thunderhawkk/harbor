@@ -150,8 +150,12 @@
 }
 
 .hbk-page-by {
+  display: -webkit-box;
+  overflow: hidden;
   flex: 0 0 auto;
   margin-top: 0.45em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: color-mix(in srgb, var(--hbk-paper-ink) 62%, transparent);
   font-size: clamp(7px, calc(var(--hbk-scale, 1) * 9px), 15px);
   font-style: italic;

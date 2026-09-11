@@ -25,7 +25,6 @@ const ICONS = {
     '<circle cx="7" cy="5.6" r="2.3"/><circle cx="7" cy="18.4" r="2.3"/>' +
     '<circle cx="17" cy="8.6" r="2.3"/><path d="M7 7.9v8.2"/>' +
     '<path d="M17 10.9c0 3.3-2.6 4.3-5.7 4.8"/>',
-  mail: '<rect x="3.2" y="5.6" width="17.6" height="12.8" rx="2.4"/><path d="m4 7.2 8 5.8 8-5.8"/>',
   chat: '<path d="M20.4 14.2a2.2 2.2 0 0 1-2.2 2.2H8.6L4.6 20V5.8a2.2 2.2 0 0 1 2.2-2.2h11.4a2.2 2.2 0 0 1 2.2 2.2Z"/>',
 };
 
@@ -38,10 +37,10 @@ const LINKS = [
     url: "https://github.com/harborstremio/harbor",
   },
   {
-    icon: "mail",
+    icon: "branch",
     lead: "Bugs",
-    value: "bugs@harbor.site",
-    url: "mailto:bugs@harbor.site?subject=Harbor%20bug%20report",
+    value: "GitHub Issues",
+    url: "https://github.com/harborstremio/harbor/issues",
   },
   {
     icon: "chat",

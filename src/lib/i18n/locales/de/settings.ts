@@ -324,8 +324,8 @@ const settings: Record<string, string> = {
   "Build a new theme": "Neues Design erstellen",
   "Build a pack in any of these, export the JSON, host it as a gist, and paste the raw link below.":
     "Erstelle ein Paket mit einem dieser Tools, exportiere das JSON, stelle es als Gist bereit und füge unten den Raw-Link ein.",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "Build-Kennung. Hilfreich beim Melden eines Fehlers an bugs@harbor.site.",
+  "Build identity. Useful when filing a bug report.":
+    "Build-Kennung. Hilfreich beim Melden eines Fehlers.",
   "Build your own palette": "Eigene Farbpalette erstellen",
   "Built-in peer-to-peer streaming, served from your own machine.":
     "Integriertes P2P-Streaming, bereitgestellt von deinem eigenen Gerät.",

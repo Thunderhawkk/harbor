@@ -414,8 +414,8 @@ const settings: Record<string, string> = {
   "Build a new theme": "Yeni tema oluştur",
   "Build a pack in any of these, export the JSON, host it as a gist, and paste the raw link below.":
     "Bunlardan herhangi birinde bir paket oluşturun, JSON'u dışa aktarın, gist olarak barındırın ve ham bağlantıyı aşağıya yapıştırın.",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "Derleme kimliği. bugs@harbor.site adresine hata bildirirken işinize yarar.",
+  "Build identity. Useful when filing a bug report.":
+    "Derleme kimliği. Hata bildirirken işinize yarar.",
   "Building your voyage": "Yolculuğunuz hazırlanıyor",
   "Built on Stremio": "Stremio üzerine kuruldu",
   "Built-in peer-to-peer streaming, served from your own machine.":

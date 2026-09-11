@@ -2,7 +2,7 @@ import { detectCountry, detectCountryFromGroup } from "@/lib/iptv/country-detect
 import { hasArabic, normalizeArabic } from "@/lib/iptv/rtl";
 import type { IptvChannel } from "@/lib/iptv/types";
 import type { LeagueDef, SportsGame, SportsSide } from "@/lib/sports/espn";
-import { sportsLeagueByTag } from "@/lib/sports/provider";
+import { leagueByTag as sportsLeagueByTag } from "@/lib/sports/espn-leagues";
 import {
   BLOC,
   BRACKET_PREFIX,

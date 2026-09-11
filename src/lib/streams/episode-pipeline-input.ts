@@ -114,6 +114,14 @@ export function buildEpisodePipelineInput(params: {
       type: requestType,
       ids: streamIds,
       animeIdUnverified,
+      context: {
+        imdbId: imdbId ?? null,
+        title: meta.name,
+        year: parseInt(meta.releaseInfo ?? "", 10) || null,
+        season: effSeason ?? null,
+        episode: effEpisode ?? null,
+        absoluteEpisode: animeAbsoluteEpisode,
+      },
     },
     query: {
       type: episode ? "series" : meta.type === "series" ? "series" : "movie",

@@ -173,8 +173,8 @@ const sweepB: Record<string, string> = {
     "可使用以下任一工具制作包，导出 JSON，将其托管为 gist，然后在下方粘贴原始链接。",
   "Build a source plugin": "构建来源插件",
   "Build from source": "从源代码构建",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "版本标识。向 bugs@harbor.site 提交错误报告时很有用。",
+  "Build identity. Useful when filing a bug report.":
+    "版本标识。提交错误报告时很有用。",
   "Build your own": "打造属于你的",
   "Build your own palette": "创建自己的配色方案",
   "Building EPUB": "正在生成 EPUB",

@@ -3,7 +3,8 @@ import { ArrowLeft } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
 import type { SportsGame, SportsMatchDetail } from "@/lib/sports/espn";
-import { fetchGameSummary, sportsLeagueByTag } from "@/lib/sports/provider";
+import { fetchMatchSummary } from "@/lib/sports/espn";
+import { leagueByTag } from "@/lib/sports/espn-leagues";
 import { MatchPanel } from "@/views/sports/match-panel";
 import { WatchSources } from "@/views/sports/watch-sources";
 import { TennisMatchPanel } from "./match-detail-view/tennis-match-panel";
@@ -15,7 +16,7 @@ export function MatchDetailView({ game }: { game: SportsGame }) {
   const [loading, setLoading] = useState(true);
   const isCombat = game.league === "UFC";
   const isTennis = game.league === "ATP" || game.league === "WTA";
-  const isSoccer = sportsLeagueByTag(game.league)?.group === "soccer";
+  const isSoccer = leagueByTag(game.league)?.group === "soccer";
   const tabs = isCombat
     ? (["summary", "profile", "stats"] as const)
     : isTennis || isSoccer
@@ -26,7 +27,7 @@ export function MatchDetailView({ game }: { game: SportsGame }) {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetchGameSummary(game)
+    fetchMatchSummary(game.league, game.id)
       .then((res) => {
         if (!active) return;
         if (res) setDetail(res);

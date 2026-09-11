@@ -19,14 +19,14 @@ const LABELS: Record<BufferSizeId, string> = {
 };
 
 const DESCRIPTIONS: Record<BufferSizeId, string> = {
-  auto: "Harbor sizes the head start for each title and grows it once playback settles. Right for almost everyone.",
+  auto: "Adjusts buffering to the video and available resources. Recommended for most connections.",
   small:
-    "The quickest start and the least memory used. Good on a fast, steady connection, or on a machine that is short on memory.",
+    "Uses less memory and starts quickly. Best for a stable connection.",
   medium:
-    "A couple of minutes of head start. Rides out a brief hiccup without much of a wait before playback begins.",
+    "Reads up to two minutes ahead to cover brief connection drops.",
   large:
-    "Ten minutes of head start. Built for spotty Wi-Fi or a far-away server, at the cost of a longer wait before playback begins.",
-  max: "Half an hour of head start. Only worth it on a badly unreliable connection.",
+    "Reads up to ten minutes ahead. Uses more memory to help with an unstable connection.",
+  max: "Reads up to thirty minutes ahead. Uses the most memory and may take longer to start.",
 };
 
 export function BufferSizeSection() {
@@ -40,14 +40,17 @@ export function BufferSizeSection() {
   const stats = [
     {
       caption: t("Reads ahead"),
+      desc: t("Target amount downloaded ahead, within the memory limit."),
       readout: profile ? duration(profile.readaheadSecs) : adaptive,
     },
     {
       caption: t("Memory cap"),
+      desc: t("Maximum memory used for buffered video."),
       readout: profile ? formatBufferMemory(profile.maxBytes) : adaptive,
     },
     {
       caption: t("Wait before playing"),
+      desc: t("Amount of video buffered before playback starts. This is not a fixed loading delay."),
       readout: !profile
         ? adaptive
         : profile.pauseWaitSecs > 0
@@ -59,10 +62,11 @@ export function BufferSizeSection() {
   return (
     <Section
       title={t("Slow or unstable connection")}
-      subtitle={t("If video keeps pausing to buffer, or you're on spotty Wi-Fi or a far-away server, this gives Harbor a bigger head start so playback rides through the rough patches.")}
+      subtitle={t("Download more of a video ahead of playback to help prevent pauses on an unstable connection.")}
       newId="mpv:buffer-size"
     >
       <SettingRow
+        wide
         label={t("Buffer size")}
         desc={t(DESCRIPTIONS[value])}
         warn={
@@ -79,19 +83,13 @@ export function BufferSizeSection() {
           onChange={(v) => update({ mpvBufferSize: v })}
         />
       </SettingRow>
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-elevated px-4 py-3.5">
-        {stats.map((s) => (
-          <span
-            key={s.caption}
-            className="flex items-center gap-2.5 rounded-md bg-canvas px-3 py-1.5"
-          >
-            <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-subtle">
-              {s.caption}
-            </span>
-            <span className="text-[12.5px] font-semibold tabular-nums text-ink">{s.readout}</span>
+      {stats.map((s) => (
+        <SettingRow key={s.caption} label={s.caption} desc={s.desc}>
+          <span className="text-[15.5px] leading-[22px] tabular-nums text-ink-muted">
+            {s.readout}
           </span>
-        ))}
-      </div>
+        </SettingRow>
+      ))}
     </Section>
   );
 }

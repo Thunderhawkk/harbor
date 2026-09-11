@@ -28,7 +28,7 @@ import { resolveChromeTheme } from "@/lib/theme";
 import { sameConfig } from "./config-helpers";
 import { EditorOverlay } from "./editor-overlay";
 import { OptionsSection } from "./options-section";
-import { EditLayoutCard, FooterBar, ThemeTabs } from "./panel-bars";
+import { EditLayoutCard, ThemeTabs, usePlayerLayoutPageActions } from "./panel-bars";
 import { useChromeEdits } from "./use-chrome-edits";
 import { AdvisoryPreview } from "./advisory-preview";
 import { AdvisoryIgnoreRow } from "./advisory-ignore-row";
@@ -55,7 +55,11 @@ export function PlayerLayoutPanel() {
   const [justSaved, setJustSaved] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [profileVersion, setProfileVersion] = useState(0);
-  const bumpProfiles = useCallback(() => setProfileVersion((v) => v + 1), []);
+  const [configVersion, setConfigVersion] = useState(0);
+  const bumpProfiles = useCallback((reloadConfig = true) => {
+    setProfileVersion((v) => v + 1);
+    if (reloadConfig) setConfigVersion((v) => v + 1);
+  }, []);
 
   const profiles = useMemo(() => listProfiles(theme), [theme, profileVersion]);
   const activeProfileId = useMemo(
@@ -70,7 +74,7 @@ export function PlayerLayoutPanel() {
     setSelectedId(null);
     setSelectedPanelId(null);
     setConfirmingReset(false);
-  }, [theme, profileVersion]);
+  }, [theme, configVersion]);
 
   useEffect(() => {
     setTheme(appTheme);
@@ -166,15 +170,13 @@ export function PlayerLayoutPanel() {
         void alertDialog(t("Couldn't rename the profile. {error}", { error: res.error }));
         return;
       }
-      bumpProfiles();
+      bumpProfiles(false);
     },
     [activeProfileId, bumpProfiles],
   );
 
-  const onDeleteProfile = useCallback(async () => {
+  const onDeleteProfile = useCallback(() => {
     if (!activeProfileId) return;
-    const ok = await confirmDialog(t("Delete this profile permanently? This cannot be undone."));
-    if (!ok) return;
     const res = deleteProfileApi(activeProfileId);
     if (!res.ok) {
       void alertDialog(t("Couldn't delete the profile. {error}", { error: res.error }));
@@ -245,6 +247,15 @@ export function PlayerLayoutPanel() {
   const visibleCount = draft.controls.filter((c) => !c.hidden).length;
   const hiddenCount = draft.controls.length - visibleCount;
 
+  usePlayerLayoutPageActions({
+    dirty,
+    justSaved,
+    confirmingReset,
+    onSave,
+    onDiscard,
+    onResetAll,
+  });
+
   return (
     <div className="flex flex-col gap-10">
       <Section
@@ -263,7 +274,14 @@ export function PlayerLayoutPanel() {
         />
         <ThemeTabs
           value={theme}
-          onChange={(id) => {
+          onChange={async (id) => {
+            if (id === theme) return;
+            if (!sameConfig(draft, saved)) {
+              const ok = await confirmDialog(
+                t("You have unsaved changes that will be lost when switching player styles. Continue?"),
+              );
+              if (!ok) return;
+            }
             update({ playerChromeTheme: id });
             setTheme(id);
           }}
@@ -297,14 +315,6 @@ export function PlayerLayoutPanel() {
           onVolumeStyle={(v: VolumeStyle) =>
             setDraft((cur) => ({ ...cur, options: { ...cur.options, volumeStyle: v } }))
           }
-        />
-        <FooterBar
-          dirty={dirty}
-          justSaved={justSaved}
-          confirmingReset={confirmingReset}
-          onSave={onSave}
-          onDiscard={onDiscard}
-          onResetAll={onResetAll}
         />
       </Section>
 

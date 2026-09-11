@@ -53,7 +53,6 @@ mod cast_server;
 mod cf_relay;
 #[cfg(desktop)]
 mod cf_solver;
-mod discord_auth;
 #[cfg(desktop)]
 mod discord_rp;
 #[cfg(desktop)]
@@ -99,6 +98,8 @@ mod sub_extract;
 mod subsync;
 #[cfg(desktop)]
 mod svp;
+#[cfg(windows)]
+mod win_graphics;
 #[cfg(desktop)]
 mod thumbs;
 #[cfg(desktop)]
@@ -598,6 +599,8 @@ pub fn run() {
     svp::prime_svp_env();
     #[cfg(target_os = "linux")]
     mpv_render_linux::configure_linux_graphics();
+    #[cfg(windows)]
+    win_graphics::configure_windows_graphics();
     let _ = rustls::crypto::ring::default_provider().install_default();
     trailer::sweep_cache();
     std::thread::spawn(temp_prune::sweep_temp);
@@ -614,7 +617,6 @@ pub fn run() {
     let dvr_state = dvr::DvrState::new();
     let multiview_state = multiview::MultiviewState::new();
     let modal_overlay_state = modal_overlay::ModalOverlayState::new();
-    let discord_loopback_state = discord_auth::DiscordLoopbackState::new();
     let app_builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             use tauri::{Emitter, Manager};
@@ -663,7 +665,6 @@ pub fn run() {
         .manage(dvr_state)
         .manage(multiview_state)
         .manage(modal_overlay_state)
-        .manage(discord_loopback_state)
         .manage(discord_rp::DiscordState::new())
         .manage(download::DownloadState::new());
 
@@ -822,6 +823,8 @@ pub fn run() {
             installer_handoff::handoff_probe,
             installer_handoff::handoff_stage,
             installer_handoff::handoff_launch,
+            installer_handoff::handoff_confirm,
+            installer_handoff::handoff_save_backup,
             power::power_inhibit,
             harbor_set_webview_memory_low,
             harbor_set_webview_visible,
@@ -921,7 +924,6 @@ pub fn run() {
             mpv::mpv_stop,
             mpv::mpv_release_media,
             mpv::mpv_restore_media_surface,
-            discord_auth::discord_auth_start,
             pip::pip_open,
             pip::pip_get_session,
             pip::pip_close,
@@ -976,6 +978,7 @@ pub fn run() {
             cast_server::cast_server_status,
             cast_server::cast_server_restart,
             torrent_engine::torrent_engine_status,
+            torrent_engine::torrent_engine_set_enabled,
             torrent_engine::torrent_engine_add,
             torrent_engine::torrent_engine_select,
             torrent_engine::torrent_engine_select_set,

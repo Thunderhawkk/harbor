@@ -6,7 +6,8 @@ import { Section } from "@/views/settings/shared";
 import { RecoveryReveal } from "@/views/settings/theme-panel/custom-themes-section/author-account-panel/recovery-reveal";
 import { AccountAuthForm } from "./account-auth-form";
 import { AccountIdentityCard } from "./account-identity-card";
-import { DiscordLinkCard } from "./discord-link-card";
+import { AccountThemeCta } from "./account-theme-cta";
+import { JoinDiscordCard } from "./join-discord-card";
 import { SignedOutHero } from "./signed-out-hero";
 
 export function HarborAccountPanel() {
@@ -14,6 +15,7 @@ export function HarborAccountPanel() {
   const [author, setAuthor] = useState(currentAuthor);
   const [reveal, setReveal] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"register" | "signin">("register");
 
   useEffect(() => subscribeAuthor(() => setAuthor(currentAuthor())), []);
 
@@ -29,9 +31,9 @@ export function HarborAccountPanel() {
     return (
       <>
         {authOpen ? (
-          <AccountAuthForm inline onRecovery={setReveal} onClose={() => setAuthOpen(false)} />
+          <AccountAuthForm inline initialMode={authMode} onRecovery={setReveal} onClose={() => setAuthOpen(false)} />
         ) : (
-          <SignedOutHero onSignIn={() => setAuthOpen(true)} />
+          <SignedOutHero onSignIn={(mode) => { setAuthMode(mode); setAuthOpen(true); }} />
         )}
         {reveal && <RecoveryReveal code={reveal} onDone={() => setReveal(null)} />}
       </>
@@ -41,9 +43,8 @@ export function HarborAccountPanel() {
   return (
     <Section title={t("Harbor account")} subtitle={t("Your handle across Harbor.")}>
       <AccountIdentityCard author={author} />
-      <div className="rounded-md bg-elevated px-5 py-5">
-        <DiscordLinkCard author={author} onRecovery={setReveal} />
-      </div>
+      <JoinDiscordCard />
+      <AccountThemeCta />
       {authOpen && <AccountAuthForm onRecovery={setReveal} onClose={() => setAuthOpen(false)} />}
       {reveal && <RecoveryReveal code={reveal} onDone={() => setReveal(null)} />}
     </Section>

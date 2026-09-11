@@ -339,7 +339,7 @@ export const SANDBOX_SOURCE = String.raw`(function () {
           id: String(provider.id),
           name: String(provider.name),
           hasTags: typeof provider.tags === "function",
-          methods: ["popular", "search", "detail", "chapters", "content", "pageUrls", "tags"]
+          methods: ["popular", "search", "detail", "chapters", "content", "pageUrls", "tags", "streams", "settings"]
             .filter(function (name) { return typeof provider[name] === "function"; })
         }
       });
@@ -347,6 +347,8 @@ export const SANDBOX_SOURCE = String.raw`(function () {
       safePost({ type: "initError", error: String(err && err.stack ? err.stack : err) });
     }
   }
+
+  var cancelled = Object.create(null);
 
   function onCall(m) {
     var fn = provider ? provider[m.method] : null;
@@ -357,12 +359,19 @@ export const SANDBOX_SOURCE = String.raw`(function () {
     Promise.resolve().then(function () {
       return fn.apply(provider, Array.isArray(m.args) ? m.args : []);
     }).then(function (v) {
+      if (cancelled[m.id]) { delete cancelled[m.id]; return; }
       if (!safePost({ type: "result", id: m.id, value: v })) {
         safePost({ type: "error", id: m.id, error: "unserializable result" });
       }
     }).catch(function (e) {
+      if (cancelled[m.id]) { delete cancelled[m.id]; return; }
       safePost({ type: "error", id: m.id, error: String(e && e.message ? e.message : e) });
     });
+  }
+
+  function onCancel(m) {
+    cancelled[m.id] = true;
+    safePost({ type: "cancelled", id: m.id });
   }
 
   function onBridge(m) {
@@ -378,6 +387,7 @@ export const SANDBOX_SOURCE = String.raw`(function () {
     if (!m || typeof m !== "object") return;
     if (m.type === "init") return onInit(m);
     if (m.type === "call") return onCall(m);
+    if (m.type === "cancel") return onCancel(m);
     if (m.type === "bridgeResult") return onBridge(m);
     if (m.type === "ping") return safePost({ type: "pong" });
     if (m.type === "dispose") return doClose();

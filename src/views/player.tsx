@@ -1131,7 +1131,12 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
   // The desktop play-picker is a mouse surface, so while it is up the ten-foot
   // chrome stands aside rather than layering a D-pad surface over something a
   // remote cannot drive. PiP and draw are mouse modes for the same reason.
-  const tenFoot = bigPictureActive && !picker && !pipMode && !drawMode;
+  const tenFoot =
+    bigPictureActive &&
+    settings.bigPicturePlayerUi !== "desktop" &&
+    !picker &&
+    !pipMode &&
+    !drawMode;
   // One lever. showChrome feeds the transport, the quick tools, the ad-report
   // button, the X-ray overlay and the P2P chip, and none of them belong on a
   // television. Big Picture renders its own.

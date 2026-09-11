@@ -30,7 +30,7 @@ const EAGER_COUNT = 6;
 const NEAR_MARGIN = "300px";
 const FAR_RELEASE_MS = 15000;
 
-export type RowShape = "portrait" | "landscape" | "service" | "rank" | "tile";
+export type RowShape = "portrait" | "landscape" | "service" | "rank" | "tile" | "square";
 
 export const TV_CARD_MIN = 318;
 
@@ -175,7 +175,8 @@ function Skeleton({ shape }: { shape: RowShape }) {
   if (shape === "tile") {
     return <div className="aspect-[5/4] w-full rounded-2xl bg-elevated/30" />;
   }
-  const aspect = shape === "landscape" ? "aspect-[16/9]" : "aspect-[2/3]";
+  const aspect =
+    shape === "landscape" ? "aspect-[16/9]" : shape === "square" ? "aspect-square" : "aspect-[2/3]";
   const hideText = shape === "portrait" && settings.hidePosterTitles;
   return (
     <div className="flex w-full min-w-0 flex-col gap-2.5">
@@ -233,6 +234,7 @@ export function Row({
   const effMin = Math.max(72, Math.round((tvCards ? TV_CARD_MIN : min) * settings.posterScale));
   const expandingCards = effShape === "portrait" && settings.posterBackdropExpansion;
   const dockEnabled = effShape === "portrait" && settings.posterDockMagnification;
+  const posterHeightRatio = effShape === "landscape" ? 9 / 16 : effShape === "square" ? 1 : 1.5;
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackEl, setTrackEl] = useState<HTMLDivElement | null>(null);
@@ -736,7 +738,7 @@ export function Row({
             }`}
             style={
               {
-                "--row-poster-height": `${(cellWidth ?? effMin) * (effShape === "landscape" ? 9 / 16 : 1.5)}px`,
+                "--row-poster-height": `${(cellWidth ?? effMin) * posterHeightRatio}px`,
                 ...(expandingCards
                   ? {}
                   : { gridAutoColumns: cellWidth != null ? `${cellWidth}px` : `${effMin}px` }),

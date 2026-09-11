@@ -1,4 +1,4 @@
-import { Clock3, Volume2 } from "lucide-react";
+import { Clock3, Volume2 } from "../icons";
 import type { PlayerChromeConfig, ThemeId, TimeFormat, VolumeStyle } from "@/lib/player-chrome";
 import { useT } from "@/lib/i18n";
 import { Segmented } from "../shared";
@@ -6,9 +6,9 @@ import { SettingRow } from "../kit";
 
 export function getOptions(t: (k: string) => string) {
   const TIME_OPTIONS: Array<{ id: TimeFormat; label: string; sub: string }> = [
-    { id: "start-end", label: t("Elapsed and remaining"), sub: t("00:23 on the left, -1:12 on the right.") },
-    { id: "remaining", label: t("Remaining only"), sub: t("Single -1:12 label, both ends collapse.") },
-    { id: "elapsed-only", label: t("Elapsed only"), sub: t("Single 00:23 label, both ends collapse.") },
+    { id: "start-end", label: t("Elapsed and total"), sub: t("Shows elapsed time and the full duration.") },
+    { id: "remaining", label: t("Elapsed and remaining"), sub: t("Shows elapsed time and how much is left.") },
+    { id: "elapsed-only", label: t("Elapsed only"), sub: t("Shows elapsed time without a second time label.") },
   ];
 
   const VOLUME_OPTIONS: Array<{ id: VolumeStyle; label: string; sub: string }> = [
@@ -39,9 +39,9 @@ export function OptionsSection({ config, theme, onTimeFormat, onVolumeStyle }: P
     <>
       <SettingRow
         wide
-        icon={<Clock3 size={16} strokeWidth={1.9} />}
+        icon={<Clock3 size={18} strokeWidth={1.9} />}
         label={t("Time format")}
-        desc={t("What the clock labels show on the seek bar.")}
+        desc={timeSub}
         tip={t("The two clock labels are ordinary controls. Move or hide either of them in the layout editor.")}
       >
         <div className="flex w-full flex-col gap-3">
@@ -51,12 +51,12 @@ export function OptionsSection({ config, theme, onTimeFormat, onVolumeStyle }: P
             options={TIME_OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
             onChange={onTimeFormat}
           />
-          <span className="w-full text-[12.5px] leading-relaxed text-ink-subtle">{timeSub}</span>
         </div>
       </SettingRow>
 
       <SettingRow
-        icon={<Volume2 size={16} strokeWidth={1.9} />}
+        wide
+        icon={<Volume2 size={18} strokeWidth={1.9} />}
         label={t("Volume control")}
         desc={volumeSub}
         tip={t("How the volume widget behaves on click and hover.")}
@@ -71,9 +71,9 @@ export function OptionsSection({ config, theme, onTimeFormat, onVolumeStyle }: P
   );
 }
 
-const ELAPSED = "00:23";
+const ELAPSED = "23:32";
 const TOTAL = "1:47:00";
-const REMAINING = "-1:12";
+const REMAINING = "-1:23:28";
 
 function TimeFormatPreview({ theme, value }: { theme: ThemeId; value: TimeFormat }) {
   if (theme === "stremio") {
@@ -83,7 +83,7 @@ function TimeFormatPreview({ theme, value }: { theme: ThemeId; value: TimeFormat
         : `${ELAPSED} / ${value === "remaining" ? REMAINING : TOTAL}`;
     return (
       <PreviewShell>
-        <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-ink">{combined}</span>
+        <span className="shrink-0 text-[15.5px] font-semibold tabular-nums text-ink">{combined}</span>
         <Track />
       </PreviewShell>
     );
@@ -91,10 +91,10 @@ function TimeFormatPreview({ theme, value }: { theme: ThemeId; value: TimeFormat
   const end = value === "remaining" ? REMAINING : value === "start-end" ? TOTAL : null;
   return (
     <PreviewShell>
-      <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-ink">{ELAPSED}</span>
+      <span className="shrink-0 text-[15.5px] font-semibold tabular-nums text-ink">{ELAPSED}</span>
       <Track />
       {end && (
-        <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-ink-muted">{end}</span>
+        <span className="shrink-0 text-[15.5px] font-semibold tabular-nums text-ink-muted">{end}</span>
       )}
     </PreviewShell>
   );

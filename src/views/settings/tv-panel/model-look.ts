@@ -57,7 +57,7 @@ export const SUB_LOOK_ROWS: TvRow[] = [
       { value: "Right", label: "Right" },
     ],
   },
-  { kind: "step", key: "subLookGap", label: "Line spacing", def: 6, min: 0, max: 40, step: 4 },
+  { kind: "step", key: "subLookGap", label: "Line spacing", def: 6, min: 0, max: 40, step: 2 },
   { kind: "toggle", key: "subLookBold", label: "Bold", def: false },
   {
     kind: "choice",
@@ -77,7 +77,7 @@ export const SUB_LOOK_GROUP: TvGroup = {
   id: "subtitle-look",
   title: "Subtitle look on the TV",
   subtitle:
-    "Thirteen controls for how a subtitle sits on the TV screen. The preview is the real shape, at TV distance.",
+    "Adjust subtitle size, color, and position for your TV. The preview follows each change.",
   wire: "playerlayout",
   rows: SUB_LOOK_ROWS,
 };

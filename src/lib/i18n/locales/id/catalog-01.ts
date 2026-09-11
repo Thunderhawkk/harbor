@@ -518,8 +518,8 @@ const catalog: Record<string, string> = {
     "Buat paket dengan salah satu alat ini, ekspor JSON, host sebagai gist, lalu tempel tautan mentahnya di bawah.",
   "Build a source plugin": "Buat plugin sumber",
   "Build from source": "Build dari kode sumber",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "Identitas build. Berguna saat melaporkan bug ke bugs@harbor.site.",
+  "Build identity. Useful when filing a bug report.":
+    "Identitas build. Berguna saat melaporkan bug.",
   "Build your own feed from actors, directors, and Trakt lists":
     "Buat feed Anda sendiri dari aktor, sutradara, dan daftar Trakt",
   "Build your own palette": "Buat palet Anda sendiri",

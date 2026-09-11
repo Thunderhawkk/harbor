@@ -1,4 +1,4 @@
-import { ExternalLink, Trash2 } from "lucide-react";
+import { ExternalLink, LogOut } from "./icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
@@ -31,7 +31,7 @@ export function TrackerIdentity({
   }, [avatar]);
   const showAvatar = !!avatar && !broken;
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-4 rounded-md bg-elevated px-5 py-5">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-4 border-b border-edge-soft pb-6 pt-2">
       <span className="relative block h-14 w-14 shrink-0">
         <span className="grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-canvas">
           {showAvatar ? (
@@ -72,7 +72,7 @@ export function TrackerIdentity({
         <span className="truncate text-[19px] font-semibold leading-tight tracking-tight text-ink">
           {handle ? `@${handle}` : t("Connected")}
         </span>
-        <span className="flex items-center gap-1.5 text-[12.5px] leading-snug text-ink-subtle">
+        <span className="flex items-center gap-1.5 text-[15.5px] leading-[22px] text-ink-subtle">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
           {meta ? `${service} · ${meta}` : service}
         </span>
@@ -84,18 +84,18 @@ export function TrackerIdentity({
           <button
             type="button"
             onClick={() => openUrl(profileUrl)}
-            className="harbor-press-pop flex h-9 items-center gap-1.5 rounded-md bg-canvas px-3.5 text-[12.5px] font-medium text-ink-muted transition-colors hover:text-ink"
+            className="harbor-press-pop flex h-11 items-center gap-2 rounded-[8px] bg-canvas px-4 text-[15px] font-semibold text-ink-muted transition-colors hover:text-ink"
           >
             {t("Open profile")}
-            <ExternalLink size={12} strokeWidth={2.2} />
+            <ExternalLink size={16} strokeWidth={2.2} />
           </button>
         )}
         <button
           type="button"
           onClick={onDisconnect}
-          className="harbor-press-pop flex h-9 items-center gap-1.5 rounded-md bg-canvas px-3.5 text-[12.5px] font-medium text-ink-muted transition-colors hover:text-danger"
+          className="harbor-press-pop flex h-11 items-center gap-2 rounded-[8px] bg-canvas px-4 text-[15px] font-semibold text-ink-muted transition-colors hover:text-danger"
         >
-          <Trash2 size={12} strokeWidth={2.2} />
+          <LogOut size={16} strokeWidth={2.2} />
           {t("Disconnect")}
         </button>
       </span>

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useDebridClients } from "@/lib/debrid/registry";
 import { useSettings } from "@/lib/settings";
 import { buildStreamIdsWithIdentity } from "@/lib/streams/anime-identity";
 import { buildEpisodePipelineInput } from "@/lib/streams/episode-pipeline-input";
 import { runPipeline } from "@/lib/streams/pipeline";
+import { isPluginAddon, pluginCacheTokens } from "@/lib/streams/plugins";
 import { buildPickerConfigHash, peekPickerCache, setPickerCache } from "@/lib/picker-cache";
 import { useAddons } from "@/views/play-picker/use-addons";
 import { stampAddonOrder } from "@/views/play-picker/picker-utils";
@@ -21,7 +22,12 @@ export function useSwitcherRefresh(params: {
   const { authKey } = useAuth();
   const { settings } = useSettings();
   const debrids = useDebridClients();
-  const { addons } = useAddons(authKey, settings);
+  const { addons: allAddons } = useAddons(authKey, settings);
+  const addons = useMemo(
+    () =>
+      allAddons ? allAddons.filter((a) => settings.pluginsBackground || !isPluginAddon(a)) : allAddons,
+    [allAddons, settings.pluginsBackground],
+  );
   const [refreshing, setRefreshing] = useState(false);
   const acRef = useRef<AbortController | null>(null);
 
@@ -41,7 +47,7 @@ export function useSwitcherRefresh(params: {
     const configHash = buildPickerConfigHash({
       addonTransportUrls: addons.map((a) => a.transportUrl),
       debridSlugs: debrids.map((d) => d.slug),
-      scraperKeys: [],
+      scraperKeys: pluginCacheTokens(),
       filterMode: filterDisabled ? "off" : strictMode ? "strict" : "balanced",
     });
     acRef.current?.abort();

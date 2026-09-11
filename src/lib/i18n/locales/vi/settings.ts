@@ -598,8 +598,8 @@ const settings: Record<string, string> = {
   "Scans your Stremio library and rewrites any item whose shape doesn't match Stremio's exact schema.":
     "Quét thư viện Stremio và ghi lại mọi mục có cấu trúc không khớp chính xác với lược đồ của Stremio.",
   About: "Giới thiệu",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "Thông tin bản dựng. Hữu ích khi báo lỗi tại bugs@harbor.site.",
+  "Build identity. Useful when filing a bug report.":
+    "Thông tin bản dựng. Hữu ích khi báo lỗi.",
   "Reveal the show or movie artwork.": "Hiện hình ảnh của phim bộ hoặc phim điện ảnh.",
   Legal: "Pháp lý",
   "Made with": "Được tạo nên bằng",

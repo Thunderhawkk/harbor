@@ -568,8 +568,8 @@ const catalog02: Record<string, string> = {
   "Build a source plugin": "Utwórz wtyczkę źródła",
   "Build a theme": "Utwórz motyw",
   "Build from source": "Skompiluj z kodu źródłowego",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "Identyfikator kompilacji. Przydaje się podczas zgłaszania błędu na adres bugs@harbor.site.",
+  "Build identity. Useful when filing a bug report.":
+    "Identyfikator kompilacji. Przydaje się podczas zgłaszania błędu.",
   "Build one in the studio or import a theme file first, then come back to share it.":
     "Najpierw utwórz motyw w edytorze lub zaimportuj plik motywu, a potem wróć tutaj, aby go udostępnić.",
   "Build or import the updated theme first, then come back to push it as a new version.":

@@ -9,7 +9,7 @@ import type {
   SportsSide,
 } from "@/lib/sports/espn";
 import { fetchHeadToHead, type HeadToHead as H2HResult } from "@/lib/sports/h2h";
-import { fetchGameSummary } from "@/lib/sports/provider";
+import { fetchMatchSummary } from "@/lib/sports/espn";
 import { LiveBadge } from "./live-badge";
 import { matchPlayerByName } from "./pitch/pitch-formation";
 import { PitchView } from "./pitch/pitch-view";
@@ -289,7 +289,7 @@ export function MatchPanel({ game, detail }: { game: SportsGame; detail?: Sports
     }
     let alive = true;
     setLoading(true);
-    fetchGameSummary(game)
+    fetchMatchSummary(game.league, game.id)
       .then((result) => {
         if (!alive) return;
         setLoaded(result);

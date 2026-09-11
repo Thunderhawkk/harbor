@@ -1,3 +1,4 @@
+import { usePreviewNavCustomization } from "@/lib/theme-preview";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -11,7 +12,7 @@ import { useParental } from "@/lib/parental";
 import { useSettings } from "@/lib/settings";
 import { useView, type View } from "@/lib/view";
 
-const PRIMARY_IDS = new Set(["home", "discover", "movies", "shows", "kids", "anime", "live", "sports", "vod"]);
+const PRIMARY_IDS = new Set(["home", "discover", "movies", "shows", "kids", "anime", "live", "vod"]);
 
 export function DraculaSidebar() {
   const { view, setView, chromeHidden } = useView();
@@ -21,7 +22,7 @@ export function DraculaSidebar() {
   const collapsed = settings.sidebarCollapsed;
   const [pinFor, setPinFor] = useState<View | null>(null);
 
-  const items = applyNavCustomization(NAV_ITEMS, settings.navCustomization);
+  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization));
   const primary = items.filter((i) => PRIMARY_IDS.has(i.id));
   const collections = items.filter((i) => !PRIMARY_IDS.has(i.id));
 
@@ -220,5 +221,4 @@ function NavPill({
     </button>
   );
 }
-
 

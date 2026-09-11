@@ -1238,8 +1238,8 @@ const catalogAC: Record<string, string> = {
   "Build a source plugin": "स्रोत प्लगइन बनाएँ",
   "Build a theme": "थीम बनाएँ",
   "Build from source": "सोर्स कोड से बिल्ड करें",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "बिल्ड की पहचान। bugs@harbor.site पर बग रिपोर्ट दर्ज करते समय उपयोगी।",
+  "Build identity. Useful when filing a bug report.":
+    "बिल्ड की पहचान। बग रिपोर्ट दर्ज करते समय उपयोगी।",
   "Build one in the studio or import a theme file first, then come back to share it.":
     "पहले स्टूडियो में एक थीम बनाएँ या थीम फ़ाइल इंपोर्ट करें, फिर उसे साझा करने के लिए वापस आएँ.",
   "Build or import the updated theme first, then come back to push it as a new version.":

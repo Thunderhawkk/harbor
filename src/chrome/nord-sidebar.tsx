@@ -1,3 +1,4 @@
+import { usePreviewNavCustomization } from "@/lib/theme-preview";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -13,7 +14,7 @@ import { useView, type View } from "@/lib/view";
 
 const FROST = "#88c0d0";
 const RAIL = "linear-gradient(180deg, #8fbcbb59, #88c0d033 44%, #b48ead2b 78%, #81a1c14d)";
-const PRIMARY_IDS = new Set(["home", "discover", "movies", "shows", "kids", "anime", "live", "sports", "vod"]);
+const PRIMARY_IDS = new Set(["home", "discover", "movies", "shows", "kids", "anime", "live", "vod"]);
 
 export function NordSidebar() {
   const { view, setView, chromeHidden } = useView();
@@ -31,7 +32,7 @@ export function NordSidebar() {
     return true;
   };
 
-  const items = applyNavCustomization(NAV_ITEMS, settings.navCustomization).filter(isVisible);
+  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization)).filter(isVisible);
   const primary = items.filter((item) => PRIMARY_IDS.has(item.id));
   const collections = items.filter((item) => !PRIMARY_IDS.has(item.id));
 

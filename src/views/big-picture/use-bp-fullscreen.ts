@@ -6,8 +6,8 @@ const FLAG = "harbor.bigpicture.forcedFullscreen";
 
 // The window is normally clamped to the work area so maximising never hides the
 // taskbar. Fullscreen has to cover it, so the clamp is lifted for the duration.
-function setMaximizeClamp(enabled: boolean): void {
-  void invoke("set_maximize_clamp", { enabled }).catch(() => {});
+function setMaximizeClamp(enabled: boolean): Promise<void> {
+  return invoke<void>("set_maximize_clamp", { enabled }).catch(() => {});
 }
 
 function markForced(on: boolean): void {
@@ -30,7 +30,7 @@ export async function releaseBigPictureFullscreen(): Promise<void> {
   if (!wasForced()) return;
   markForced(false);
   await setWindowFullscreen(false).catch(() => {});
-  setMaximizeClamp(true);
+  await setMaximizeClamp(true);
 }
 
 export function useBpFullscreen(active: boolean): void {
@@ -54,8 +54,17 @@ export function useBpFullscreen(active: boolean): void {
       if (already) return;
       forced.current = true;
       markForced(true);
-      setMaximizeClamp(false);
+      await setMaximizeClamp(false);
+      if (!alive) return;
       await setWindowFullscreen(true).catch(() => {});
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise((r) => window.setTimeout(r, 120));
+        if (!alive) return;
+        const on = await readWindowFullscreen().catch(() => true);
+        if (on) return;
+        await setMaximizeClamp(false);
+        await setWindowFullscreen(true).catch(() => {});
+      }
     })();
 
     window.addEventListener("beforeunload", release);

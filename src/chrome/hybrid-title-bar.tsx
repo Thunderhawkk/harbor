@@ -73,19 +73,24 @@ function BarSearch() {
   );
 }
 
-function WinControls() {
+export function WindowCaptionPreview({ native = false }: { native?: boolean }) {
+  return osClass() === "macos" ? <MacDots preview /> : <WinControls preview native={native} />;
+}
+
+function WinControls({ preview = false, native = false }: { preview?: boolean; native?: boolean } = {}) {
   const t = useT();
   const maxed = useMaximized();
   const win = osClass() === "windows";
   return (
     <div data-tauri-drag-region="false" className="flex h-full items-stretch">
-      <WinBtn label={t("chrome.minimize")} onClick={minimize} win={win} glyph={""}>
+      <WinBtn label={t("chrome.minimize")} onClick={preview ? undefined : minimize} win={win} native={native} glyph={""}>
         <path d="M3 6.5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </WinBtn>
       <WinBtn
         label={maxed ? t("chrome.restore") : t("chrome.maximize")}
-        onClick={() => void toggleMaximize()}
+        onClick={preview ? undefined : () => void toggleMaximize()}
         win={win}
+        native={native}
         glyph={maxed ? "" : ""}
       >
         {maxed ? (
@@ -102,7 +107,7 @@ function WinControls() {
           <rect x="3" y="3" width="7" height="7" stroke="currentColor" strokeWidth="1.4" rx="1.2" />
         )}
       </WinBtn>
-      <WinBtn label={t("common.close")} onClick={close} danger win={win} glyph={""}>
+      <WinBtn label={t("common.close")} onClick={preview ? undefined : close} danger win={win} native={native} glyph={""}>
         <path d="M3.5 3.5l6 6M9.5 3.5l-6 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </WinBtn>
     </div>
@@ -116,13 +121,15 @@ function WinBtn({
   children,
   win,
   glyph,
+  native,
 }: {
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
   danger?: boolean;
   children: ReactNode;
   win: boolean;
   glyph: string;
+  native?: boolean;
 }) {
   return (
     <div className="group/ctl relative flex h-full">
@@ -130,7 +137,7 @@ function WinBtn({
         type="button"
         aria-label={label}
         onClick={onClick}
-        className={`flex h-full w-[52px] items-center justify-center text-ink-muted transition-colors duration-100 ${
+        className={`flex h-full ${native ? "w-[46px]" : "w-[52px]"} items-center justify-center text-ink-muted transition-colors duration-100 ${
           danger ? "hover:bg-[#e5484d] hover:text-white" : "hover:bg-ink/10 hover:text-ink"
         }`}
       >
@@ -159,21 +166,21 @@ function WinBtn({
   );
 }
 
-function MacDots() {
+function MacDots({ preview = false }: { preview?: boolean } = {}) {
   const t = useT();
   const maxed = useMaximized();
   return (
     <div data-tauri-drag-region="false" className="flex h-full items-center gap-2 pl-3.5 pr-2">
-      <MacDot color="#ff5f57" label={t("common.close")} onClick={close}>
+      <MacDot color="#ff5f57" label={t("common.close")} onClick={preview ? undefined : close}>
         <path d="M3.2 3.2l3.6 3.6M6.8 3.2l-3.6 3.6" stroke="#4d0000" strokeWidth="1.3" strokeLinecap="round" />
       </MacDot>
-      <MacDot color="#febc2e" label={t("chrome.minimize")} onClick={minimize}>
+      <MacDot color="#febc2e" label={t("chrome.minimize")} onClick={preview ? undefined : minimize}>
         <path d="M2.6 5h4.8" stroke="#5a3d00" strokeWidth="1.3" strokeLinecap="round" />
       </MacDot>
       <MacDot
         color="#28c840"
         label={maxed ? t("chrome.restore") : t("chrome.maximize")}
-        onClick={() => void toggleMaximize()}
+        onClick={preview ? undefined : () => void toggleMaximize()}
       >
         <path d="M2.6 2.6H5.8L2.6 5.8Z" fill="#0b3d0b" />
         <path d="M7.4 7.4H4.2L7.4 4.2Z" fill="#0b3d0b" />
@@ -190,7 +197,7 @@ function MacDot({
 }: {
   color: string;
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
   children: ReactNode;
 }) {
   return (

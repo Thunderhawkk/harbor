@@ -23,17 +23,17 @@ const SEV_RANK: Record<string, number> = { None: 0, Mild: 1, Moderate: 2, Severe
 type SeverityStyle = { text: string; bar: string };
 
 const SEV_STYLE_COLORED: Record<string, SeverityStyle> = {
-  Severe: { text: "text-red-300", bar: "bg-red-400" },
-  Moderate: { text: "text-amber-300", bar: "bg-amber-400" },
-  Mild: { text: "text-ink-subtle", bar: "bg-ink-subtle/70" },
-  None: { text: "text-ink-subtle/70", bar: "bg-ink-subtle/40" },
+  Severe: { text: "text-danger", bar: "bg-danger" },
+  Moderate: { text: "text-accent", bar: "bg-accent" },
+  Mild: { text: "text-white/45", bar: "bg-white/45" },
+  None: { text: "text-white/35", bar: "bg-white/30" },
 };
 
 const SEV_STYLE_MONO: Record<string, SeverityStyle> = {
-  Severe: { text: "text-ink", bar: "bg-ink" },
-  Moderate: { text: "text-ink-muted", bar: "bg-ink-muted" },
-  Mild: { text: "text-ink-subtle", bar: "bg-ink-subtle/70" },
-  None: { text: "text-ink-subtle/70", bar: "bg-ink-subtle/40" },
+  Severe: { text: "text-white/90", bar: "bg-white/90" },
+  Moderate: { text: "text-white/65", bar: "bg-white/65" },
+  Mild: { text: "text-white/45", bar: "bg-white/45" },
+  None: { text: "text-white/35", bar: "bg-white/30" },
 };
 
 function metaFor(category: string): { Icon: typeof Info; label: string } {
@@ -64,7 +64,7 @@ const HOLD_MS = 10_000;
 const HOVER_TAIL_MS = 2_500;
 const EXIT_MS = 500;
 const CARD_CLASS =
-  "w-[266px] overflow-hidden rounded-2xl border border-edge-soft/70 bg-canvas/85 px-4 py-3.5 shadow-[0_18px_50px_-16px_rgba(0,0,0,0.72)] backdrop-blur-xl";
+  "w-[264px] overflow-hidden rounded-[14px] bg-black/45 px-3.5 py-3 ring-1 ring-white/10 backdrop-blur-xl";
 
 type Phase = "idle" | "holding" | "collapsing" | "done";
 
@@ -195,15 +195,24 @@ export function ContentAdvisoryToast({
       {!preview && (
         <style>{`
           @keyframes harborAdvisoryIn {
-            from { opacity: 0; transform: translateY(-6px); }
-            to { opacity: 1; transform: translateY(0); }
+            0% { opacity: 0; transform: translateY(-10px) scale(0.965); }
+            60% { opacity: 1; }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
           }
           @keyframes harborAdvisoryOut {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(-6px); }
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+          }
+          @keyframes harborAdvisoryRow {
+            0% { opacity: 0; transform: translateY(5px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          .harbor-content-advisory-row {
+            animation: harborAdvisoryRow 260ms var(--ease-out) both;
           }
           @media (prefers-reduced-motion: reduce) {
-            .harbor-content-advisory { animation-duration: 1ms !important; }
+            .harbor-content-advisory,
+            .harbor-content-advisory-row { animation-duration: 1ms !important; }
           }
         `}</style>
       )}
@@ -224,8 +233,8 @@ export function ContentAdvisoryToast({
             ? undefined
             : {
                 animation: isCardExiting
-                  ? `harborAdvisoryOut ${EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1) forwards`
-                  : "harborAdvisoryIn 500ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                  ? `harborAdvisoryOut ${EXIT_MS}ms var(--ease-out) forwards`
+                  : "harborAdvisoryIn 420ms var(--ease-out) both",
               }
         }
       >
@@ -234,7 +243,7 @@ export function ContentAdvisoryToast({
             rated.length > 0 ? "mb-2.5" : ""
           }`}
         >
-          <span className="flex min-w-0 items-center gap-1.5 text-ink-subtle">
+          <span className="flex min-w-0 items-center gap-1.5 text-white/45">
             <ShieldAlert size={12} strokeWidth={2.2} className="shrink-0" />
             <span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] rtl:tracking-normal">
               {t("Content advisory")}
@@ -242,7 +251,7 @@ export function ContentAdvisoryToast({
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
             {mpaRating && (
-              <span className="rounded-md bg-raised px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-muted">
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white/70">
                 {mpaRating}
               </span>
             )}
@@ -254,7 +263,7 @@ export function ContentAdvisoryToast({
                   setPhase("collapsing");
                 }}
                 aria-label={t("Dismiss")}
-                className="flex h-6 w-6 items-center justify-center rounded-md text-ink-subtle transition-[color,background-color,transform] duration-150 hover:bg-raised hover:text-ink active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ink"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-white/45 transition-[color,background-color,transform] duration-150 hover:bg-white/10 hover:text-white active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
               >
                 <X size={13} strokeWidth={2} />
               </button>
@@ -263,16 +272,22 @@ export function ContentAdvisoryToast({
         </div>
 
         {rated.length > 0 && (
-          <ul className="flex flex-col gap-2">
-            {rated.map((category) => {
+          <ul className="flex flex-col gap-2.5">
+            {rated.map((category, index) => {
               const { Icon, label } = metaFor(category.category);
               const style = severityStyles[category.severity] ?? severityStyles.Mild;
               const rank = SEV_RANK[category.severity] ?? 1;
               return (
-                <li key={category.category} className="flex items-center justify-between gap-3">
+                <li
+                  key={category.category}
+                  className={`flex items-center justify-between gap-3 ${
+                    preview ? "" : "harbor-content-advisory-row"
+                  }`}
+                  style={preview ? undefined : { animationDelay: `${110 + index * 50}ms` }}
+                >
                   <span className="flex min-w-0 items-center gap-2">
                     <Icon size={14} strokeWidth={2} className={`shrink-0 ${style.text}`} />
-                    <span className="truncate text-[12.5px] text-ink">{t(label)}</span>
+                    <span className="truncate text-[12.5px] text-white/85">{t(label)}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1.5">
                     <span className="flex gap-[3px]" aria-hidden="true">
@@ -296,7 +311,7 @@ export function ContentAdvisoryToast({
         )}
 
         {canIgnore && (
-          <div className={rated.length > 0 ? "mt-3 border-t border-edge-soft/70 pt-2.5" : "mt-2.5"}>
+          <div className={rated.length > 0 ? "mt-2.5" : "mt-2"}>
             <button
               type="button"
               onClick={(event) => {
@@ -304,7 +319,7 @@ export function ContentAdvisoryToast({
                 handleIgnore();
               }}
               title={t("Never show the content advisory for this title again")}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-[11.5px] font-semibold text-ink-muted transition-[color,background-color,transform] duration-150 hover:bg-white/[0.10] hover:text-ink active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ink"
+              className="flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-white/[0.07] px-3 py-2 text-[11.5px] font-semibold text-white/60 transition-[color,background-color,transform] duration-150 hover:bg-white/[0.12] hover:text-white active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
             >
               <EyeOff size={12} strokeWidth={2.2} className="shrink-0" />
               {t("Ignore this title")}
@@ -315,10 +330,10 @@ export function ContentAdvisoryToast({
         {!preview && phase === "holding" && (
           <div
             dir="ltr"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-edge-soft"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-white/10"
           >
             <div
-              className="h-full bg-ink-muted"
+              className="h-full bg-white/35"
               style={{
                 width: `${countdownWidth}%`,
                 transition: paused ? "none" : "width 60ms linear",

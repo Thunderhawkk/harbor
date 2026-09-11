@@ -7,6 +7,10 @@ import { usePlaybackStatus } from "@/lib/player/playback-clock";
 import { useIdleScreensaver } from "@/lib/screensaver/use-idle-screensaver";
 import type { AmbientItem } from "./ambient-overlay";
 
+const CatBoatOverlay = lazy(() =>
+  import("./cat-boat-overlay").then((m) => ({ default: m.CatBoatOverlay })),
+);
+
 const AmbientOverlay = lazy(() =>
   import("./ambient-overlay").then((m) => ({ default: m.AmbientOverlay })),
 );
@@ -34,6 +38,7 @@ export function ScreensaverRoot() {
   const { active: bigPicture } = useBigPicture();
   const playerStatus = usePlaybackStatus();
   const enabled = settings.screensaver;
+  const catBoat = settings.screensaverStyle === "catBoat";
   const delayMs = Math.max(1, settings.screensaverDelayMin || 5) * 60000;
   // Big Picture claims keydown in the capture phase, so this hook's bubble
   // listeners never see its navigation and it would idle out mid use.
@@ -60,12 +65,15 @@ export function ScreensaverRoot() {
 
   useEffect(() => {
     if (!enabled) return;
-    const warm = window.setTimeout(() => void import("./ambient-overlay"), 3000);
+    const warm = window.setTimeout(
+      () => void (catBoat ? import("./cat-boat-overlay") : import("./ambient-overlay")),
+      3000,
+    );
     return () => window.clearTimeout(warm);
-  }, [enabled]);
+  }, [enabled, catBoat]);
 
   useEffect(() => {
-    if (!active || fetchedRef.current) return;
+    if (catBoat || !active || fetchedRef.current) return;
     fetchedRef.current = true;
     let cancelled = false;
     const source = settings.heroFeed === "classic" ? "trending" : settings.heroFeed;
@@ -78,9 +86,9 @@ export function ScreensaverRoot() {
     return () => {
       cancelled = true;
     };
-  }, [active, settings.heroFeed]);
+  }, [active, settings.heroFeed, catBoat]);
 
-  const wantShow = active && !suppressed && items.length > 0;
+  const wantShow = active && !suppressed && (catBoat || items.length > 0);
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -97,7 +105,11 @@ export function ScreensaverRoot() {
   if (!mounted || suppressed) return null;
   return (
     <Suspense fallback={null}>
-      <AmbientOverlay items={items} reduce={reduce} visible={visible} onDismiss={dismiss} neverDeep />
+      {catBoat ? (
+        <CatBoatOverlay reduce={reduce} visible={visible} onDismiss={dismiss} />
+      ) : (
+        <AmbientOverlay items={items} reduce={reduce} visible={visible} onDismiss={dismiss} neverDeep />
+      )}
     </Suspense>
   );
 }

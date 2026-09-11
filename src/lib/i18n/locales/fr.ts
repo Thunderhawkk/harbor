@@ -1,3 +1,5 @@
+import ebookSources from "./fr/ebook-sources";
+import settingsRefinements from "./fr/settings-refinements";
 import inventory from "./fr/inventory";
 import wired from "./fr/wired";
 import sweep from "./fr/sweep";
@@ -30,8 +32,11 @@ import controllers from "./fr/controllers";
 import plurals from "./fr/plurals";
 import bpSources from "./fr/bp-sources";
 import coverage from "./fr/coverage";
+import plugins from "./fr/plugins";
+import brands from "./fr/brands";
 
 const fr: Record<string, string> = {
+  ...ebookSources,
   ...inventory,
   ...wired,
   ...sweep,
@@ -64,6 +69,9 @@ const fr: Record<string, string> = {
   ...plurals,
   ...bpSources,
   ...coverage,
+  ...settingsRefinements,
+  ...plugins,
+  ...brands,
 };
 
 export default fr;

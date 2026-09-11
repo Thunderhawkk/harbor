@@ -4,10 +4,8 @@ import { headersFromChannel } from "@/lib/iptv/channel-headers";
 import { recordChannelPlay } from "@/lib/iptv/channel-stats";
 import type { IptvChannel } from "@/lib/iptv/types";
 import type { SportsGame } from "@/lib/sports/espn";
-import { bestChannelForGame, type SportsChannelIndex } from "@/lib/sports/iptv-match";
 import { useView } from "@/lib/view";
-import { useStreamPlayer } from "./add-stream-dialog";
-import { useAttachments } from "./source-store";
+import type { AttachedStream } from "./source-store";
 
 export function fixtureLabelOf(game: SportsGame): string {
   return `${game.away.name} v ${game.home.name}`;
@@ -44,25 +42,37 @@ export function useChannelPlayer(): (channel: IptvChannel, subtitle: string) => 
   );
 }
 
-export function useWatchGame(index: SportsChannelIndex): (game: SportsGame) => boolean {
-  const attachments = useAttachments();
-  const playChannel = useChannelPlayer();
-  const playStream = useStreamPlayer();
+export function useStreamPlayer(): (stream: AttachedStream, name: string) => void {
+  const t = useT();
+  const { openPlayer } = useView();
   return useCallback(
-    (game: SportsGame) => {
-      const label = fixtureLabelOf(game);
-      const stream = attachments.streams[game.id];
-      if (stream) {
-        playStream(stream, label);
-        return true;
-      }
-      const best = bestChannelForGame(game, index, {
-        attachedIds: attachments.channels[game.league] ?? [],
+    (stream: AttachedStream, name: string) => {
+      openPlayer({
+        meta: {
+          id: `page-stream:${stream.url}`,
+          type: "tv",
+          name,
+          poster: stream.poster || undefined,
+          background: stream.poster || undefined,
+          description: t("Resolved from {host}", { host: hostOf(stream.page) }),
+          releaseInfo: t("Live"),
+        },
+        url: stream.url,
+        title: name,
+        subtitle: hostOf(stream.page),
+        notWebReady: true,
+        isLive: stream.kind !== "file",
+        headers: stream.headers,
       });
-      if (!best || best.tier !== "exact") return false;
-      playChannel(best.channel, label);
-      return true;
     },
-    [attachments, index, playChannel, playStream],
+    [openPlayer, t],
   );
+}
+
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, "");
+  } catch {
+    return url;
+  }
 }

@@ -1,6 +1,7 @@
 import { Dropdown } from "@/components/dropdown";
-import { Clock, UserCheck } from "lucide-react";
+import { Clock, UserCheck } from "../icons";
 import { useProfiles } from "@/lib/profiles";
+import { PickerBackground } from "./picker-background";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
 import { Segmented } from "../shared";
@@ -26,9 +27,10 @@ export function StartupDefaults() {
   return (
     <SettingGroup label={t("Startup & default")}>
       <SettingRow
-        icon={<Clock size={16} strokeWidth={2} />}
+        wide
+        icon={<Clock size={18} strokeWidth={2} />}
         label={t("Who's watching")}
-        desc={t("How often the profile screen appears when you have more than one profile.")}
+        desc={t("Choose when Harbor asks you to pick a profile. Timed prompts appear when you return to Harbor.")}
       >
         <Segmented<Interval>
           value={interval}
@@ -36,25 +38,23 @@ export function StartupDefaults() {
           onChange={(v) => update({ profilePromptInterval: v })}
         />
       </SettingRow>
-      {profiles.length > 1 && (
-        <SettingRow
-          icon={<UserCheck size={16} strokeWidth={2} />}
-          label={t("Start as")}
-          desc={t("Skip Who's watching and always start as this profile.")}
-          tip={t("Skip Who's watching and always start as this profile. PIN-locked profiles can't be a default.")}
-        >
+      <PickerBackground />
+      <SettingRow
+        icon={<UserCheck size={18} strokeWidth={2} />}
+        label={t("Start as")}
+        desc={t("Open this profile at launch. Timed prompts can still appear later. Profiles with a PIN cannot be a default.")}
+      >
+        <div className="w-[280px] max-w-full">
           <Dropdown
-            size="sm"
             value={defaultId}
             onChange={(v) => update({ defaultProfileId: v })}
-            className="w-[200px] shrink-0"
             options={[
-              { value: "", label: t("Ask each time") },
+              { value: "", label: t("No default profile") },
               ...profiles.filter((p) => !p.passwordHash).map((p) => ({ value: p.id, label: p.name })),
             ]}
           />
-        </SettingRow>
-      )}
+        </div>
+      </SettingRow>
     </SettingGroup>
   );
 }

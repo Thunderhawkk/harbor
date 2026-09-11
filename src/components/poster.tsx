@@ -14,7 +14,7 @@ import { sizeImageUrl, qualityMultiplier } from "@/lib/img-size";
 import { shouldLocalizePosters } from "@/lib/providers/tmdb/tmdb-image-lang";
 import { useProxiedImageSrc } from "@/lib/remote-image-proxy";
 
-type Ratio = "portrait" | "landscape" | "wide";
+type Ratio = "portrait" | "landscape" | "wide" | "square";
 
 export function useLocalizedPoster(metaId: string): {
   url: string | undefined;
@@ -195,12 +195,14 @@ const ASPECT_PAD: Record<Ratio, string> = {
   portrait: "150%", // 3 / 2
   landscape: "56.25%", // 9 / 16
   wide: "43.75%", // 7 / 16
+  square: "100%",
 };
 
 const RATIO_AR: Record<Ratio, number> = {
   portrait: 2 / 3,
   landscape: 16 / 9,
   wide: 16 / 7,
+  square: 1,
 };
 
 function PosterBody({

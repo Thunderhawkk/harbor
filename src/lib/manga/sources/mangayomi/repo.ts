@@ -155,6 +155,14 @@ function entryId(entry: MangayomiIndexEntry, repoUrl: string): string {
   return "my-" + rk + "-" + (slug ? slug.slice(0, 48) + "-" : "") + key;
 }
 
+export function mangayomiEntryId(entry: MangayomiIndexEntry, repoUrl: string): string {
+  return entryId(entry, repoUrl);
+}
+
+export function dedupeMangayomiVariants(entries: MangayomiIndexEntry[]): MangayomiIndexEntry[] {
+  return dedupeVariants(entries);
+}
+
 function dedupeVariants(entries: MangayomiIndexEntry[]): MangayomiIndexEntry[] {
   const pref = ["en", "all", "multi", "en-us"];
   const groups = new Map<string, MangayomiIndexEntry[]>();

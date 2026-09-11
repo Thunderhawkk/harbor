@@ -1,3 +1,5 @@
+import ebookSources from "./vi/ebook-sources";
+import settingsRefinements from "./vi/settings-refinements";
 import coverage from "./vi/coverage";
 import gap from "./vi/gap";
 import plurals from "./vi/plurals";
@@ -33,8 +35,11 @@ import manga from "./vi/manga";
 import controllers from "./vi/controllers";
 import bpSources from "./vi/bp-sources";
 import ageGate from "./vi/age-gate";
+import plugins from "./vi/plugins";
+import brands from "./vi/brands";
 
 const vi: Record<string, string> = {
+  ...ebookSources,
   ...coverage,
   ...gap,
   ...plurals,
@@ -70,6 +75,9 @@ const vi: Record<string, string> = {
   ...controllers,
   ...bpSources,
   ...ageGate,
+  ...settingsRefinements,
+  ...plugins,
+  ...brands,
 };
 
 export default vi;

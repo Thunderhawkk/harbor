@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 const METADATA_TIMEOUT: Duration = Duration::from_secs(15);
@@ -90,11 +91,11 @@ fn cached_info(path: &Path, quality: &str, size: u64, stream_url: Option<String>
     }
 }
 
-struct YtDlpOutput {
-    success: bool,
-    exit_code: Option<i32>,
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
+pub(crate) struct YtDlpOutput {
+    pub(crate) success: bool,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) stdout: Vec<u8>,
+    pub(crate) stderr: Vec<u8>,
 }
 
 fn yt_dlp_failure(source: &str, label: &str, output: &YtDlpOutput) -> String {
@@ -116,7 +117,81 @@ fn yt_dlp_failure(source: &str, label: &str, output: &YtDlpOutput) -> String {
     }
 }
 
-async fn run_yt_dlp(
+trait KillProcess {
+    fn terminate(self);
+}
+
+impl KillProcess for CommandChild {
+    fn terminate(self) {
+        let _ = self.kill();
+    }
+}
+
+#[cfg(test)]
+impl KillProcess for std::process::Child {
+    fn terminate(mut self) {
+        let _ = self.kill();
+        let _ = self.wait();
+    }
+}
+
+struct KillProcessOnDrop<T: KillProcess>(Option<T>);
+
+impl<T: KillProcess> KillProcessOnDrop<T> {
+    fn disarm(&mut self) {
+        self.0.take();
+    }
+}
+
+impl<T: KillProcess> Drop for KillProcessOnDrop<T> {
+    fn drop(&mut self) {
+        if let Some(child) = self.0.take() {
+            child.terminate();
+        }
+    }
+}
+
+async fn collect_sidecar_output(
+    command: Command,
+    args: Vec<String>,
+    label: &str,
+) -> Result<YtDlpOutput, String> {
+    let (mut events, child) = command
+        .args(args)
+        .spawn()
+        .map_err(|error| format!("yt-dlp {label} could not start: {error}"))?;
+    let mut child = KillProcessOnDrop(Some(child));
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    while let Some(event) = events.recv().await {
+        match event {
+            CommandEvent::Stdout(mut bytes) => {
+                stdout.append(&mut bytes);
+                stdout.push(b'\n');
+            }
+            CommandEvent::Stderr(mut bytes) => {
+                stderr.append(&mut bytes);
+                stderr.push(b'\n');
+            }
+            CommandEvent::Terminated(status) => {
+                child.disarm();
+                return Ok(YtDlpOutput {
+                    success: status.code == Some(0),
+                    exit_code: status.code,
+                    stdout,
+                    stderr,
+                });
+            }
+            CommandEvent::Error(error) => {
+                return Err(format!("yt-dlp {label}: {error}"));
+            }
+            _ => {}
+        }
+    }
+    Err(format!("yt-dlp {label} ended without an exit status"))
+}
+
+pub(crate) async fn run_yt_dlp(
     app: &tauri::AppHandle,
     args: Vec<String>,
     timeout: Duration,
@@ -125,43 +200,34 @@ async fn run_yt_dlp(
     #[cfg(target_os = "linux")]
     {
         let run = async {
-            let system_failure = match tokio::process::Command::new("yt-dlp")
-                .args(&args)
-                .output()
-                .await
-            {
-                Ok(output) => {
-                    let output = YtDlpOutput {
-                        success: output.status.success(),
-                        exit_code: output.status.code(),
-                        stdout: output.stdout,
-                        stderr: output.stderr,
-                    };
-                    if output.success {
-                        eprintln!("[harbor::trailer] system yt-dlp completed {label}");
-                        return Ok(output);
+            let system_failure = {
+                let mut command = tokio::process::Command::new("yt-dlp");
+                command.args(&args).kill_on_drop(true);
+                match command.output().await {
+                    Ok(output) => {
+                        let output = YtDlpOutput {
+                            success: output.status.success(),
+                            exit_code: output.status.code(),
+                            stdout: output.stdout,
+                            stderr: output.stderr,
+                        };
+                        if output.success {
+                            eprintln!("[harbor::trailer] system yt-dlp completed {label}");
+                            return Ok(output);
+                        }
+                        yt_dlp_failure("system", label, &output)
                     }
-                    yt_dlp_failure("system", label, &output)
+                    Err(error) => format!("system yt-dlp {label} could not start: {error}"),
                 }
-                Err(error) => format!("system yt-dlp {label} could not start: {error}"),
             };
             eprintln!("[harbor::trailer] {system_failure}; trying bundled yt-dlp");
 
-            let bundled =
-                match app.shell().sidecar("yt-dlp") {
-                    Ok(command) => command.args(args).output().await.map_err(|error| {
-                        format!("bundled yt-dlp {label} could not start: {error}")
-                    }),
-                    Err(error) => Err(format!("bundled yt-dlp {label} unavailable: {error}")),
-                };
+            let bundled = match app.shell().sidecar("yt-dlp") {
+                Ok(command) => collect_sidecar_output(command, args, label).await,
+                Err(error) => Err(format!("bundled yt-dlp {label} unavailable: {error}")),
+            };
             match bundled {
                 Ok(output) => {
-                    let output = YtDlpOutput {
-                        success: output.status.success(),
-                        exit_code: output.status.code(),
-                        stdout: output.stdout,
-                        stderr: output.stderr,
-                    };
                     if output.success {
                         eprintln!("[harbor::trailer] bundled yt-dlp completed {label}");
                         Ok(output)
@@ -186,16 +252,10 @@ async fn run_yt_dlp(
             .shell()
             .sidecar("yt-dlp")
             .map_err(|error| format!("sidecar init: {error}"))?;
-        let output = tokio::time::timeout(timeout, command.args(args).output())
+        let output = tokio::time::timeout(timeout, collect_sidecar_output(command, args, label))
             .await
-            .map_err(|_| format!("yt-dlp {label} timed out"))?
-            .map_err(|error| format!("yt-dlp {label}: {error}"))?;
-        Ok(YtDlpOutput {
-            success: output.status.success(),
-            exit_code: output.status.code(),
-            stdout: output.stdout,
-            stderr: output.stderr,
-        })
+            .map_err(|_| format!("yt-dlp {label} timed out"))??;
+        Ok(output)
     }
 }
 
@@ -424,4 +484,42 @@ async fn trailer_stream_url(
     _path: &Path,
 ) -> Result<Option<String>, String> {
     Ok(None)
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    fn process_count(name: &str) -> usize {
+        let output = std::process::Command::new("tasklist")
+            .args(["/FI", &format!("IMAGENAME eq {name}"), "/FO", "CSV", "/NH"])
+            .output()
+            .expect("query process list");
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|line| {
+                line.to_ascii_lowercase()
+                    .contains(&format!("\"{}\"", name.to_ascii_lowercase()))
+            })
+            .count()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn timed_out_process_guard_kills_child() {
+        let baseline = process_count("ping.exe");
+        let process = std::process::Command::new("ping")
+            .args(["-n", "30", "127.0.0.1"])
+            .spawn()
+            .expect("start timeout probe");
+        let guard = KillProcessOnDrop(Some(process));
+        let run = async move {
+            let _guard = guard;
+            std::future::pending::<()>().await;
+        };
+        assert!(tokio::time::timeout(Duration::from_millis(150), run)
+            .await
+            .is_err());
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        assert_eq!(process_count("ping.exe"), baseline);
+    }
 }

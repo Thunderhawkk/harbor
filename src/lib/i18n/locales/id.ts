@@ -1,3 +1,5 @@
+import ebookSources from "./id/ebook-sources";
+import settingsRefinements from "./id/settings-refinements";
 import coverage from "./id/coverage";
 import catalog01 from "./id/catalog-01";
 import catalog02 from "./id/catalog-02";
@@ -14,8 +16,11 @@ import catalog12 from "./id/catalog-12";
 import catalog13 from "./id/catalog-13";
 import audit from "./id/audit";
 import identityAudit from "./id/identity-audit";
+import plugins from "./id/plugins";
+import brands from "./id/brands";
 
 const id: Record<string, string> = {
+  ...ebookSources,
   ...coverage,
   ...catalog01,
   ...catalog02,
@@ -32,6 +37,9 @@ const id: Record<string, string> = {
   ...catalog13,
   ...audit,
   ...identityAudit,
+  ...settingsRefinements,
+  ...plugins,
+  ...brands,
 };
 
 export default id;

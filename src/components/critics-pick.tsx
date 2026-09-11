@@ -30,7 +30,7 @@ import { MetaAwardsCorner } from "./meta-awards-corner";
 import { Poster } from "./poster";
 import { RtBadge } from "./rt-badge";
 
-export function CriticsPick({ meta }: { meta: Meta }) {
+export function CriticsPick({ meta, title }: { meta: Meta; title?: string }) {
   const { settings } = useSettings();
   const { openMeta, openPicker, openPerson } = useView();
   const t = useT();
@@ -214,7 +214,7 @@ export function CriticsPick({ meta }: { meta: Meta }) {
     <section className="flex flex-col gap-5">
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-[28px] font-medium leading-tight tracking-tight text-ink">
-          {t("Critics' Pick")}
+          {title ?? t("Critics' Pick")}
         </h2>
         <span className="text-[12px] uppercase tracking-[0.22em] text-ink-subtle">
           {t("Loved by reviewers today")}

@@ -201,10 +201,6 @@ export function loadStoredSettings(rawKey: string = STORAGE_KEY): Settings {
       parsed.stremioDeeplinkInstall = true;
       parsed._stremioDeeplinkOnByDefault = true;
     }
-    if (!parsed._contentAdvisoryOnByDefaultV1) {
-      parsed.contentAdvisoryToast = true;
-      parsed._contentAdvisoryOnByDefaultV1 = true;
-    }
     if (parsed.contentAdvisoryTheme !== "monochrome" && parsed.contentAdvisoryTheme !== "colored") {
       parsed.contentAdvisoryTheme = "colored";
     }
@@ -311,6 +307,10 @@ export function loadStoredSettings(rawKey: string = STORAGE_KEY): Settings {
         parsed.navCustomization = { ...nav, hidden: [] } as Settings["navCustomization"];
       }
       parsed._navThemeRepairV1 = true;
+    }
+    if (parsed.cwSources == null) {
+      const ext = parsed.externalContinueWatching === true;
+      parsed.cwSources = { library: true, trakt: ext, simkl: ext, local: true };
     }
     const posterCards = normalizePosterCardSettings(parsed);
     return {

@@ -32,10 +32,10 @@ const LANGS: Lang[] = [
   { iso: "ar", name: "Arabic", endonym: "العربية", hue: 165 },
 ];
 
-export function LanguageTiles() {
+export function LanguageTiles({ title }: { title?: string }) {
   const t = useT();
   return (
-    <Row title={t("Browse by Language")} min={210} shape="tile" alwaysActive>
+    <Row title={title ?? t("Browse by Language")} min={210} shape="tile" alwaysActive>
       {LANGS.map((l) => (
         <LanguageTile key={l.iso} lang={l} />
       ))}

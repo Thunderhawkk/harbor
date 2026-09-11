@@ -208,8 +208,8 @@ const catalog02: Record<string, string> = {
   "Build a source plugin": "소스 플러그인 만들기",
   "Build a theme": "테마 만들기",
   "Build from source": "소스에서 빌드",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "빌드 식별 정보입니다. bugs@harbor.site에 버그를 신고할 때 유용합니다.",
+  "Build identity. Useful when filing a bug report.":
+    "빌드 식별 정보입니다. 버그를 신고할 때 유용합니다.",
   "Build one in the studio or import a theme file first, then come back to share it.":
     "먼저 스튜디오에서 테마를 만들거나 테마 파일을 가져온 다음 다시 공유해 보세요.",
   "Build or import the updated theme first, then come back to push it as a new version.":

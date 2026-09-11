@@ -11,6 +11,7 @@ import { BackToTop } from "@/components/back-to-top";
 import { CollectionsRow } from "@/components/collections-row";
 import { CriticsPick } from "@/components/critics-pick";
 import { LazyMount } from "@/components/lazy-mount";
+import { BrandTiles } from "@/components/brand-tiles";
 import { DiscoveryQueueCta } from "@/components/discovery-queue-cta";
 import { TopPeopleCta } from "@/components/top-people-cta";
 import { FeaturedBanner } from "@/components/featured-banner";
@@ -71,6 +72,22 @@ const MAX_RAIL_PAGES = 10;
 const MIN_PAGE_YIELD = 4;
 const ROW_COUNT = 14;
 const DEDUP_PRIORITY = [ANCHOR_TOP_RATED, ANCHOR_AWARDS];
+
+type RowItem = { key: string; title: string };
+
+const SPECIAL_ROWS: Array<RowItem & { after: number }> = [
+  { key: "special:genres", title: "Browse by Genre", after: 0 },
+  { key: "special:queue", title: "Your Discovery Queue", after: 1 },
+  { key: "special:languages", title: "Browse by Language", after: 2 },
+  { key: "special:collections", title: "Collections", after: 2 },
+  { key: "special:critics", title: "Critics' Pick", after: 3 },
+  { key: "special:studios", title: "Top studios", after: 3 },
+  { key: "special:awards", title: "Browse by Award", after: 4 },
+  { key: "special:networks", title: "Top networks", after: 4 },
+  { key: "special:people", title: "Top People", after: -1 },
+];
+
+const isSpecialRow = (key: string) => key.startsWith("special:");
 
 export function Discover({ active = true }: { active?: boolean }) {
   const scrollRef = useRef<HTMLElement>(null);
@@ -379,27 +396,32 @@ export function Discover({ active = true }: { active?: boolean }) {
     return out;
   }, [hideAnime, deduped, animeVersion]);
 
-  const railItems = useMemo(
-    () => dailyRows.map((r) => ({ key: r.id, title: r.shelf.title })),
-    [dailyRows],
-  );
+  const railItems = useMemo(() => {
+    const base: RowItem[] = dailyRows.map((r) => ({ key: r.id, title: r.shelf.title }));
+    let peopleAfter = -1;
+    base.forEach((it, i) => {
+      if (it.key.startsWith("keyword:")) peopleAfter = i;
+    });
+    if (peopleAfter < 0) peopleAfter = base.length - 1;
+    const out: RowItem[] = [];
+    base.forEach((it, i) => {
+      out.push(it);
+      for (const s of SPECIAL_ROWS) {
+        if (s.after === i || (s.after === -1 && i === peopleAfter)) out.push({ key: s.key, title: s.title });
+      }
+    });
+    return out;
+  }, [dailyRows]);
   const railKeys = useMemo(() => railItems.map((r) => r.key), [railItems]);
   const visibleRails = useMemo(
     () => applyPageRows(railItems, pageRows.custom, false),
     [railItems, pageRows.custom],
   );
-  const peopleCtaIdx = useMemo(() => {
-    let idx = -1;
-    visibleRails.forEach((it, i) => {
-      if (it.key.startsWith("keyword:")) idx = i;
-    });
-    return idx >= 0 ? idx : visibleRails.length - 1;
-  }, [visibleRails]);
   const editRails = useMemo(
     () =>
       applyPageRows(railItems, pageRows.custom, true).filter((item) => {
         const d = dedupedShown[item.key];
-        return d == null || d.length > 0;
+        return isSpecialRow(item.key) || d == null || d.length > 0;
       }),
     [railItems, pageRows.custom, dedupedShown],
   );
@@ -440,6 +462,59 @@ export function Discover({ active = true }: { active?: boolean }) {
       onReset={() => pageRows.persist(resetPageRows())}
     />
   );
+
+  const renderRow = (item: RowItem) => {
+    const renamed = item.key in pageRows.custom.renamed ? item.title : undefined;
+    switch (item.key) {
+      case "special:genres":
+        return <GenreTiles title={renamed} />;
+      case "special:queue":
+        return shownQueue.length > 0 ? <DiscoveryQueueCta items={shownQueue} title={renamed} /> : null;
+      case "special:languages":
+        return <LanguageTiles title={renamed} />;
+      case "special:collections":
+        return settings.tmdbKey ? (
+          <LazyMount minHeight={260}>
+            <CollectionsRow title={renamed} />
+          </LazyMount>
+        ) : null;
+      case "special:critics":
+        return criticsPick && !(hideAnime && metaLooksAnime(criticsPick)) ? (
+          <LazyMount minHeight={580}>
+            <CriticsPick meta={criticsPick} title={renamed} />
+          </LazyMount>
+        ) : null;
+      case "special:studios":
+        return settings.tmdbKey ? (
+          <LazyMount minHeight={300}>
+            <BrandTiles kind="studio" title={renamed} />
+          </LazyMount>
+        ) : null;
+      case "special:awards":
+        return <AwardTiles title={renamed} />;
+      case "special:networks":
+        return settings.tmdbKey ? (
+          <LazyMount minHeight={300}>
+            <BrandTiles kind="network" title={renamed} />
+          </LazyMount>
+        ) : null;
+      case "special:people":
+        return <TopPeopleCta title={renamed} />;
+      default:
+        return (
+          <LazyMount minHeight={340}>
+            <Rail
+              railId={item.key}
+              allRails={dailyRows}
+              deduped={dedupedShown}
+              loadMore={loadMore}
+              ensureLoaded={ensureLoaded}
+              titleOverride={renamed}
+            />
+          </LazyMount>
+        );
+    }
+  };
 
   return (
     <main ref={scrollCb} className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-20 pt-28">
@@ -569,49 +644,11 @@ export function Discover({ active = true }: { active?: boolean }) {
                       }
                       isRenamed={item.key in pageRows.custom.renamed}
                     />
-                    {!hidden && (
-                      <Rail
-                        railId={item.key}
-                        allRails={dailyRows}
-                        deduped={dedupedShown}
-                        loadMore={loadMore}
-                        ensureLoaded={ensureLoaded}
-                        titleOverride={item.key in pageRows.custom.renamed ? item.title : undefined}
-                      />
-                    )}
+                    {!hidden && renderRow(item)}
                   </div>
                 );
               })
-            : visibleRails.map((item, i) => (
-                <Fragment key={item.key}>
-                  <LazyMount minHeight={340}>
-                    <Rail
-                      railId={item.key}
-                      allRails={dailyRows}
-                      deduped={dedupedShown}
-                      loadMore={loadMore}
-                      ensureLoaded={ensureLoaded}
-                      titleOverride={item.key in pageRows.custom.renamed ? item.title : undefined}
-                    />
-                  </LazyMount>
-
-                  {i === 0 && <GenreTiles />}
-                  {i === 1 && shownQueue.length > 0 && <DiscoveryQueueCta items={shownQueue} />}
-                  {i === 2 && <LanguageTiles />}
-                  {i === 2 && settings.tmdbKey && (
-                    <LazyMount minHeight={260}>
-                      <CollectionsRow />
-                    </LazyMount>
-                  )}
-                  {i === 3 && criticsPick && !(hideAnime && metaLooksAnime(criticsPick)) && (
-                    <LazyMount minHeight={580}>
-                      <CriticsPick meta={criticsPick} />
-                    </LazyMount>
-                  )}
-                  {i === 4 && <AwardTiles />}
-                  {i === peopleCtaIdx && <TopPeopleCta />}
-                </Fragment>
-              ))}
+            : visibleRails.map((item) => <Fragment key={item.key}>{renderRow(item)}</Fragment>)}
         </div>
       </ScrollRootContext.Provider>
       <BackToTop scrollRef={scrollRef} />

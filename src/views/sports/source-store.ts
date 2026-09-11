@@ -1,11 +1,10 @@
 import { useSyncExternalStore } from "react";
-import type { StreamKind } from "@/lib/sports/stream-resolver";
 
 const STORE_KEY = "harbor.sports.sources.v1";
 
 export type AttachedStream = {
   url: string;
-  kind: StreamKind;
+  kind: "hls" | "dash" | "file";
   headers?: Record<string, string>;
   page: string;
   title: string;

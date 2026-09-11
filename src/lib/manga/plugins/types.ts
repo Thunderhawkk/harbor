@@ -74,6 +74,7 @@ export type HNode = { t: string; a: Record<string, string>; x: string; c: HNode[
 export type ToWorker =
   | { type: "init"; source: string; config: Record<string, unknown> }
   | { type: "call"; id: string; method: string; args: unknown[] }
+  | { type: "cancel"; id: string }
   | { type: "bridgeResult"; id: string; ok: boolean; value?: unknown; error?: string }
   | { type: "ping" }
   | { type: "dispose" };
@@ -83,6 +84,7 @@ export type FromWorker =
   | { type: "initError"; error: string }
   | { type: "result"; id: string; value: unknown }
   | { type: "error"; id: string; error: string }
+  | { type: "cancelled"; id: string }
   | { type: "http"; id: string; payload: { url: string; opts: PluginHttpOpts } }
   | {
       type: "grpc";

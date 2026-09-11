@@ -7,6 +7,7 @@ import { buildPickerConfigHash, getPickerCache, setPickerCache } from "@/lib/pic
 import { useSettings } from "@/lib/settings";
 import { buildEpisodePipelineInput } from "@/lib/streams/episode-pipeline-input";
 import { runPipeline } from "@/lib/streams/pipeline";
+import { isPluginAddon, pluginCacheTokens } from "@/lib/streams/plugins";
 import { useAddons } from "@/views/play-picker/use-addons";
 import { useAnimeAltTitles } from "@/views/play-picker/use-anime-alt-titles";
 import { useImdbId } from "@/views/play-picker/use-imdb-id";
@@ -19,7 +20,12 @@ export function VoyagePrefetch({ meta }: { meta: Meta }) {
   const debrids = useDebridClients();
   const imdb = useImdbId(meta, settings.tmdbKey);
   const streamIds = useStreamIds(meta, undefined, imdb.id);
-  const { addons } = useAddons(authKey, settings);
+  const { addons: allAddons } = useAddons(authKey, settings);
+  const addons = useMemo(
+    () =>
+      allAddons ? allAddons.filter((a) => settings.pluginsBackground || !isPluginAddon(a)) : allAddons,
+    [allAddons, settings.pluginsBackground],
+  );
   const animeTitles = useAnimeAltTitles(meta);
   const startedRef = useRef<string | null>(null);
 
@@ -31,7 +37,7 @@ export function VoyagePrefetch({ meta }: { meta: Meta }) {
       buildPickerConfigHash({
         addonTransportUrls: (addons ?? []).map((a) => a.transportUrl),
         debridSlugs: debrids.map((d) => d.slug),
-        scraperKeys: [],
+        scraperKeys: pluginCacheTokens(),
         filterMode: filterDisabled ? "off" : strictMode ? "strict" : "balanced",
       }),
     [addons, debrids, filterDisabled, strictMode],

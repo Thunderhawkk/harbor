@@ -1,4 +1,4 @@
-import { Check, Globe, Link2, Plus, X } from "lucide-react";
+import { Check, Globe, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Search } from "@/components/icons/search-icon";
 import { useT } from "@/lib/i18n";
@@ -14,17 +14,15 @@ import {
   type PreparedChannel,
   type SportsChannelIndex,
 } from "@/lib/sports/iptv-match";
-import { hostOf } from "@/lib/sports/stream-resolver";
 import { useView } from "@/lib/view";
 import { useAllPlaylists } from "@/views/live/hooks/use-all-playlists";
-import { AddStreamDialog, useStreamPlayer } from "./add-stream-dialog";
 import {
   setAttachedStream,
   toggleAttachedChannel,
   useAttachments,
   type AttachedStream,
 } from "./source-store";
-import { fixtureLabelOf, useChannelPlayer } from "./watch-flow";
+import { fixtureLabelOf, hostOf, useChannelPlayer, useStreamPlayer } from "./watch-flow";
 
 const VISIBLE_CHIPS = 4;
 const CHIP =
@@ -73,7 +71,6 @@ export function WatchSources({
   const stream = attachments.streams[game.id] ?? null;
   const [expanded, setExpanded] = useState(false);
   const [picking, setPicking] = useState(false);
-  const [webStream, setWebStream] = useState(false);
   const anchor = useRef<HTMLDivElement>(null);
   const fixtureLabel = fixtureLabelOf(game);
 
@@ -116,10 +113,6 @@ export function WatchSources({
             <Plus size={9} />
             {t("Add an IPTV source")}
           </button>
-          <button type="button" onClick={() => setWebStream(true)} className={CHIP_QUIET}>
-            <Link2 size={9} />
-            {t("Paste a stream")}
-          </button>
         </>
       ) : (
         <button
@@ -140,17 +133,6 @@ export function WatchSources({
           attachedIds={attachedIds}
           anchor={anchor}
           onClose={() => setPicking(false)}
-          onWebStream={() => {
-            setPicking(false);
-            setWebStream(true);
-          }}
-        />
-      )}
-      {webStream && (
-        <AddStreamDialog
-          fixtureLabel={fixtureLabel}
-          onAttach={(next) => setAttachedStream(game.id, next)}
-          onClose={() => setWebStream(false)}
         />
       )}
     </div>
@@ -241,14 +223,12 @@ function AttachPopover({
   attachedIds,
   anchor,
   onClose,
-  onWebStream,
 }: {
   game: SportsGame;
   index: SportsChannelIndex;
   attachedIds: string[];
   anchor: RefObject<HTMLDivElement | null>;
   onClose: () => void;
-  onWebStream: () => void;
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
@@ -318,14 +298,6 @@ function AttachPopover({
           ))
         )}
       </div>
-      <button
-        type="button"
-        onClick={onWebStream}
-        className="flex w-full items-center gap-2 border-t border-edge-soft px-3 py-2.5 text-start text-[12.5px] text-ink-muted transition-colors hover:bg-raised hover:text-ink"
-      >
-        <Link2 size={13} className="shrink-0 text-ink-subtle" />
-        {t("Find a stream on a web page")}
-      </button>
     </div>
   );
 }

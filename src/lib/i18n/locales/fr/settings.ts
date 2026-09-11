@@ -257,8 +257,8 @@ const settings: Record<string, string> = {
   "Build a pack in any of these, export the JSON, host it as a gist, and paste the raw link below.":
     "Créez un pack dans l’un de ces outils, exportez le JSON, hébergez-le sous forme de gist, puis collez le lien brut ci-dessous.",
   "Build a Theme": "Créer un thème",
-  "Build identity. Useful when filing a bug report at bugs@harbor.site.":
-    "Identifiant du build. Utile pour envoyer un signalement de bug à bugs@harbor.site.",
+  "Build identity. Useful when filing a bug report.":
+    "Identifiant du build. Utile pour envoyer un signalement de bug.",
   "Built-in peer-to-peer streaming, served from your own machine.":
     "Streaming pair à pair intégré, diffusé depuis votre propre machine.",
   "Bundled with Harbor. Plays anything you throw at it.":
