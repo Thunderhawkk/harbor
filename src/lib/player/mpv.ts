@@ -543,6 +543,25 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
     document.addEventListener("visibilitychange", onVisibilityRestore);
   }
 
+  // A Windows screensaver paints over the window without hiding the document,
+  // so `visibilitychange` never fires for it. Dismissing the screensaver does
+  // return activation to the app window, so a refocus after a long absence is
+  // the wake signal here. The absence gate keeps ordinary alt-tab returns
+  // from paying for an `ao-reload` they don't need.
+  const FOCUS_RELOAD_MIN_ABSENT_MS = 60_000;
+  let lastWindowBlur = Date.now();
+  const onWindowBlur = () => {
+    lastWindowBlur = Date.now();
+  };
+  const onWindowFocusRestore = () => {
+    if (Date.now() - lastWindowBlur < FOCUS_RELOAD_MIN_ABSENT_MS) return;
+    scheduleAudioDeviceReload();
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("focus", onWindowFocusRestore);
+  }
+
   const handleEvent = (raw: MpvEvent) => {
     if (raw.event === "log") {
       const prefix = String((raw as { prefix?: unknown }).prefix ?? "");
@@ -1375,6 +1394,8 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
       }
       geomTauriUnlisten = [];
       document.removeEventListener("visibilitychange", onVisibilityRestore);
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("focus", onWindowFocusRestore);
       if (audioDeviceReloadTimer != null) {
         window.clearTimeout(audioDeviceReloadTimer);
         audioDeviceReloadTimer = null;
