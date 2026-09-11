@@ -283,6 +283,7 @@ pub struct HarborFetchArgs {
     pub max_response_bytes: Option<u64>,
     pub credential_handle: Option<String>,
     pub public_network_only: Option<bool>,
+    pub follow_redirects: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -293,6 +294,7 @@ pub struct HarborFetchResponse {
     pub body: String,
     pub content_type: Option<String>,
     pub headers: HashMap<String, String>,
+    pub url: Option<String>,
 }
 
 #[tauri::command]
@@ -311,6 +313,7 @@ async fn harbor_fetch_inner(
 ) -> Result<HarborFetchResponse, String> {
     let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS));
     let public_network_only = args.public_network_only.unwrap_or(false);
+    let follow_redirects = args.follow_redirects.unwrap_or(true);
 
     let method = args.method.as_deref().unwrap_or("GET").to_uppercase();
     let mut current_method =
@@ -425,7 +428,7 @@ async fn harbor_fetch_inner(
             }
         })?;
         let status = resp.status();
-        if !is_followable_redirect(status) {
+        if !follow_redirects || !is_followable_redirect(status) {
             break resp;
         }
         let location = resp
@@ -503,6 +506,7 @@ async fn harbor_fetch_inner(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
     let response_headers = collect_headers(res.headers());
+    let final_url = res.url().to_string();
     let body = if let Some(max_bytes) = args.max_response_bytes {
         if res.content_length().is_some_and(|size| size > max_bytes) {
             return Err("response size limit exceeded".to_string());
@@ -555,6 +559,7 @@ async fn harbor_fetch_inner(
                     body: solved,
                     content_type: None,
                     headers: HashMap::new(),
+                    url: None,
                 });
             }
         }
@@ -566,6 +571,7 @@ async fn harbor_fetch_inner(
         body,
         content_type,
         headers: response_headers,
+        url: Some(final_url),
     })
 }
 
@@ -662,6 +668,7 @@ async fn harbor_upload_inner(args: HarborUploadArgs) -> Result<HarborFetchRespon
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
     let headers = collect_headers(resp.headers());
+    let url = Some(resp.url().to_string());
     let body = resp.text().await.unwrap_or_default();
     Ok(HarborFetchResponse {
         status,
@@ -669,6 +676,7 @@ async fn harbor_upload_inner(args: HarborUploadArgs) -> Result<HarborFetchRespon
         body,
         content_type,
         headers,
+        url,
     })
 }
 

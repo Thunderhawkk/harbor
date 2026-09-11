@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Loader2, RefreshCw, Settings2, Trash2 } from "../icons";
+import { Loader2, RefreshCw, Settings2, Trash2 } from "../icons";
 import { AddonLogo } from "@/components/addon-logo";
 import { relativeTime } from "@/lib/dates";
 import { useT, useUiLanguage } from "@/lib/i18n";
@@ -77,7 +77,9 @@ export function PluginRow({
   const log = adapter.log?.(plugin.id) ?? [];
   const activity = health?.lastError
     ? healthErrorText(t, health.lastError)
-    : health?.lastCount != null && health.lastTitle
+    : health?.lastSkip
+      ? t("Skipped: {reason}", { reason: health.lastSkip })
+      : health?.lastCount != null && health.lastTitle
       ? health.lastCount > 0
         ? t("Found {count} streams for {title} in {seconds}s", {
             count: health.lastCount,
@@ -106,31 +108,22 @@ export function PluginRow({
   return (
     <>
       <div className={`hset-row ${locked ? "opacity-60" : ""}`} data-settings-row>
-        <button
-          type="button"
+        <RowText
+          lead={<AddonLogo addonId={plugin.id} addonName={plugin.name} manifestLogo={plugin.icon} size="lg" />}
           onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-3 text-start"
+          expanded={open}
         >
-          <RowText
-            lead={<AddonLogo addonId={plugin.id} addonName={plugin.name} manifestLogo={plugin.icon} size="lg" />}
-          >
-            <RowTitle>
-              <span className="min-w-0">{plugin.name}</span>
-              {plugin.nsfw && <Chip>18+</Chip>}
-              {plugin.format === "provider-script" && <Chip>{t("Script")}</Chip>}
-              {plugin.verified && <Chip accent>{t("Verified")}</Chip>}
-            </RowTitle>
-            <RowDesc accent={!!copy.lock}>{copy.lock ?? sub}</RowDesc>
-            {copy.desc && <RowDesc accent>{copy.desc}</RowDesc>}
-            {masterOff && !locked && <RowDesc>{t("Plugins are paused. Turn on Use plugins above to run them.")}</RowDesc>}
-            {(error ?? copy.warn) && <RowNote>{error ?? copy.warn}</RowNote>}
-          </RowText>
-          <ChevronDown
-            size={16}
-            className={`shrink-0 text-ink-subtle transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </button>
+          <RowTitle>
+            <span className="min-w-0">{plugin.name}</span>
+            {plugin.nsfw && <Chip>18+</Chip>}
+            {plugin.format === "provider-script" && <Chip>{t("Script")}</Chip>}
+            {plugin.verified && <Chip accent>{t("Verified")}</Chip>}
+          </RowTitle>
+          <RowDesc accent={!!copy.lock}>{copy.lock ?? sub}</RowDesc>
+          {copy.desc && <RowDesc accent>{copy.desc}</RowDesc>}
+          {masterOff && !locked && <RowDesc>{t("Plugins are paused. Turn on Use plugins above to run them.")}</RowDesc>}
+          {(error ?? copy.warn) && <RowNote>{error ?? copy.warn}</RowNote>}
+        </RowText>
         <RowControl>
           {plugin.hasSettings && adapter.settingsFields && (
             <button

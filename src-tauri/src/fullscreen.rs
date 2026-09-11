@@ -54,17 +54,18 @@ pub async fn window_fullscreen_exit(
         .get_webview_window("main")
         .ok_or_else(|| "main window missing".to_string())?;
 
-    let is_fs = main.is_fullscreen().unwrap_or(false);
-    if is_fs {
+    if main.is_fullscreen().unwrap_or(false) {
         main.set_fullscreen(false)
             .map_err(|e| format!("set_fullscreen(false): {}", e))?;
-        let saved = state.saved.lock().unwrap().take();
-        let was_max = {
-            let mut g = state.was_maximized.lock().unwrap();
-            let v = *g;
-            *g = false;
-            v
-        };
+    }
+    let saved = state.saved.lock().unwrap().take();
+    let was_max = {
+        let mut g = state.was_maximized.lock().unwrap();
+        let v = *g;
+        *g = false;
+        v
+    };
+    if saved.is_some() || was_max {
         if was_max {
             let _ = main.maximize();
             let _ = main.set_focus();

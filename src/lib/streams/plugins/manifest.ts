@@ -51,6 +51,12 @@ export function normalizeRepoUrl(raw: string): string {
   return u.href;
 }
 
+export function repoUrlCandidates(url: string): string[] {
+  const m = /^(https:\/\/raw\.githubusercontent\.com\/[^/]+\/[^/]+\/)HEAD\/(.*)$/.exec(url);
+  if (!m) return [url];
+  return [`${m[1]}main/${m[2]}`, `${m[1]}master/${m[2]}`, url];
+}
+
 export function repoBaseUrl(manifestUrl: string): string {
   return manifestUrl.replace(/[^/]*$/, "");
 }

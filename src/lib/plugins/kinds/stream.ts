@@ -28,12 +28,12 @@ import { repoHost, type EntryView, type KindAdapter, type PluginState, type Plug
 
 const SAMPLE = {
   type: "movie" as const,
-  id: "tt0063350",
-  ids: ["tt0063350"],
-  imdbId: "tt0063350",
-  tmdb: { id: 10331, kind: "movie" as const },
-  title: "Night of the Living Dead",
-  year: 1968,
+  id: "tt0137523",
+  ids: ["tt0137523"],
+  imdbId: "tt0137523",
+  tmdb: { id: 550, kind: "movie" as const },
+  title: "Fight Club",
+  year: 1999,
   season: null,
   episode: null,
   absoluteEpisode: null,

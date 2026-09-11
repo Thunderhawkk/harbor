@@ -1,6 +1,6 @@
 import { PackageOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Loader2, RefreshCw, Trash2 } from "../icons";
+import { Loader2, RefreshCw, Trash2 } from "../icons";
 import { AddonLogo } from "@/components/addon-logo";
 import { relativeTime } from "@/lib/dates";
 import { useT, useUiLanguage } from "@/lib/i18n";
@@ -121,30 +121,19 @@ export function RepoGroup({ repo, adapter }: { repo: RepoView; adapter: KindAdap
   return (
     <SettingGroup>
       <div className="hset-row" data-settings-row>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-3 text-start"
-        >
-          <RowText lead={<PackageOpen size={18} strokeWidth={2} />}>
-            <RowTitle>
-              <span className="min-w-0">{repo.name}</span>
-              <Chip>{kindLabel(t, repo.kind)}</Chip>
-              {repo.format === "provider-script" && <Chip>{t("Script")}</Chip>}
-              {repo.entries.length > 0 && <Chip>{t("{count} plugins", { count: repo.entries.length })}</Chip>}
-              {repo.installedCount > 0 && (
-                <Chip accent>{t("{count} installed", { count: repo.installedCount })}</Chip>
-              )}
-            </RowTitle>
-            <RowDesc accent={repo.updates > 0}>{progress ? t("Installing {done} of {total}", progress) : headerDesc}</RowDesc>
-            {warn && <RowNote>{warn}</RowNote>}
-          </RowText>
-          <ChevronDown
-            size={16}
-            className={`shrink-0 text-ink-subtle transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </button>
+        <RowText lead={<PackageOpen size={18} strokeWidth={2} />} onClick={() => setOpen((v) => !v)} expanded={open}>
+          <RowTitle>
+            <span className="min-w-0">{repo.name}</span>
+            <Chip>{kindLabel(t, repo.kind)}</Chip>
+            {repo.format === "provider-script" && <Chip>{t("Script")}</Chip>}
+            {repo.entries.length > 0 && <Chip>{t("{count} plugins", { count: repo.entries.length })}</Chip>}
+            {repo.installedCount > 0 && (
+              <Chip accent>{t("{count} installed", { count: repo.installedCount })}</Chip>
+            )}
+          </RowTitle>
+          <RowDesc accent={repo.updates > 0}>{progress ? t("Installing {done} of {total}", progress) : headerDesc}</RowDesc>
+          {warn && <RowNote>{warn}</RowNote>}
+        </RowText>
         <RowControl>
           {updatable.length > 0 && adapter.update && (
             <SButton variant="primary" disabled={!!busy} onClick={() => void updateAll()}>

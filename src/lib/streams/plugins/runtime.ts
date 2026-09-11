@@ -76,7 +76,7 @@ function learnHost(id: string, url: string): void {
 }
 
 function emptyHealth(): PluginHealth {
-  return { lastAt: null, lastMs: null, lastCount: null, lastError: null, lastTitle: null, seenHosts: [] };
+  return { lastAt: null, lastMs: null, lastCount: null, lastError: null, lastSkip: null, lastTitle: null, seenHosts: [] };
 }
 
 function workerKey(plugin: InstalledStreamPlugin): string {
@@ -91,7 +91,7 @@ function spawn(plugin: InstalledStreamPlugin): Slot {
       const s = slots.get(plugin.id);
       if (s) s.requests += 1;
     },
-    httpPolicy: { sameSiteHeaders: true, publicOnly: true, maxBytes: MAX_BYTES },
+    httpPolicy: { sameSiteHeaders: true, publicOnly: true, openHeaders: true, maxBytes: MAX_BYTES },
     readyTimeoutMs: READY_TIMEOUT,
   });
   const slot: Slot = { worker, key: workerKey(plugin), lastUsed: Date.now(), requests: 0 };
@@ -199,6 +199,13 @@ async function recordSuccess(plugin: InstalledStreamPlugin): Promise<void> {
   await saveStreamPlugin({ ...fresh, failures: 0 });
 }
 
+export function recordSkip(plugin: InstalledStreamPlugin, reason: string): void {
+  const h = health.get(plugin.id) ?? emptyHealth();
+  h.lastSkip = reason;
+  health.set(plugin.id, h);
+  pushLog(plugin.id, "warn", reason);
+}
+
 export async function runStreamPlugin(
   plugin: InstalledStreamPlugin,
   req: StreamPluginRequest,
@@ -218,6 +225,7 @@ export async function runStreamPlugin(
     h.lastMs = Math.round(performance.now() - started);
     h.lastCount = count;
     h.lastError = null;
+    h.lastSkip = null;
     h.lastTitle = req.title;
     health.set(plugin.id, h);
     pushLog(

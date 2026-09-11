@@ -3777,6 +3777,10 @@ html[data-theme-card="crunch"][dir="rtl"] .harbor-profile-dropdown {
   min-inline-size: 0;
 }
 
+.hset-row-text > .hset-row-chevron {
+  flex: 0 0 auto;
+}
+
 .hset-row-lead {
   display: flex;
   flex: 0 0 auto;

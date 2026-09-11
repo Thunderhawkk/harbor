@@ -2,7 +2,7 @@ import { DOM_PRELUDE } from "@/lib/manga/sources/mangayomi/prelude/dom";
 import { CRYPTO_PRELUDE } from "@/lib/manga/sources/mangayomi/prelude/crypto";
 import { PROVIDER_CHEERIO } from "./cheerio";
 
-export const PRELUDE_VERSION = 1;
+export const PRELUDE_VERSION = 2;
 
 const PROVIDER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
@@ -108,12 +108,13 @@ function __hpResponse(res, url) {
   var status = res && typeof res.status === "number" ? res.status : 0;
   function getBytes() { if (!bytes) bytes = __hpBytes(res && res.body); return bytes; }
   function getText() { if (text == null) text = new TextDecoder("utf-8").decode(getBytes()); return text; }
+  var finalUrl = res && res.url ? String(res.url) : String(url);
   var out = {
     ok: status >= 200 && status < 300,
     status: status,
     statusText: status ? "" : "Network Error",
-    url: String(url),
-    redirected: false,
+    url: finalUrl,
+    redirected: finalUrl !== String(url),
     headers: __hpHeaders(raw),
     bodyUsed: false,
     text: function () { return Promise.resolve(getText()); },
@@ -143,8 +144,12 @@ var fetch = function (input, init) {
     headers: headers,
     body: body,
     responseType: "base64",
+    redirect: init.redirect,
     timeoutMs: typeof init.timeoutMs === "number" ? init.timeoutMs : undefined
-  }).then(function (res) { return __hpResponse(res, url); }, function (err) { return __hpFailed(err, url); });
+  }).then(function (res) {
+    if (init.redirect === "error" && res && res.status >= 300 && res.status < 400) throw new TypeError("Failed to fetch");
+    return __hpResponse(res, url);
+  }, function (err) { return __hpFailed(err, url); });
 };
 __g.fetch = fetch;
 
@@ -178,7 +183,7 @@ function __hpAxiosRequest(defaults, cfg) {
   }
   var body = __hpBody(merged.data, headers);
   var method = (merged.method || "GET").toUpperCase();
-  return fetch(url, { method: method, headers: headers, body: body, timeoutMs: merged.timeout }).then(function (res) {
+  return fetch(url, { method: method, headers: headers, body: body, redirect: merged.maxRedirects === 0 ? "manual" : undefined, timeoutMs: merged.timeout }).then(function (res) {
     if (res.status === 0) throw __hpAxiosError(res.statusText || "Network Error", merged, null);
     return res.text().then(function (text) {
       var data = text;

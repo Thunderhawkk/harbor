@@ -1,4 +1,4 @@
-import { safeFetch, safeFetchBytes } from "@/lib/safe-fetch";
+import { FINAL_URL_HEADER, safeFetch, safeFetchBytes } from "@/lib/safe-fetch";
 import { isBlockedUrl } from "@/lib/privacy/blocklist";
 import { SUBTITLE_PUBLIC_NETWORK_HEADER } from "@/lib/subtitles/provider-url";
 import type { PluginGrpcOpts, PluginGrpcResult, PluginHttpOpts, PluginHttpResult } from "./types";
@@ -6,6 +6,7 @@ import type { PluginGrpcOpts, PluginGrpcResult, PluginHttpOpts, PluginHttpResult
 export type PluginHttpPolicy = {
   publicOnly?: boolean;
   maxBytes?: number;
+  openHeaders?: boolean;
 };
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -231,6 +232,7 @@ function keepCookie(gate: HeaderGate): boolean {
 function filterHeaders(
   headers: Record<string, string> | undefined,
   gate: HeaderGate,
+  open = false,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (!headers) return out;
@@ -239,16 +241,20 @@ function filterHeaders(
     if (raw == null) continue;
     const low = k.toLowerCase();
     const val = String(raw);
+    if (low === "accept-encoding" || low.startsWith("x-harbor")) continue;
     if (low === "referer" || low === "origin") {
-      if (keepReferer(val, gate)) out[k] = val;
+      if (open || keepReferer(val, gate)) out[k] = val;
       continue;
     }
     if (low === "cookie") {
-      if (keepCookie(gate)) out[k] = val;
+      if (open || keepCookie(gate)) out[k] = val;
+      continue;
+    }
+    if (open && (low === "authorization" || low.startsWith("sec-"))) {
+      out[k] = val;
       continue;
     }
     if (DENY_HEADERS.has(low)) continue;
-    if (low.startsWith("x-harbor")) continue;
     if (low.startsWith("sec-")) continue;
     out[k] = val;
   }
@@ -328,18 +334,22 @@ export async function runPluginHttp(
   const target = assertSafeUrl(url);
   const method = (opts.method || "GET").toUpperCase();
   const timeout = Math.min(Math.max(opts.timeoutMs || DEFAULT_TIMEOUT, 1_000), MAX_TIMEOUT);
-  const headers = filterHeaders(opts.headers, {
-    host: hostOf(target) ?? "",
-    allowRefererHost: hostOf(opts.allowReferer),
-    allowCookieHost: hostOf(opts.allowCookie),
-  });
+  const headers = filterHeaders(
+    opts.headers,
+    {
+      host: hostOf(target) ?? "",
+      allowRefererHost: hostOf(opts.allowReferer),
+      allowCookieHost: hostOf(opts.allowCookie),
+    },
+    policy?.openHeaders === true,
+  );
   if (!Object.keys(headers).some((k) => k.toLowerCase() === "user-agent")) {
     headers["User-Agent"] = PLUGIN_UA;
   }
   const init: RequestInit = {
     method,
     headers,
-    redirect: "follow",
+    redirect: opts.redirect === "manual" || opts.redirect === "error" ? "manual" : "follow",
     credentials: "omit",
     signal: AbortSignal.timeout(timeout),
   };
@@ -354,7 +364,8 @@ export async function runPluginHttp(
     : await safeFetch(target, init);
   const bytes = await readCapped(res);
   const body = opts.responseType === "base64" ? toBase64(bytes) : new TextDecoder().decode(bytes);
-  return { status: res.status, ok: res.ok, headers: pickHeaders(res.headers), body };
+  const finalUrl = res.headers.get(FINAL_URL_HEADER) ?? undefined;
+  return { status: res.status, ok: res.ok, headers: pickHeaders(res.headers), body, url: finalUrl };
 }
 
 export async function runPluginGrpc(

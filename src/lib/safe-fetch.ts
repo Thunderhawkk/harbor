@@ -201,7 +201,10 @@ type HarborFetchResponse = {
   body: string;
   contentType: string | null;
   headers?: Record<string, string>;
+  url?: string;
 };
+
+export const FINAL_URL_HEADER = "x-harbor-final-url";
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -267,11 +270,16 @@ async function tauriHarborFetch(
       maxResponseBytes,
       credentialHandle,
       publicNetworkOnly,
+      followRedirects: init?.redirect === "manual" || init?.redirect === "error" ? false : undefined,
     },
   });
+  const responseHeaders = new Headers(
+    resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
+  );
+  if (resp.url) responseHeaders.set(FINAL_URL_HEADER, resp.url);
   return new Response(responseType === "base64" ? base64ToBytes(resp.body) : resp.body, {
     status: resp.status,
-    headers: resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
+    headers: responseHeaders,
   });
 }
 

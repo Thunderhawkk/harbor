@@ -50,6 +50,7 @@ export const SANDBOX_SOURCE = String.raw`(function () {
       headers: headers,
       body: typeof opts.body === "string" ? opts.body : undefined,
       responseType: rt,
+      redirect: opts.redirect === "manual" || opts.redirect === "error" ? String(opts.redirect) : undefined,
       timeoutMs: typeof opts.timeoutMs === "number" ? opts.timeoutMs : undefined
     };
   }

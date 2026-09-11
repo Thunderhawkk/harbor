@@ -151,6 +151,7 @@ export type PluginHealth = {
   lastMs: number | null;
   lastCount: number | null;
   lastError: string | null;
+  lastSkip: string | null;
   lastTitle: string | null;
   seenHosts: string[];
 };

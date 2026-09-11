@@ -78,3 +78,12 @@ export function subscribeStreamPlugins(cb: () => void): () => void {
     c();
   };
 }
+
+export function subscribeStreamPluginList(cb: () => void): () => void {
+  const a = subscribeStreamPluginStore(cb);
+  const b = subscribeStreamRepos(cb);
+  return () => {
+    a();
+    b();
+  };
+}

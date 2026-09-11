@@ -379,6 +379,7 @@ fn apply_pre_init(
     set("osd-level", "0");
     set("cursor-autohide", "200");
     set("volume-max", "600");
+    set("sub-codepage", "utf-8");
     let _ = init.set_property("background-color", "#000000");
     let _ = init.set_property("background", "color");
     let _ = init.set_property("media-controls", "no");
