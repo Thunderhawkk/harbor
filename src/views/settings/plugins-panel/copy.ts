@@ -19,6 +19,12 @@ export function errorText(t: T, e: unknown): string {
       );
     case "manga-repo":
       return t("This is a manga repository. Add it from the Manga page.");
+    case "android-extensions":
+      return t(
+        "These are compiled Android extensions (.cs3). Harbor runs script plugins only, so they cannot be installed here.",
+      );
+    case "stremio-addon":
+      return t("This is a Stremio addon manifest. Add it from the Addons page instead.");
     case "already-added":
       return t("Already added.");
     case "not-stream-plugin":

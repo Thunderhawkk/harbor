@@ -7,7 +7,7 @@ import { toStreams } from "./adapter";
 import { repoKey } from "./manifest";
 import { PRELUDE_VERSION } from "./provider-compat/prelude";
 import { buildPluginRequest } from "./request";
-import { runStreamPlugin } from "./runtime";
+import { recordSkip, runStreamPlugin } from "./runtime";
 import { settingsFingerprint } from "./source";
 import { installedStreamPluginsSync } from "./store";
 import type { InstalledStreamPlugin } from "./types";
@@ -99,6 +99,13 @@ export function pluginsForAddon(addon: Pick<Addon, "transportUrl">): InstalledSt
   return runnableStreamPlugins().filter((p) => p.id === id);
 }
 
+export function pluginListKey(): string {
+  return installedStreamPluginsSync()
+    .filter((p) => p.enabled && !p.repoDisabled && !p.incompatible && p.listed)
+    .map((p) => `${p.id}@${p.hash}@${settingsFingerprint(p)}`)
+    .join("|");
+}
+
 export function pluginCacheTokens(): string[] {
   return [
     `prelude:${PRELUDE_VERSION}`,
@@ -118,7 +125,7 @@ export async function runPluginAddon(
     plugins.map(async (plugin) => {
       const request = await buildPluginRequest(req, pickedId, plugin, tmdbKey);
       if (plugin.format === "provider-script" && !request.tmdb) {
-        dwarn(`[plugins] ${plugin.name} skipped: no TMDB id for ${request.title || pickedId}`);
+        recordSkip(plugin, `No TMDB id for ${request.title || pickedId}`);
         return [];
       }
       const budget = plugin.timeoutMs ? Math.min(plugin.timeoutMs, timeoutMs) : timeoutMs;
@@ -133,6 +140,9 @@ export async function runPluginAddon(
     }),
   );
   const out: Stream[] = [];
-  for (const r of results) if (r.status === "fulfilled") out.push(...r.value);
+  for (const r of results) {
+    if (r.status === "fulfilled") out.push(...r.value);
+    else dwarn(`[plugins] ${addon.manifest.name} dropped`, r.reason);
+  }
   return out;
 }

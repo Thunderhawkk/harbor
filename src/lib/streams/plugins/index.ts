@@ -47,6 +47,7 @@ export {
   isPluginAddon,
   pluginAddons,
   pluginCacheTokens,
+  pluginListKey,
   pluginsForAddon,
   runPluginAddon,
   runnableStreamPlugins,
@@ -76,5 +77,14 @@ export function subscribeStreamPlugins(cb: () => void): () => void {
     a();
     b();
     c();
+  };
+}
+
+export function subscribeStreamPluginList(cb: () => void): () => void {
+  const a = subscribeStreamPluginStore(cb);
+  const b = subscribeStreamRepos(cb);
+  return () => {
+    a();
+    b();
   };
 }

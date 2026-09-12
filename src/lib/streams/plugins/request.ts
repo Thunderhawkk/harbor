@@ -6,6 +6,8 @@ import type { InstalledStreamPlugin, StreamPluginRequest } from "./types";
 
 const MAP_KEY = "harbor.plugins.tmdb.v1";
 const MAP_MAX = 500;
+const MISS_TTL_MS = 10 * 60_000;
+const misses = new Map<string, number>();
 
 type TmdbRef = { id: number; kind: "movie" | "tv" };
 
@@ -18,7 +20,7 @@ function loadMap(): Map<string, TmdbRef | null> {
   try {
     const raw = localStorage.getItem(MAP_KEY);
     if (raw) {
-      for (const [k, v] of Object.entries(JSON.parse(raw) as Record<string, TmdbRef | null>)) map.set(k, v);
+      for (const [k, v] of Object.entries(JSON.parse(raw) as Record<string, TmdbRef | null>)) if (v) map.set(k, v);
     }
   } catch {
     /* ignore */
@@ -55,7 +57,10 @@ export async function resolveTmdb(
   const kind = type === "series" ? "tv" : "movie";
   const cacheKey = `${imdbId}:${kind}`;
   const cache = loadMap();
-  if (cache.has(cacheKey)) return cache.get(cacheKey) ?? null;
+  const hit = cache.get(cacheKey);
+  if (hit) return hit;
+  const missedAt = misses.get(cacheKey);
+  if (missedAt && Date.now() - missedAt < MISS_TTL_MS) return null;
   const pending = inflight.get(cacheKey);
   if (pending) return pending;
   const p = (async () => {
@@ -70,8 +75,13 @@ export async function resolveTmdb(
       const id = m?.moviedb_id;
       if (typeof id === "number" && id > 0) ref = { id, kind };
     }
-    cache.set(cacheKey, ref);
-    persistMap();
+    if (ref) {
+      cache.set(cacheKey, ref);
+      persistMap();
+      misses.delete(cacheKey);
+    } else {
+      misses.set(cacheKey, Date.now());
+    }
     return ref;
   })().finally(() => inflight.delete(cacheKey));
   inflight.set(cacheKey, p);

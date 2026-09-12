@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, ExternalLink, Eye, Key, Lock } from "./icons";
+import { AlertTriangle, Check, ChevronDown, ExternalLink, Eye, Key, Lock } from "./icons";
 import {
   createContext,
   useContext,
@@ -145,12 +145,40 @@ export function stripArrowKeys(
   };
 }
 
-export function RowText({ lead, children }: { lead?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <span className="hset-row-text flex min-w-0 items-start gap-3">
+export function RowText({
+  lead,
+  children,
+  onClick,
+  expanded,
+}: {
+  lead?: React.ReactNode;
+  children: React.ReactNode;
+  onClick?: () => void;
+  expanded?: boolean;
+}) {
+  const body = (
+    <>
       {lead && <span className="hset-row-lead shrink-0 text-ink-muted">{lead}</span>}
       <span className="flex min-w-0 flex-1 flex-col gap-1">{children}</span>
-    </span>
+    </>
+  );
+  if (!onClick) return <span className="hset-row-text flex min-w-0 items-start gap-3">{body}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={expanded}
+      className="hset-row-text flex min-w-0 items-start gap-3 text-start"
+    >
+      {body}
+      {expanded !== undefined && (
+        <span
+          className={`hset-row-chevron shrink-0 self-center text-ink-subtle transition-transform ${expanded ? "rotate-180" : ""}`}
+        >
+          <ChevronDown size={16} />
+        </span>
+      )}
+    </button>
   );
 }
 

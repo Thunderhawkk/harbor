@@ -43,6 +43,7 @@ export type PluginHttpOpts = {
   body?: string;
   responseType?: PluginHttpResponseType;
   timeoutMs?: number;
+  redirect?: "follow" | "manual" | "error";
   allowReferer?: string;
   allowCookie?: string;
 };
@@ -52,6 +53,7 @@ export type PluginHttpResult = {
   ok: boolean;
   headers: Record<string, string>;
   body: string;
+  url?: string;
 };
 
 export type PluginGrpcOpts = {

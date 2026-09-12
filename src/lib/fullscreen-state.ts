@@ -269,6 +269,10 @@ export async function exitAnyFullscreen(): Promise<void> {
   if (typeof document !== "undefined" && document.fullscreenElement) {
     await document.exitFullscreen().catch(() => {});
   }
+  if (windowFullscreen || borderlessActive) {
+    await exitWindowFullscreen();
+    return;
+  }
   if (isTauri()) {
     try {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -278,7 +282,6 @@ export async function exitAnyFullscreen(): Promise<void> {
       /* ignore */
     }
   }
-  if (windowFullscreen || borderlessActive) await exitWindowFullscreen();
 }
 
 if (isTauri()) {

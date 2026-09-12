@@ -201,7 +201,10 @@ type HarborFetchResponse = {
   body: string;
   contentType: string | null;
   headers?: Record<string, string>;
+  url?: string;
 };
+
+export const FINAL_URL_HEADER = "x-harbor-final-url";
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -215,13 +218,13 @@ function base64ToBytes(value: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-async function tauriHarborFetch(
+async function invokeHarborFetch(
   input: string,
   init?: RequestInit,
   responseType?: "base64",
   timeoutMs = 30000,
   maxResponseBytes?: number,
-): Promise<Response> {
+): Promise<HarborFetchResponse> {
   countCrossing("harborFetch", input);
   const headers: Record<string, string> = {};
   let credentialHandle: string | undefined;
@@ -267,12 +270,61 @@ async function tauriHarborFetch(
       maxResponseBytes,
       credentialHandle,
       publicNetworkOnly,
+      followRedirects: init?.redirect === "manual" || init?.redirect === "error" ? false : undefined,
     },
   });
+  return resp;
+}
+
+async function tauriHarborFetch(
+  input: string,
+  init?: RequestInit,
+  responseType?: "base64",
+  timeoutMs = 30000,
+  maxResponseBytes?: number,
+): Promise<Response> {
+  const resp = await invokeHarborFetch(input, init, responseType, timeoutMs, maxResponseBytes);
+  const responseHeaders = new Headers(
+    resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
+  );
+  if (resp.url) responseHeaders.set(FINAL_URL_HEADER, resp.url);
   return new Response(responseType === "base64" ? base64ToBytes(resp.body) : resp.body, {
     status: resp.status,
-    headers: resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
+    headers: responseHeaders,
   });
+}
+
+export type Base64FetchResult = {
+  status: number;
+  ok: boolean;
+  headers: Record<string, string>;
+  body: string;
+  url?: string;
+};
+
+export function safeFetchBase64(
+  target: string,
+  init: RequestInit | undefined,
+  timeoutMs = 30000,
+  maxResponseBytes?: number,
+): Promise<Base64FetchResult> | null {
+  if (!isTauri) return null;
+  const policyHeaders = new Headers(init?.headers as HeadersInit | undefined);
+  if (policyHeaders.get(SUBTITLE_PUBLIC_NETWORK_HEADER) === "1" && !isSafeProviderSubtitleUrl(target)) {
+    return Promise.reject(new TypeError("blocked non-public provider subtitle target"));
+  }
+  if (isBlockedUrl(target)) {
+    noteBlocked();
+    return Promise.reject(new TrackerBlockedError(new URL(target).hostname));
+  }
+  const raw = invokeHarborFetch(target, init, "base64", timeoutMs, maxResponseBytes).then((resp) => ({
+    status: resp.status,
+    ok: resp.ok,
+    headers: resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
+    body: resp.body,
+    url: resp.url,
+  }));
+  return withDeadline(raw, init?.signal, timeoutMs + 5_000);
 }
 
 function isIdempotent(method: string | undefined): boolean {
@@ -325,13 +377,13 @@ async function materializeRequest(
 
 const HARBOR_FETCH_DEADLINE_MS = 35000;
 
-function withDeadline(
-  p: Promise<Response>,
+function withDeadline<T>(
+  p: Promise<T>,
   signal?: AbortSignal | null,
   deadlineMs = HARBOR_FETCH_DEADLINE_MS,
-): Promise<Response> {
+): Promise<T> {
   if (signal?.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
-  return new Promise<Response>((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     let settled = false;
     const cleanups: Array<() => void> = [];
     const finish = (run: () => void) => {

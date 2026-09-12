@@ -1,6 +1,6 @@
 import { safeFetch } from "@/lib/safe-fetch";
 import { assertSafeUrl } from "@/lib/manga/plugins/host-http";
-import { normalizeRepoUrl, parseStreamRepoManifest, pluginIdFor, type ParsedStreamRepo } from "./manifest";
+import { normalizeRepoUrl, parseStreamRepoManifest, pluginIdFor, repoUrlCandidates, type ParsedStreamRepo } from "./manifest";
 import { uninstallStreamPlugin } from "./install";
 import { installedStreamPluginsSync, saveStreamPlugin, deleteStreamRepoRecord, loadStreamRepoRecords, saveStreamRepoRecord } from "./store";
 import { PluginError, type StreamRepoRecord } from "./types";
@@ -94,10 +94,18 @@ async function upsert(url: string, parsed: ParsedStreamRepo): Promise<StreamRepo
 }
 
 export async function addStreamRepo(rawUrl: string): Promise<StreamRepoRecord> {
-  const url = normalizeRepoUrl(rawUrl);
-  if (repos.some((r) => r.url === url)) throw new PluginError("already-added");
-  const parsed = await fetchStreamRepoManifest(url);
-  return upsert(url, parsed);
+  const candidates = repoUrlCandidates(normalizeRepoUrl(rawUrl));
+  if (candidates.some((u) => repos.some((r) => r.url === u))) throw new PluginError("already-added");
+  let lastError: unknown = null;
+  for (const url of candidates) {
+    try {
+      const parsed = await fetchStreamRepoManifest(url);
+      if (parsed.entries.length > 0 || url === candidates[candidates.length - 1]) return await upsert(url, parsed);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError ?? new PluginError("no-answer");
 }
 
 export async function refreshStreamRepo(url: string): Promise<StreamRepoRecord> {

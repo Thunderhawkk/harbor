@@ -5,7 +5,8 @@ import type { PluginStream, StreamPluginRequest } from "./types";
 
 const MAX_STREAMS = 150;
 const MAX_TEXT = 400;
-const HEADER_ALLOW = new Set(["user-agent", "referer", "origin", "cookie", "accept", "accept-language"]);
+const HEADER_DENY = new Set(["host", "content-length", "connection", "transfer-encoding", "keep-alive", "te", "upgrade"]);
+const MAX_HEADERS = 24;
 const STOP_WORDS = new Set(["the", "and", "of", "a", "an", "to", "in", "on", "for", "vs", "with"]);
 
 export type AdapterContext = {
@@ -48,15 +49,22 @@ function sameSite(a: string, b: string): boolean {
   return tail(a) === tail(b);
 }
 
+function headerName(key: string): string {
+  return key.replace(/(^|-)([a-z])/g, (_, sep: string, ch: string) => sep + ch.toUpperCase());
+}
+
 function pickHeaders(raw: unknown, url: string | undefined): Record<string, string> | null {
   if (!raw || typeof raw !== "object") return null;
   const out: Record<string, string> = {};
   const host = url ? hostOf(url) : "";
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    const key = k.toLowerCase();
-    if (!HEADER_ALLOW.has(key) || typeof v !== "string" || !v) continue;
-    if ((key === "referer" || key === "origin") && !sameSite(hostOf(v), host)) continue;
-    out[key === "user-agent" ? "User-Agent" : key === "referer" ? "Referer" : key === "origin" ? "Origin" : key === "cookie" ? "Cookie" : key === "accept" ? "Accept" : "Accept-Language"] = v.slice(0, 2000);
+    const key = k.trim().toLowerCase();
+    if (!/^[a-z0-9-]+$/.test(key) || HEADER_DENY.has(key) || key.startsWith("x-harbor")) continue;
+    const value = typeof v === "string" ? v.replace(/[\x00-\x1f\x7f]/g, "").trim() : "";
+    if (!value || value.includes(",")) continue;
+    if ((key === "referer" || key === "origin") && !sameSite(hostOf(value), host)) continue;
+    out[headerName(key)] = value.slice(0, 2000);
+    if (Object.keys(out).length >= MAX_HEADERS) break;
   }
   return Object.keys(out).length ? out : null;
 }

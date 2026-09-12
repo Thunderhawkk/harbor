@@ -11,8 +11,9 @@ import type { useSettings } from "@/lib/settings";
 import {
   loadStreamPlugins,
   pluginAddons,
+  pluginListKey,
   setStreamPluginConfig,
-  subscribeStreamPlugins,
+  subscribeStreamPluginList,
 } from "@/lib/streams/plugins";
 
 type Settings = ReturnType<typeof useSettings>["settings"];
@@ -44,7 +45,15 @@ export function useAddons(authKey: string | null, settings: Settings): {
   const [addons, setAddons] = useState<Addon[] | null>(null);
   const [userHasStreamAddons, setUserHasStreamAddons] = useState(false);
   const [pluginTick, setPluginTick] = useState(0);
-  useEffect(() => subscribeStreamPlugins(() => setPluginTick((n) => n + 1)), []);
+  useEffect(() => {
+    let last = pluginListKey();
+    return subscribeStreamPluginList(() => {
+      const next = pluginListKey();
+      if (next === last) return;
+      last = next;
+      setPluginTick((n) => n + 1);
+    });
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const debridKeys = {
