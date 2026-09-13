@@ -76,6 +76,7 @@ export function useHdrStage(params: {
     if (!isTauri) return;
     let cancelled = false;
     let unMoved: (() => void) | null = null;
+    let unFlip: (() => void) | null = null;
     let timer: number | null = null;
     const recheck = async () => {
       const w = await displayHdrActive();
@@ -91,10 +92,22 @@ export function useHdrStage(params: {
       if (cancelled) off();
       else unMoved = off;
     })();
+    // The display-info script flips the display a beat after the video
+    // opens; re-check once the OS-level flip lands so staging follows it.
+    void (async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const off = await listen("hdr-stage://display-status", () => {
+        if (timer != null) window.clearTimeout(timer);
+        timer = window.setTimeout(() => void recheck(), 250);
+      });
+      if (cancelled) off();
+      else unFlip = off;
+    })();
     return () => {
       cancelled = true;
       if (timer != null) window.clearTimeout(timer);
       unMoved?.();
+      unFlip?.();
     };
   }, [eligible, playerHdrStage]);
 

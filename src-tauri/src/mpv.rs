@@ -155,6 +155,10 @@ struct MpvSession {
     is_live: bool,
     #[cfg(any(windows, target_os = "linux"))]
     embedded: bool,
+    /// OS-level HDR state when the session started. Compared against the
+    /// script-reported state at teardown: only an off->on flip waits.
+    #[cfg(windows)]
+    hdr_baseline_on: bool,
 }
 
 impl MpvState {
@@ -309,7 +313,10 @@ fn apply_pre_init(
     init: &MpvInitializer,
     args: &MpvStartArgs,
     embed_hwnd: Option<&str>,
+    separate_screen: Option<i32>,
 ) -> Result<(), String> {
+    #[cfg(not(windows))]
+    let _ = separate_screen;
     // Property sets here are best-effort. Some builds of mpv (e.g. Flatpak's
     // meson build without Lua) omit optional properties like `osc`. Treat
     // PROPERTY_NOT_FOUND as non-fatal so the player still initializes.
@@ -318,6 +325,15 @@ fn apply_pre_init(
             eprintln!("[harbor::mpv] pre-init skip {}={}: {}", k, v, e);
         }
     };
+    // Scripts and script options must be applied before mpv initializes; they
+    // cannot be set afterwards. Parse them out of extra_options so the
+    // post-init pass skips them.
+    let (init_only_pairs, _rest) = args
+        .extra_options
+        .as_deref()
+        .map(split_extra_option_pairs)
+        .unwrap_or_default();
+    let joined_init_only = join_init_only_pairs(&init_only_pairs);
     set("title", "Harbor");
     set("audio-client-name", "Harbor");
     set("terminal", "no");
@@ -403,6 +419,14 @@ fn apply_pre_init(
     } else if !args.embed.unwrap_or(false) {
         set("ontop", "yes");
         set("border", "no");
+        // The separate-window player is created with force-window: immediate
+        // while mpv_initialize runs, so its win32 monitor must be fixed here
+        // pre-init or the VO window lands on the primary monitor. `screen` is
+        // a 0-based EnumDisplayMonitors ordinal.
+        #[cfg(windows)]
+        if let Some(idx) = separate_screen {
+            set("screen", idx.to_string().as_str());
+        }
     }
 
     let opt = |k: &str, v: &str| {
@@ -460,10 +484,14 @@ fn apply_pre_init(
             set("start", &format!("{}", start));
         }
     }
+    for (key, value) in &joined_init_only {
+        set(key, value);
+    }
     Ok(())
 }
 
-fn apply_extra_mpv_options(mpv: &Mpv, raw: &str) {
+fn parse_extra_option_lines(raw: &str) -> Vec<(String, String)> {
+    let mut options = Vec::new();
     for line in raw.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
@@ -480,7 +508,95 @@ fn apply_extra_mpv_options(mpv: &Mpv, raw: &str) {
         if key.is_empty() {
             continue;
         }
-        match mpv.set_property(key, value) {
+        options.push((key.to_string(), value.to_string()));
+    }
+    options
+}
+
+/// Extra-option keys that only take effect before mpv initializes. Scripts
+/// and script options must be present when mpv_initialize runs; setting them
+/// afterwards is rejected or silently ignored.
+const EXTRA_INIT_ONLY_KEYS: &[&str] = &["scripts", "script-opts", "load-scripts", "load-script"];
+
+fn is_init_only_key(key: &str) -> bool {
+    EXTRA_INIT_ONLY_KEYS
+        .iter()
+        .any(|k| k.eq_ignore_ascii_case(key))
+}
+
+/// Splits parsed extra options into (init_only, rest), preserving the order
+/// within each bucket. `load-script` entries are folded into the `scripts`
+/// bucket so every script path is joined and applied together pre-init.
+fn split_extra_option_pairs(raw: &str) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    let mut init_only = Vec::new();
+    let mut rest = Vec::new();
+    for (key, value) in parse_extra_option_lines(raw) {
+        if is_init_only_key(&key) {
+            let key = key.to_ascii_lowercase();
+            let key = if key == "load-script" {
+                "scripts".to_string()
+            } else {
+                key
+            };
+            init_only.push((key, value));
+        } else {
+            rest.push((key, value));
+        }
+    }
+    (init_only, rest)
+}
+
+/// Joins init-only pairs into single option values. `scripts` entries are
+/// joined with ';' on Windows and ':' elsewhere (empty entries rejected),
+/// `script-opts` with ',', and `load-scripts` keeps the last non-empty value.
+fn join_init_only_pairs(pairs: &[(String, String)]) -> Vec<(String, String)> {
+    let mut scripts: Vec<String> = Vec::new();
+    let mut script_opts: Vec<String> = Vec::new();
+    let mut load_scripts: Option<String> = None;
+    for (key, value) in pairs {
+        match key.as_str() {
+            "scripts" => {
+                if !value.is_empty() {
+                    scripts.push(value.clone());
+                }
+            }
+            "script-opts" => {
+                if !value.is_empty() {
+                    script_opts.push(value.clone());
+                }
+            }
+            "load-scripts" => {
+                if !value.is_empty() {
+                    load_scripts = Some(value.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    if !scripts.is_empty() {
+        let sep = if cfg!(windows) { ";" } else { ":" };
+        out.push(("scripts".to_string(), scripts.join(sep)));
+    }
+    if !script_opts.is_empty() {
+        out.push(("script-opts".to_string(), script_opts.join(",")));
+    }
+    if let Some(v) = load_scripts {
+        out.push(("load-scripts".to_string(), v));
+    }
+    out
+}
+
+fn apply_extra_mpv_options(mpv: &Mpv, raw: &str) {
+    for (key, value) in parse_extra_option_lines(raw) {
+        if is_init_only_key(&key) {
+            eprintln!(
+                "[harbor::mpv] extra option {}={} skipped (init-only)",
+                key, value
+            );
+            continue;
+        }
+        match mpv.set_property(&key, value.as_str()) {
             Ok(()) => eprintln!("[harbor::mpv] extra option set {}={}", key, value),
             Err(e) => eprintln!(
                 "[harbor::mpv] extra option {}={} rejected: {:?}",
@@ -541,6 +657,14 @@ pub async fn mpv_start(
     state: State<'_, MpvState>,
     args: MpvStartArgs,
 ) -> Result<(), String> {
+    // OS-level HDR state before this transition begins. Compared at teardown
+    // against the script-reported state: only off->on waits for restore.
+    #[cfg(windows)]
+    let hdr_baseline_on = app
+        .get_webview_window("main")
+        .and_then(|w| w.hwnd().ok())
+        .map(|h| monitor_hdr_active(h.0 as isize))
+        .unwrap_or(false);
     let mut g = state.inner.lock().await;
     if let Some(prev) = g.take() {
         #[cfg(target_os = "macos")]
@@ -565,10 +689,17 @@ pub async fn mpv_start(
             });
             let _ = rx.recv_timeout(std::time::Duration::from_millis(4000));
         }
-        #[cfg(all(not(target_os = "macos"), not(target_os = "linux")))]
+        #[cfg(all(not(target_os = "macos"), not(target_os = "linux"), not(windows)))]
         {
             let _ = prev.mpv.command("quit", &[]);
             drop(prev);
+        }
+        #[cfg(windows)]
+        {
+            let was_off = !prev.hdr_baseline_on;
+            let _ = prev.mpv.command("quit", &[]);
+            drop(prev);
+            restore_display_sdr_if_flipped(&app, was_off);
         }
     }
 
@@ -585,13 +716,31 @@ pub async fn mpv_start(
         embed_hwnd
     );
     let embed_hwnd_for_init = embed_hwnd.clone();
+    // Resolve the display the Harbor window sits on before init: Windows
+    // creates the separate player's VO window during mpv_initialize, so the
+    // win32 `screen` ordinal must be known here to fix it pre-init.
+    #[cfg(windows)]
+    let separate_screen_for_init = if want_embed {
+        None
+    } else {
+        app.get_webview_window("main")
+            .and_then(|w| w.hwnd().ok())
+            .and_then(|h| monitor_index_of_hwnd(h.0 as isize))
+    };
+    #[cfg(not(windows))]
+    let separate_screen_for_init = None;
     let args_for_init = args.clone();
     let init_err: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
     let init_err_cap = init_err.clone();
 
     force_c_numeric_locale();
     let mpv = Mpv::with_initializer(move |init| {
-        if let Err(e) = apply_pre_init(&init, &args_for_init, embed_hwnd_for_init.as_deref()) {
+        if let Err(e) = apply_pre_init(
+            &init,
+            &args_for_init,
+            embed_hwnd_for_init.as_deref(),
+            separate_screen_for_init,
+        ) {
             eprintln!("[harbor::mpv] pre-init failed: {}", e);
             if let Ok(mut g) = init_err_cap.lock() {
                 *g = Some(e);
@@ -625,8 +774,8 @@ pub async fn mpv_start(
     let use_render_api = (cfg!(target_os = "macos") || cfg!(target_os = "linux")) && want_embed;
     if !use_render_api {
         let vo = match args.renderer.as_deref() {
-            Some("gpu") => "gpu,",
-            _ => "gpu-next,",
+            Some("gpu") => "gpu",
+            _ => "gpu-next",
         };
         if let Err(e) = mpv.set_property("vo", vo) {
             eprintln!("[harbor::mpv] vo set FAILED: {:?}", e);
@@ -889,6 +1038,8 @@ pub async fn mpv_start(
         embedded: embed_hwnd.is_some(),
         #[cfg(target_os = "linux")]
         embedded: use_render_api,
+        #[cfg(windows)]
+        hdr_baseline_on,
     });
     drop(g);
 
@@ -902,6 +1053,48 @@ fn reassert_hdr_colorspace(mpv: &Arc<Mpv>) {
     let _ = mpv.set_property("target-peak", "10000");
     std::thread::sleep(Duration::from_millis(60));
     let _ = mpv.set_property("target-peak", "auto");
+}
+
+/// Confident HDR-to-SDR restore after mpv quit. The user script's own
+/// shutdown toggle (hdr-mode.lua's `toggle-hdr-display off`) runs while the
+/// vo window is already being destroyed and can be cut off before the display
+/// flip lands, so Harbor re-applies the flip itself once mpv is gone. Only
+/// acts when this session flipped HDR off->on (baseline was SDR); a session
+/// on an always-HDR display keeps that mode untouched.
+///
+/// The display is the one Harbor's own window sits on, which matches the
+/// embedded player (mpv is a child of "main"). The separate-window player is
+/// opened on the same display (via the `screen` option), so the same monitor
+/// check works for both modes.
+#[cfg(windows)]
+fn restore_display_sdr_if_flipped(app: &AppHandle, was_off: bool) {
+    if !was_off {
+        eprintln!("[harbor::mpv] skip display restore (baseline HDR was on)");
+        return;
+    }
+    // Give mpv's teardown (and the script's own shutdown toggle) a moment to
+    // settle, then force the display back to SDR ourselves if it is still on.
+    std::thread::sleep(Duration::from_millis(150));
+    // The Harbor window's monitor is the one the script flipped in both
+    // modes: embedded mpv renders as a child of "main", and the
+    // separate-window player is placed on "main"'s display at init.
+    let window = match app.get_webview_window("main") {
+        Some(w) => w,
+        None => return,
+    };
+    let hwnd = match window.hwnd() {
+        Ok(h) => h,
+        Err(_) => return,
+    };
+    if !monitor_hdr_active(hwnd.0 as isize) {
+        eprintln!("[harbor::mpv] display already SDR after quit");
+        return;
+    }
+    if set_monitor_advanced_color(hwnd.0 as isize, false) {
+        eprintln!("[harbor::mpv] display restored to SDR via DisplayConfig");
+    } else {
+        eprintln!("[harbor::mpv] DisplayConfig SDR restore failed");
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -967,7 +1160,25 @@ fn spawn_event_loop(
         #[cfg(not(target_os = "macos"))]
         let _ = mac_edr;
         let mut error_backoff = EventErrorBackoff::default();
+        #[cfg(windows)]
+        let mut last_hdr_status: Option<String> = None;
         loop {
+            // display-info publishes user-data/display-info/hdr-status only
+            // after the vo window exists, so observing it at init misses the
+            // value; poll it and surface changes so the frontend can react to
+            // the script's display flips.
+            #[cfg(windows)]
+            {
+                let status = mpv_keepalive
+                    .get_property::<String>("user-data/display-info/hdr-status")
+                    .ok();
+                if status != last_hdr_status {
+                    last_hdr_status = status.clone();
+                    if let Some(s) = &status {
+                        let _ = app.emit("hdr-stage://display-status", s.as_str());
+                    }
+                }
+            }
             let res = ctx.wait_event(0.5);
             match res {
                 Some(Ok(event)) => {
@@ -1443,6 +1654,57 @@ pub async fn display_hdr_active(_app: AppHandle) -> Result<bool, String> {
     }
 }
 
+/// 1-based-safe EnumDisplayMonitors ordinal of the display `hwnd` sits on, the
+/// same enumeration order mpv's win32 backend uses for the `screen` option
+/// (its `get_monitor_proc` counts 0-based from EnumDisplayMonitors). None when
+/// the window's monitor cannot be resolved.
+#[cfg(windows)]
+fn monitor_index_of_hwnd(hwnd_raw: isize) -> Option<i32> {
+    use windows::core::BOOL;
+    use windows::Win32::Foundation::{HWND, LPARAM, RECT};
+    use windows::Win32::Graphics::Gdi::{
+        EnumDisplayMonitors, HMONITOR, MonitorFromWindow, MONITOR_DEFAULTTONEAREST,
+    };
+
+    struct State {
+        target: isize,
+        index: i32,
+        found: Option<i32>,
+    }
+
+    let hwnd = HWND(hwnd_raw as *mut _);
+    let target = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+    if target.is_invalid() {
+        return None;
+    }
+    let mut state = State {
+        target: target.0 as isize,
+        index: 0,
+        found: None,
+    };
+    let state_ptr = &mut state as *mut State;
+
+    unsafe extern "system" fn enum_proc(
+        hmon: HMONITOR,
+        _hdc: windows::Win32::Graphics::Gdi::HDC,
+        _rc: *mut RECT,
+        lparam: LPARAM,
+    ) -> BOOL {
+        // Mirrors mpv's get_monitor_proc: monitors are counted in
+        // EnumDisplayMonitors order, 0-based; stop on the target.
+        let state = &mut *(lparam.0 as *mut State);
+        if hmon.0 as isize == state.target {
+            state.found = Some(state.index);
+            return BOOL(0);
+        }
+        state.index += 1;
+        BOOL(1)
+    }
+
+    let _ = unsafe { EnumDisplayMonitors(None, None, Some(enum_proc), LPARAM(state_ptr as isize)) };
+    state.found
+}
+
 #[cfg(windows)]
 fn monitor_hdr_active(hwnd_raw: isize) -> bool {
     use windows::core::Interface;
@@ -1501,6 +1763,102 @@ fn monitor_hdr_active(hwnd_raw: isize) -> bool {
             if monitor_matches || rect_matches {
                 return desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
             }
+        }
+    }
+    false
+}
+
+/// Flips the display that `hwnd` sits on into or out of advanced color (HDR)
+/// mode via the DisplayConfig set-advanced-color state packet. Same mechanism
+/// Windows Settings and display-info.dll use; Harbor calls it as an
+/// authoritative restore after mpv teardown.
+#[cfg(windows)]
+fn set_monitor_advanced_color(hwnd_raw: isize, enable: bool) -> bool {
+    use windows::Win32::Devices::Display::{
+        DisplayConfigGetDeviceInfo, DisplayConfigSetDeviceInfo, QueryDisplayConfig,
+        QDC_ONLY_ACTIVE_PATHS, DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
+        DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE, DISPLAYCONFIG_MODE_INFO,
+        DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE,
+        DISPLAYCONFIG_SOURCE_DEVICE_NAME,
+    };
+    use windows::Win32::Foundation::WIN32_ERROR;
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MONITORINFOEXW, MonitorFromWindow, MONITOR_DEFAULTTONEAREST,
+    };
+    use windows::Win32::Foundation::HWND;
+
+    fn wide_to_string(raw: &[u16]) -> String {
+        String::from_utf16_lossy(
+            &raw.iter().take_while(|&&c| c != 0).copied().collect::<Vec<u16>>(),
+        )
+    }
+
+    let hwnd = HWND(hwnd_raw as *mut _);
+    let hmon = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+    if hmon.is_invalid() {
+        return false;
+    }
+    let mut mi = MONITORINFOEXW::default();
+    mi.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+    if unsafe { GetMonitorInfoW(hmon, &mut mi.monitorInfo) }.as_bool() == false {
+        return false;
+    }
+    let device = wide_to_string(&mi.szDevice);
+    if device.is_empty() {
+        return false;
+    }
+
+    unsafe {
+        let mut path_count = 0u32;
+        let mut mode_count = 0u32;
+        if QueryDisplayConfig(
+            QDC_ONLY_ACTIVE_PATHS,
+            &mut path_count,
+            std::ptr::null_mut(),
+            &mut mode_count,
+            std::ptr::null_mut(),
+            None,
+        ) != WIN32_ERROR(0)
+            || path_count == 0
+            || path_count > 64
+        {
+            return false;
+        }
+        let mut paths: Vec<DISPLAYCONFIG_PATH_INFO> = Vec::new();
+        paths.resize_with(path_count as usize, DISPLAYCONFIG_PATH_INFO::default);
+        let mut modes: Vec<DISPLAYCONFIG_MODE_INFO> = Vec::new();
+        modes.resize_with(mode_count.max(1) as usize, DISPLAYCONFIG_MODE_INFO::default);
+        if QueryDisplayConfig(
+            QDC_ONLY_ACTIVE_PATHS,
+            &mut path_count,
+            paths.as_mut_ptr(),
+            &mut mode_count,
+            modes.as_mut_ptr(),
+            None,
+        ) != WIN32_ERROR(0)
+        {
+            return false;
+        }
+        for path in paths.iter().take(path_count as usize) {
+            let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
+            source.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+            source.header.size = std::mem::size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32;
+            source.header.adapterId = path.sourceInfo.adapterId;
+            source.header.id = path.sourceInfo.id;
+            if DisplayConfigGetDeviceInfo(&mut source.header) != 0 {
+                continue;
+            }
+            if wide_to_string(&source.viewGdiDeviceName) != device {
+                continue;
+            }
+            // Bit 0 of the state union is advancedColorEnabled (1 = HDR).
+            let mut set = DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE::default();
+            set.header.r#type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE;
+            set.header.size = std::mem::size_of::<DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE>() as u32;
+            set.header.adapterId = path.targetInfo.adapterId;
+            set.header.id = path.targetInfo.id;
+            set.Anonymous.value = if enable { 1 } else { 0 };
+            return DisplayConfigSetDeviceInfo(&set.header) == 0;
         }
     }
     false
@@ -2416,10 +2774,22 @@ pub async fn mpv_stop(app: AppHandle, state: State<'_, MpvState>) -> Result<(), 
             });
             let _ = rx.recv_timeout(std::time::Duration::from_millis(4000));
         }
-        #[cfg(all(not(target_os = "macos"), not(target_os = "linux")))]
+        #[cfg(all(
+            not(target_os = "macos"),
+            not(target_os = "linux"),
+            not(windows)
+        ))]
         {
             let _ = session.mpv.command("quit", &[]);
             drop(session);
+        }
+        #[cfg(windows)]
+        {
+            let was_off = !session.hdr_baseline_on;
+            let _ = session.mpv.command("quit", &[]);
+            drop(session);
+            drop(g);
+            restore_display_sdr_if_flipped(&app, was_off);
         }
     }
     #[cfg(windows)]
@@ -2909,5 +3279,142 @@ mod event_backoff_tests {
         record_event_poll_success(&mut backoff);
 
         assert_eq!(backoff.next_delay(), Some(Duration::from_millis(40)));
+    }
+}
+
+#[cfg(test)]
+mod extra_option_parser_tests {
+    use super::parse_extra_option_lines;
+
+    #[test]
+    fn parses_key_equals_value() {
+        assert_eq!(
+            parse_extra_option_lines("hwdec=auto"),
+            vec![("hwdec".to_string(), "auto".to_string())]
+        );
+    }
+
+    #[test]
+    fn parses_key_space_value() {
+        assert_eq!(
+            parse_extra_option_lines("hwdec auto"),
+            vec![("hwdec".to_string(), "auto".to_string())]
+        );
+    }
+
+    #[test]
+    fn parses_bare_key_as_yes() {
+        assert_eq!(
+            parse_extra_option_lines("keep-open"),
+            vec![("keep-open".to_string(), "yes".to_string())]
+        );
+    }
+
+    #[test]
+    fn strips_leading_double_dashes() {
+        assert_eq!(
+            parse_extra_option_lines("--hwdec=auto"),
+            vec![("hwdec".to_string(), "auto".to_string())]
+        );
+    }
+
+    #[test]
+    fn skips_blank_lines_and_comments() {
+        assert_eq!(
+            parse_extra_option_lines("\n  \n# comment\n// also comment\nhwdec=auto\n"),
+            vec![("hwdec".to_string(), "auto".to_string())]
+        );
+    }
+
+    #[test]
+    fn trims_whitespace_around_key_and_value() {
+        assert_eq!(
+            parse_extra_option_lines("  hwdec  =  auto  "),
+            vec![("hwdec".to_string(), "auto".to_string())]
+        );
+    }
+
+    #[test]
+    fn drops_empty_keys() {
+        assert_eq!(parse_extra_option_lines("--=auto\n=auto\n  =  "), Vec::new());
+    }
+
+    #[test]
+    fn preserves_duplicates_and_order() {
+        assert_eq!(
+            parse_extra_option_lines("hwdec=auto\nvolume=50\nhwdec=no"),
+            vec![
+                ("hwdec".to_string(), "auto".to_string()),
+                ("volume".to_string(), "50".to_string()),
+                ("hwdec".to_string(), "no".to_string()),
+            ]
+        );
+    }
+}
+
+#[cfg(test)]
+mod script_pre_init_tests {
+    use super::{join_init_only_pairs, split_extra_option_pairs};
+
+    #[test]
+    fn split_partitions_init_only_keys_and_preserves_order() {
+        let (init_only, rest) = split_extra_option_pairs(
+            "scripts=C:\\scripts\\hdr-mode.lua\nscript-opts=hdr-mode=peak=1000\nvo=gpu\nload-scripts=yes\n",
+        );
+        assert_eq!(
+            init_only,
+            vec![
+                ("scripts".to_string(), "C:\\scripts\\hdr-mode.lua".to_string()),
+                ("script-opts".to_string(), "hdr-mode=peak=1000".to_string()),
+                ("load-scripts".to_string(), "yes".to_string()),
+            ]
+        );
+        assert_eq!(rest, vec![("vo".to_string(), "gpu".to_string())]);
+    }
+
+    #[test]
+    fn split_is_case_insensitive_and_folds_load_script_into_scripts() {
+        let (init_only, rest) = split_extra_option_pairs(
+            "Scripts=a.lua\nLOAD-SCRIPT=b.lua\nload-script=c.lua\nscale=bilinear\n",
+        );
+        assert_eq!(
+            init_only,
+            vec![
+                ("scripts".to_string(), "a.lua".to_string()),
+                ("scripts".to_string(), "b.lua".to_string()),
+                ("scripts".to_string(), "c.lua".to_string()),
+            ]
+        );
+        assert_eq!(rest, vec![("scale".to_string(), "bilinear".to_string())]);
+    }
+
+    #[test]
+    fn join_scripts_uses_platform_separator_and_rejects_empty_entries() {
+        let (init_only, _) = split_extra_option_pairs("scripts=a.lua\nscripts=\nload-script=b.lua\n");
+        let joined = join_init_only_pairs(&init_only);
+        let sep = if cfg!(windows) { ";" } else { ":" };
+        assert_eq!(
+            joined,
+            vec![("scripts".to_string(), format!("a.lua{}b.lua", sep))]
+        );
+    }
+
+    #[test]
+    fn join_script_opts_uses_comma() {
+        let (init_only, _) = split_extra_option_pairs("script-opts=a=1\nscript-opts=b=2\n");
+        assert_eq!(
+            join_init_only_pairs(&init_only),
+            vec![("script-opts".to_string(), "a=1,b=2".to_string())]
+        );
+    }
+
+    #[test]
+    fn join_load_scripts_keeps_last_non_empty_value() {
+        let (init_only, _) =
+            split_extra_option_pairs("load-scripts=yes\nload-scripts=\nload-scripts=no\n");
+        assert_eq!(
+            join_init_only_pairs(&init_only),
+            vec![("load-scripts".to_string(), "no".to_string())]
+        );
     }
 }
