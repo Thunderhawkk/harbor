@@ -18,6 +18,7 @@ import { mangaBackdrop } from "@/lib/manga/backdrop";
 import { collectionsForTitle } from "@/lib/manga/collections";
 import { useIsMangaFavorite, useMangaFavorites } from "@/lib/manga-favorites";
 import { useMangaProgressEntry, type MangaProgressEntry } from "@/lib/manga-progress";
+import { chapterNumberKey } from "@/lib/manga/chapter-identity";
 import { setMangaDetails } from "@/lib/manga-downloads";
 import {
   chapterLanguages,
@@ -311,6 +312,24 @@ export function MangaDetail({
     : "";
   const bannerSrc = backdrop || detail?.cover;
   const canRead = langFiltered.length > 0;
+  const handleResume = (entry: MangaProgressEntry) => {
+    const pool = langFiltered.length > 0 ? langFiltered : chapters;
+    let i = pool.findIndex((c) => c.id === entry.chapterId);
+    if (i < 0) {
+      const want = chapterNumberKey(entry.chapterNumber) ?? chapterNumberKey(entry.chapterLabel);
+      if (want != null) {
+        i = pool.findIndex((c) => chapterNumberKey(c.chapter ?? c.title ?? "") === want);
+      }
+    }
+    if (i < 0 && entry.chapterNumber != null) {
+      i = pool.findIndex((c) => c.chapter != null && c.chapter === entry.chapterNumber);
+    }
+    if (i >= 0) {
+      onRead(pool, i, mangaMeta);
+      return;
+    }
+    onResume?.(entry);
+  };
   const longDesc = (enriched.description?.length ?? 0) > 280;
 
   const pills: string[] = [];
@@ -451,7 +470,7 @@ export function MangaDetail({
                 {progress && onResume ? (
                   <button
                     type="button"
-                    onClick={() => onResume(progress)}
+                    onClick={() => handleResume(progress)}
                     className="inline-flex h-12 items-center gap-2 rounded-full bg-white/[0.06] px-6 text-[15px] font-semibold text-ink ring-1 ring-inset ring-edge-soft transition-colors duration-150 hover:bg-white/[0.10] active:scale-[0.98]"
                   >
                     <RotateCcw size={17} strokeWidth={2.2} />
