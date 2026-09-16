@@ -1191,6 +1191,17 @@ export function useKeyboardNavigation(options: TVNavigationOptions = {}) {
     if (!enabled) clearTvFocusRing();
   }, [enabled]);
 
+  // F6 is WebView2 pane-focus: on this frameless window it tears down the
+  // renderer instead. Nothing binds F6, so swallow it before default handling.
+  useEffect(() => {
+    const swallowF6 = (e: KeyboardEvent) => {
+      if (e.key !== "F6" || e.defaultPrevented) return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", swallowF6);
+    return () => window.removeEventListener("keydown", swallowF6);
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
     const owner = {};
