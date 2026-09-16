@@ -28,7 +28,7 @@ import {
   type MangaDownloadInfo,
 } from "@/lib/manga-downloads";
 import { listMangaSources, sourceIconUrl } from "@/lib/manga/sources";
-import { chapterGroupKey, chapterNumberKey } from "@/lib/manga/chapter-identity";
+import { chapterGroupKey } from "@/lib/manga/chapter-identity";
 
 type ChapterView = "grid" | "list";
 const VIEW_KEY = "harbor.manga.chapterview";
@@ -196,12 +196,7 @@ function chapterSourceId(id: string): string {
 
 function isCurrentChapter(progress: MangaProgressEntry | undefined, c: MangaChapter): boolean {
   if (!progress) return false;
-  if (progress.chapterId === c.id) return true;
-  if (progress.chapterNumber == null || c.chapter == null) return false;
-  const a = chapterNumberKey(progress.chapterNumber);
-  const b = chapterNumberKey(c.chapter);
-  if (a != null && b != null) return a === b;
-  return progress.chapterNumber === c.chapter;
+  return progress.chapterId === c.id;
 }
 
 function ChapterDownloadButton({
