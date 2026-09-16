@@ -1,5 +1,6 @@
 import { Poster } from "@/components/poster";
 import { Row } from "@/components/row";
+import { useContextMenu } from "@/lib/context-menu";
 import type { MangaSummary } from "@/lib/manga/types";
 
 export function MangaPosterRow({
@@ -15,6 +16,7 @@ export function MangaPosterRow({
   art?: string | null;
   scrollKey?: string;
 }) {
+  const { open: openContextMenu } = useContextMenu();
   if (items && items.length === 0) return null;
 
   return (
@@ -31,6 +33,9 @@ export function MangaPosterRow({
               key={m.id}
               type="button"
               onClick={() => onOpen(m)}
+              onContextMenu={(e) =>
+                openContextMenu(e, { kind: "manga", id: m.id, title: m.title, cover: m.cover })
+              }
               className="group flex w-full flex-col gap-2 text-start"
             >
               <div className="relative w-full transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0.24,1)] group-hover:-translate-y-1.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">

@@ -132,12 +132,31 @@ export function useReadMangaChapterIds(mangaId?: string): Set<string> {
     () => new Set(mangaId ? listReadMangaChapters(pid, mangaId) : []),
   );
   useEffect(() => {
-    const sync = () =>
-      setIds(new Set(mangaId ? listReadMangaChapters(pid, mangaId) : []));
+    const sync = () => setIds(new Set(mangaId ? listReadMangaChapters(pid, mangaId) : []));
     sync();
     return subscribeMangaProgress(sync);
   }, [pid, mangaId]);
   return ids;
+}
+
+export function removeMangaChapterRead(pid: string, mangaId: string, chapterId: string): void {
+  if (!mangaId || !chapterId) return;
+  try {
+    const raw = localStorage.getItem(readKeyFor(pid));
+    if (raw == null) return;
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed == null || typeof parsed !== "object") return;
+    const rec = parsed as Record<string, string[]>;
+    const prev = Array.isArray(rec[mangaId]) ? rec[mangaId] : [];
+    if (!prev.includes(chapterId)) return;
+    const next = prev.filter((v) => v !== chapterId);
+    if (next.length === 0) delete rec[mangaId];
+    else rec[mangaId] = next;
+    localStorage.setItem(readKeyFor(pid), JSON.stringify(rec));
+  } catch {
+    return;
+  }
+  notify();
 }
 
 export function useMangaProgressList(): MangaProgressEntry[] {

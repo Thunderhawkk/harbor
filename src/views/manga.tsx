@@ -128,6 +128,18 @@ export function MangaView() {
   useEffect(() => subscribeMangaSources(() => setSourceTick((n) => n + 1)), []);
 
   useEffect(() => {
+    const suppressNativeMenu = (e: MouseEvent) => {
+      if (topKindRef.current !== "manga") return;
+      const t = e.target;
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+      if (t instanceof HTMLElement && t.isContentEditable) return;
+      e.preventDefault();
+    };
+    document.addEventListener("contextmenu", suppressNativeMenu, true);
+    return () => document.removeEventListener("contextmenu", suppressNativeMenu, true);
+  }, []);
+
+  useEffect(() => {
     const onLocalBack = (e: Event) => {
       if (topKindRef.current !== "manga") return;
       const m = modeRef.current;

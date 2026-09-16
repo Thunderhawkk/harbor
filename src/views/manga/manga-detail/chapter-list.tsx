@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   BookOpen,
   Check,
@@ -16,6 +16,7 @@ import { Play } from "@/components/icons/play-filled";
 import { Search } from "@/components/icons/search-icon";
 import { t, useT } from "@/lib/i18n";
 import { Flag, flagSrc } from "@/components/flag";
+import { useContextMenu } from "@/lib/context-menu";
 import { languageName, type MangaChapter } from "@/lib/manga/model";
 import {
   useMangaProgressEntry,
@@ -426,6 +427,11 @@ export function ChapterList({
   const progress = useMangaProgressEntry(mangaId, mangaTitle);
   const readIds = useReadMangaChapterIds(mangaId);
   const isRead = (c: MangaChapter) => c.serverRead === true || readIds.has(c.id);
+  const { open: openContextMenu } = useContextMenu();
+  const chapterMenu = (e: ReactMouseEvent, c: MangaChapter) => {
+    if (!mangaId) return;
+    openContextMenu(e, { kind: "manga-chapter", mangaId, mangaTitle, mangaCover, chapter: c });
+  };
 
   const sourceOptions = useMemo(() => {
     const all = listMangaSources();
@@ -780,10 +786,16 @@ export function ChapterList({
                 key={c.id}
                 type="button"
                 onClick={() => readChapter(c)}
-                className={`group flex min-h-[64px] w-full items-center justify-between gap-4 border-b border-edge-soft/60 px-5 py-3.5 text-start transition-colors last:border-b-0 hover:bg-elevated/40 ${
+                onContextMenu={(e) => chapterMenu(e, c)}
+                className={`group relative flex min-h-[64px] w-full items-center justify-between gap-4 border-b border-edge-soft/60 px-5 py-3.5 text-start transition-colors last:border-b-0 hover:bg-elevated/40 ${
                   cur ? "bg-accent/5" : ""
                 }`}
               >
+                {!cur && isRead(c) && (
+                  <span className="absolute end-3 top-2">
+                    <ReadTag />
+                  </span>
+                )}
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <span className={`text-[12px] ${cur ? "text-accent" : "text-ink-subtle"}`}>
@@ -800,24 +812,21 @@ export function ChapterList({
                     </div>
                   )}
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  {!cur && isRead(c) && <ReadTag />}
-                  <div className="flex items-center gap-2.5">
-                    <ChapterMeta chapter={c} />
-                    <ChapterDownloadButton
-                      mangaId={mangaId ?? ""}
-                      chapterId={c.id}
-                      altChapterIds={(sameChapterIds.get(chapterGroupKey(c)) ?? [c.id]).filter(
-                        (id) => id !== c.id,
-                      )}
-                      info={{ title: mangaTitle, cover: mangaCover, chapter: c.chapter }}
-                      serverDownloaded={c.downloaded}
-                    />
-                    <BookOpen
-                      size={18}
-                      className="shrink-0 text-ink-subtle transition-colors group-hover:text-accent"
-                    />
-                  </div>
+                <div className="flex shrink-0 items-center gap-2.5">
+                  <ChapterMeta chapter={c} />
+                  <ChapterDownloadButton
+                    mangaId={mangaId ?? ""}
+                    chapterId={c.id}
+                    altChapterIds={(sameChapterIds.get(chapterGroupKey(c)) ?? [c.id]).filter(
+                      (id) => id !== c.id,
+                    )}
+                    info={{ title: mangaTitle, cover: mangaCover, chapter: c.chapter }}
+                    serverDownloaded={c.downloaded}
+                  />
+                  <BookOpen
+                    size={18}
+                    className="shrink-0 text-ink-subtle transition-colors group-hover:text-accent"
+                  />
                 </div>
               </button>
             );
@@ -836,10 +845,16 @@ export function ChapterList({
                 key={c.id}
                 type="button"
                 onClick={() => readChapter(c)}
-                className={`group flex min-h-[64px] flex-col justify-between gap-2 rounded-xl border bg-surface/60 px-4 py-3.5 text-start transition-colors hover:bg-elevated/60 ${
+                onContextMenu={(e) => chapterMenu(e, c)}
+                className={`group relative flex min-h-[64px] flex-col justify-between gap-2 rounded-xl border bg-surface/60 px-4 py-3.5 text-start transition-colors hover:bg-elevated/60 ${
                   cur ? "border-accent/70" : "border-edge-soft hover:border-edge"
                 }`}
               >
+                {!cur && isRead(c) && (
+                  <span className="absolute end-3 top-2.5">
+                    <ReadTag />
+                  </span>
+                )}
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <span className={`text-[12px] ${cur ? "text-accent" : "text-ink-subtle"}`}>
@@ -858,23 +873,20 @@ export function ChapterList({
                       <ChapterProgress page={progress.page} total={progress.totalPages} />
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    {!cur && isRead(c) && <ReadTag />}
-                    <div className="flex items-center gap-1.5">
-                      <ChapterDownloadButton
-                        mangaId={mangaId ?? ""}
-                        chapterId={c.id}
-                        altChapterIds={(sameChapterIds.get(chapterGroupKey(c)) ?? [c.id]).filter(
-                          (id) => id !== c.id,
-                        )}
-                        info={{ title: mangaTitle, cover: mangaCover, chapter: c.chapter }}
-                        serverDownloaded={c.downloaded}
-                      />
-                      <BookOpen
-                        size={16}
-                        className="shrink-0 text-ink-subtle transition-colors group-hover:text-accent"
-                      />
-                    </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <ChapterDownloadButton
+                      mangaId={mangaId ?? ""}
+                      chapterId={c.id}
+                      altChapterIds={(sameChapterIds.get(chapterGroupKey(c)) ?? [c.id]).filter(
+                        (id) => id !== c.id,
+                      )}
+                      info={{ title: mangaTitle, cover: mangaCover, chapter: c.chapter }}
+                      serverDownloaded={c.downloaded}
+                    />
+                    <BookOpen
+                      size={16}
+                      className="shrink-0 text-ink-subtle transition-colors group-hover:text-accent"
+                    />
                   </div>
                 </div>
               </button>

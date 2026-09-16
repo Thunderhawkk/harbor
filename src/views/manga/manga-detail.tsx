@@ -19,6 +19,11 @@ import { collectionsForTitle } from "@/lib/manga/collections";
 import { useIsMangaFavorite, useMangaFavorites } from "@/lib/manga-favorites";
 import { useMangaProgressEntry, type MangaProgressEntry } from "@/lib/manga-progress";
 import { chapterNumberKey } from "@/lib/manga/chapter-identity";
+import {
+  MANGA_READ_CHAPTER_EVENT,
+  setMangaChapterIntent,
+  takeMangaChapterIntent,
+} from "@/lib/manga/read-intent";
 import { setMangaDetails } from "@/lib/manga-downloads";
 import {
   chapterLanguages,
@@ -279,6 +284,29 @@ export function MangaDetail({
     if (!detail?.title) return;
     void setMangaDetails(mangaId, detail.title, detail.cover);
   }, [mangaId, detail?.title, detail?.cover]);
+
+  useEffect(() => {
+    const openChapter = (chapterId: string) => {
+      if (chapters.length === 0) return false;
+      const pool = chapters.filter((c) => c.language === selectedLang);
+      const list = pool.length > 0 ? pool : chapters;
+      const i = list.findIndex((c) => c.id === chapterId);
+      if (i < 0) return false;
+      onRead(list, i, { id: mangaId, title: detail?.title ?? "", cover: detail?.cover });
+      return true;
+    };
+    if (chapters.length > 0) {
+      const intent = takeMangaChapterIntent(mangaId);
+      if (intent) openChapter(intent.chapterId);
+    }
+    const onRequest = (e: Event) => {
+      const req = (e as CustomEvent<{ mangaId: string; chapterId: string }>).detail;
+      if (!req || req.mangaId !== mangaId) return;
+      if (!openChapter(req.chapterId)) setMangaChapterIntent(req);
+    };
+    window.addEventListener(MANGA_READ_CHAPTER_EVENT, onRequest);
+    return () => window.removeEventListener(MANGA_READ_CHAPTER_EVENT, onRequest);
+  }, [mangaId, chapters, selectedLang]);
 
   const langs = useMemo(() => chapterLanguages(chapters), [chapters]);
   const langFiltered = useMemo(

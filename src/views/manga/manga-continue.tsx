@@ -2,6 +2,7 @@ import { Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Poster } from "@/components/poster";
+import { useContextMenu } from "@/lib/context-menu";
 import { RailChevron } from "@/components/nav-arrow";
 import { useProfiles } from "@/lib/profiles";
 import {
@@ -63,6 +64,7 @@ function ContinueCard({
 }) {
   const [busy, setBusy] = useState(false);
   const t = useT();
+  const { open: openContextMenu } = useContextMenu();
   const pct =
     entry.totalPages > 0 ? Math.min(100, Math.round((entry.page / entry.totalPages) * 100)) : 0;
   const open = () => {
@@ -91,6 +93,7 @@ function ContinueCard({
       <button
         type="button"
         onClick={open}
+        onContextMenu={(e) => openContextMenu(e, { kind: "manga-continue", entry })}
         aria-busy={busy}
         className={`flex w-full items-stretch gap-3.5 rounded-2xl border p-3 text-start transition-[transform,background-color,box-shadow] duration-200 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${
           busy
