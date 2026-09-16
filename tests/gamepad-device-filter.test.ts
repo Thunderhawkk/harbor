@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isLikelyGamepad, type GamepadShape } from "../src/lib/gamepad/web-source.ts";
+import { isLikelyGamepad, isNativeDuplicate, normalizeGamepadName, type GamepadShape } from "../src/lib/gamepad/web-source.ts";
 
 function pad(id: string, mapping: string, buttons: number, axes: number): GamepadShape {
   return {
@@ -43,4 +43,33 @@ test("rejects HID blobs without a gamepad button and axis shape", () => {
 
 test("the device denylist outranks the button and axis shape fallback", () => {
   assert.equal(isLikelyGamepad(pad("HyperX Cloud III Wireless", "", 16, 4)), false);
+});
+
+test("strips Chromium vendor wrapping so backend names compare equal", () => {
+  assert.equal(
+    normalizeGamepadName("8BitDo Ultimate 2C (STANDARD GAMEPAD Vendor: 2dc8 Product: 3106)"),
+    "8bitdo ultimate 2c",
+  );
+  assert.equal(normalizeGamepadName("8BitDo Ultimate 2C"), "8bitdo ultimate 2c");
+});
+
+test("treats a Chromium standard pad as a duplicate of its native twin", () => {
+  assert.equal(
+    isNativeDuplicate("8BitDo Ultimate 2C (STANDARD GAMEPAD Vendor: 2dc8 Product: 3106)", [
+      "8BitDo Ultimate 2C",
+    ]),
+    true,
+  );
+  assert.equal(
+    isNativeDuplicate("Xbox 360 Controller (STANDARD GAMEPAD Vendor: 045e Product: 028e)", [
+      "Xbox 360 Controller",
+    ]),
+    true,
+  );
+});
+
+test("keeps genuinely different pads listed separately", () => {
+  assert.equal(isNativeDuplicate("Wireless Controller", ["Xbox 360 Controller"]), false);
+  assert.equal(isNativeDuplicate("", ["Xbox 360 Controller"]), false);
+  assert.equal(isNativeDuplicate("Pad", ["Pad Pro Controller"]), false);
 });

@@ -8,7 +8,7 @@ import { dispatchTvNav } from "@/lib/keyboard-navigation";
 import { isGamepadCaptured } from "./capture";
 import { publishGamepads } from "./store";
 import { resetLiveGamepad, setLiveAxis, setLiveButton } from "./live";
-import { startWebGamepadSource } from "./web-source";
+import { startWebGamepadSource, isNativeDuplicate } from "./web-source";
 import type { GamepadEventPayload, GamepadInfo, GpAxis, GpButton } from "./protocol";
 import {
   NAV_AXIS,
@@ -78,7 +78,13 @@ let nativePads: GamepadInfo[] = [];
 let webPads: GamepadInfo[] = [];
 
 function publishMerged(): void {
-  publishGamepads([...nativePads, ...webPads]);
+  // The same physical pad can surface in both backends (notably third-party
+  // XInput pads over 2.4 GHz dongles). Listing it twice confuses users and
+  // each copy would dispatch the same input, so web copies of native pads
+  // are dropped here as a second line of defense behind web-source filtering.
+  const nativeNames = nativePads.map((p) => p.name);
+  const uniqueWeb = webPads.filter((p) => !isNativeDuplicate(p.name, nativeNames));
+  publishGamepads([...nativePads, ...uniqueWeb]);
 }
 
 function seedList(): void {
@@ -122,6 +128,12 @@ export function useGamepad(): void {
 
     const repeats = new Map<string, { delay: number | null; interval: number | null }>();
     const axisDir = new Map<GpAxis, "neg" | "pos" | null>();
+    // Guards against two backend copies of one physical pad (e.g. a 2.4 GHz
+    // dongle enumerated twice) dispatching the same edge within milliseconds.
+    // Human double-taps land well above this window; held-input autorepeat is
+    // driven by timers below, not by repeated edges, so it is unaffected.
+    const EDGE_DEDUPE_MS = 50;
+    const lastEdge = new Map<string, number>();
 
     const stopRepeat = (id: string) => {
       const r = repeats.get(id);
@@ -181,6 +193,10 @@ export function useGamepad(): void {
     };
 
     const onButton = (button: GpButton, pressed: boolean) => {
+      const edgeKey = `btn:${button}:${pressed ? 1 : 0}`;
+      const now = Date.now();
+      if (now - (lastEdge.get(edgeKey) ?? Number.NEGATIVE_INFINITY) < EDGE_DEDUPE_MS) return;
+      lastEdge.set(edgeKey, now);
       if (!pressed) {
         stopRepeat(`btn:${button}`);
         return;
@@ -256,6 +272,11 @@ export function useGamepad(): void {
         publishMerged();
       },
       inputAllowed: () => backgroundInputRef.current || document.hasFocus(),
+      isNativeDuplicate: (padName) =>
+        isNativeDuplicate(
+          padName,
+          nativePads.map((p) => p.name),
+        ),
     });
 
     return () => {
@@ -263,6 +284,7 @@ export function useGamepad(): void {
       stopAll();
       stopWebSource();
       axisDir.clear();
+      lastEdge.clear();
       webPads = [];
       resetLiveGamepad();
       unlisten?.();

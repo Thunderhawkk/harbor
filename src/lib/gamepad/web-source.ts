@@ -40,6 +40,49 @@ function handledNatively(pad: Gamepad): boolean {
 const AUDIO_DEVICE = /headset|headphone|audio|cloud|\bmic\b/i;
 const NON_GAMEPAD_VENDORS = ["0951", "03f0"];
 
+/**
+ * Normalize a gamepad name for cross-backend comparison. The native Rust
+ * backend (gilrs) reports short names like "8BitDo Ultimate 2C" while
+ * Chromium reports "8BitDo Ultimate 2C (STANDARD GAMEPAD Vendor: 2dc8
+ * Product: 3106)" for the same physical device.
+ */
+export function normalizeGamepadName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")
+    .replace(/vendor:\s*[0-9a-f]{4}/g, " ")
+    .replace(/product:\s*[0-9a-f]{4}/g, " ")
+    .replace(/standard\s*gamepad/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+const MIN_SUBSTRING_MATCH = 4;
+
+/**
+ * True when a web-enumerated pad is the same physical device as one the
+ * native backend already reports. Prevents the double-input / double-listing
+ * seen with third-party XInput pads (e.g. 8BitDo over a 2.4 GHz dongle),
+ * whose Chromium id carries their own VID instead of an "xinput"/Microsoft
+ * marker that handledNatively() would catch.
+ */
+export function isNativeDuplicate(
+  webName: string,
+  nativeNames: readonly string[],
+): boolean {
+  const web = normalizeGamepadName(webName);
+  if (!web) return false;
+  return nativeNames.some((candidate) => {
+    const native = normalizeGamepadName(candidate);
+    if (!native) return false;
+    if (native === web) return true;
+    const shorter = native.length <= web.length ? native : web;
+    if (shorter.length < MIN_SUBSTRING_MATCH) return false;
+    return native.includes(web) || web.includes(native);
+  });
+}
+
 export type GamepadShape = {
   id: string;
   mapping: string;
@@ -61,6 +104,8 @@ export type WebGamepadHandlers = {
   onPads: (pads: GamepadInfo[]) => void;
   /** Gate input dispatch (e.g. on window focus loss). Defaults to always allowed. */
   inputAllowed?: () => boolean;
+  /** Names already reported by the native backend; matching web pads are skipped. */
+  isNativeDuplicate?: (padName: string) => boolean;
 };
 
 export function startWebGamepadSource(h: WebGamepadHandlers): () => void {
@@ -72,6 +117,7 @@ export function startWebGamepadSource(h: WebGamepadHandlers): () => void {
   const pressed = new Map<string, boolean>();
   const axisValue = new Map<string, number>();
   const inputAllowed = h.inputAllowed ?? (() => true);
+  const isNativeDuplicateOf = h.isNativeDuplicate ?? (() => false);
   let padSignature = "";
   let raf = 0;
   let stopped = false;
@@ -91,7 +137,14 @@ export function startWebGamepadSource(h: WebGamepadHandlers): () => void {
 
     const active: GamepadInfo[] = [];
     for (const pad of list) {
-      if (!pad || !pad.connected || handledNatively(pad) || !isLikelyGamepad(pad)) continue;
+      if (
+        !pad ||
+        !pad.connected ||
+        handledNatively(pad) ||
+        !isLikelyGamepad(pad) ||
+        isNativeDuplicateOf(pad.id)
+      )
+        continue;
       active.push({ id: WEB_ID_BASE + pad.index, name: pad.id });
 
       pad.buttons.forEach((btn, i) => {
