@@ -108,6 +108,12 @@ export function tvHover(el: HTMLElement | null) {
 }
 
 function borrowRadius(el: HTMLElement) {
+  // Focus restore can target top-level containers (e.g. <body> when search
+  // closes). Never reshape the page itself; drop any stale inline radius.
+  if (el === document.body || el === document.documentElement) {
+    el.style.borderRadius = "";
+    return;
+  }
   const existing = el.style.borderRadius || getComputedStyle(el).borderRadius;
   if (existing && existing !== "0px") return;
 
