@@ -20,6 +20,10 @@ const PREFIX = "harbor.mangaread.v1.";
 const keyFor = (pid: string) => PREFIX + pid;
 const MAX = 24;
 
+const READ_PREFIX = "harbor.mangaread.chapters.v1.";
+const readKeyFor = (pid: string) => READ_PREFIX + pid;
+const READ_MAX_PER_MANGA = 500;
+
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -59,6 +63,9 @@ export function recordMangaProgress(pid: string, entry: MangaProgressEntry): voi
   if (!entry.id || !entry.title) return;
   const prev = listMangaProgress(pid).filter((e) => e.id !== entry.id);
   write(pid, [entry, ...prev]);
+  if (entry.totalPages > 0 && entry.page >= entry.totalPages) {
+    recordMangaChapterRead(pid, entry.id, entry.chapterId, true);
+  }
   notify();
   queueSuwayomiProgress({
     sourceId: entry.sourceId,
@@ -80,6 +87,57 @@ export function removeMangaProgress(pid: string): void {
     return;
   }
   notify();
+}
+
+export function listReadMangaChapters(pid: string, mangaId: string): string[] {
+  try {
+    const raw = localStorage.getItem(readKeyFor(pid));
+    if (!raw) return [];
+    const rec = JSON.parse(raw) as Record<string, string[]>;
+    const arr = rec?.[mangaId];
+    return Array.isArray(arr) ? arr.filter((v) => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function recordMangaChapterRead(
+  pid: string,
+  mangaId: string,
+  chapterId: string,
+  silent = false,
+): void {
+  if (!mangaId || !chapterId) return;
+  try {
+    const raw = localStorage.getItem(readKeyFor(pid));
+    let rec: Record<string, string[]> = {};
+    if (raw != null) {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed != null && typeof parsed === "object") rec = parsed as Record<string, string[]>;
+    }
+    const prev = Array.isArray(rec[mangaId]) ? rec[mangaId] : [];
+    if (prev.includes(chapterId)) return;
+    rec[mangaId] = [chapterId, ...prev].slice(0, READ_MAX_PER_MANGA);
+    localStorage.setItem(readKeyFor(pid), JSON.stringify(rec));
+  } catch {
+    return;
+  }
+  if (!silent) notify();
+}
+
+export function useReadMangaChapterIds(mangaId?: string): Set<string> {
+  const { activeId } = useProfiles();
+  const pid = activeId ?? "default";
+  const [ids, setIds] = useState<Set<string>>(
+    () => new Set(mangaId ? listReadMangaChapters(pid, mangaId) : []),
+  );
+  useEffect(() => {
+    const sync = () =>
+      setIds(new Set(mangaId ? listReadMangaChapters(pid, mangaId) : []));
+    sync();
+    return subscribeMangaProgress(sync);
+  }, [pid, mangaId]);
+  return ids;
 }
 
 export function useMangaProgressList(): MangaProgressEntry[] {
