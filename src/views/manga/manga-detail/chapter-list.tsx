@@ -830,13 +830,12 @@ export function ChapterList({
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  {cur && progress ? (
-                    <div className="min-w-0 flex-1">
-                      <ChapterProgress page={progress.page} total={progress.totalPages} />
-                    </div>
-                  ) : (
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <ChapterMeta chapter={c} />
-                  )}
+                    {cur && progress && (
+                      <ChapterProgress page={progress.page} total={progress.totalPages} />
+                    )}
+                  </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <ChapterDownloadButton
                       mangaId={mangaId ?? ""}
