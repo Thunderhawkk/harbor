@@ -605,6 +605,16 @@ function ensureFocusStyles() {
       position: relative;
     }
 
+    /*
+     * Search overlay is a direct typing surface with its own panel styling.
+     * Never ring its header container or input while editing.
+     */
+    html:not([data-input-modality="pointer"]) [data-search-overlay] [data-tv-search-editing-focused="true"],
+    html:not([data-input-modality="pointer"]) [data-search-overlay] [data-search-editing="true"] {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
     html:not([data-input-modality="pointer"]) [data-tv-search-editing-focused="true"] [data-search-editing="true"] {
       box-shadow: none !important;
     }

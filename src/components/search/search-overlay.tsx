@@ -51,6 +51,7 @@ export function SearchOverlay() {
     setAiHold,
   } = useSearch();
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const { openFilter, openMeta, openPerson } = useView();
   const [explore, setExplore] = useState<ExploreFrame[]>([]);
   const t = useT();
@@ -113,6 +114,39 @@ export function SearchOverlay() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, explore.length]);
+
+  // Modal Tab trap: cycle input -> actions -> results in DOM order. Native Tab
+  // can skip result stops and drop focus onto the page behind the scrim, after
+  // which arrows drive TV nav on the home page instead of the overlay.
+  useEffect(() => {
+    if (!open || closing || !mounted) return;
+    const root = panelRef.current;
+    if (!root) return;
+    const tabbables = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.getClientRects().length > 0);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || e.defaultPrevented) return;
+      if (!(e.target instanceof Node) || !root.contains(e.target)) return;
+      const els = tabbables();
+      if (els.length === 0) return;
+      e.preventDefault();
+      const idx = els.indexOf(document.activeElement as HTMLElement);
+      const next = e.shiftKey
+        ? idx <= 0
+          ? els[els.length - 1]
+          : els[idx - 1]
+        : idx === -1 || idx === els.length - 1
+          ? els[0]
+          : els[idx + 1];
+      next.focus();
+    };
+    root.addEventListener("keydown", onKeyDown);
+    return () => root.removeEventListener("keydown", onKeyDown);
+  }, [open, closing, mounted]);
 
   const trimmedQ = query.trim();
   const collectionsQuery =
@@ -198,6 +232,7 @@ export function SearchOverlay() {
 
   return createPortal(
     <div
+      ref={panelRef}
       className={`fixed inset-0 z-[200] flex flex-col overflow-hidden ${closing ? "pointer-events-none" : ""}`}
       role="dialog"
       aria-modal="true"
