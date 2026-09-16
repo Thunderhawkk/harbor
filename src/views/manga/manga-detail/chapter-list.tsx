@@ -806,7 +806,7 @@ export function ChapterList({
                   <span className="truncate text-[16px] font-semibold text-ink">
                     {c.title?.trim() ? c.title : chapterLabel(c.chapter)}
                   </span>
-                  {cur && progress && (
+                  {cur && progress && !progress.upNext && (
                     <div className="mt-1 w-56">
                       <ChapterProgress page={progress.page} total={progress.totalPages} />
                     </div>
@@ -869,7 +869,7 @@ export function ChapterList({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <ChapterMeta chapter={c} />
-                    {cur && progress && (
+                    {cur && progress && !progress.upNext && (
                       <ChapterProgress page={progress.page} total={progress.totalPages} />
                     )}
                   </div>

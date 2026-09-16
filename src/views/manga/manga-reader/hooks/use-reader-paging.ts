@@ -14,12 +14,13 @@ type Args = {
   autoNext: boolean;
   setCurrentPage: Dispatch<SetStateAction<number>>;
   onChangeIndex: (i: number) => void;
+  onEndReached?: () => void;
   pageEls: RefObject<Array<HTMLDivElement | null>>;
   scrollRef: RefObject<HTMLDivElement | null>;
 };
 
 export function useReaderPaging(a: Args) {
-  const { paged, double, horizontal = false, rtl = false, total, currentPage, step, lastStart, nextIndex, prevIndex, autoNext, setCurrentPage, onChangeIndex, pageEls, scrollRef } = a;
+  const { paged, double, horizontal = false, rtl = false, total, currentPage, step, lastStart, nextIndex, prevIndex, autoNext, setCurrentPage, onChangeIndex, onEndReached, pageEls, scrollRef } = a;
 
   const goToPage = (p: number) => {
     if (paged) {
@@ -41,6 +42,7 @@ export function useReaderPaging(a: Args) {
       if (currentPage >= total) {
         if (nextIndex != null) onChangeIndex(nextIndex);
       } else if (currentPage >= lastStart) {
+        onEndReached?.();
         if (autoNext && nextIndex != null) onChangeIndex(nextIndex);
         else setCurrentPage(total);
       } else {

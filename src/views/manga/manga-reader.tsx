@@ -5,7 +5,12 @@ import { chapterPages, type MangaChapter } from "@/lib/manga/api";
 import { pageHeadersFor } from "@/lib/manga/plugins/adapter";
 import { t, useT } from "@/lib/i18n";
 import { downloadedPages, downloadMangaPage } from "@/lib/manga-downloads";
-import { recordMangaProgress, resumePageForChapter } from "@/lib/manga-progress";
+import {
+  listMangaProgress,
+  recordMangaChapterRead,
+  recordMangaProgress,
+  resumePageForChapter,
+} from "@/lib/manga-progress";
 import { clearMangaReading } from "@/lib/manga-reading-state";
 import {
   subscribeMangaMatchRequest,
@@ -397,6 +402,41 @@ export function MangaReader({
   );
 
   const label = chapterLabel(chapter);
+  const markChapterComplete = () => {
+    if (disableMangaPersistence) return;
+    recordMangaProgress(pid, {
+      id: manga.id,
+      title: manga.title,
+      cover: manga.cover,
+      sourceId: activeMangaSourceId(),
+      chapterId: chapter.id,
+      chapterNumber: chapter.chapter,
+      chapterLabel: label,
+      page: total,
+      totalPages: total,
+      completed: true,
+      updatedAt: Date.now(),
+    });
+    recordMangaChapterRead(pid, manga.id, chapter.id);
+    if (nextIndex == null) return;
+    const n = chapters[nextIndex];
+    if (!n) return;
+    const existing = listMangaProgress(pid).find((e) => e.id === manga.id);
+    if (existing?.upNext && existing.chapterId === n.id) return;
+    recordMangaProgress(pid, {
+      id: manga.id,
+      title: manga.title,
+      cover: manga.cover,
+      sourceId: activeMangaSourceId(),
+      chapterId: n.id,
+      chapterNumber: n.chapter,
+      chapterLabel: chapterLabel(n),
+      page: 0,
+      totalPages: 0,
+      upNext: true,
+      updatedAt: Date.now(),
+    });
+  };
   const recordBookPage = useReaderProgress({
     pid,
     manga,
@@ -412,6 +452,7 @@ export function MangaReader({
     settled,
     scrollRef,
     disabled: disableMangaPersistence,
+    onCompleted: markChapterComplete,
   });
 
   useEffect(() => {
@@ -432,12 +473,14 @@ export function MangaReader({
     autoNext,
     setCurrentPage,
     onChangeIndex,
+    onEndReached: markChapterComplete,
     pageEls,
     scrollRef,
   });
 
   const atChapterEnd = !loading && !failed && !complete && bookAtEnd;
   const advanceFromBookEnd = () => {
+    markChapterComplete();
     if (nextIndex == null) return;
     if (autoNext) onChangeIndex(nextIndex);
     else setCurrentPage(total);

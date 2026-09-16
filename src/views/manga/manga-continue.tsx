@@ -113,21 +113,29 @@ function ContinueCard({
           <p className="line-clamp-2 text-[14.5px] font-semibold leading-snug text-ink">
             {entry.title}
           </p>
-          <p className="text-[12.5px] text-ink-muted">
-            {busy
-              ? t("Opening…")
-              : t("{label} · page {page}/{total}", {
-                  label: entry.chapterLabel,
-                  page: entry.page,
-                  total: entry.totalPages,
-                })}
-          </p>
-          <div className="mt-1 flex items-center gap-2.5">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-edge-soft/60">
-              <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+          {entry.upNext && !busy ? (
+            <p className="mt-1.5 text-[14px] font-semibold text-accent">
+              {t("{label} · Up Next", { label: entry.chapterLabel })}
+            </p>
+          ) : (
+            <p className="text-[12.5px] text-ink-muted">
+              {busy
+                ? t("Opening…")
+                : t("{label} · page {page}/{total}", {
+                    label: entry.chapterLabel,
+                    page: entry.page,
+                    total: entry.totalPages,
+                  })}
+            </p>
+          )}
+          {!entry.upNext && (
+            <div className="mt-1 flex items-center gap-2.5">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-edge-soft/60">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+              </div>
+              <span className="text-[11.5px] font-semibold tabular-nums text-ink-subtle">{pct}%</span>
             </div>
-            <span className="text-[11.5px] font-semibold tabular-nums text-ink-subtle">{pct}%</span>
-          </div>
+          )}
         </div>
       </button>
       <button

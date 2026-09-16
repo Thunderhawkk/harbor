@@ -14,6 +14,8 @@ export type MangaProgressEntry = {
   totalPages: number;
   scroll?: number;
   updatedAt: number;
+  completed?: boolean;
+  upNext?: boolean;
 };
 
 const PREFIX = "harbor.mangaread.v1.";
@@ -63,15 +65,17 @@ export function recordMangaProgress(pid: string, entry: MangaProgressEntry): voi
   if (!entry.id || !entry.title) return;
   const prev = listMangaProgress(pid).filter((e) => e.id !== entry.id);
   write(pid, [entry, ...prev]);
-  if (entry.totalPages > 0 && entry.page >= entry.totalPages) {
+  if (entry.completed === true) {
     recordMangaChapterRead(pid, entry.id, entry.chapterId, true);
   }
   notify();
+  if (entry.upNext) return;
   queueSuwayomiProgress({
     sourceId: entry.sourceId,
     chapterId: entry.chapterId,
     page: Math.max(0, entry.page - 1),
     totalPages: entry.totalPages,
+    completed: entry.completed,
   });
 }
 
