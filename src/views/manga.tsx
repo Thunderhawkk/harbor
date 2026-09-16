@@ -24,6 +24,7 @@ import {
   type MangaSummary,
 } from "@/lib/manga/api";
 import { listMangaProgress, type MangaProgressEntry } from "@/lib/manga-progress";
+import { chapterNumberKey } from "@/lib/manga/chapter-identity";
 import { useProfiles } from "@/lib/profiles";
 import { takeMangaReadIntent } from "@/lib/manga/read-intent";
 import { MangaHero } from "./manga/manga-hero";
@@ -241,12 +242,21 @@ export function MangaView() {
     const target = entry.sourceId || activeMangaSourceId();
     if (target && activeMangaSourceId() !== target) setActiveMangaSource(target);
     try {
-      let chs = await resumeChapters(entry.id);
+      const chs = await resumeChapters(entry.id);
       let i = chs.findIndex((c) => c.id === entry.chapterId);
       if (i < 0) {
+        const want =
+          chapterNumberKey(entry.chapterNumber) ?? chapterNumberKey(entry.chapterLabel);
+        if (want != null) {
+          i = chs.findIndex(
+            (c) => chapterNumberKey(c.chapter ?? c.title ?? "") === want,
+          );
+        }
+      }
+      if (i < 0 && entry.chapterNumber != null) {
         i = chs.findIndex(
           (c) =>
-            entry.chapterNumber != null && c.chapter != null && c.chapter === entry.chapterNumber,
+            c.chapter != null && c.chapter === entry.chapterNumber,
         );
       }
       if (i >= 0) {
@@ -256,6 +266,18 @@ export function MangaView() {
           manga: { id: entry.id, title: entry.title, cover: entry.cover },
           chapters: chs,
           index: i,
+          startPage: Math.max(0, entry.page - 1),
+          startScroll: entry.scroll,
+        });
+        return;
+      }
+      if (chs.length > 0) {
+        setMode({
+          screen: "reader",
+          mangaId: entry.id,
+          manga: { id: entry.id, title: entry.title, cover: entry.cover },
+          chapters: chs,
+          index: 0,
           startPage: Math.max(0, entry.page - 1),
           startScroll: entry.scroll,
         });
