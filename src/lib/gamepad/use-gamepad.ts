@@ -277,6 +277,7 @@ export function useGamepad(): void {
           padName,
           nativePads.map((p) => p.name),
         ),
+      hasNativePads: () => nativePads.length > 0,
     });
 
     return () => {

@@ -83,6 +83,18 @@ export function isNativeDuplicate(
   });
 }
 
+/**
+ * True when a standard-mapping web pad is redundant because the native
+ * backend already owns at least one device. gilrs covers every standard pad
+ * on Windows regardless of vendor or OS language, so names never need to
+ * match here. Falls back to false when native found nothing (web stays the
+ * sole input path) and never applies to non-standard DInput pads, which the
+ * web source must keep serving.
+ */
+export function isRedundantStandardPad(mapping: string, hasNativePads: boolean): boolean {
+  return hasNativePads && mapping === "standard";
+}
+
 export type GamepadShape = {
   id: string;
   mapping: string;
@@ -106,6 +118,8 @@ export type WebGamepadHandlers = {
   inputAllowed?: () => boolean;
   /** Names already reported by the native backend; matching web pads are skipped. */
   isNativeDuplicate?: (padName: string) => boolean;
+  /** Whether the native backend owns any device; standard web pads are skipped when true. */
+  hasNativePads?: () => boolean;
 };
 
 export function startWebGamepadSource(h: WebGamepadHandlers): () => void {
@@ -118,6 +132,7 @@ export function startWebGamepadSource(h: WebGamepadHandlers): () => void {
   const axisValue = new Map<string, number>();
   const inputAllowed = h.inputAllowed ?? (() => true);
   const isNativeDuplicateOf = h.isNativeDuplicate ?? (() => false);
+  const hasNativePads = h.hasNativePads ?? (() => false);
   let padSignature = "";
   let raf = 0;
   let stopped = false;
@@ -142,7 +157,8 @@ export function startWebGamepadSource(h: WebGamepadHandlers): () => void {
         !pad.connected ||
         handledNatively(pad) ||
         !isLikelyGamepad(pad) ||
-        isNativeDuplicateOf(pad.id)
+        isNativeDuplicateOf(pad.id) ||
+        isRedundantStandardPad(pad.mapping, hasNativePads())
       )
         continue;
       active.push({ id: WEB_ID_BASE + pad.index, name: pad.id });

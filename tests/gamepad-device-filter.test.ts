@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isLikelyGamepad, isNativeDuplicate, normalizeGamepadName, type GamepadShape } from "../src/lib/gamepad/web-source.ts";
+import { isLikelyGamepad, isNativeDuplicate, isRedundantStandardPad, normalizeGamepadName, type GamepadShape } from "../src/lib/gamepad/web-source.ts";
 
 function pad(id: string, mapping: string, buttons: number, axes: number): GamepadShape {
   return {
@@ -72,4 +72,17 @@ test("keeps genuinely different pads listed separately", () => {
   assert.equal(isNativeDuplicate("Wireless Controller", ["Xbox 360 Controller"]), false);
   assert.equal(isNativeDuplicate("", ["Xbox 360 Controller"]), false);
   assert.equal(isNativeDuplicate("Pad", ["Pad Pro Controller"]), false);
+});
+
+test("skips standard web pads while native owns a device, whatever the OS language", () => {
+  assert.equal(isRedundantStandardPad("standard", true), true);
+  assert.equal(
+    isRedundantStandardPad("standard", false),
+    false,
+  );
+});
+
+test("keeps DInput web pads even while native owns a device", () => {
+  assert.equal(isRedundantStandardPad("", true), false);
+  assert.equal(isRedundantStandardPad("", false), false);
 });
