@@ -711,14 +711,105 @@ export function MangaReader({
 
   const bookTurn = useBookTurnQueue(bookApi);
 
-  const remoteSetPage = (page: number) => {
+  const followRaf = useRef(0);
+  const followTarget = useRef<{ top: number; left: number } | null>(null);
+  const followVel = useRef({ x: 0, y: 0, page: -1, t: 0 });
+  const followGeom = useRef<{ key: string; page: number; top: number; left: number; h: number; w: number; at: number } | null>(null);
+  useEffect(
+    () => () => {
+      if (followRaf.current) cancelAnimationFrame(followRaf.current);
+      followRaf.current = 0;
+      followTarget.current = null;
+    },
+    [],
+  );
+
+  const remoteSetPage = (page: number, scroll?: number, vel?: number) => {
     const clamped = Math.max(0, Math.min(Math.max(0, total - 1), page));
     if (book) {
       bookApi.current?.goToPage(clamped + 1);
       setCurrentPage(clamped);
-    } else {
-      goToPage(clamped);
+      return;
     }
+    if (paged) {
+      goToPage(clamped);
+      return;
+    }
+    const el = pageEls.current[clamped];
+    const root = scrollRef.current;
+    if (!el || !root) {
+      goToPage(clamped);
+      return;
+    }
+    const s = scroll != null && Number.isFinite(scroll) ? Math.max(0, Math.min(1, scroll)) : 0;
+    const key = `${manga.id}|${chapter.id}`;
+    const now = performance.now();
+    let geom = followGeom.current;
+    if (!geom || geom.key !== key || geom.page !== clamped || now - geom.at > 250) {
+      const rRoot = root.getBoundingClientRect();
+      const rEl = el.getBoundingClientRect();
+      geom = {
+        key,
+        page: clamped,
+        top: root.scrollTop + (rEl.top - rRoot.top),
+        left: root.scrollLeft + (rEl.left - rRoot.left),
+        h: Math.max(1, rEl.height),
+        w: Math.max(1, rEl.width),
+        at: now,
+      };
+      followGeom.current = geom;
+    }
+    const top = horizontal
+      ? root.scrollTop
+      : Math.max(0, geom.top + s * geom.h - root.clientHeight / 2);
+    const left = horizontal
+      ? Math.max(0, geom.left + s * geom.w - root.clientWidth / 2)
+      : root.scrollLeft;
+    const prev = followVel.current;
+    if (prev.page === clamped && now > prev.t && vel != null && Number.isFinite(vel)) {
+      const cap = 0.05;
+      const vfrac = Math.max(-cap, Math.min(cap, vel));
+      const vpx = (horizontal ? geom.w : geom.h) * vfrac;
+      const blend = 0.5;
+      const sx = prev.x + (vpx - prev.x) * blend;
+      followVel.current = horizontal
+        ? { x: sx, y: 0, page: clamped, t: now }
+        : { x: 0, y: sx, page: clamped, t: now };
+    } else if (prev.page === clamped && now > prev.t) {
+      const dt = now - prev.t;
+      const vx = (left - (followTarget.current?.left ?? left)) / dt;
+      const vy = (top - (followTarget.current?.top ?? top)) / dt;
+      const cap = 10;
+      followVel.current = {
+        x: Math.max(-cap, Math.min(cap, vx)),
+        y: Math.max(-cap, Math.min(cap, vy)),
+        page: clamped,
+        t: now,
+      };
+    } else {
+      followVel.current = { x: 0, y: 0, page: clamped, t: now };
+    }
+    followTarget.current = { top, left };
+    setCurrentPage(clamped);
+    if (followRaf.current) return;
+    const step = () => {
+      followRaf.current = 0;
+      const target = followTarget.current;
+      const node = scrollRef.current;
+      if (!target || !node) {
+        followTarget.current = null;
+        return;
+      }
+      const dy = target.top - node.scrollTop;
+      const dx = target.left - node.scrollLeft;
+      if (Math.abs(dy) < 1 && Math.abs(dx) < 1) {
+        followTarget.current = null;
+        return;
+      }
+      node.scrollTo({ top: node.scrollTop + dy * 0.5, left: node.scrollLeft + dx * 0.5, behavior: "auto" });
+      followRaf.current = requestAnimationFrame(step);
+    };
+    followRaf.current = requestAnimationFrame(step);
   };
 
   useMangaRemoteBinding({

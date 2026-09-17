@@ -237,7 +237,7 @@ export type RemoteCommand =
       op: RemoteLibraryAction;
     }
   | { action: "mangaTurnPage"; dir: "next" | "prev" }
-  | { action: "mangaSetPage"; page: number }
+  | { action: "mangaSetPage"; page: number; scroll?: number; vel?: number }
   | { action: "mangaJumpChapter"; index: number }
   | { action: "mangaZoomIn" }
   | { action: "mangaZoomOut" }

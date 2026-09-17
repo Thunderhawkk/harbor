@@ -22,6 +22,8 @@ export type MangaGestureInput = {
   zoom: number;
   canZoom: boolean;
   reduce: boolean;
+  axis?: "x" | "y";
+  tapZones?: boolean;
   onTurn: (dir: TurnDir) => void;
   onZoom: (zoom: number) => void;
   onToggleChrome: () => void;
@@ -30,7 +32,7 @@ export type MangaGestureInput = {
   onDragEnd?: (commit: boolean, dir: TurnDir) => void;
 };
 
-type Visual = { tx: number; scale: number; hintDir: TurnDir | null };
+type Visual = { tx: number; ty: number; scale: number; hintDir: TurnDir | null };
 type Mode = "idle" | "pending" | "drag" | "pinch";
 
 const GLIDE_MS = 220;
@@ -40,7 +42,7 @@ const STANDALONE_GUTTER = 8;
 
 export function useMangaGestures(input: MangaGestureInput) {
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const [visual, setVisual] = useState<Visual>({ tx: 0, scale: 1, hintDir: null });
+  const [visual, setVisual] = useState<Visual>({ tx: 0, ty: 0, scale: 1, hintDir: null });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const st = useRef({
     mode: "idle" as Mode,
@@ -52,7 +54,9 @@ export function useMangaGestures(input: MangaGestureInput) {
     lastT: 0,
     vel: 0,
     width: 1,
+    height: 1,
     tx: 0,
+    ty: 0,
     pinchD0: 0,
     pinchZoom0: 1,
     lastSentZoom: -1,
@@ -62,6 +66,7 @@ export function useMangaGestures(input: MangaGestureInput) {
     tapTimer: 0,
     lastTapAt: 0,
   });
+  const axis = input.axis ?? "x";
 
   const gutter = useMemo(() => {
     if (typeof window === "undefined") return EDGE_GUTTER;
@@ -95,41 +100,46 @@ export function useMangaGestures(input: MangaGestureInput) {
 
   const glideToZero = () => {
     cancelRaf();
-    const from = st.current.tx;
-    if (input.reduce || Math.abs(from) < 0.5) {
+    const fromX = st.current.tx;
+    const fromY = st.current.ty;
+    if (input.reduce || (Math.abs(fromX) < 0.5 && Math.abs(fromY) < 0.5)) {
       st.current.tx = 0;
-      setVisual((v) => ({ ...v, tx: 0, hintDir: null }));
+      st.current.ty = 0;
+      setVisual((v) => ({ ...v, tx: 0, ty: 0, hintDir: null }));
       return;
     }
     const t0 = performance.now();
     const tick = () => {
       const p = Math.min(1, (performance.now() - t0) / GLIDE_MS);
       const eased = 1 - Math.pow(1 - p, 3);
-      const tx = from * (1 - eased);
+      const tx = fromX * (1 - eased);
+      const ty = fromY * (1 - eased);
       st.current.tx = tx;
-      setVisual((v) => ({ ...v, tx, hintDir: null }));
+      st.current.ty = ty;
+      setVisual((v) => ({ ...v, tx, ty, hintDir: null }));
       if (p < 1) {
         st.current.raf = requestAnimationFrame(tick);
       } else {
         st.current.tx = 0;
+        st.current.ty = 0;
         st.current.raf = 0;
-        setVisual((v) => ({ ...v, tx: 0, hintDir: null }));
+        setVisual((v) => ({ ...v, tx: 0, ty: 0, hintDir: null }));
       }
     };
     st.current.raf = requestAnimationFrame(tick);
   };
 
   const resolveCommit = () => {
-    const w = st.current.width;
-    const tx = st.current.tx;
+    const size = axis === "y" ? st.current.height : st.current.width;
+    const t = axis === "y" ? st.current.ty : st.current.tx;
     const vel = st.current.vel;
     const flick = Math.abs(vel) >= FLICK_VEL;
-    const projected = tx + project(vel);
-    const passed = Math.abs(tx) >= TURN_FRAC * w || Math.abs(projected) >= TURN_FRAC * w;
-    const carrier = flick ? vel : tx;
+    const projected = t + project(vel);
+    const passed = Math.abs(t) >= TURN_FRAC * size || Math.abs(projected) >= TURN_FRAC * size;
+    const carrier = flick ? vel : t;
     if (progressiveOn()) {
       cancelStream();
-      const dir = readingDir(carrier || tx || -1, input.rtl);
+      const dir = readingDir(carrier || t || -1, input.rtl);
       const ok = dir === "next" ? input.canNext : input.canPrev;
       input.onDragEnd?.((flick || passed) && carrier !== 0 && ok, dir);
       glideToZero();
@@ -143,7 +153,17 @@ export function useMangaGestures(input: MangaGestureInput) {
     glideToZero();
   };
 
-  const handleTap = () => {
+  const handleTap = (fracX: number) => {
+    if (input.tapZones) {
+      const zone = fracX < 1 / 3 ? "prev" : fracX > 2 / 3 ? "next" : null;
+      if (zone == null) {
+        input.onToggleChrome();
+        return;
+      }
+      const ok = zone === "next" ? input.canNext : input.canPrev;
+      if (ok) input.onTurn(zone);
+      return;
+    }
     if (!input.canZoom) {
       input.onToggleChrome();
       return;
@@ -177,6 +197,7 @@ export function useMangaGestures(input: MangaGestureInput) {
       cancelRaf();
       st.current.mode = "pinch";
       st.current.tx = 0;
+      st.current.ty = 0;
       if (input.canZoom) {
         const pts = [...pointers.current.values()];
         const a = pts[0];
@@ -187,14 +208,16 @@ export function useMangaGestures(input: MangaGestureInput) {
       } else {
         st.current.pinchD0 = 0;
       }
-      setVisual((v) => ({ ...v, tx: 0, hintDir: null }));
+      setVisual((v) => ({ ...v, tx: 0, ty: 0, hintDir: null }));
       return;
     }
 
     cancelRaf();
     const now = performance.now();
     st.current.mode = "pending";
-    st.current.width = Math.max(1, surfaceRef.current?.getBoundingClientRect().width ?? vw);
+    const rect = surfaceRef.current?.getBoundingClientRect();
+    st.current.width = Math.max(1, rect?.width ?? vw);
+    st.current.height = Math.max(1, rect?.height ?? 1);
     st.current.startX = e.clientX;
     st.current.startY = e.clientY;
     st.current.startT = now;
@@ -203,7 +226,8 @@ export function useMangaGestures(input: MangaGestureInput) {
     st.current.lastT = now;
     st.current.vel = 0;
     st.current.tx = 0;
-    setVisual((v) => (v.tx === 0 && v.hintDir === null ? v : { ...v, tx: 0, hintDir: null }));
+    st.current.ty = 0;
+    setVisual((v) => (v.tx === 0 && v.ty === 0 && v.hintDir === null ? v : { ...v, tx: 0, ty: 0, hintDir: null }));
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -220,7 +244,7 @@ export function useMangaGestures(input: MangaGestureInput) {
       const ratio = Math.hypot(a.x - b.x, a.y - b.y) / st.current.pinchD0;
       const z = clampZoom(st.current.pinchZoom0 * ratio);
       const scale = Math.max(PINCH_MIN, Math.min(PINCH_MAX, ratio));
-      setVisual((v) => (v.scale === scale && v.tx === 0 ? v : { ...v, scale, tx: 0, hintDir: null }));
+      setVisual((v) => (v.scale === scale && v.tx === 0 && v.ty === 0 ? v : { ...v, scale, tx: 0, ty: 0, hintDir: null }));
       if (z !== st.current.lastSentZoom) {
         st.current.lastSentZoom = z;
         input.onZoom(z);
@@ -237,20 +261,29 @@ export function useMangaGestures(input: MangaGestureInput) {
       st.current.mode = "drag";
     }
     const dt = Math.max(1, now - st.current.lastT);
-    st.current.vel = emaVel(st.current.vel, (e.clientX - st.current.lastX) / dt);
+    const primaryNow = axis === "y" ? e.clientY : e.clientX;
+    const primaryLast = axis === "y" ? st.current.lastY : st.current.lastX;
+    st.current.vel = emaVel(st.current.vel, (primaryNow - primaryLast) / dt);
     st.current.lastX = e.clientX;
     st.current.lastY = e.clientY;
     st.current.lastT = now;
 
-    const dir = readingDir(dx, input.rtl);
+    const d = axis === "y" ? dy : dx;
+    const dir = readingDir(d, input.rtl);
     const allowed = dir === "next" ? input.canNext : input.canPrev;
-    const w = st.current.width;
-    const travel = allowed ? dx : dx * RUBBER;
-    const tx = Math.max(-w, Math.min(w, travel));
-    st.current.tx = tx;
-    const hintDir = allowed && Math.abs(tx) >= TURN_FRAC * w ? dir : null;
-    setVisual((v) => (v.tx === tx && v.hintDir === hintDir ? v : { ...v, tx, hintDir }));
-    if (progressiveOn()) scheduleStream(allowed ? tx / w : 0);
+    const size = axis === "y" ? st.current.height : st.current.width;
+    const travel = allowed ? d : d * RUBBER;
+    const t = Math.max(-size, Math.min(size, travel));
+    if (axis === "y") {
+      st.current.ty = t;
+      st.current.tx = 0;
+    } else {
+      st.current.tx = t;
+      st.current.ty = 0;
+    }
+    const hintDir = allowed && Math.abs(t) >= TURN_FRAC * size ? dir : null;
+    setVisual((v) => (v.tx === st.current.tx && v.ty === st.current.ty && v.hintDir === hintDir ? v : { ...v, tx: st.current.tx, ty: st.current.ty, hintDir }));
+    if (progressiveOn()) scheduleStream(allowed ? t / size : 0);
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -265,7 +298,7 @@ export function useMangaGestures(input: MangaGestureInput) {
         st.current.pinchD0 = 0;
         st.current.lastSentZoom = -1;
         st.current.mode = "idle";
-        setVisual((v) => ({ ...v, scale: 1, tx: 0, hintDir: null }));
+        setVisual((v) => ({ ...v, scale: 1, tx: 0, ty: 0, hintDir: null }));
       }
       return;
     }
@@ -279,7 +312,11 @@ export function useMangaGestures(input: MangaGestureInput) {
     if (st.current.mode === "pending") {
       const held = performance.now() - st.current.startT;
       const moved = Math.hypot(st.current.lastX - st.current.startX, st.current.lastY - st.current.startY);
-      if (held <= TAP_MS && moved <= TAP_SLOP) handleTap();
+      if (held <= TAP_MS && moved <= TAP_SLOP) {
+        const rect = surfaceRef.current?.getBoundingClientRect();
+        const fracX = rect && rect.width > 0 ? (st.current.lastX - rect.left) / rect.width : 0.5;
+        handleTap(fracX);
+      }
       st.current.mode = "idle";
       return;
     }
@@ -302,7 +339,7 @@ export function useMangaGestures(input: MangaGestureInput) {
         input.onDragEnd?.(false, readingDir(st.current.tx || -1, input.rtl));
       }
       glideToZero();
-    } else setVisual((v) => ({ ...v, tx: 0, scale: 1, hintDir: null }));
+    } else setVisual((v) => ({ ...v, tx: 0, ty: 0, scale: 1, hintDir: null }));
   };
 
   useEffect(() => {
@@ -313,6 +350,7 @@ export function useMangaGestures(input: MangaGestureInput) {
       s.pinchD0 = 0;
       s.vel = 0;
       s.tx = 0;
+      s.ty = 0;
       s.lastSentZoom = -1;
       s.lastTapAt = 0;
       if (s.raf) cancelAnimationFrame(s.raf);
@@ -321,7 +359,7 @@ export function useMangaGestures(input: MangaGestureInput) {
       s.streamRaf = 0;
       if (s.tapTimer) window.clearTimeout(s.tapTimer);
       s.tapTimer = 0;
-      setVisual({ tx: 0, scale: 1, hintDir: null });
+      setVisual({ tx: 0, ty: 0, scale: 1, hintDir: null });
     };
     const onVisibility = () => {
       if (document.visibilityState !== "visible") clear();

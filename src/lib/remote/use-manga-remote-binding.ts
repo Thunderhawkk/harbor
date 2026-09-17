@@ -23,7 +23,7 @@ type Params = {
   hasPrev: boolean;
   hasNext: boolean;
   turnPage: (dir: "next" | "prev") => void;
-  setPage: (page: number) => void;
+  setPage: (page: number, scroll?: number, vel?: number) => void;
   jumpChapter: (index: number) => void;
   zoomBy: (delta: number) => void;
   setZoom: (zoom: number) => void;
@@ -61,7 +61,7 @@ export function useMangaRemoteBinding(params: Params) {
       hasPrev: params.hasPrev,
       hasNext: params.hasNext,
       turnPage: (dir) => ref.current.turnPage(dir),
-      setPage: (page) => ref.current.setPage(page),
+      setPage: (page, scroll, vel) => ref.current.setPage(page, scroll, vel),
       jumpChapter: (index) => ref.current.jumpChapter(index),
       zoomBy: (delta) => ref.current.zoomBy(delta),
       setZoom: (zoom) => ref.current.setZoom(zoom),

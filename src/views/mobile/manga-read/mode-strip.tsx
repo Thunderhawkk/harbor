@@ -6,16 +6,20 @@ export function ModeStrip({
   initialPage,
   onPageChange,
   onToggleChrome,
+  onScrollState,
 }: {
   pages: string[];
   initialPage: number;
   onPageChange: (p: number) => void;
   onToggleChrome: () => void;
+  onScrollState?: (page: number, frac: number, vel: number) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const els = useRef<Array<HTMLDivElement | null>>([]);
   const change = useRef(onPageChange);
   change.current = onPageChange;
+  const scrollState = useRef(onScrollState);
+  scrollState.current = onScrollState;
 
   const didScroll = useRef(false);
   const firstUrl = useRef(pages[0]);
@@ -47,6 +51,48 @@ export function ModeStrip({
     if (initialPage <= 0) return;
     els.current[initialPage]?.scrollIntoView({ block: "start" });
   }, [pages, initialPage]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let raf = 0;
+    let last = 0;
+    let lastSample = { frac: -1, page: -1, t: 0 };
+    const report = () => {
+      raf = 0;
+      const cb = scrollState.current;
+      if (!cb) return;
+      const now = performance.now();
+      if (now - last < 50) return;
+      last = now;
+      const rRoot = root.getBoundingClientRect();
+      const center = rRoot.top + rRoot.height / 2;
+      for (let i = 0; i < els.current.length; i++) {
+        const el = els.current[i];
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (center >= r.top && center < r.bottom && r.height > 0) {
+          const frac = Math.max(0, Math.min(1, (center - r.top) / r.height));
+          let vel = 0;
+          if (lastSample.page === i && now > lastSample.t) {
+            vel = (frac - lastSample.frac) / (now - lastSample.t);
+          }
+          lastSample = { frac, page: i, t: now };
+          cb(i, frac, vel);
+          return;
+        }
+      }
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(report);
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [pages]);
 
   return (
     <div ref={rootRef} className="h-full w-full overflow-y-auto overscroll-contain" onClick={onToggleChrome}>

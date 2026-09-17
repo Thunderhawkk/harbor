@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
   BookOpen,
@@ -7,6 +7,9 @@ import {
   ChevronsRight,
   Minus,
   Monitor,
+  MousePointerClick,
+  MoveHorizontal,
+  MoveVertical,
   Plus,
   X,
 } from "lucide-react";
@@ -18,6 +21,7 @@ import { MangaPageSurface } from "./manga-page-surface";
 import { MangaRemoteEmpty } from "./manga-remote-empty";
 import { ZoomJoystick } from "./zoom-joystick";
 import { useOptimisticPage } from "./use-optimistic-page";
+import { useRemoteLayout, type RemoteLayout } from "./use-remote-layout";
 import { useHistoryBackGuard } from "./use-history-guard";
 import { clampZoom, ZOOM_MAX, ZOOM_MIN, type TurnDir } from "./gesture-math";
 
@@ -51,6 +55,13 @@ export function MangaRemote({
   const [zoomEngaged, setZoomEngaged] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const hintTimer = useRef(0);
+  const [layout, setLayout] = useRemoteLayout();
+  const [feedPage, setFeedPage] = useState<number | null>(null);
+  const feedState = useRef({ page: -1, frac: -1, t: 0 });
+  useEffect(() => {
+    setFeedPage(null);
+    feedState.current = { page: -1, frac: -1, t: 0 };
+  }, [m?.chapterId]);
 
   useHistoryBackGuard(true);
 
@@ -61,6 +72,7 @@ export function MangaRemote({
     m?.chapterId ?? "",
     m?.seq ?? 0,
   );
+  const feedUrls = useMemo(() => m?.pageUrls ?? [], [m?.chapterId, m?.pageCount]);
 
   if (!m || !m.open) return <MangaRemoteEmpty variant="closed" />;
 
@@ -70,10 +82,36 @@ export function MangaRemote({
     hintTimer.current = window.setTimeout(() => setHint(null), 1600);
   };
 
+  const LAYOUTS: Array<{ id: RemoteLayout; label: string; Icon: typeof MoveHorizontal }> = [
+    { id: "swipe", label: t("Swipe sideways"), Icon: MoveHorizontal },
+    { id: "strip", label: t("Long strip"), Icon: MoveVertical },
+    { id: "tap", label: t("Tap sides to turn"), Icon: MousePointerClick },
+  ];
+  const layoutIdx = LAYOUTS.findIndex((l) => l.id === layout);
+  const ActiveLayout = LAYOUTS[layoutIdx >= 0 ? layoutIdx : 0];
+  const cycleLayout = () => {
+    const next = LAYOUTS[((layoutIdx >= 0 ? layoutIdx : 0) + 1) % LAYOUTS.length];
+    setLayout(next.id);
+    flash(next.label);
+  };
+
   const turn = (dir: TurnDir) => {
     const sent = sendCommand({ action: "mangaTurnPage", dir });
     if (sent) advance(dir);
     else flash(t("Reconnecting to your computer"));
+  };
+  const reportFeedPage = (page: number, scroll?: number, vel?: number) => {
+    setFeedPage(page);
+    const last = feedState.current;
+    const frac = scroll == null ? last.frac : Math.max(0, Math.min(1, Math.round(scroll * 1000) / 1000));
+    const v = vel == null || !Number.isFinite(vel) ? 0 : Math.round(vel * 100000) / 100000;
+    if (page === last.page && frac === last.frac) return;
+    feedState.current = { page, frac, t: performance.now() };
+    sendCommand(
+      scroll == null
+        ? { action: "mangaSetPage", page }
+        : { action: "mangaSetPage", page, scroll: frac, vel: v },
+    );
   };
   const flipProgress = (p: number) => {
     sendCommand({ action: "mangaFlipProgress", p });
@@ -93,12 +131,17 @@ export function MangaRemote({
   const spreadNums = (m.spread ?? []).filter((n) => n > 0);
   const isSpread = (m.mode === "book" || m.mode === "double") && spreadNums.length >= 2;
   const spreadLabel = isSpread ? `${Math.min(...spreadNums)}-${Math.max(...spreadNums)}` : "";
-  const chipPage = isSpread ? spreadLabel : String(Math.min(displayPage + 1, total));
+  const chipPage =
+    layout === "strip" && feedPage != null
+      ? String(Math.min(feedPage + 1, total))
+      : isSpread
+        ? spreadLabel
+        : String(Math.min(displayPage + 1, total));
 
   return (
     <>
       <div
-        className="relative flex h-full touch-none select-none flex-col"
+        className={`relative flex h-full select-none flex-col ${layout === "strip" ? "[touch-action:pan-y]" : "touch-none"}`}
         style={{
           paddingBottom: standalone
             ? "calc(env(safe-area-inset-bottom, 0px) + 16px)"
@@ -139,6 +182,16 @@ export function MangaRemote({
               <BookOpen size={15} strokeWidth={2.4} /> {t("Read here")}
             </button>
           )}
+          {!onReadHere && <span className="ms-auto" />}
+          <button
+            type="button"
+            onClick={cycleLayout}
+            aria-label={t("Change control layout")}
+            title={ActiveLayout.label}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-muted transition-transform active:scale-90"
+          >
+            <ActiveLayout.Icon size={20} strokeWidth={2.2} />
+          </button>
         </div>
 
         <button
@@ -157,6 +210,10 @@ export function MangaRemote({
           displayPage={displayPage}
           pageCount={count}
           spreadLabel={spreadLabel || undefined}
+          layout={layout}
+          pageUrls={feedUrls}
+          initialPage={feedPage ?? displayPage}
+          onPageVisible={reportFeedPage}
           gestures={{
             rtl: m.rtl,
             canPrev: m.pageIndex > 0 || m.hasPrev,
@@ -164,10 +221,12 @@ export function MangaRemote({
             zoom: m.zoom,
             canZoom: m.canZoom,
             reduce,
+            axis: layout === "strip" ? "y" : "x",
+            tapZones: layout === "tap",
             onTurn: turn,
             onZoom: zoomAbs,
             onToggleChrome: () => setChromeHidden((v) => !v),
-            progressive: m.mode === "book",
+            progressive: layout === "swipe" && m.mode === "book",
             onDrag: flipProgress,
             onDragEnd: flipEnd,
           }}

@@ -28,7 +28,7 @@ export type RemoteMangaBinding = {
   hasPrev: boolean;
   hasNext: boolean;
   turnPage: (dir: "next" | "prev") => void;
-  setPage: (page: number) => void;
+  setPage: (page: number, scroll?: number, vel?: number) => void;
   jumpChapter: (index: number) => void;
   zoomBy: (delta: number) => void;
   setZoom: (zoom: number) => void;
@@ -119,7 +119,7 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
       b.turnPage(command.dir);
       return;
     case "mangaSetPage":
-      b.setPage(command.page);
+      b.setPage(command.page, command.scroll, command.vel);
       return;
     case "mangaJumpChapter":
       if (command.index >= 0 && command.index < b.chapters.length) b.jumpChapter(command.index);
