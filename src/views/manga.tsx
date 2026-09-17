@@ -2,6 +2,7 @@ import { ArrowDownToLine, BookOpen, ChevronLeft, ChevronRight, Layers } from "lu
 import { CoverImg } from "@/components/cover-img";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
+import { LazyMount } from "@/components/lazy-mount";
 import { useMangaDownloadsCount } from "@/lib/manga-downloads";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
@@ -321,18 +322,24 @@ export function MangaView() {
           <MangaContinue onResume={resume} />
         </div>
         <MangaHiddenRows />
-        <AnilistMangaRows onOpen={openMangaByTitle} />
-        <BecauseYouWatched onOpen={openMangaItem} />
+        <LazyMount minHeight={280}>
+          <AnilistMangaRows onOpen={openMangaByTitle} />
+        </LazyMount>
+        <LazyMount minHeight={280}>
+          <BecauseYouWatched onOpen={openMangaItem} />
+        </LazyMount>
         <div className="mt-8">
-          <MangaRail
-            title={t("Popular Manga")}
-            subtitle={t("Most read right now")}
-            collapsibleKey="harbor.manga.popularRowOpen"
-            hideKey="popular"
-            scrollKey="manga:Popular Manga"
-            load={() => popularManga(0)}
-            onOpen={openMangaItem}
-          />
+          <LazyMount minHeight={300}>
+            <MangaRail
+              title={t("Popular Manga")}
+              subtitle={t("Most read right now")}
+              collapsibleKey="harbor.manga.popularRowOpen"
+              hideKey="popular"
+              scrollKey="manga:Popular Manga"
+              load={() => popularManga(0)}
+              onOpen={openMangaItem}
+            />
+          </LazyMount>
         </div>
         <div className="mb-9 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <button
@@ -419,6 +426,7 @@ export function MangaView() {
             onResume={resume}
             onOpenDownloads={() => setMode({ screen: "downloads", from: mode.mangaId })}
             onOpenManga={(id) => setMode({ screen: "detail", mangaId: id })}
+            scrollRoot={detailScrollRef}
             onRead={(chapters, index, manga) =>
               setMode({
                 screen: "reader",

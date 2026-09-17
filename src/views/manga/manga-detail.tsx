@@ -173,6 +173,7 @@ export function MangaDetail({
   onBack,
   onOpenManga,
   onOpenDownloads,
+  scrollRoot,
 }: {
   mangaId: string;
   onRead: (
@@ -184,6 +185,7 @@ export function MangaDetail({
   onBack: () => void;
   onOpenManga: (id: string) => void;
   onOpenDownloads?: () => void;
+  scrollRoot?: React.RefObject<HTMLElement | null>;
 }) {
   const t = useT();
   const [detail, setDetail] = useState<MangaSummary | null>(null);
@@ -616,6 +618,7 @@ export function MangaDetail({
         mangaCover={detail?.cover}
         animeEndChapter={coverage?.endChapter}
         pending={chaptersPending}
+        scrollRoot={scrollRoot}
       />
 
       {detail?.title && <MangaRecommendedRail title={detail.title} onOpen={onOpenManga} />}
