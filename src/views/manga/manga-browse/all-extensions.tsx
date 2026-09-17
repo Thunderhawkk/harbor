@@ -429,7 +429,7 @@ export function AllExtensionsView({
   return (
     <div className="flex flex-col gap-9">
       {favList.length > 0 && (
-        <Row title={t("Favorites")} min={140}>
+        <Row title={t("Library")} min={140}>
           {favList.map((m) => (
             <MangaCard key={m.id} manga={m} onOpen={onOpen} />
           ))}

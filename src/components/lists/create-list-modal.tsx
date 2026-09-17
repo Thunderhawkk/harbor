@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { createList, MAX_LISTS, useCustomLists } from "@/lib/custom-lists";
+import { MAX_LISTS, sharedLists, type ListStore } from "@/lib/custom-lists";
 import { useT } from "@/lib/i18n";
 import { emitListToast } from "./list-toast";
 
 export function CreateListModal({
   onClose,
   onCreated,
+  store = sharedLists,
 }: {
   onClose: () => void;
   onCreated?: (id: string) => void;
+  store?: ListStore;
 }) {
   const t = useT();
-  const lists = useCustomLists();
+  const lists = store.useLists();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const atMax = lists.length >= MAX_LISTS;
@@ -27,7 +29,7 @@ export function CreateListModal({
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || atMax) return;
-    const id = createList(trimmed, description);
+    const id = store.createList(trimmed, description);
     if (!id) return;
     emitListToast(t('Created "{name}"', { name: trimmed }));
     onCreated?.(id);

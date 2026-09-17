@@ -33,6 +33,7 @@ import { MangaBrowse } from "./manga/manga-browse";
 import { BrowseResults } from "./manga/manga-sources-panel/suwayomi/browse-results";
 import type { SuwayomiSource } from "@/lib/manga/sources/suwayomi/provider";
 import { MangaCollections } from "./manga/manga-collections";
+import { MangaLibrary } from "./manga/manga-library";
 import { MangaContinue } from "./manga/manga-continue";
 import { MangaDetail } from "./manga/manga-detail";
 import { MangaDownloadsView } from "./manga/manga-downloads";
@@ -43,15 +44,15 @@ import { MangaUniverses, UniversesCta } from "./manga/manga-universes";
 import { AnilistMangaRows } from "./manga/anilist-manga-rows";
 import { MangaHiddenRows } from "./manga/manga-row-visibility";
 import { BecauseYouWatched } from "./manga/because-you-watched";
-import { MyListsTab } from "./library/my-lists-tab";
-import { useCustomLists } from "@/lib/custom-lists";
+import { useMangaFavorites } from "@/lib/manga-favorites";
+import { mangaLists } from "@/lib/manga-lists";
 
 type MangaMeta = { id: string; title: string; cover?: string };
 
 type Mode =
   | { screen: "browse" }
   | { screen: "collections" }
-  | { screen: "lists" }
+  | { screen: "library" }
   | { screen: "universes" }
   | { screen: "sources" }
   | { screen: "downloads"; from?: string }
@@ -368,7 +369,7 @@ export function MangaView() {
             />
           </button>
           <UniversesCta onClick={() => setMode({ screen: "universes" })} />
-          <MyListsCta onClick={() => setMode({ screen: "lists" })} />
+          <LibraryCta onClick={() => setMode({ screen: "library" })} />
         </div>
         <div className="mb-6 mt-3 flex items-center justify-between gap-4">
           <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Browse manga")}</h2>
@@ -390,6 +391,7 @@ export function MangaView() {
           onOpen={(id) => setMode({ screen: "detail", mangaId: id })}
           onManageSources={() => setMode({ screen: "sources" })}
           onBrowseExtension={(source) => setMode({ screen: "browse-extension", source })}
+          onOpenLibrary={() => setMode({ screen: "library" })}
         />
         <BackToTop scrollRef={browseScrollRef} />
       </main>
@@ -448,7 +450,7 @@ export function MangaView() {
         </main>
       )}
 
-      {mode.screen === "lists" && (
+      {mode.screen === "library" && (
         <main className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24">
           <button
             type="button"
@@ -459,9 +461,9 @@ export function MangaView() {
             {t("Back")}
           </button>
           <h1 className="mb-8 font-display text-[32px] font-medium tracking-tight text-ink">
-            {t("My lists")}
+            {t("Library")}
           </h1>
-          <MyListsTab />
+          <MangaLibrary />
         </main>
       )}
 
@@ -520,25 +522,26 @@ function EnableGate({ onEnable }: { onEnable: () => void }) {
   );
 }
 
-function MyListsCta({ onClick }: { onClick: () => void }) {
+function LibraryCta({ onClick }: { onClick: () => void }) {
   const t = useT();
-  const lists = useCustomLists();
+  const { items } = useMangaFavorites();
+  const lists = mangaLists.useLists();
   const covers = useMemo(() => {
-    const manga = lists
-      .flatMap((l) => l.items)
-      .filter((it) => it.type === "manga" && it.poster)
-      .map((it) => it.poster!);
-    const any = lists
+    const fav = [...items.values()]
+      .sort((a, b) => b.addedAt - a.addedAt)
+      .map((e) => e.cover)
+      .filter((c): c is string => !!c);
+    const listed = lists
       .flatMap((l) => l.items)
       .filter((it) => it.poster)
       .map((it) => it.poster!);
     const seen = new Set<string>();
-    for (const c of [...manga, ...any]) {
+    for (const c of [...fav, ...listed]) {
       if (c && !seen.has(c)) seen.add(c);
       if (seen.size === 3) break;
     }
     return [...seen];
-  }, [lists]);
+  }, [items, lists]);
 
   const [a, b, center] = covers;
   return (
@@ -571,9 +574,9 @@ function MyListsCta({ onClick }: { onClick: () => void }) {
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15.5px] font-semibold text-ink">{t("My lists")}</span>
+        <span className="text-[15.5px] font-semibold text-ink">{t("Library")}</span>
         <span className="truncate text-[13px] text-ink-muted">
-          {t("The lists you created, full of saved manga")}
+          {t("Your favorites and manga lists")}
         </span>
       </div>
       <ChevronRight

@@ -64,6 +64,7 @@ import {
 } from "@/lib/manga-bookmarks";
 import { downloadChapter } from "@/lib/manga-downloads";
 import { requestMangaChapterRead, setMangaReadIntent } from "@/lib/manga/read-intent";
+import { mangaLists } from "@/lib/manga-lists";
 import { mangaChapters } from "@/lib/manga/api";
 import { resolveReaderChapters } from "@/lib/manga/chapter-identity";
 
@@ -649,6 +650,7 @@ export function ContextMenu() {
       <MyListSubmenu
         key="manga-list"
         item={{ id: target.id, type: "manga", name: target.title, poster: target.cover }}
+        store={mangaLists}
         onClose={close}
       />,
       <Item
