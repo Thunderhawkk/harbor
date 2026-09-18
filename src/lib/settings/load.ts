@@ -319,10 +319,6 @@ function parseStoredSettings(raw: string | null): Settings {
       }
     }
     if (!parsed._navThemeRepairV1) {
-      const nav = parsed.navCustomization as Partial<Settings["navCustomization"]> | undefined;
-      if (nav && Array.isArray(nav.hidden) && nav.hidden.length > 0) {
-        parsed.navCustomization = { ...nav, hidden: [] } as Settings["navCustomization"];
-      }
       parsed._navThemeRepairV1 = true;
     }
     if (parsed.cwSources == null) {

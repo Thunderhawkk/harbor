@@ -1,5 +1,12 @@
 import { useState } from "react";
 import { Monitor } from "lucide-react";
+import { useContextMenu } from "@/lib/context-menu";
+import {
+  NavHiddenTray,
+  NavHideBadge,
+  useNavDrag,
+} from "@/chrome/nav-edit";
+import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { Search } from "@/components/icons/search-icon";
 import { HarborMark } from "@/components/icons/harbor-mark";
 import { NotificationCenter } from "@/components/notification-center/notification-center";
@@ -29,6 +36,12 @@ export function TopDock() {
   const [pinFor, setPinFor] = useState<View | null>(null);
   const maxed = useMaximized();
   const bigPicture = useBigPictureEntry();
+  const editing = useNavEditMode();
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
 
   const themePreset =
     settings.theme.preset !== "custom" ? getThemeById(settings.theme.preset) : null;
@@ -60,27 +73,7 @@ export function TopDock() {
         active,
         onSelect: () => navigate(item),
         node: (
-          <button
-            type="button"
-            onClick={() => navigate(item)}
-            aria-label={label}
-            data-harbor-nav={item.id}
-            data-active={active ? "" : undefined}
-            className={`relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12.5px] font-medium transition-colors ${
-              active ? "text-ink" : "text-ink-muted hover:text-ink"
-            }`}
-          >
-            {active && (
-              <span
-                aria-hidden
-                className="absolute inset-0 -z-10 rounded-full bg-white/15 ring-1 ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_4px_12px_-2px_rgba(0,0,0,0.3)] backdrop-blur-md"
-              />
-            )}
-            <span data-topdock-icon aria-hidden className="hidden">
-              {item.render(active)}
-            </span>
-            <span data-topdock-label>{label}</span>
-          </button>
+          <TopDockNavButton item={item} active={active} label={label} navigate={navigate} />
         ),
       };
     });
@@ -96,6 +89,7 @@ export function TopDock() {
       >
         <div
           data-tauri-drag-region
+          onContextMenu={openEmptyMenu}
           className="pointer-events-auto flex h-14 w-full items-center gap-2 rounded-full border border-white/20 bg-black/55 ps-4 pe-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_60px_-20px_rgba(0,0,0,0.75)] backdrop-blur-md"
         >
           <button
@@ -204,6 +198,13 @@ export function TopDock() {
           </div>
         </div>
       </header>
+      {editing && (
+        <div className="fixed inset-x-0 top-20 z-[59] flex justify-center px-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-white/15 bg-black/70 p-2 shadow-2xl backdrop-blur-xl">
+            <NavHiddenTray orientation="horizontal" />
+          </div>
+        </div>
+      )}
       {pinFor !== null && (
         <ParentalPinModal
           mode={{
@@ -219,6 +220,52 @@ export function TopDock() {
         />
       )}
     </>
+  );
+}
+
+function TopDockNavButton({
+  item,
+  active,
+  label,
+  navigate,
+}: {
+  item: NavItem;
+  active: boolean;
+  label: string;
+  navigate: (item: NavItem) => void;
+}) {
+  const { open: openContextMenu } = useContextMenu();
+  const editing = useNavEditMode();
+  const drag = useNavDrag(item.id, "horizontal");
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(item)}
+      onContextMenu={(e) =>
+        openContextMenu(e, { kind: "nav", itemId: item.id, view: item.view, label })
+      }
+      data-tauri-drag-region={editing ? "false" : undefined}
+      onPointerDown={drag.onPointerDown}
+      data-nav-drop-id={item.id}
+      aria-label={label}
+      data-harbor-nav={item.id}
+      data-active={active ? "" : undefined}
+      className={`relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12.5px] font-medium transition-colors ${
+        drag.over ? "ring-2 ring-accent" : ""
+      } ${active ? "text-ink" : "text-ink-muted hover:text-ink"}`}
+    >
+      {editing && <NavHideBadge itemId={item.id} />}
+      {active && (
+        <span
+          aria-hidden
+          className="absolute inset-0 -z-10 rounded-full bg-white/15 ring-1 ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_4px_12px_-2px_rgba(0,0,0,0.3)] backdrop-blur-md"
+        />
+      )}
+      <span data-topdock-icon aria-hidden className="hidden">
+        {item.render(active)}
+      </span>
+      <span data-topdock-label>{label}</span>
+    </button>
   );
 }
 

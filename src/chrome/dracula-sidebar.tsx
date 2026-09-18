@@ -5,6 +5,13 @@ import { HarborMark } from "@/components/icons/harbor-mark";
 import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
 import { ProfileChip } from "@/chrome/sidebar/profile-chip";
 import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
+import { useContextMenu } from "@/lib/context-menu";
+import {
+  NavHiddenTray,
+  NavHideBadge,
+  useNavDrag,
+} from "@/chrome/nav-edit";
+import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
 import { useT } from "@/lib/i18n";
@@ -21,6 +28,11 @@ export function DraculaSidebar() {
   const t = useT();
   const collapsed = settings.sidebarCollapsed;
   const [pinFor, setPinFor] = useState<View | null>(null);
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
 
   const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization));
   const primary = items.filter((i) => PRIMARY_IDS.has(i.id));
@@ -91,7 +103,10 @@ export function DraculaSidebar() {
             </button>
           </div>
 
-          <nav className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 pb-4 pt-1 [scrollbar-width:none] lg:px-4 [&::-webkit-scrollbar]:hidden">
+          <nav
+            className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 pb-4 pt-1 [scrollbar-width:none] lg:px-4 [&::-webkit-scrollbar]:hidden"
+            onContextMenu={openEmptyMenu}
+          >
             {primary.filter(isVisible).map((item) => (
               <NavPill
                 key={item.id}
@@ -115,6 +130,9 @@ export function DraculaSidebar() {
           </nav>
 
           <div className={`relative px-3 pb-3 pt-1 ${collapsed ? "" : "lg:px-4"}`}>
+            <div className="mb-1 px-1">
+              <NavHiddenTray orientation="vertical" compact={collapsed} />
+            </div>
             <div
               aria-hidden
               className="pointer-events-none mb-2 h-px bg-gradient-to-r from-transparent via-edge-soft to-transparent"
@@ -179,17 +197,28 @@ function NavPill({
 }) {
   const t = useT();
   const label = t(item.label);
+  const { open: openContextMenu } = useContextMenu();
+  const editing = useNavEditMode();
+  const drag = useNavDrag(item.id, "vertical");
   return (
     <button
       onClick={onClick}
+      onContextMenu={(e) =>
+        openContextMenu(e, { kind: "nav", itemId: item.id, view: item.view, label })
+      }
+      data-harbor-nav={item.id}
+      data-tauri-drag-region={editing ? "false" : undefined}
+      onPointerDown={drag.onPointerDown}
+      data-nav-drop-id={item.id}
       aria-label={gated ? t("chrome.lockedRequiresPin", { label }) : label}
       title={gated ? t("chrome.lockedShort", { label }) : label}
       className={`group relative flex h-12 items-center justify-center gap-3.5 rounded-[18px] transition-colors duration-200 ${
         collapsed ? "" : "lg:justify-start lg:px-4"
-      } ${
+      } ${drag.over ? "ring-2 ring-accent" : ""} ${
         active ? "text-accent" : "text-ink-muted hover:text-ink"
       }`}
     >
+      {editing && <NavHideBadge itemId={item.id} />}
       {active ? (
         <span
           aria-hidden

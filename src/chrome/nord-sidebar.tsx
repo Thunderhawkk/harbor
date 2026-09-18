@@ -1,4 +1,5 @@
 import { usePreviewNavCustomization } from "@/lib/theme-preview";
+import { useContextMenu } from "@/lib/context-menu";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -7,6 +8,12 @@ import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
 import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import {
+  NavHiddenTray,
+  NavHideBadge,
+  useNavDrag,
+} from "@/chrome/nav-edit";
+import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { useT } from "@/lib/i18n";
 import { useParental } from "@/lib/parental";
 import { useSettings } from "@/lib/settings";
@@ -23,6 +30,11 @@ export function NordSidebar() {
   const t = useT();
   const collapsed = settings.sidebarCollapsed;
   const [pinFor, setPinFor] = useState<View | null>(null);
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
 
   const isVisible = (item: NavItem) => {
     if (item.id === "kids") return false;
@@ -84,7 +96,10 @@ export function NordSidebar() {
             </button>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav
+            className="min-h-0 flex-1 overflow-y-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onContextMenu={openEmptyMenu}
+          >
             <div className="relative flex flex-col">
               <span
                 aria-hidden
@@ -118,6 +133,9 @@ export function NordSidebar() {
             <div className={`mb-1 flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
               <SidebarBigPictureEntry collapsed={collapsed} />
             <CollapseToggle collapsed={collapsed} />
+            </div>
+            <div className="px-1">
+              <NavHiddenTray orientation="vertical" compact={collapsed} />
             </div>
             {locked ? (
               <div
@@ -178,13 +196,26 @@ function Station({
 }) {
   const t = useT();
   const label = t(item.label);
+  const { open: openContextMenu } = useContextMenu();
+  const editing = useNavEditMode();
+  const drag = useNavDrag(item.id, "vertical");
   return (
     <button
       onClick={onClick}
+      onContextMenu={(e) =>
+        openContextMenu(e, { kind: "nav", itemId: item.id, view: item.view, label })
+      }
+      data-harbor-nav={item.id}
+      data-tauri-drag-region={editing ? "false" : undefined}
+      onPointerDown={drag.onPointerDown}
+      data-nav-drop-id={item.id}
       aria-label={gated ? t("chrome.lockedRequiresPin", { label }) : label}
       title={gated ? t("chrome.lockedShort", { label }) : label}
-      className="group relative z-10 flex h-[52px] w-full items-center"
+      className={`group relative z-10 flex h-[52px] w-full items-center ${
+        drag.over ? "ring-2 ring-accent" : ""
+      }`}
     >
+      {editing && <NavHideBadge itemId={item.id} />}
       <span className="flex w-[78px] shrink-0 items-center justify-center">
         <span
           className={`relative grid h-10 w-10 place-items-center rounded-full transition-colors duration-200 ${

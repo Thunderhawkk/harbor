@@ -1,4 +1,5 @@
 import { usePreviewNavCustomization } from "@/lib/theme-preview";
+import { useContextMenu } from "@/lib/context-menu";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -8,7 +9,13 @@ import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
 import { RecordingPill } from "@/chrome/recording-pill";
 import { TogetherButton } from "@/chrome/topbar";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { NAV_ITEMS, applyNavCustomization, type NavItem, type NavItemId } from "@/chrome/nav-items";
+import {
+  NavHiddenTray,
+  NavHideBadge,
+  useNavDrag,
+} from "@/chrome/nav-edit";
+import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { useSearch } from "@/lib/search-context";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
@@ -27,6 +34,11 @@ export function SideRail() {
   const { locked, unlock, hiddenTabs } = useParental();
   const { setOpen: setSearchOpen } = useSearch();
   const t = useT();
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
   const [pinFor, setPinFor] = useState<View | null>(null);
   const collapsed = settings.sidebarCollapsed;
 
@@ -88,10 +100,13 @@ export function SideRail() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className="flex-1 overflow-y-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onContextMenu={openEmptyMenu}
+        >
           <nav className="flex flex-col gap-0.5">
             {primary.map((item) => (
-              <RailItem key={item.id} label={item.label} active={view === item.view} collapsed={collapsed} onClick={() => navigate(item)} />
+              <RailItem key={item.id} itemId={item.id} view={item.view} label={item.label} active={view === item.view} collapsed={collapsed} onClick={() => navigate(item)} />
             ))}
           </nav>
 
@@ -100,7 +115,7 @@ export function SideRail() {
               <GoldRule collapsed={collapsed} />
               <nav className="flex flex-col gap-0.5">
                 {secondary.map((item) => (
-                  <RailItem key={item.id} label={item.label} active={view === item.view} collapsed={collapsed} onClick={() => navigate(item)} />
+                  <RailItem key={item.id} itemId={item.id} view={item.view} label={item.label} active={view === item.view} collapsed={collapsed} onClick={() => navigate(item)} />
                 ))}
               </nav>
             </>
@@ -110,13 +125,16 @@ export function SideRail() {
             <>
               <GoldRule collapsed={collapsed} />
               <nav className="flex flex-col gap-0.5">
-                <RailItem key={settingsItem.id} label={settingsItem.label} active={view === settingsItem.view} collapsed={collapsed} onClick={() => setView(settingsItem.view)} />
+                <RailItem key={settingsItem.id} itemId={settingsItem.id} view={settingsItem.view} label={settingsItem.label} active={view === settingsItem.view} collapsed={collapsed} onClick={() => setView(settingsItem.view)} />
               </nav>
             </>
           )}
         </div>
 
         <div className={`relative flex flex-col gap-2 py-4 ${collapsed ? "px-2" : "px-4"}`}>
+          <div className="mb-1 px-1">
+            <NavHiddenTray orientation="vertical" compact={collapsed} />
+          </div>
           <span
             aria-hidden
             className="absolute inset-x-0 top-0 h-px"
@@ -174,11 +192,15 @@ export function SideRail() {
 }
 
 function RailItem({
+  itemId,
+  view,
   label,
   active,
   collapsed,
   onClick,
 }: {
+  itemId: NavItemId;
+  view: View;
   label: string;
   active: boolean;
   collapsed: boolean;
@@ -186,17 +208,28 @@ function RailItem({
 }) {
   const t = useT();
   const translated = t(label);
+  const { open: openContextMenu } = useContextMenu();
+  const editing = useNavEditMode();
+  const drag = useNavDrag(itemId, "vertical");
   return (
     <button
       type="button"
       onClick={onClick}
+      onContextMenu={(e) =>
+        openContextMenu(e, { kind: "nav", itemId, view, label: translated })
+      }
+      data-harbor-nav={itemId}
+      data-tauri-drag-region={editing ? "false" : undefined}
+      onPointerDown={drag.onPointerDown}
+      data-nav-drop-id={itemId}
       aria-label={translated}
       title={collapsed ? translated : undefined}
       className={`group relative flex h-10 items-center text-[16px] tracking-tight transition-colors ${
         collapsed ? "justify-center px-2" : "ps-7 pe-3 text-start"
-      } ${active ? "text-accent" : "text-ink-muted hover:text-ink"}`}
+      } ${drag.over ? "ring-2 ring-accent" : ""} ${active ? "text-accent" : "text-ink-muted hover:text-ink"}`}
       style={{ fontFamily: "var(--font-display)" }}
     >
+      {editing && <NavHideBadge itemId={itemId} />}
       <span
         aria-hidden
         className={`absolute inset-y-1 rounded-lg transition-opacity duration-200 ${

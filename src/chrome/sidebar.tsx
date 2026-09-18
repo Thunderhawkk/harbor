@@ -1,4 +1,5 @@
 import { usePreviewNavCustomization } from "@/lib/theme-preview";
+import { useContextMenu } from "@/lib/context-menu";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -13,7 +14,13 @@ import { useView, type View } from "@/lib/view";
 import { KidsSidebarDoodles } from "./kids-sidebar-doodles";
 import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { NAV_ITEMS, applyNavCustomization, type NavItem, type NavItemId } from "@/chrome/nav-items";
+import {
+  NavHiddenTray,
+  NavHideBadge,
+  useNavDrag,
+} from "@/chrome/nav-edit";
+import { useNavEditMode } from "@/chrome/nav-edit-mode";
 
 const PRIMARY_IDS = new Set([
   "home",
@@ -146,6 +153,9 @@ export function Sidebar() {
           onPinNav={(v) => setPendingPinView(v)}
         />
         <div data-harbor-sidebar-footer className={`relative p-2 ${collapsed ? "" : "lg:p-4"}`}>
+          <div className="mb-1 px-1">
+            <NavHiddenTray orientation="vertical" compact={collapsed} />
+          </div>
           <div className={`flex flex-col gap-1 pb-1 ${collapsed ? "items-center" : ""}`}>
             <SidebarBigPictureEntry collapsed={collapsed} retainLabels={retainLabels} />
             <CollapseToggle collapsed={collapsed} retainLabels={retainLabels} />
@@ -217,6 +227,11 @@ function ScrollableNav({
   const { settings } = useSettings();
   const kid = useActiveKid();
   const t = useT();
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
   const items = applyNavCustomization(
     NAV_ITEMS,
     usePreviewNavCustomization(settings.navCustomization),
@@ -274,6 +289,7 @@ function ScrollableNav({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={ref}
+        onContextMenu={openEmptyMenu}
         className="flex flex-1 flex-col overflow-y-auto px-4 pt-3 pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div className="flex flex-col gap-1.5">
@@ -303,7 +319,7 @@ function ScrollableNav({
             />
           )}
         </div>
-        <div data-tauri-drag-region aria-hidden className="h-5 shrink-0" />
+        <div data-tauri-drag-region aria-hidden className="h-5 shrink-0" onContextMenu={openEmptyMenu} />
         <div className="flex flex-col gap-1.5">
           {collections.map((item) => {
             const gated = !!item.pinGated && locked;
@@ -320,7 +336,7 @@ function ScrollableNav({
             );
           })}
         </div>
-        <div data-tauri-drag-region className="flex-1 min-h-2" />
+        <div data-tauri-drag-region className="flex-1 min-h-2" onContextMenu={openEmptyMenu} />
       </div>
       {overflow.top && (
         <>
@@ -377,6 +393,7 @@ function KidsPlayIcon({ active }: { active: boolean }) {
 }
 
 function NavItem({
+  id,
   render,
   label,
   active,
@@ -387,6 +404,7 @@ function NavItem({
   big,
   view,
 }: {
+  id?: NavItemId;
   render: (active: boolean, hovered?: boolean) => ReactNode;
   label: string;
   active?: boolean;
@@ -400,18 +418,30 @@ function NavItem({
   const t = useT();
   const text = t(label);
   const [hovered, setHovered] = useState(false);
+  const { open: openContextMenu } = useContextMenu();
+  const editing = useNavEditMode();
+  const drag = useNavDrag(id, "vertical");
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onContextMenu={(e) => {
+        if (!id) return;
+        openContextMenu(e, { kind: "nav", itemId: id, view, label: text });
+      }}
       data-harbor-nav={view}
       data-active={active ? "" : undefined}
+      data-tauri-drag-region={editing ? "false" : undefined}
+      onPointerDown={drag.onPointerDown}
+      data-nav-drop-id={id}
       aria-label={gated ? t("chrome.lockedRequiresPin", { label: text }) : text}
       title={gated ? t("chrome.lockedShort", { label: text }) : text}
       className={`group relative flex items-center justify-center gap-4 transition-colors duration-150 ${
         big ? "h-[68px] rounded-2xl text-[20px] font-bold" : "h-14 rounded-lg text-[16px]"
       } ${collapsed ? "" : big ? "lg:justify-start lg:px-5" : "lg:justify-start lg:px-4"} ${
+        drag.over ? "ring-2 ring-accent" : ""
+      } ${
         collapsed
           ? active
             ? "text-accent"
@@ -421,6 +451,7 @@ function NavItem({
             : "text-ink-muted hover:bg-elevated/50 hover:text-ink"
       }`}
     >
+      {editing && id && <NavHideBadge itemId={id} />}
       <span
         data-harbor-sidebar-icon
         className={`relative ${big ? "scale-110" : ""} ${gated ? "opacity-70" : ""}`}

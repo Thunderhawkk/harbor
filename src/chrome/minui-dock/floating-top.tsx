@@ -1,4 +1,5 @@
 import { ArrowLeft, Monitor } from "lucide-react";
+import { useContextMenu } from "@/lib/context-menu";
 import { Search } from "@/components/icons/search-icon";
 import { HarborMark } from "@/components/icons/harbor-mark";
 import { NotificationCenter } from "@/components/notification-center/notification-center";
@@ -21,6 +22,11 @@ export function FloatingTop() {
   const { setOpen: setSearchOpen } = useSearch();
   const t = useT();
   const bigPicture = useBigPictureEntry();
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
 
   const themePreset =
     settings.theme.preset !== "custom" ? getThemeById(settings.theme.preset) : null;
@@ -58,7 +64,7 @@ export function FloatingTop() {
           {t("common.back")}
         </button>
       )}
-      <div className="flex flex-1" data-tauri-drag-region />
+      <div className="flex flex-1" data-tauri-drag-region onContextMenu={openEmptyMenu} />
       <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
         <RecordingPill />
         <NotificationCenter />

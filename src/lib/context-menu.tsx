@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Meta } from "@/lib/cinemeta";
+import type { NavItemId } from "@/chrome/nav-items";
+import type { View } from "@/lib/view";
 
 export type ViewSummonable = "home" | "discover" | "anime" | "queue" | "addons";
 
@@ -27,6 +29,7 @@ export type ContextMenuTarget =
   | { kind: "person"; id: number }
   | { kind: "manga"; id: string }
   | { kind: "ebook"; id: string }
+  | { kind: "nav"; itemId?: NavItemId; view?: View; label?: string }
   | {
       kind: "subtitle";
       label: string;

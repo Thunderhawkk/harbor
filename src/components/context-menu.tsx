@@ -1,6 +1,8 @@
 import {
+  ArrowDown,
   ArrowDownToLine,
   ArrowLeft,
+  ArrowUp,
   Bookmark,
   BookmarkCheck,
   CheckCheck,
@@ -8,6 +10,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Eye,
   EyeOff,
   Heart,
   Info,
@@ -15,12 +18,13 @@ import {
   Magnet,
   Maximize,
   Navigation,
+  Pencil,
   RotateCcw,
   Share2,
   UserPlus,
   Wallpaper,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useActiveAddon } from "@/lib/active-addon";
 import { copyText } from "@/components/player/copy-link-button";
 import { emitListToast } from "@/components/lists/list-toast";
@@ -45,6 +49,15 @@ import { useIsFavorite, useMediaFavorites } from "@/lib/media-favorites";
 import { toggleAutoDownload, useIsAutoDownloaded } from "@/lib/auto-download";
 import { clearTitleBackdrop, getTitleBackdrop, setTitleBackdrop } from "@/lib/title-backdrop";
 import { MyListSubmenu } from "./context-menu/my-list-submenu";
+import { useSettings } from "@/lib/settings";
+import {
+  NAV_ITEMS,
+  effectiveNavOrder,
+  moveNavItem,
+  resetNavCustomization,
+  toggleNavHidden,
+} from "@/chrome/nav-items";
+import { setNavEditMode, useNavEditMode } from "@/chrome/nav-edit-mode";
 
 const MENU_WIDTH = 220;
 const SUBTITLE_MENU_WIDTH = 360;
@@ -111,6 +124,10 @@ export function ContextMenu() {
   const { toggle: toggleFavorite } = useMediaFavorites();
   const isFav = useIsFavorite(targetMetaId);
   const isAutoDl = useIsAutoDownloaded(targetMetaId ?? "");
+  const { settings: appSettings, update: updateSettings } = useSettings();
+  const navEditing = useNavEditMode();
+  const commitNav = (next: typeof appSettings.navCustomization) =>
+    updateSettings({ navCustomization: next });
 
   const shareLink = (type: string, id: string) => {
     void copyText(shareDeepLink(type, id)).then((ok) => {
@@ -202,6 +219,16 @@ export function ContextMenu() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [state, close]);
+
+  const [flipUp, setFlipUp] = useState(0);
+  useLayoutEffect(() => {
+    setFlipUp(0);
+    const el = ref.current;
+    if (!el || !state) return;
+    const r = el.getBoundingClientRect();
+    const overflow = r.bottom - (window.innerHeight - 8);
+    if (overflow > 0) setFlipUp(Math.min(overflow, Math.max(0, r.top - 8)));
+  }, [state]);
 
   if (!state) return null;
 
@@ -558,6 +585,91 @@ export function ContextMenu() {
         onClick={() => shareLink("manga", target.id)}
       />,
     );
+  } else if (state.target.kind === "nav") {
+    const target = state.target;
+    const navItem = target.itemId ? NAV_ITEMS.find((it) => it.id === target.itemId) : undefined;
+    if (navItem && target.itemId) {
+      const order = effectiveNavOrder(appSettings.navCustomization);
+      const at = order.indexOf(target.itemId);
+      const prevId = at > 0 ? order[at - 1] : null;
+      const nextId = at >= 0 && at < order.length - 1 ? order[at + 1] : null;
+      items.push(
+        <Item
+          key="nav-open"
+          icon={<Info size={14} strokeWidth={2} />}
+          label={t("Open")}
+          onClick={() => {
+            setView(navItem.view);
+            close();
+          }}
+        />,
+        <Item
+          key="nav-hide"
+          icon={<EyeOff size={14} strokeWidth={2} />}
+          label={t("Hide this tab")}
+          onClick={() => {
+            commitNav(toggleNavHidden(appSettings.navCustomization, target.itemId!));
+            close();
+          }}
+        />,
+      );
+      if (prevId) {
+        items.push(
+          <Item
+            key="nav-up"
+            icon={<ArrowUp size={14} strokeWidth={2} />}
+            label={t("Move up")}
+            onClick={() => {
+              commitNav(moveNavItem(appSettings.navCustomization, target.itemId!, prevId, "before"));
+              close();
+            }}
+          />,
+        );
+      }
+      if (nextId) {
+        items.push(
+          <Item
+            key="nav-down"
+            icon={<ArrowDown size={14} strokeWidth={2} />}
+            label={t("Move down")}
+            onClick={() => {
+              commitNav(moveNavItem(appSettings.navCustomization, target.itemId!, nextId, "after"));
+              close();
+            }}
+          />,
+        );
+      }
+    }
+    items.push(
+      <Item
+        key="nav-edit"
+        icon={<Pencil size={14} strokeWidth={2} />}
+        label={navEditing ? t("Done editing") : t("Edit sidebar")}
+        onClick={() => {
+          setNavEditMode(!navEditing);
+          close();
+        }}
+        accent={navEditing}
+      />,
+      <Item
+        key="nav-show-all"
+        icon={<Eye size={14} strokeWidth={2} />}
+        label={t("Show all tabs")}
+        onClick={() => {
+          commitNav({ ...appSettings.navCustomization, hidden: [] });
+          close();
+        }}
+      />,
+      <Item
+        key="nav-reset"
+        icon={<RotateCcw size={14} strokeWidth={2} />}
+        label={t("Reset layout")}
+        onClick={() => {
+          commitNav(resetNavCustomization());
+          close();
+        }}
+      />,
+    );
   } else if (state.target.kind === "ebook") {
     const target = state.target;
     items.push(
@@ -637,7 +749,7 @@ export function ContextMenu() {
         ref={ref}
         role="menu"
         aria-label={subtitleDetails ? t("Subtitle details") : undefined}
-        style={{ left, top, width: menuWidth, maxHeight: "calc(100vh - 16px)" }}
+        style={{ left, top: top - flipUp, width: menuWidth, maxHeight: "calc(100vh - 16px)" }}
         className="fixed z-[145] flex flex-col overflow-y-auto rounded-xl border border-edge bg-elevated p-1 shadow-[0_18px_50px_-15px_rgba(0,0,0,0.7)] animate-popover-in"
       >
         {items}
