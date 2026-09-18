@@ -24,6 +24,8 @@ export type RemoteMangaBinding = {
   zoom: number;
   canZoom: boolean;
   rtl: boolean;
+  fit: RemoteMangaState["fit"];
+  bg: RemoteMangaState["bg"];
   mode: RemoteMangaState["mode"];
   hasPrev: boolean;
   hasNext: boolean;
@@ -36,6 +38,8 @@ export type RemoteMangaBinding = {
   flipProgress: (p: number) => void;
   flipEnd: (commit: boolean, dir: "next" | "prev") => void;
   setRtl: (rtl: boolean) => void;
+  setFit: (fit: RemoteMangaState["fit"]) => void;
+  setBg: (bg: RemoteMangaState["bg"]) => void;
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
   jumpBookmark: (bm: MangaBookmark) => void;
   close: () => void;
@@ -104,6 +108,8 @@ export function buildRemoteMangaState(): RemoteMangaState | null {
     zoom: b.zoom,
     canZoom: b.canZoom,
     rtl: b.rtl,
+    fit: b.fit,
+    bg: b.bg,
     mode: b.mode,
     hasPrev: b.hasPrev,
     hasNext: b.hasNext,
@@ -144,6 +150,12 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
       return;
     case "mangaSetRtl":
       b.setRtl(command.rtl);
+      return;
+    case "mangaSetFit":
+      b.setFit(command.fit);
+      return;
+    case "mangaSetBg":
+      b.setBg(command.bg);
       return;
     case "mangaBookmark": {
       const base = b.bookmarkCurrent();

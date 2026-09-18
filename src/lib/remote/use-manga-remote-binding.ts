@@ -19,6 +19,8 @@ type Params = {
   zoom: number;
   canZoom: boolean;
   rtl: boolean;
+  fit: RemoteMangaState["fit"];
+  bg: RemoteMangaState["bg"];
   mode: RemoteMangaState["mode"];
   hasPrev: boolean;
   hasNext: boolean;
@@ -31,6 +33,8 @@ type Params = {
   flipProgress: (p: number) => void;
   flipEnd: (commit: boolean, dir: "next" | "prev") => void;
   setRtl: (rtl: boolean) => void;
+  setFit: (fit: RemoteMangaState["fit"]) => void;
+  setBg: (bg: RemoteMangaState["bg"]) => void;
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
   jumpBookmark: (bm: MangaBookmark) => void;
   close: () => void;
@@ -57,6 +61,8 @@ export function useMangaRemoteBinding(params: Params) {
       zoom: params.zoom,
       canZoom: params.canZoom,
       rtl: params.rtl,
+      fit: params.fit,
+      bg: params.bg,
       mode: params.mode,
       hasPrev: params.hasPrev,
       hasNext: params.hasNext,
@@ -69,6 +75,8 @@ export function useMangaRemoteBinding(params: Params) {
       flipProgress: (p) => ref.current.flipProgress(p),
       flipEnd: (commit, dir) => ref.current.flipEnd(commit, dir),
       setRtl: (rtl) => ref.current.setRtl(rtl),
+      setFit: (fit) => ref.current.setFit(fit),
+      setBg: (bg) => ref.current.setBg(bg),
       bookmarkCurrent: () => ref.current.bookmarkCurrent(),
       jumpBookmark: (bm) => ref.current.jumpBookmark(bm),
       close: () => ref.current.close(),
@@ -86,6 +94,8 @@ export function useMangaRemoteBinding(params: Params) {
     params.zoom,
     params.canZoom,
     params.rtl,
+    params.fit,
+    params.bg,
     params.mode,
     params.hasPrev,
     params.hasNext,

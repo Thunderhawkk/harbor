@@ -6,12 +6,11 @@ import {
   ChevronsLeft,
   ChevronsRight,
   GalleryHorizontal,
-  Minus,
   Monitor,
   MousePointerClick,
   MoveHorizontal,
   MoveVertical,
-  Plus,
+  Settings,
   X,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -35,6 +34,9 @@ const PageJumpSheet = lazy(() =>
 const BookmarksSheet = lazy(() =>
   import("./bookmarks-sheet").then((m) => ({ default: m.BookmarksSheet })),
 );
+const MangaSettingsSheet = lazy(() =>
+  import("./manga-settings-sheet").then((m) => ({ default: m.MangaSettingsSheet })),
+);
 
 export function MangaRemote({
   standalone = false,
@@ -51,6 +53,7 @@ export function MangaRemote({
   const [deviceOpen, setDeviceOpen] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [pageJumpOpen, setPageJumpOpen] = useState(false);
   const [chromeHidden, setChromeHidden] = useState(false);
   const [zoomEngaged, setZoomEngaged] = useState(false);
@@ -106,14 +109,6 @@ export function MangaRemote({
     { id: "strip-h", label: t("Horizontal strip"), Icon: GalleryHorizontal },
     { id: "tap", label: t("Tap sides to turn"), Icon: MousePointerClick },
   ];
-  const layoutIdx = LAYOUTS.findIndex((l) => l.id === layout);
-  const ActiveLayout = LAYOUTS[layoutIdx >= 0 ? layoutIdx : 0];
-  const cycleLayout = () => {
-    const next = LAYOUTS[((layoutIdx >= 0 ? layoutIdx : 0) + 1) % LAYOUTS.length];
-    setLayout(next.id);
-    flash(next.label);
-  };
-
   const turn = (dir: TurnDir) => {
     const sent = sendCommand({ action: "mangaTurnPage", dir });
     if (sent) advance(dir);
@@ -141,8 +136,6 @@ export function MangaRemote({
     else if (!sent) flash(t("Reconnecting to your computer"));
   };
   const zoomAbs = (z: number) => sendCommand({ action: "mangaSetZoom", zoom: clampZoom(z) });
-  const zoomStep = (dir: "in" | "out") =>
-    sendCommand({ action: dir === "in" ? "mangaZoomIn" : "mangaZoomOut" });
   const pan = (dx: number, dy: number) => sendCommand({ action: "mangaPan", dx, dy });
 
   const chromeCls = `${reduce ? "" : "transition-opacity duration-200 "}${chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"}`;
@@ -204,12 +197,19 @@ export function MangaRemote({
           {!onReadHere && <span className="ms-auto" />}
           <button
             type="button"
-            onClick={cycleLayout}
-            aria-label={t("Change control layout")}
-            title={ActiveLayout.label}
+            aria-label={t("Bookmarks")}
+            onClick={() => setBookmarksOpen(true)}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-muted transition-transform active:scale-90"
           >
-            <ActiveLayout.Icon size={20} strokeWidth={2.2} />
+            <Bookmark size={20} strokeWidth={2.2} />
+          </button>
+          <button
+            type="button"
+            aria-label={t("Reader settings")}
+            onClick={() => setSettingsOpen(true)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-muted transition-transform active:scale-90"
+          >
+            <Settings size={20} strokeWidth={2.2} />
           </button>
         </div>
 
@@ -262,29 +262,36 @@ export function MangaRemote({
           >
             <ChevronsLeft size={24} strokeWidth={2.2} />
           </DockButton>
-          {m.canZoom && (
-            <DockButton label={t("Zoom out")} onPress={() => zoomStep("out")}>
-              <Minus size={22} strokeWidth={2.4} />
-            </DockButton>
-          )}
-          {m.canZoom && (
-            <button
-              type="button"
-              aria-label={t("Reset zoom")}
-              onClick={() => zoomAbs(1)}
-              className="grid h-11 min-w-[54px] place-items-center rounded-full bg-elevated/60 px-3 text-[13px] font-semibold tabular-nums text-ink ring-1 ring-edge-soft/50 transition-transform active:scale-95"
-            >
-              {Math.round(m.zoom * 100)}%
-            </button>
-          )}
+          <div
+            role="group"
+            aria-label={t("Control layout")}
+            className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-elevated/60 p-1 ring-1 ring-edge-soft/50"
+          >
+            {LAYOUTS.map(({ id, label, Icon }) => {
+              const active = layout === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-label={label}
+                  title={label}
+                  aria-pressed={active}
+                  onClick={() => {
+                    setLayout(id);
+                    flash(label);
+                  }}
+                  className={`grid h-10 min-w-0 flex-1 place-items-center rounded-full transition-transform active:scale-90 ${
+                    active ? "bg-accent text-canvas" : "text-ink-muted"
+                  }`}
+                >
+                  <Icon size={18} strokeWidth={2.2} />
+                </button>
+              );
+            })}
+          </div>
           <DockButton label={t("Bookmarks")} accent onPress={() => setBookmarksOpen(true)}>
             <Bookmark size={26} strokeWidth={2.2} />
           </DockButton>
-          {m.canZoom && (
-            <DockButton label={t("Zoom in")} onPress={() => zoomStep("in")}>
-              <Plus size={22} strokeWidth={2.4} />
-            </DockButton>
-          )}
           <DockButton
             label={t("Next chapter")}
             disabled={!m.hasNext}
@@ -294,16 +301,22 @@ export function MangaRemote({
           </DockButton>
         </div>
 
-        <ZoomJoystick
-          zoom={m.zoom}
-          min={ZOOM_MIN}
-          max={ZOOM_MAX}
-          canZoom={m.canZoom}
-          onZoom={zoomAbs}
-          onPan={pan}
-          onEngageChange={setZoomEngaged}
-          bottomOffset="calc(env(safe-area-inset-bottom, 0px) + 84px)"
-        />
+        <div
+          className={`${reduce ? "" : "transition-opacity duration-200 "}${
+            chromeHidden && !zoomEngaged ? "pointer-events-none opacity-0" : "opacity-100"
+          }`}
+        >
+          <ZoomJoystick
+            zoom={m.zoom}
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            canZoom={m.canZoom}
+            onZoom={zoomAbs}
+            onPan={pan}
+            onEngageChange={setZoomEngaged}
+            bottomOffset="calc(env(safe-area-inset-bottom, 0px) + 84px)"
+          />
+        </div>
       </div>
 
       {!connected && (
@@ -344,6 +357,9 @@ export function MangaRemote({
         )}
         {bookmarksOpen && (
           <BookmarksSheet open={bookmarksOpen} onClose={() => setBookmarksOpen(false)} />
+        )}
+        {settingsOpen && (
+          <MangaSettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         )}
       </Suspense>
     </>

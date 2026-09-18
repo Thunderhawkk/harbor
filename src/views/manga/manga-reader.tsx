@@ -828,6 +828,8 @@ export function MangaReader({
     zoom: prefs.zoom,
     canZoom: true,
     rtl,
+    fit: prefs.fit,
+    bg: prefs.bg,
     mode: effMode,
     hasPrev: !atFirstChapter,
     hasNext: !atLastChapter,
@@ -851,6 +853,8 @@ export function MangaReader({
       if (book) bookApi.current?.dragEnd?.(commit, dir);
     },
     setRtl: (r) => patchPrefs({ rtl: r }),
+    setFit: (f) => patchPrefs({ fit: f }),
+    setBg: (b) => patchPrefs({ bg: b }),
     bookmarkCurrent: () => bookmarkCurrent,
     jumpBookmark,
     close: onExit,

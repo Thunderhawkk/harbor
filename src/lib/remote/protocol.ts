@@ -127,6 +127,8 @@ export type RemoteMangaState = {
   zoom: number;
   canZoom: boolean;
   rtl: boolean;
+  fit: "width" | "height" | "original";
+  bg: "dark" | "gray" | "light";
   mode: "long" | "long-h" | "paged" | "double" | "book";
   hasPrev: boolean;
   hasNext: boolean;
@@ -246,6 +248,8 @@ export type RemoteCommand =
   | { action: "mangaFlipProgress"; p: number }
   | { action: "mangaFlipEnd"; commit: boolean; dir: "next" | "prev" }
   | { action: "mangaSetRtl"; rtl: boolean }
+  | { action: "mangaSetFit"; fit: "width" | "height" | "original" }
+  | { action: "mangaSetBg"; bg: "dark" | "gray" | "light" }
   | { action: "mangaBookmark"; page?: number }
   | { action: "mangaJumpBookmark"; id: string }
   | { action: "mangaBookmarkRemove"; id: string }
