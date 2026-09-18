@@ -38,6 +38,7 @@ export type RemoteMangaBinding = {
   flipProgress: (p: number) => void;
   flipEnd: (commit: boolean, dir: "next" | "prev") => void;
   setRtl: (rtl: boolean) => void;
+  setMode: (mode: RemoteMangaState["mode"]) => void;
   setFit: (fit: RemoteMangaState["fit"]) => void;
   setBg: (bg: RemoteMangaState["bg"]) => void;
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
@@ -151,6 +152,9 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
     case "mangaSetRtl":
       b.setRtl(command.rtl);
       return;
+    case "mangaSetMode":
+      b.setMode(command.mode);
+      return;
     case "mangaSetFit":
       b.setFit(command.fit);
       return;
@@ -174,6 +178,7 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
       b.close();
       return;
     default:
+      console.warn(`[manga/remote] unhandled command ${(command as { action: string }).action}`);
       return;
   }
 }

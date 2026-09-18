@@ -78,10 +78,10 @@ export function MangaRemote({
     setLayout(mapped);
   }, [m?.mode, setLayout]);
   const [feedPage, setFeedPage] = useState<number | null>(null);
-  const feedState = useRef({ page: -1, frac: -1, t: 0 });
+  const feedState = useRef({ page: -1, frac: -1, t: 0, seq: -1 });
   useEffect(() => {
     setFeedPage(null);
-    feedState.current = { page: -1, frac: -1, t: 0 };
+    feedState.current = { page: -1, frac: -1, t: 0, seq: -1 };
   }, [m?.chapterId]);
 
   useHistoryBackGuard(true);
@@ -94,6 +94,13 @@ export function MangaRemote({
     m?.seq ?? 0,
   );
   const feedUrls = useMemo(() => m?.pageUrls ?? [], [m?.chapterId, m?.pageCount]);
+
+  useEffect(() => {
+    if (feedPage == null || displayPage === feedPage) return;
+    if ((m?.seq ?? -1) === feedState.current.seq) return;
+    if (performance.now() - feedState.current.t < 1200) return;
+    setFeedPage(null);
+  }, [displayPage, feedPage, m?.seq]);
 
   if (!m || !m.open) return <MangaRemoteEmpty variant="closed" />;
 
@@ -120,7 +127,7 @@ export function MangaRemote({
     const frac = scroll == null ? last.frac : Math.max(0, Math.min(1, Math.round(scroll * 1000) / 1000));
     const v = vel == null || !Number.isFinite(vel) ? 0 : Math.round(vel * 100000) / 100000;
     if (page === last.page && frac === last.frac) return;
-    feedState.current = { page, frac, t: performance.now() };
+    feedState.current = { page, frac, t: performance.now(), seq: m?.seq ?? -1 };
     sendCommand(
       scroll == null
         ? { action: "mangaSetPage", page }
@@ -279,6 +286,19 @@ export function MangaRemote({
                   onClick={() => {
                     setLayout(id);
                     flash(label);
+                    const desktop = m.mode;
+                    if (id === "strip" && desktop !== "long") {
+                      sendCommand({ action: "mangaSetMode", mode: "long" });
+                    } else if (id === "strip-h" && desktop !== "long-h") {
+                      sendCommand({ action: "mangaSetMode", mode: "long-h" });
+                    } else if (
+                      id === "tap" &&
+                      desktop !== "paged" &&
+                      desktop !== "double" &&
+                      desktop !== "book"
+                    ) {
+                      sendCommand({ action: "mangaSetMode", mode: "paged" });
+                    }
                   }}
                   className={`grid h-10 min-w-0 flex-1 place-items-center rounded-full transition-transform active:scale-90 ${
                     active ? "bg-accent text-canvas" : "text-ink-muted"

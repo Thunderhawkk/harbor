@@ -248,6 +248,7 @@ export type RemoteCommand =
   | { action: "mangaFlipProgress"; p: number }
   | { action: "mangaFlipEnd"; commit: boolean; dir: "next" | "prev" }
   | { action: "mangaSetRtl"; rtl: boolean }
+  | { action: "mangaSetMode"; mode: RemoteMangaState["mode"] }
   | { action: "mangaSetFit"; fit: "width" | "height" | "original" }
   | { action: "mangaSetBg"; bg: "dark" | "gray" | "light" }
   | { action: "mangaBookmark"; page?: number }

@@ -18,6 +18,14 @@ export function mapDesktopMode(mode: DesktopMode): LocalMode {
   return "strip";
 }
 
+export function mapLocalToDesktopMode(mode: LocalMode): DesktopMode {
+  if (mode === "single") return "paged";
+  if (mode === "double") return "double";
+  if (mode === "book") return "book";
+  if (mode === "strip-h") return "long-h";
+  return "long";
+}
+
 export function loadLocalMode(fallback: LocalMode): LocalMode {
   try {
     const v = localStorage.getItem(LOCAL_MODE_KEY);

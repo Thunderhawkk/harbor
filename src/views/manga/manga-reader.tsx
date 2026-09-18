@@ -853,6 +853,10 @@ export function MangaReader({
       if (book) bookApi.current?.dragEnd?.(commit, dir);
     },
     setRtl: (r) => patchPrefs({ rtl: r }),
+    setMode: (m) => {
+      setAutoLong(false);
+      patchPrefs({ mode: m });
+    },
     setFit: (f) => patchPrefs({ fit: f }),
     setBg: (b) => patchPrefs({ bg: b }),
     bookmarkCurrent: () => bookmarkCurrent,

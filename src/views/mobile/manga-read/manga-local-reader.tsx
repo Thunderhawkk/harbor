@@ -8,7 +8,7 @@ import { ModeStrip } from "./mode-strip";
 import { ModePaged } from "./mode-paged";
 import { ModeBook } from "./mode-book";
 import { useLocalPager } from "./hooks/use-local-pager";
-import { loadLocalMode, mapDesktopMode, saveLocalMode, type LocalMode } from "./local-reader-types";
+import { loadLocalMode, mapDesktopMode, mapLocalToDesktopMode, saveLocalMode, type LocalMode } from "./local-reader-types";
 
 export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const { snapshot, sendCommand } = useMobileRemote();
@@ -105,6 +105,7 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const pickMode = (next: LocalMode) => {
     setMode(next);
     saveLocalMode(next);
+    sendCommand({ action: "mangaSetMode", mode: mapLocalToDesktopMode(next) });
     if (next === "double") setPage(page - (page % 2));
   };
 

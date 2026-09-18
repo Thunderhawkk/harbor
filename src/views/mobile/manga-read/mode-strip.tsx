@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { ProxiedImg } from "./proxied-img";
 
+const FOLLOW_IDLE_MS = 1200;
+
 export function ModeStrip({
   pages,
   initialPage,
@@ -28,6 +30,10 @@ export function ModeStrip({
   const horizontal = direction === "horizontal";
 
   const didScroll = useRef(false);
+  const lastInput = useRef(0);
+  const currentRef = useRef(initialPage);
+  const targetRef = useRef(initialPage);
+  targetRef.current = initialPage;
   const firstUrl = useRef(pages[0]);
   const firstDir = useRef(horizontal);
   if (firstUrl.current !== pages[0] || firstDir.current !== horizontal) {
@@ -44,7 +50,10 @@ export function ModeStrip({
         for (const e of entries) {
           if (!e.isIntersecting) continue;
           const i = Number((e.target as HTMLElement).dataset.page);
-          if (Number.isFinite(i)) change.current(i);
+          if (Number.isFinite(i)) {
+            currentRef.current = i;
+            change.current(i);
+          }
         }
       },
       { root, rootMargin: horizontal ? "0px -45% 0px -45%" : "-45% 0px -45% 0px" },
@@ -92,6 +101,7 @@ export function ModeStrip({
             vel = (frac - lastSample.frac) / (now - lastSample.t);
           }
           lastSample = { frac, page: i, t: now };
+          currentRef.current = i;
           cb(i, frac, vel);
           return;
         }
@@ -102,11 +112,35 @@ export function ModeStrip({
       raf = requestAnimationFrame(report);
     };
     root.addEventListener("scroll", onScroll, { passive: true });
+    const stamp = () => {
+      lastInput.current = performance.now();
+    };
+    root.addEventListener("pointerdown", stamp);
+    root.addEventListener("wheel", stamp, { passive: true });
     return () => {
       root.removeEventListener("scroll", onScroll);
+      root.removeEventListener("pointerdown", stamp);
+      root.removeEventListener("wheel", stamp);
       if (raf) cancelAnimationFrame(raf);
     };
   }, [pages, horizontal]);
+
+  useEffect(() => {
+    if (targetRef.current === currentRef.current) return;
+    const node = els.current[targetRef.current];
+    if (!node) return;
+    if (performance.now() - lastInput.current < FOLLOW_IDLE_MS) {
+      const t = window.setTimeout(() => {
+        if (targetRef.current === currentRef.current) return;
+        if (performance.now() - lastInput.current < FOLLOW_IDLE_MS) return;
+        els.current[targetRef.current]?.scrollIntoView(
+          horizontal ? { inline: "center", block: "nearest" } : { block: "start" },
+        );
+      }, FOLLOW_IDLE_MS + 100);
+      return () => window.clearTimeout(t);
+    }
+    node.scrollIntoView(horizontal ? { inline: "center", block: "nearest" } : { block: "start" });
+  }, [initialPage, horizontal, rtl]);
 
   return (
     <div
