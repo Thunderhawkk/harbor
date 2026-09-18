@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   fitLevel,
+  guardPageLoaded,
   hasNativeZoom,
   nativePan,
   type FlipBookView,
@@ -234,6 +235,7 @@ export function BookFlip({
       const aspect = await sampledAspect(pages);
       await loadFlipbook();
       if (cancelled || !ref.current) return;
+      guardPageLoaded();
       const Ctor = (window as unknown as { FlipBook?: FlipCtor }).FlipBook;
       if (!Ctor) return;
       const FB = (window as unknown as { FLIPBOOK?: Record<string, unknown> }).FLIPBOOK;

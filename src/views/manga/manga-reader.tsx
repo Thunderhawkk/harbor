@@ -910,14 +910,17 @@ export function MangaReader({
           </div>
         ) : paged ? (
           <div
-            className={`flex min-h-full justify-center px-4 py-3 ${double ? "items-center" : "items-start"}`}
+            className="flex min-h-full items-start justify-center px-4 py-3"
             style={double ? { gap: `${prefs.doubleGap}px` } : undefined}
             onClick={(e) => {
+              const t = e.target as HTMLElement;
+              if (t.closest("button, a, [role='button']")) return;
               const x =
                 (e.clientX - e.currentTarget.getBoundingClientRect().left) /
                 e.currentTarget.clientWidth;
               if (x < 0.35) (rtl ? nextPage : prevPage)();
               else if (x > 0.65) (rtl ? prevPage : nextPage)();
+              else toggleChrome();
             }}
           >
             {complete ? (
@@ -937,7 +940,7 @@ export function MangaReader({
               <PageImage
                 url={pages[displayPage]?.url ?? ""}
                 headers={pages[displayPage]?.headers}
-                className="mx-auto block"
+                className="m-auto block"
                 style={pStyle}
               />
             )}
