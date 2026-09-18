@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
+  GalleryHorizontal,
   Minus,
   Monitor,
   MousePointerClick,
@@ -56,6 +57,23 @@ export function MangaRemote({
   const [hint, setHint] = useState<string | null>(null);
   const hintTimer = useRef(0);
   const [layout, setLayout] = useRemoteLayout();
+  const prevMode = useRef<string | null>(null);
+  useEffect(() => {
+    const mode: string | undefined = m?.mode;
+    if (!mode || mode === prevMode.current) return;
+    prevMode.current = mode;
+    const mapped: RemoteLayout =
+      mode === "long"
+        ? "strip"
+        : mode === "long-h"
+          ? "strip-h"
+          : mode === "paged" || mode === "double"
+            ? "tap"
+            : mode === "book"
+              ? "swipe"
+              : "strip";
+    setLayout(mapped);
+  }, [m?.mode, setLayout]);
   const [feedPage, setFeedPage] = useState<number | null>(null);
   const feedState = useRef({ page: -1, frac: -1, t: 0 });
   useEffect(() => {
@@ -85,6 +103,7 @@ export function MangaRemote({
   const LAYOUTS: Array<{ id: RemoteLayout; label: string; Icon: typeof MoveHorizontal }> = [
     { id: "swipe", label: t("Swipe sideways"), Icon: MoveHorizontal },
     { id: "strip", label: t("Long strip"), Icon: MoveVertical },
+    { id: "strip-h", label: t("Horizontal strip"), Icon: GalleryHorizontal },
     { id: "tap", label: t("Tap sides to turn"), Icon: MousePointerClick },
   ];
   const layoutIdx = LAYOUTS.findIndex((l) => l.id === layout);
@@ -132,7 +151,7 @@ export function MangaRemote({
   const isSpread = (m.mode === "book" || m.mode === "double") && spreadNums.length >= 2;
   const spreadLabel = isSpread ? `${Math.min(...spreadNums)}-${Math.max(...spreadNums)}` : "";
   const chipPage =
-    layout === "strip" && feedPage != null
+    (layout === "strip" || layout === "strip-h") && feedPage != null
       ? String(Math.min(feedPage + 1, total))
       : isSpread
         ? spreadLabel
@@ -141,7 +160,7 @@ export function MangaRemote({
   return (
     <>
       <div
-        className={`relative flex h-full select-none flex-col ${layout === "strip" ? "[touch-action:pan-y]" : "touch-none"}`}
+        className={`relative flex h-full select-none flex-col ${layout === "strip" ? "[touch-action:pan-y]" : layout === "strip-h" ? "[touch-action:pan-x]" : "touch-none"}`}
         style={{
           paddingBottom: standalone
             ? "calc(env(safe-area-inset-bottom, 0px) + 16px)"
@@ -213,6 +232,7 @@ export function MangaRemote({
           layout={layout}
           pageUrls={feedUrls}
           initialPage={feedPage ?? displayPage}
+          rtl={m.rtl}
           onPageVisible={reportFeedPage}
           gestures={{
             rtl: m.rtl,

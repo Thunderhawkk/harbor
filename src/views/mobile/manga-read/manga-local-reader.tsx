@@ -56,6 +56,15 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     prevMode.current = mode;
   }, [mode, page]);
 
+  const desktopMapped = mapDesktopMode((m?.mode as any) ?? "long");
+  const desktopModeRef = useRef(desktopMapped);
+  useEffect(() => {
+    if (desktopMapped === desktopModeRef.current) return;
+    desktopModeRef.current = desktopMapped;
+    setMode(desktopMapped);
+    saveLocalMode(desktopMapped);
+  }, [desktopMapped]);
+
   const lastSent = useRef(m?.pageIndex ?? 0);
   useEffect(() => {
     if (page === lastSent.current) return;
@@ -116,12 +125,14 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
               <span className="text-[13px] font-medium">{t("Loading chapter")}</span>
             </div>
           </div>
-        ) : mode === "strip" ? (
+        ) : mode === "strip" || mode === "strip-h" ? (
           <ModeStrip
             pages={pages}
             initialPage={page}
             onPageChange={setPage}
             onToggleChrome={toggleChrome}
+            direction={mode === "strip-h" ? "horizontal" : "vertical"}
+            rtl={rtl}
           />
         ) : mode === "book" ? (
           <ModeBook

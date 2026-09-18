@@ -8,9 +8,10 @@ type Props = {
   displayPage: number;
   pageCount: number;
   spreadLabel?: string;
-  layout: "swipe" | "strip" | "tap";
+  layout: "swipe" | "strip" | "strip-h" | "tap";
   pageUrls: string[];
   initialPage: number;
+  rtl?: boolean;
   onPageVisible: (page: number, scroll?: number, vel?: number) => void;
   gestures: MangaGestureInput;
 };
@@ -23,6 +24,7 @@ export function MangaPageSurface({
   layout,
   pageUrls,
   initialPage,
+  rtl,
   onPageVisible,
   gestures,
 }: Props) {
@@ -33,12 +35,14 @@ export function MangaPageSurface({
   const atStart = displayPage <= 0 && !gestures.canPrev;
   const atEnd = displayPage >= pageCount - 1 && !gestures.canNext;
 
-  if (layout === "strip" && pageUrls.length > 0) {
+  if ((layout === "strip" || layout === "strip-h") && pageUrls.length > 0) {
     return (
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <ModeStrip
           pages={pageUrls}
           initialPage={initialPage}
+          direction={layout === "strip-h" ? "horizontal" : "vertical"}
+          rtl={rtl}
           onPageChange={(p) => onPageVisible(p)}
           onScrollState={(p, frac, vel) => onPageVisible(p, frac, vel)}
           onToggleChrome={gestures.onToggleChrome}

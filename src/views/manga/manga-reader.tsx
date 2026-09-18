@@ -828,7 +828,7 @@ export function MangaReader({
     zoom: prefs.zoom,
     canZoom: true,
     rtl,
-    mode: effMode === "long-h" ? "long" : effMode,
+    mode: effMode,
     hasPrev: !atFirstChapter,
     hasNext: !atLastChapter,
     turnPage: (dir) => {

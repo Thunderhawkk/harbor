@@ -127,7 +127,7 @@ export type RemoteMangaState = {
   zoom: number;
   canZoom: boolean;
   rtl: boolean;
-  mode: "long" | "paged" | "double" | "book";
+  mode: "long" | "long-h" | "paged" | "double" | "book";
   hasPrev: boolean;
   hasNext: boolean;
   chapters: RemoteMangaChapter[];

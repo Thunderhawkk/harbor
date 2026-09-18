@@ -7,12 +7,16 @@ export function ModeStrip({
   onPageChange,
   onToggleChrome,
   onScrollState,
+  direction = "vertical",
+  rtl = false,
 }: {
   pages: string[];
   initialPage: number;
   onPageChange: (p: number) => void;
   onToggleChrome: () => void;
   onScrollState?: (page: number, frac: number, vel: number) => void;
+  direction?: "vertical" | "horizontal";
+  rtl?: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const els = useRef<Array<HTMLDivElement | null>>([]);
@@ -21,10 +25,14 @@ export function ModeStrip({
   const scrollState = useRef(onScrollState);
   scrollState.current = onScrollState;
 
+  const horizontal = direction === "horizontal";
+
   const didScroll = useRef(false);
   const firstUrl = useRef(pages[0]);
-  if (firstUrl.current !== pages[0]) {
+  const firstDir = useRef(horizontal);
+  if (firstUrl.current !== pages[0] || firstDir.current !== horizontal) {
     firstUrl.current = pages[0];
+    firstDir.current = horizontal;
     didScroll.current = false;
   }
 
@@ -39,18 +47,20 @@ export function ModeStrip({
           if (Number.isFinite(i)) change.current(i);
         }
       },
-      { root, rootMargin: "-45% 0px -45% 0px" },
+      { root, rootMargin: horizontal ? "0px -45% 0px -45%" : "-45% 0px -45% 0px" },
     );
     els.current.forEach((el) => el && obs.observe(el));
     return () => obs.disconnect();
-  }, [pages]);
+  }, [pages, horizontal]);
 
   useEffect(() => {
     if (didScroll.current || pages.length === 0) return;
     didScroll.current = true;
     if (initialPage <= 0) return;
-    els.current[initialPage]?.scrollIntoView({ block: "start" });
-  }, [pages, initialPage]);
+    els.current[initialPage]?.scrollIntoView(
+      horizontal ? { inline: "center", block: "nearest" } : { block: "start" },
+    );
+  }, [pages, initialPage, horizontal]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -66,13 +76,17 @@ export function ModeStrip({
       if (now - last < 50) return;
       last = now;
       const rRoot = root.getBoundingClientRect();
-      const center = rRoot.top + rRoot.height / 2;
+      const center = horizontal
+        ? rRoot.left + rRoot.width / 2
+        : rRoot.top + rRoot.height / 2;
       for (let i = 0; i < els.current.length; i++) {
         const el = els.current[i];
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        if (center >= r.top && center < r.bottom && r.height > 0) {
-          const frac = Math.max(0, Math.min(1, (center - r.top) / r.height));
+        const start = horizontal ? r.left : r.top;
+        const size = horizontal ? r.width : r.height;
+        if (center >= start && center < start + size && size > 0) {
+          const frac = Math.max(0, Math.min(1, (center - start) / size));
           let vel = 0;
           if (lastSample.page === i && now > lastSample.t) {
             vel = (frac - lastSample.frac) / (now - lastSample.t);
@@ -92,16 +106,32 @@ export function ModeStrip({
       root.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [pages]);
+  }, [pages, horizontal]);
 
   return (
-    <div ref={rootRef} className="h-full w-full overflow-y-auto overscroll-contain" onClick={onToggleChrome}>
+    <div
+      ref={rootRef}
+      dir={horizontal ? (rtl ? "rtl" : "ltr") : undefined}
+      className={`h-full w-full overscroll-contain ${horizontal ? "overflow-x-auto" : "overflow-y-auto"}`}
+      onClick={onToggleChrome}
+    >
       <div
-        className="flex flex-col items-center"
-        style={{
-          paddingTop: "calc(env(safe-area-inset-top, 0px) + 108px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
-        }}
+        className={
+          horizontal
+            ? "flex h-full w-max min-w-full flex-row items-center"
+            : "flex flex-col items-center"
+        }
+        style={
+          horizontal
+            ? {
+                paddingLeft: "calc(env(safe-area-inset-left, 0px) + 108px)",
+                paddingRight: "calc(env(safe-area-inset-right, 0px) + 96px)",
+              }
+            : {
+                paddingTop: "calc(env(safe-area-inset-top, 0px) + 108px)",
+                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
+              }
+        }
       >
         {pages.map((url, i) => (
           <div
@@ -110,9 +140,16 @@ export function ModeStrip({
             ref={(el) => {
               els.current[i] = el;
             }}
-            className="min-h-[40vh] w-full bg-[#0b0b0d]"
+            className={
+              horizontal
+                ? "h-full min-w-[36vw] shrink-0 bg-[#0b0b0d]"
+                : "min-h-[40vh] w-full bg-[#0b0b0d]"
+            }
           >
-            <ProxiedImg url={url} className="block w-full" />
+            <ProxiedImg
+              url={url}
+              className={horizontal ? "block h-full w-auto object-contain" : "block w-full"}
+            />
           </div>
         ))}
       </div>

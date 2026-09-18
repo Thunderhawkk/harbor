@@ -1,13 +1,13 @@
 import { useState } from "react";
 
-export type RemoteLayout = "swipe" | "strip" | "tap";
+export type RemoteLayout = "swipe" | "strip" | "strip-h" | "tap";
 
 const KEY = "harbor.remote-reader.layout.v1";
 
 function read(): RemoteLayout {
   try {
     const v = localStorage.getItem(KEY);
-    if (v === "strip" || v === "tap") return v;
+    if (v === "strip" || v === "strip-h" || v === "tap") return v;
   } catch {
     /* fall through to default */
   }
