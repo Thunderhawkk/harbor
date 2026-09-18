@@ -65,15 +65,25 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     saveLocalMode(desktopMapped);
   }, [desktopMapped]);
 
-  const lastSent = useRef(m?.pageIndex ?? 0);
-  useEffect(() => {
-    if (page === lastSent.current) return;
-    const id = window.setTimeout(() => {
-      lastSent.current = page;
-      sendCommand({ action: "mangaSetPage", page });
-    }, 450);
-    return () => window.clearTimeout(id);
-  }, [page, sendCommand]);
+  const reportRef = useRef({ page: -1, frac: -1 });
+  const reportStripPage = (page: number, scroll?: number, vel?: number) => {
+    setPage(page);
+    const last = reportRef.current;
+    const frac =
+      scroll == null
+        ? page === last.page
+          ? last.frac
+          : 0
+        : Math.max(0, Math.min(1, Math.round(scroll * 1000) / 1000));
+    const v = vel == null || !Number.isFinite(vel) ? 0 : Math.round(vel * 100000) / 100000;
+    if (page === last.page && frac === last.frac) return;
+    reportRef.current = { page, frac };
+    sendCommand(
+      scroll == null
+        ? { action: "mangaSetPage", page }
+        : { action: "mangaSetPage", page, scroll: frac, vel: v },
+    );
+  };
 
   const pageLabel = useMemo(() => {
     if (total <= 0) return "";
@@ -93,11 +103,11 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const turn = (dir: "next" | "prev") => {
     if (dir === "next") {
       const target = anchor + step;
-      if (target < total) setPage(target);
+      if (target < total) reportStripPage(target);
       else if (hasNext) jumpChapter(chapterIndex + 1);
     } else {
       const target = anchor - step;
-      if (target >= 0) setPage(target);
+      if (target >= 0) reportStripPage(target);
       else if (hasPrev) jumpChapter(chapterIndex - 1);
     }
   };
@@ -106,7 +116,7 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     setMode(next);
     saveLocalMode(next);
     sendCommand({ action: "mangaSetMode", mode: mapLocalToDesktopMode(next) });
-    if (next === "double") setPage(page - (page % 2));
+    if (next === "double") reportStripPage(page - (page % 2));
   };
 
   const toggleChrome = () => setChromeHidden((v) => !v);
@@ -130,7 +140,8 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
           <ModeStrip
             pages={pages}
             initialPage={page}
-            onPageChange={setPage}
+            onPageChange={(p, f) => reportStripPage(p, f)}
+            onScrollState={(p, f, v) => reportStripPage(p, f, v)}
             onToggleChrome={toggleChrome}
             direction={mode === "strip-h" ? "horizontal" : "vertical"}
             rtl={rtl}
@@ -141,7 +152,7 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
             rtl={rtl}
             resumePage={bookStart}
             onProgress={(p, sp) => {
-              setPage(p);
+              reportStripPage(p);
               setBookSpread(sp);
             }}
           />
