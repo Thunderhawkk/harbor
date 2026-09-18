@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bookmark, Download, EyeOff } from "lucide-react";
+import { BookOpen, Bookmark, Download, EyeOff } from "lucide-react";
 import { chapterPages, type MangaChapter } from "@/lib/manga/api";
 import { pageHeadersFor } from "@/lib/manga/plugins/adapter";
 import { t, useT } from "@/lib/i18n";
@@ -95,6 +95,7 @@ export function MangaReader({
   const [prefs, setPrefs] = useState<ReaderPrefs>(() => loadPrefs(prefsKey));
   const [currentPage, setCurrentPage] = useState(0);
   const [pagesHidden, setPagesHidden] = useState(false);
+  const [exitLocalSeq, setExitLocalSeq] = useState(0);
   const [bookSpread, setBookSpread] = useState("");
   const [chromeOpen, setChromeOpen] = useState(true);
   const [manualHide, setManualHide] = useState(false);
@@ -861,6 +862,7 @@ export function MangaReader({
     bookmarkCurrent: () => bookmarkCurrent,
     jumpBookmark,
     close: onExit,
+    exitLocalReader: exitLocalSeq,
   });
 
   const completeCard = (
@@ -1023,6 +1025,16 @@ export function MangaReader({
             <EyeOff size={30} strokeWidth={1.8} className="text-ink-subtle" />
             <p className="text-[15px] font-semibold text-ink">{t("Chapter hidden")}</p>
             <p className="text-[12.5px] text-ink-subtle">{t("Reading on phone")}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setPagesHidden(false);
+                setExitLocalSeq((n) => n + 1);
+              }}
+              className="pointer-events-auto mt-2 flex h-11 items-center gap-1.5 rounded-full bg-accent px-5 text-[13.5px] font-semibold text-canvas transition-transform active:scale-95"
+            >
+              <BookOpen size={15} strokeWidth={2.4} /> {t("Read here")}
+            </button>
           </div>
         </div>
       )}

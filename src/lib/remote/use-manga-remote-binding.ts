@@ -40,6 +40,7 @@ type Params = {
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
   jumpBookmark: (bm: MangaBookmark) => void;
   close: () => void;
+  exitLocalReader: number;
 };
 
 export function useMangaRemoteBinding(params: Params) {
@@ -84,6 +85,7 @@ export function useMangaRemoteBinding(params: Params) {
       bookmarkCurrent: () => ref.current.bookmarkCurrent(),
       jumpBookmark: (bm) => ref.current.jumpBookmark(bm),
       close: () => ref.current.close(),
+      exitLocalReader: params.exitLocalReader,
     };
     registerRemoteManga(next);
   }, [
@@ -103,6 +105,7 @@ export function useMangaRemoteBinding(params: Params) {
     params.mode,
     params.hasPrev,
     params.hasNext,
+    params.exitLocalReader,
   ]);
 
   useEffect(() => {

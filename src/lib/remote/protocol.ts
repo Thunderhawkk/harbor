@@ -134,6 +134,7 @@ export type RemoteMangaState = {
   hasNext: boolean;
   chapters: RemoteMangaChapter[];
   bookmarks: RemoteMangaBookmark[];
+  exitLocalReader: number;
 };
 
 export type RemoteSnapshot = {

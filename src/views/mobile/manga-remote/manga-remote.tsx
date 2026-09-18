@@ -19,11 +19,10 @@ import { useMobileRemote } from "../mobile-remote";
 import { RendererSheet } from "../renderer-sheet";
 import { MangaPageSurface } from "./manga-page-surface";
 import { MangaRemoteEmpty } from "./manga-remote-empty";
-import { ZoomJoystick } from "./zoom-joystick";
 import { useOptimisticPage } from "./use-optimistic-page";
 import { useRemoteLayout, useStripPreview, type RemoteLayout } from "./use-remote-layout";
 import { useHistoryBackGuard } from "./use-history-guard";
-import { clampZoom, ZOOM_MAX, ZOOM_MIN, type TurnDir } from "./gesture-math";
+import { clampZoom, type TurnDir } from "./gesture-math";
 
 const ChapterNavigator = lazy(() =>
   import("./chapter-navigator").then((m) => ({ default: m.ChapterNavigator })),
@@ -56,9 +55,22 @@ export function MangaRemote({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pageJumpOpen, setPageJumpOpen] = useState(false);
   const [chromeHidden, setChromeHidden] = useState(false);
-  const [zoomEngaged, setZoomEngaged] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const hintTimer = useRef(0);
+  const [zoomFlash, setZoomFlash] = useState(false);
+  const zoomFlashTimer = useRef(0);
+  const zoomPct = m ? Math.round(m.zoom * 100) : 100;
+  useEffect(() => {
+    if (!chromeHidden) {
+      setZoomFlash(false);
+      window.clearTimeout(zoomFlashTimer.current);
+      return;
+    }
+    setZoomFlash(true);
+    window.clearTimeout(zoomFlashTimer.current);
+    zoomFlashTimer.current = window.setTimeout(() => setZoomFlash(false), 1500);
+    return () => window.clearTimeout(zoomFlashTimer.current);
+  }, [zoomPct, chromeHidden]);
   const [layout, setLayout] = useRemoteLayout();
   const [showPreview, setShowPreview] = useStripPreview();
   const prevMode = useRef<string | null>(null);
@@ -149,9 +161,9 @@ export function MangaRemote({
     else if (!sent) flash(t("Reconnecting to your computer"));
   };
   const zoomAbs = (z: number) => sendCommand({ action: "mangaSetZoom", zoom: clampZoom(z) });
-  const pan = (dx: number, dy: number) => sendCommand({ action: "mangaPan", dx, dy });
-
   const chromeCls = `${reduce ? "" : "transition-opacity duration-200 "}${chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"}`;
+  const chromeVisible = !chromeHidden;
+  const zoomBadgeVisible = (chromeVisible && zoomPct !== 100) || zoomFlash;
   const total = Math.max(1, count);
   const spreadNums = (m.spread ?? []).filter((n) => n > 0);
   const isSpread = (m.mode === "book" || m.mode === "double") && spreadNums.length >= 2;
@@ -267,7 +279,7 @@ export function MangaRemote({
         />
 
         <div
-          className={`flex items-center justify-center gap-2 px-4 ${chromeCls} ${zoomEngaged ? "pointer-events-none opacity-0" : ""}`}
+          className={`flex items-center justify-center gap-2 px-4 ${chromeCls}`}
         >
           <DockButton
             label={t("Previous chapter")}
@@ -325,22 +337,19 @@ export function MangaRemote({
           </DockButton>
         </div>
 
-        <div
-          className={`${reduce ? "" : "transition-opacity duration-200 "}${
-            chromeHidden && !zoomEngaged ? "pointer-events-none opacity-0" : "opacity-100"
-          }`}
-        >
-          <ZoomJoystick
-            zoom={m.zoom}
-            min={ZOOM_MIN}
-            max={ZOOM_MAX}
-            canZoom={m.canZoom}
-            onZoom={zoomAbs}
-            onPan={pan}
-            onEngageChange={setZoomEngaged}
-            bottomOffset="calc(env(safe-area-inset-bottom, 0px) + 84px)"
-          />
-        </div>
+        {m.canZoom && (
+          <button
+            type="button"
+            aria-label={t("Reset zoom")}
+            onClick={() => zoomAbs(1)}
+            className={`absolute end-4 z-40 rounded-full bg-elevated/70 px-2.5 py-1 text-[11.5px] font-semibold tabular-nums ring-1 ring-edge-soft/50 backdrop-blur-xl transition-opacity duration-200 motion-reduce:transition-none ${
+              zoomBadgeVisible ? "text-ink opacity-100" : "pointer-events-none opacity-0"
+            }`}
+            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 84px)" }}
+          >
+            {zoomPct}%
+          </button>
+        )}
       </div>
 
       {!connected && (

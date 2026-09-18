@@ -10,6 +10,7 @@ export function ModeBook({
   onProgress,
   zoom = 1,
   onZoom,
+  onToggleChrome,
 }: {
   pages: string[];
   rtl: boolean;
@@ -17,6 +18,7 @@ export function ModeBook({
   onProgress: (page: number, spread: string) => void;
   zoom?: number;
   onZoom?: (z: number) => void;
+  onToggleChrome: () => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const pinch = usePinchZoom({ zoom, onZoom, rootRef: wrapRef });
@@ -27,6 +29,10 @@ export function ModeBook({
       ref={wrapRef}
       className="h-full w-full"
       style={onZoom ? { touchAction: "pan-x pan-y" } : undefined}
+      onClickCapture={() => {
+        if (pinch.shouldSuppressClick()) return;
+        onToggleChrome();
+      }}
       onPointerDown={pinch.onPointerDown}
       onPointerMove={pinch.onPointerMove}
       onPointerUp={pinch.onPointerUp}

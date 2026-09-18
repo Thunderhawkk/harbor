@@ -22,6 +22,20 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const [chromeHidden, setChromeHidden] = useState(false);
   const [showPreview, setShowPreview] = useState(loadStripPreview);
   const [localZoom, setLocalZoomState] = useState(() => (mode === "book" ? 1 : loadLocalZoom()));
+  const [zoomFlash, setZoomFlash] = useState(false);
+  const zoomFlashTimer = useRef(0);
+  const zoomPct = Math.round(localZoom * 100);
+  useEffect(() => {
+    if (!chromeHidden) {
+      setZoomFlash(false);
+      window.clearTimeout(zoomFlashTimer.current);
+      return;
+    }
+    setZoomFlash(true);
+    window.clearTimeout(zoomFlashTimer.current);
+    zoomFlashTimer.current = window.setTimeout(() => setZoomFlash(false), 1500);
+    return () => window.clearTimeout(zoomFlashTimer.current);
+  }, [zoomPct, chromeHidden]);
   const [bookSpread, setBookSpread] = useState("");
   const [bookStart, setBookStart] = useState(() => m?.pageIndex ?? 0);
 
@@ -43,6 +57,18 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const anchor = double ? page - (page % 2) : page;
 
   const firstChapter = useRef(true);
+  const exitSeqSeen = useRef<number | null>(null);
+  useEffect(() => {
+    const seq = m?.exitLocalReader ?? 0;
+    if (exitSeqSeen.current == null) {
+      exitSeqSeen.current = seq;
+      return;
+    }
+    if (seq !== exitSeqSeen.current) {
+      exitSeqSeen.current = seq;
+      onExit();
+    }
+  }, [m?.exitLocalReader, onExit]);
   useEffect(() => {
     sendCommand({ action: "mangaSetPagesHidden", hidden: !loadStripPreview() });
     return () => {
@@ -152,10 +178,11 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   };
 
   const toggleChrome = () => setChromeHidden((v) => !v);
-  const chromeVisible = mode === "book" || !chromeHidden;
+  const chromeVisible = !chromeHidden;
   const chromeCls = `${reduce ? "" : "transition-opacity duration-200 motion-reduce:transition-none "}${
     chromeVisible ? "opacity-100" : "pointer-events-none opacity-0"
   }`;
+  const zoomBadgeVisible = (chromeVisible && zoomPct !== 100) || zoomFlash;
   const waiting = pages.length === 0;
 
   return (
@@ -188,6 +215,7 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
             resumePage={bookStart}
             zoom={localZoom}
             onZoom={setLocalZoom}
+            onToggleChrome={toggleChrome}
             onProgress={(p, sp) => {
               reportStripPage(p);
               setBookSpread(sp);
@@ -229,6 +257,18 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
           onNext={() => jumpChapter(chapterIndex + 1)}
         />
       </div>
+
+      <button
+        type="button"
+        aria-label={t("Reset zoom")}
+        onClick={() => setLocalZoom(1)}
+        className={`absolute end-4 z-20 rounded-full bg-elevated/70 px-2.5 py-1 text-[11.5px] font-semibold tabular-nums ring-1 ring-edge-soft/50 backdrop-blur-xl transition-opacity duration-200 motion-reduce:transition-none ${
+          zoomBadgeVisible ? "text-ink opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)" }}
+      >
+        {zoomPct}%
+      </button>
     </div>
   );
 }

@@ -45,6 +45,7 @@ export type RemoteMangaBinding = {
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
   jumpBookmark: (bm: MangaBookmark) => void;
   close: () => void;
+  exitLocalReader: number;
 };
 
 type Listener = () => void;
@@ -116,6 +117,7 @@ export function buildRemoteMangaState(): RemoteMangaState | null {
     hasPrev: b.hasPrev,
     hasNext: b.hasNext,
     bookmarks,
+    exitLocalReader: b.exitLocalReader,
   };
 }
 
