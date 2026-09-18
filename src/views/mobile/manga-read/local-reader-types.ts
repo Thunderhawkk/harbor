@@ -61,3 +61,23 @@ export function saveStripPreview(show: boolean): void {
     return;
   }
 }
+
+export const LOCAL_ZOOM_KEY = "harbor.localreader.zoom.v1";
+
+export function loadLocalZoom(): number {
+  try {
+    const v = Number(localStorage.getItem(LOCAL_ZOOM_KEY));
+    if (Number.isFinite(v)) return Math.max(0.5, Math.min(3, v));
+  } catch {
+    return 1;
+  }
+  return 1;
+}
+
+export function saveLocalZoom(zoom: number): void {
+  try {
+    localStorage.setItem(LOCAL_ZOOM_KEY, String(zoom));
+  } catch {
+    return;
+  }
+}

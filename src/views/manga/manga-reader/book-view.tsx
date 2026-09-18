@@ -249,6 +249,7 @@ export function BookFlip({
         pages: pages.map((src) => ({ src })),
         viewMode: "webgl",
         singlePageMode,
+        singlePageModeIfMobile: true,
         cover: false,
         rightToLeft: rtl,
         startPage: Math.min(pages.length, Math.max(1, resumePage + 1)),

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ProxiedImg } from "./proxied-img";
+import { usePinchZoom } from "./hooks/use-pinch-zoom";
 
 const OBSERVER_FALLBACK_MS = 300;
 const FOLLOW_IDLE_MS = 1200;
@@ -13,6 +14,9 @@ export function ModeStrip({
   direction = "vertical",
   rtl = false,
   showImages = true,
+  zoom = 1,
+  applyZoom = false,
+  onZoom,
 }: {
   pages: string[];
   initialPage: number;
@@ -22,6 +26,9 @@ export function ModeStrip({
   direction?: "vertical" | "horizontal";
   rtl?: boolean;
   showImages?: boolean;
+  zoom?: number;
+  applyZoom?: boolean;
+  onZoom?: (z: number) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const els = useRef<Array<HTMLDivElement | null>>([]);
@@ -29,6 +36,12 @@ export function ModeStrip({
   change.current = onPageChange;
   const scrollState = useRef(onScrollState);
   scrollState.current = onScrollState;
+  const pinch = usePinchZoom({ zoom, onZoom, rootRef });
+
+  const onRootClick = () => {
+    if (pinch.shouldSuppressClick()) return;
+    onToggleChrome();
+  };
 
   const horizontal = direction === "horizontal";
 
@@ -161,12 +174,52 @@ export function ModeStrip({
     node.scrollIntoView(horizontal ? { inline: "center", block: "nearest" } : { block: "start" });
   }, [initialPage, horizontal, rtl]);
 
+  const innerStyle: CSSProperties = horizontal
+    ? {
+        paddingLeft: "calc(env(safe-area-inset-left, 0px) + 108px)",
+        paddingRight: "calc(env(safe-area-inset-right, 0px) + 96px)",
+      }
+    : {
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 108px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
+      };
+
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const update = () => {
+      const w = Math.max(1, Math.round(root.clientWidth));
+      const h = Math.max(1, Math.round(root.clientHeight));
+      setViewport((v) => (v.w === w && v.h === h ? v : { w, h }));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [pages, horizontal]);
+
+  const zoomed = applyZoom && zoom > 1;
+  const imgStyle: CSSProperties | undefined =
+    !zoomed || viewport.w <= 0 || viewport.h <= 0
+      ? undefined
+      : horizontal
+        ? { height: `${Math.round(viewport.h * zoom)}px`, width: "auto" }
+        : { width: `${Math.round(viewport.w * zoom)}px`, height: "auto" };
+
   return (
     <div
       ref={rootRef}
       dir={horizontal ? (rtl ? "rtl" : "ltr") : undefined}
-      className={`h-full w-full overscroll-contain ${horizontal ? "overflow-x-auto" : "overflow-y-auto"}`}
-      onClick={onToggleChrome}
+      className={`h-full w-full overscroll-contain ${
+        horizontal ? "overflow-x-auto" : zoomed ? "overflow-x-auto overflow-y-auto" : "overflow-y-auto"
+      }`}
+      style={onZoom ? { touchAction: "pan-x pan-y" } : undefined}
+      onClick={onRootClick}
+      onPointerDown={pinch.onPointerDown}
+      onPointerMove={pinch.onPointerMove}
+      onPointerUp={pinch.onPointerUp}
+      onPointerCancel={pinch.onPointerCancel}
     >
       <div
         className={
@@ -174,17 +227,7 @@ export function ModeStrip({
             ? "flex h-full w-max min-w-full flex-row items-center"
             : "flex flex-col items-center"
         }
-        style={
-          horizontal
-            ? {
-                paddingLeft: "calc(env(safe-area-inset-left, 0px) + 108px)",
-                paddingRight: "calc(env(safe-area-inset-right, 0px) + 96px)",
-              }
-            : {
-                paddingTop: "calc(env(safe-area-inset-top, 0px) + 108px)",
-                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
-              }
-        }
+        style={innerStyle}
       >
         {pages.map((url, i) => (
           <div
@@ -204,6 +247,7 @@ export function ModeStrip({
               <ProxiedImg
                 url={url}
                 className={horizontal ? "block h-full w-auto object-contain" : "block w-full"}
+                style={imgStyle}
               />
             ) : (
               <span className="text-[15px] font-semibold tabular-nums text-ink-subtle">

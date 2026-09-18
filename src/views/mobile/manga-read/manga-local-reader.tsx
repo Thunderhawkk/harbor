@@ -8,7 +8,7 @@ import { ModeStrip } from "./mode-strip";
 import { ModePaged } from "./mode-paged";
 import { ModeBook } from "./mode-book";
 import { useLocalPager } from "./hooks/use-local-pager";
-import { loadLocalMode, loadStripPreview, mapDesktopMode, mapLocalToDesktopMode, saveLocalMode, saveStripPreview, type LocalMode } from "./local-reader-types";
+import { loadLocalMode, loadLocalZoom, loadStripPreview, mapDesktopMode, mapLocalToDesktopMode, saveLocalMode, saveLocalZoom, saveStripPreview, type LocalMode } from "./local-reader-types";
 
 export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const { snapshot, sendCommand } = useMobileRemote();
@@ -21,6 +21,7 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   );
   const [chromeHidden, setChromeHidden] = useState(false);
   const [showPreview, setShowPreview] = useState(loadStripPreview);
+  const [localZoom, setLocalZoomState] = useState(() => (mode === "book" ? 1 : loadLocalZoom()));
   const [bookSpread, setBookSpread] = useState("");
   const [bookStart, setBookStart] = useState(() => m?.pageIndex ?? 0);
 
@@ -60,7 +61,10 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
 
   const prevMode = useRef(mode);
   useEffect(() => {
-    if (mode === "book" && prevMode.current !== "book") setBookStart(page);
+    if (mode === "book" && prevMode.current !== "book") {
+      setBookStart(page);
+      setLocalZoom(1);
+    }
     prevMode.current = mode;
   }, [mode, page]);
 
@@ -124,6 +128,7 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     setMode(next);
     saveLocalMode(next);
     sendCommand({ action: "mangaSetMode", mode: mapLocalToDesktopMode(next) });
+    setLocalZoom(1);
     if (next === "double") reportStripPage(page - (page % 2));
   };
 
@@ -138,6 +143,12 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     saveStripPreview(true);
     sendCommand({ action: "mangaSetPagesHidden", hidden: false });
     onExit();
+  };
+
+  const setLocalZoom = (z: number) => {
+    const clamped = Math.max(0.5, Math.min(3, Math.round(z * 100) / 100));
+    setLocalZoomState(clamped);
+    saveLocalZoom(clamped);
   };
 
   const toggleChrome = () => setChromeHidden((v) => !v);
@@ -166,12 +177,17 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
             onToggleChrome={toggleChrome}
             direction={mode === "strip-h" ? "horizontal" : "vertical"}
             rtl={rtl}
+            zoom={localZoom}
+            applyZoom
+            onZoom={setLocalZoom}
           />
         ) : mode === "book" ? (
           <ModeBook
             pages={pages}
             rtl={rtl}
             resumePage={bookStart}
+            zoom={localZoom}
+            onZoom={setLocalZoom}
             onProgress={(p, sp) => {
               reportStripPage(p);
               setBookSpread(sp);
@@ -186,6 +202,8 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
             double={double}
             onTurn={turn}
             onToggleChrome={toggleChrome}
+            zoom={localZoom}
+            onZoom={setLocalZoom}
           />
         )}
       </div>

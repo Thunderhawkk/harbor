@@ -46,6 +46,8 @@ export function MangaPageSurface({
           direction={layout === "strip-h" ? "horizontal" : "vertical"}
           rtl={rtl}
           showImages={showPreview}
+          zoom={gestures.zoom}
+          onZoom={gestures.canZoom ? gestures.onZoom : undefined}
           onPageChange={(p, frac) => onPageVisible(p, frac)}
           onScrollState={(p, frac, vel) => onPageVisible(p, frac, vel)}
           onToggleChrome={gestures.onToggleChrome}
