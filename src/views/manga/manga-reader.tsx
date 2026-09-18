@@ -714,7 +714,6 @@ export function MangaReader({
   const followRaf = useRef(0);
   const followTarget = useRef<{ top: number; left: number } | null>(null);
   const followVel = useRef({ x: 0, y: 0, page: -1, t: 0 });
-  const followGeom = useRef<{ key: string; page: number; top: number; left: number; h: number; w: number; at: number } | null>(null);
   useEffect(
     () => () => {
       if (followRaf.current) cancelAnimationFrame(followRaf.current);
@@ -742,29 +741,27 @@ export function MangaReader({
       return;
     }
     const s = scroll != null && Number.isFinite(scroll) ? Math.max(0, Math.min(1, scroll)) : 0;
-    const key = `${manga.id}|${chapter.id}`;
     const now = performance.now();
-    let geom = followGeom.current;
-    if (!geom || geom.key !== key || geom.page !== clamped || now - geom.at > 250) {
-      const rRoot = root.getBoundingClientRect();
-      const rEl = el.getBoundingClientRect();
-      geom = {
-        key,
-        page: clamped,
-        top: root.scrollTop + (rEl.top - rRoot.top),
-        left: root.scrollLeft + (rEl.left - rRoot.left),
-        h: Math.max(1, rEl.height),
-        w: Math.max(1, rEl.width),
-        at: now,
-      };
-      followGeom.current = geom;
-    }
+    const rRoot = root.getBoundingClientRect();
+    const rEl = el.getBoundingClientRect();
+    const geom = {
+      top: root.scrollTop + (rEl.top - rRoot.top),
+      left: root.scrollLeft + (rEl.left - rRoot.left),
+      h: Math.max(1, rEl.height),
+      w: Math.max(1, rEl.width),
+    };
     const top = horizontal
       ? root.scrollTop
       : Math.max(0, geom.top + s * geom.h - root.clientHeight / 2);
-    const left = horizontal
-      ? Math.max(0, geom.left + s * geom.w - root.clientWidth / 2)
-      : root.scrollLeft;
+    // Geom is already in scroll space in both models, so only the clamp
+    // differs: Chromium RTL scrolls negative, LTR never goes below zero.
+    const maxLeft = Math.max(0, root.scrollWidth - root.clientWidth);
+    const centeredLeft = geom.left + s * geom.w - root.clientWidth / 2;
+    const left = !horizontal
+      ? root.scrollLeft
+      : rtl
+        ? Math.max(-maxLeft, Math.min(0, centeredLeft))
+        : Math.max(0, centeredLeft);
     const prev = followVel.current;
     if (prev.page === clamped && now > prev.t && vel != null && Number.isFinite(vel)) {
       const cap = 0.05;

@@ -12,6 +12,7 @@ type Props = {
   pageUrls: string[];
   initialPage: number;
   rtl?: boolean;
+  showPreview: boolean;
   onPageVisible: (page: number, scroll?: number, vel?: number) => void;
   gestures: MangaGestureInput;
 };
@@ -25,6 +26,7 @@ export function MangaPageSurface({
   pageUrls,
   initialPage,
   rtl,
+  showPreview,
   onPageVisible,
   gestures,
 }: Props) {
@@ -43,7 +45,8 @@ export function MangaPageSurface({
           initialPage={initialPage}
           direction={layout === "strip-h" ? "horizontal" : "vertical"}
           rtl={rtl}
-          onPageChange={(p) => onPageVisible(p)}
+          showImages={showPreview}
+          onPageChange={(p, frac) => onPageVisible(p, frac)}
           onScrollState={(p, frac, vel) => onPageVisible(p, frac, vel)}
           onToggleChrome={gestures.onToggleChrome}
         />

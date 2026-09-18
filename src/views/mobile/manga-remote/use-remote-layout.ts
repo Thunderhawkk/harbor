@@ -26,3 +26,24 @@ export function useRemoteLayout() {
   };
   return [layout, setLayout] as const;
 }
+
+const PREVIEW_KEY = "harbor.remote-reader.strip-preview.v1";
+
+export function useStripPreview() {
+  const [show, setShowState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(PREVIEW_KEY) === "on";
+    } catch {
+      return false;
+    }
+  });
+  const setShow = (next: boolean) => {
+    setShowState(next);
+    try {
+      localStorage.setItem(PREVIEW_KEY, next ? "on" : "off");
+    } catch {
+      /* persistence is best-effort */
+    }
+  };
+  return [show, setShow] as const;
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ProxiedImg } from "./proxied-img";
 
+const OBSERVER_FALLBACK_MS = 300;
 const FOLLOW_IDLE_MS = 1200;
 
 export function ModeStrip({
@@ -11,14 +12,16 @@ export function ModeStrip({
   onScrollState,
   direction = "vertical",
   rtl = false,
+  showImages = true,
 }: {
   pages: string[];
   initialPage: number;
-  onPageChange: (p: number) => void;
+  onPageChange: (p: number, frac?: number) => void;
   onToggleChrome: () => void;
   onScrollState?: (page: number, frac: number, vel: number) => void;
   direction?: "vertical" | "horizontal";
   rtl?: boolean;
+  showImages?: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const els = useRef<Array<HTMLDivElement | null>>([]);
@@ -30,16 +33,21 @@ export function ModeStrip({
   const horizontal = direction === "horizontal";
 
   const didScroll = useRef(false);
+  const quietUntil = useRef(0);
+  const lastScrollSend = useRef(0);
   const lastInput = useRef(0);
   const currentRef = useRef(initialPage);
   const targetRef = useRef(initialPage);
   targetRef.current = initialPage;
   const firstUrl = useRef(pages[0]);
   const firstDir = useRef(horizontal);
-  if (firstUrl.current !== pages[0] || firstDir.current !== horizontal) {
+  const firstRtl = useRef(rtl);
+  if (firstUrl.current !== pages[0] || firstDir.current !== horizontal || firstRtl.current !== rtl) {
     firstUrl.current = pages[0];
     firstDir.current = horizontal;
+    firstRtl.current = rtl;
     didScroll.current = false;
+    quietUntil.current = performance.now() + 200;
   }
 
   useEffect(() => {
@@ -47,13 +55,23 @@ export function ModeStrip({
     if (!root) return;
     const obs = new IntersectionObserver(
       (entries) => {
+        if (performance.now() < quietUntil.current) return;
+        if (performance.now() - lastScrollSend.current < OBSERVER_FALLBACK_MS) return;
+        const rRoot = root.getBoundingClientRect();
+        const center = horizontal
+          ? rRoot.left + rRoot.width / 2
+          : rRoot.top + rRoot.height / 2;
         for (const e of entries) {
           if (!e.isIntersecting) continue;
+          const box = (e.target as HTMLElement).getBoundingClientRect();
+          const start = horizontal ? box.left : box.top;
+          const size = horizontal ? box.width : box.height;
+          if (size < 2) continue;
           const i = Number((e.target as HTMLElement).dataset.page);
-          if (Number.isFinite(i)) {
-            currentRef.current = i;
-            change.current(i);
-          }
+          if (!Number.isFinite(i)) continue;
+          const frac = Math.max(0, Math.min(1, (center - start) / size));
+          currentRef.current = i;
+          change.current(i, frac);
         }
       },
       { root, rootMargin: horizontal ? "0px -45% 0px -45%" : "-45% 0px -45% 0px" },
@@ -69,7 +87,7 @@ export function ModeStrip({
     els.current[initialPage]?.scrollIntoView(
       horizontal ? { inline: "center", block: "nearest" } : { block: "start" },
     );
-  }, [pages, initialPage, horizontal]);
+  }, [pages, initialPage, horizontal, rtl]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -82,7 +100,7 @@ export function ModeStrip({
       const cb = scrollState.current;
       if (!cb) return;
       const now = performance.now();
-      if (now - last < 50) return;
+      if (now - last < 50 || now < quietUntil.current) return;
       last = now;
       const rRoot = root.getBoundingClientRect();
       const center = horizontal
@@ -101,6 +119,7 @@ export function ModeStrip({
             vel = (frac - lastSample.frac) / (now - lastSample.t);
           }
           lastSample = { frac, page: i, t: now };
+          lastScrollSend.current = now;
           currentRef.current = i;
           cb(i, frac, vel);
           return;
@@ -111,10 +130,10 @@ export function ModeStrip({
       if (raf) return;
       raf = requestAnimationFrame(report);
     };
-    root.addEventListener("scroll", onScroll, { passive: true });
     const stamp = () => {
       lastInput.current = performance.now();
     };
+    root.addEventListener("scroll", onScroll, { passive: true });
     root.addEventListener("pointerdown", stamp);
     root.addEventListener("wheel", stamp, { passive: true });
     return () => {
@@ -176,14 +195,21 @@ export function ModeStrip({
             }}
             className={
               horizontal
-                ? "h-full min-w-[36vw] shrink-0 bg-[#0b0b0d]"
-                : "min-h-[40vh] w-full bg-[#0b0b0d]"
+                ? "flex h-full shrink-0 items-center justify-center bg-[#0b0b0d]"
+                : "flex min-h-[40vh] w-full items-center justify-center bg-[#0b0b0d]"
             }
+            style={horizontal ? { minWidth: "36vw" } : undefined}
           >
-            <ProxiedImg
-              url={url}
-              className={horizontal ? "block h-full w-auto object-contain" : "block w-full"}
-            />
+            {showImages ? (
+              <ProxiedImg
+                url={url}
+                className={horizontal ? "block h-full w-auto object-contain" : "block w-full"}
+              />
+            ) : (
+              <span className="text-[15px] font-semibold tabular-nums text-ink-subtle">
+                {i + 1}
+              </span>
+            )}
           </div>
         ))}
       </div>

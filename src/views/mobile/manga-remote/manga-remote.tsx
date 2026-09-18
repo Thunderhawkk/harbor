@@ -21,7 +21,7 @@ import { MangaPageSurface } from "./manga-page-surface";
 import { MangaRemoteEmpty } from "./manga-remote-empty";
 import { ZoomJoystick } from "./zoom-joystick";
 import { useOptimisticPage } from "./use-optimistic-page";
-import { useRemoteLayout, type RemoteLayout } from "./use-remote-layout";
+import { useRemoteLayout, useStripPreview, type RemoteLayout } from "./use-remote-layout";
 import { useHistoryBackGuard } from "./use-history-guard";
 import { clampZoom, ZOOM_MAX, ZOOM_MIN, type TurnDir } from "./gesture-math";
 
@@ -60,6 +60,7 @@ export function MangaRemote({
   const [hint, setHint] = useState<string | null>(null);
   const hintTimer = useRef(0);
   const [layout, setLayout] = useRemoteLayout();
+  const [showPreview, setShowPreview] = useStripPreview();
   const prevMode = useRef<string | null>(null);
   useEffect(() => {
     const mode: string | undefined = m?.mode;
@@ -124,7 +125,12 @@ export function MangaRemote({
   const reportFeedPage = (page: number, scroll?: number, vel?: number) => {
     setFeedPage(page);
     const last = feedState.current;
-    const frac = scroll == null ? last.frac : Math.max(0, Math.min(1, Math.round(scroll * 1000) / 1000));
+    const frac =
+      scroll == null
+        ? page === last.page
+          ? last.frac
+          : 0.5
+        : Math.max(0, Math.min(1, Math.round(scroll * 1000) / 1000));
     const v = vel == null || !Number.isFinite(vel) ? 0 : Math.round(vel * 100000) / 100000;
     if (page === last.page && frac === last.frac) return;
     feedState.current = { page, frac, t: performance.now(), seq: m?.seq ?? -1 };
@@ -240,6 +246,7 @@ export function MangaRemote({
           pageUrls={feedUrls}
           initialPage={feedPage ?? displayPage}
           rtl={m.rtl}
+          showPreview={showPreview}
           onPageVisible={reportFeedPage}
           gestures={{
             rtl: m.rtl,
@@ -309,9 +316,6 @@ export function MangaRemote({
               );
             })}
           </div>
-          <DockButton label={t("Bookmarks")} accent onPress={() => setBookmarksOpen(true)}>
-            <Bookmark size={26} strokeWidth={2.2} />
-          </DockButton>
           <DockButton
             label={t("Next chapter")}
             disabled={!m.hasNext}
@@ -379,7 +383,12 @@ export function MangaRemote({
           <BookmarksSheet open={bookmarksOpen} onClose={() => setBookmarksOpen(false)} />
         )}
         {settingsOpen && (
-          <MangaSettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+          <MangaSettingsSheet
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            showPreview={showPreview}
+            onTogglePreview={setShowPreview}
+          />
         )}
       </Suspense>
     </>

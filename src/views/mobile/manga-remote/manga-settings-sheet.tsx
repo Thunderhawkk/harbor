@@ -21,7 +21,17 @@ const BGS: Array<{ v: Bg; label: string; color: string }> = [
   { v: "light", label: "Light", color: "#f5f5f5" },
 ];
 
-export function MangaSettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function MangaSettingsSheet({
+  open,
+  onClose,
+  showPreview,
+  onTogglePreview,
+}: {
+  open: boolean;
+  onClose: () => void;
+  showPreview: boolean;
+  onTogglePreview: (v: boolean) => void;
+}) {
   const { snapshot, sendCommand } = useMobileRemote();
   const manga = snapshot.manga;
   const reduce = useReducedMotion();
@@ -122,6 +132,27 @@ export function MangaSettingsSheet({ open, onClose }: { open: boolean; onClose: 
             <ArrowLeftRight size={13} className="shrink-0" />
             {t("Changes apply to your computer instantly, and stay in sync both ways.")}
           </p>
+
+          <section className="flex flex-col gap-2">
+            <span className="px-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-subtle">
+              {t("Strip preview")}
+            </span>
+            <div className="flex gap-2">
+              <OptionButton
+                active={showPreview}
+                label={t("Show pages")}
+                onPick={() => onTogglePreview(true)}
+              />
+              <OptionButton
+                active={!showPreview}
+                label={t("Hide pages")}
+                onPick={() => onTogglePreview(false)}
+              />
+            </div>
+            <p className="px-1 text-[12px] leading-snug text-ink-subtle">
+              {t("Hidden strips scroll numbered pages with the same sync.")}
+            </p>
+          </section>
         </div>
       </div>
     </div>
