@@ -43,7 +43,7 @@ export function DockButton({
         style={{
           width: baseSize,
           height: baseSize,
-          background: active ? "var(--color-accent)" : "var(--color-surface)",
+          background: active ? "var(--color-accent)" : "var(--color-elevated)",
           color: active ? "#fff" : "var(--color-ink-muted)",
           borderColor: active ? "transparent" : "var(--color-edge-soft)",
           boxShadow: active

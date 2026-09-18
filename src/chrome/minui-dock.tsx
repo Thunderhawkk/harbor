@@ -97,7 +97,7 @@ export function MinUIDock() {
           className="harbor-minui-shell pointer-events-auto rounded-2xl border border-edge p-1.5 shadow-[0_30px_60px_-22px_rgba(15,15,18,0.32),0_4px_18px_-6px_rgba(15,15,18,0.16)] backdrop-blur-xl"
           style={{
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78))",
+              "linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 88%, transparent), color-mix(in srgb, var(--color-surface) 72%, transparent))",
             transform: `translateY(${mounted ? 0 : 28}px)`,
             opacity: mounted ? 1 : 0,
             transition:

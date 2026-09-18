@@ -6,6 +6,7 @@ import forestPreview from "@/assets/theme-previews/forest.png";
 import harborPreview from "@/assets/theme-previews/harbor.png";
 import kawaiiPreview from "@/assets/theme-previews/kawaii.jpg";
 import minuiPreview from "@/assets/theme-previews/minui.png";
+import minuiDarkPreview from "@/assets/theme-previews/minui-dark.png";
 import noirPreview from "@/assets/theme-previews/noir.png";
 import nordPreview from "@/assets/theme-previews/nord.png";
 import royalPreview from "@/assets/theme-previews/royal.png";
@@ -1717,6 +1718,36 @@ export const FEATURED_CUSTOM_THEMES: ThemePreset[] = [
     },
     background: {
       image: "radial-gradient(ellipse 120% 70% at 50% -10%, #ffffff 0%, #f4f4f6 45%, #ececef 100%)",
+      dim: 0,
+    },
+    layout: "minui",
+    cardStyle: "minui",
+    buttonStyle: "minui",
+    bokeh: false,
+    fontPair: "general-sans",
+  },
+  {
+    id: "minui-dark" as ThemePresetId,
+    name: "MinUI Dark",
+    blurb: "MinUI after dark. Same floating dock, deep charcoal chrome.",
+    previewImage: minuiDarkPreview,
+    swatch: ["#101014", "#1a1a20", "#14b8a6"],
+    tokens: {
+      "--color-canvas": "#101014",
+      "--color-surface": "#17171c",
+      "--color-elevated": "#1e1e25",
+      "--color-raised": "#26262e",
+      "--color-ink": "#f4f4f5",
+      "--color-ink-muted": "#a1a1aa",
+      "--color-ink-subtle": "#63636b",
+      "--color-edge": "rgba(255,255,255,0.12)",
+      "--color-edge-soft": "rgba(255,255,255,0.06)",
+      "--color-accent": "#14b8a6",
+      "--color-accent-soft": "rgba(20,184,166,0.16)",
+      "--color-danger": "#e87474",
+    },
+    background: {
+      image: "radial-gradient(ellipse 120% 70% at 50% -10%, #1c1c22 0%, #131316 45%, #0c0c0f 100%)",
       dim: 0,
     },
     layout: "minui",
