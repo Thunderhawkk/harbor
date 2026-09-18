@@ -39,6 +39,7 @@ export type RemoteMangaBinding = {
   flipEnd: (commit: boolean, dir: "next" | "prev") => void;
   setRtl: (rtl: boolean) => void;
   setMode: (mode: RemoteMangaState["mode"]) => void;
+  setPagesHidden: (hidden: boolean) => void;
   setFit: (fit: RemoteMangaState["fit"]) => void;
   setBg: (bg: RemoteMangaState["bg"]) => void;
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
@@ -154,6 +155,9 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
       return;
     case "mangaSetMode":
       b.setMode(command.mode);
+      return;
+    case "mangaSetPagesHidden":
+      b.setPagesHidden(command.hidden);
       return;
     case "mangaSetFit":
       b.setFit(command.fit);

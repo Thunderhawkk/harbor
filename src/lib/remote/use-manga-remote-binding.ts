@@ -34,6 +34,7 @@ type Params = {
   flipEnd: (commit: boolean, dir: "next" | "prev") => void;
   setRtl: (rtl: boolean) => void;
   setMode: (mode: RemoteMangaState["mode"]) => void;
+  setPagesHidden: (hidden: boolean) => void;
   setFit: (fit: RemoteMangaState["fit"]) => void;
   setBg: (bg: RemoteMangaState["bg"]) => void;
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
@@ -77,6 +78,7 @@ export function useMangaRemoteBinding(params: Params) {
       flipEnd: (commit, dir) => ref.current.flipEnd(commit, dir),
       setRtl: (rtl) => ref.current.setRtl(rtl),
       setMode: (mode) => ref.current.setMode(mode),
+      setPagesHidden: (hidden) => ref.current.setPagesHidden(hidden),
       setFit: (fit) => ref.current.setFit(fit),
       setBg: (bg) => ref.current.setBg(bg),
       bookmarkCurrent: () => ref.current.bookmarkCurrent(),

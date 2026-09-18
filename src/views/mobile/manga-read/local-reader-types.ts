@@ -43,3 +43,21 @@ export function saveLocalMode(mode: LocalMode): void {
     return;
   }
 }
+
+export const STRIP_PREVIEW_KEY = "harbor.remote-reader.strip-preview.v1";
+
+export function loadStripPreview(): boolean {
+  try {
+    return localStorage.getItem(STRIP_PREVIEW_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export function saveStripPreview(show: boolean): void {
+  try {
+    localStorage.setItem(STRIP_PREVIEW_KEY, show ? "on" : "off");
+  } catch {
+    return;
+  }
+}

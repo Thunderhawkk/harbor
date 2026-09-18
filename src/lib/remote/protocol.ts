@@ -251,6 +251,7 @@ export type RemoteCommand =
   | { action: "mangaSetMode"; mode: RemoteMangaState["mode"] }
   | { action: "mangaSetFit"; fit: "width" | "height" | "original" }
   | { action: "mangaSetBg"; bg: "dark" | "gray" | "light" }
+  | { action: "mangaSetPagesHidden"; hidden: boolean }
   | { action: "mangaBookmark"; page?: number }
   | { action: "mangaJumpBookmark"; id: string }
   | { action: "mangaBookmarkRemove"; id: string }

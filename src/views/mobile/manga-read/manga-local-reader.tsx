@@ -8,7 +8,7 @@ import { ModeStrip } from "./mode-strip";
 import { ModePaged } from "./mode-paged";
 import { ModeBook } from "./mode-book";
 import { useLocalPager } from "./hooks/use-local-pager";
-import { loadLocalMode, mapDesktopMode, mapLocalToDesktopMode, saveLocalMode, type LocalMode } from "./local-reader-types";
+import { loadLocalMode, loadStripPreview, mapDesktopMode, mapLocalToDesktopMode, saveLocalMode, saveStripPreview, type LocalMode } from "./local-reader-types";
 
 export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const { snapshot, sendCommand } = useMobileRemote();
@@ -20,6 +20,7 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     loadLocalMode(mapDesktopMode(m?.mode ?? "long")),
   );
   const [chromeHidden, setChromeHidden] = useState(false);
+  const [showPreview, setShowPreview] = useState(loadStripPreview);
   const [bookSpread, setBookSpread] = useState("");
   const [bookStart, setBookStart] = useState(() => m?.pageIndex ?? 0);
 
@@ -41,6 +42,13 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const anchor = double ? page - (page % 2) : page;
 
   const firstChapter = useRef(true);
+  useEffect(() => {
+    sendCommand({ action: "mangaSetPagesHidden", hidden: !loadStripPreview() });
+    return () => {
+      sendCommand({ action: "mangaSetPagesHidden", hidden: false });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (firstChapter.current) {
       firstChapter.current = false;
@@ -119,6 +127,19 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     if (next === "double") reportStripPage(page - (page % 2));
   };
 
+  const togglePreview = (next: boolean) => {
+    setShowPreview(next);
+    saveStripPreview(next);
+    sendCommand({ action: "mangaSetPagesHidden", hidden: !next });
+  };
+
+  const handleExit = () => {
+    setShowPreview(true);
+    saveStripPreview(true);
+    sendCommand({ action: "mangaSetPagesHidden", hidden: false });
+    onExit();
+  };
+
   const toggleChrome = () => setChromeHidden((v) => !v);
   const chromeVisible = mode === "book" || !chromeHidden;
   const chromeCls = `${reduce ? "" : "transition-opacity duration-200 motion-reduce:transition-none "}${
@@ -175,8 +196,10 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
           pageLabel={pageLabel}
           mode={mode}
           reduce={reduce}
-          onExit={onExit}
+          showPreview={showPreview}
+          onExit={handleExit}
           onPickMode={pickMode}
+          onTogglePreview={togglePreview}
         />
       </div>
 

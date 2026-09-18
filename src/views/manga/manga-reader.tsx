@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bookmark, Download } from "lucide-react";
+import { Bookmark, Download, EyeOff } from "lucide-react";
 import { chapterPages, type MangaChapter } from "@/lib/manga/api";
 import { pageHeadersFor } from "@/lib/manga/plugins/adapter";
 import { t, useT } from "@/lib/i18n";
@@ -94,6 +94,7 @@ export function MangaReader({
   const [reloadTick, setReloadTick] = useState(0);
   const [prefs, setPrefs] = useState<ReaderPrefs>(() => loadPrefs(prefsKey));
   const [currentPage, setCurrentPage] = useState(0);
+  const [pagesHidden, setPagesHidden] = useState(false);
   const [bookSpread, setBookSpread] = useState("");
   const [chromeOpen, setChromeOpen] = useState(true);
   const [manualHide, setManualHide] = useState(false);
@@ -850,6 +851,7 @@ export function MangaReader({
       if (book) bookApi.current?.dragEnd?.(commit, dir);
     },
     setRtl: (r) => patchPrefs({ rtl: r }),
+    setPagesHidden: (h) => setPagesHidden(h),
     setMode: (m) => {
       setAutoLong(false);
       patchPrefs({ mode: m });
@@ -1014,6 +1016,16 @@ export function MangaReader({
           </div>
         )}
       </div>
+
+      {pagesHidden && !loading && !failed && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black">
+          <div className="flex flex-col items-center gap-2 px-6 text-center">
+            <EyeOff size={30} strokeWidth={1.8} className="text-ink-subtle" />
+            <p className="text-[15px] font-semibold text-ink">{t("Chapter hidden")}</p>
+            <p className="text-[12.5px] text-ink-subtle">{t("Reading on phone")}</p>
+          </div>
+        </div>
+      )}
 
       {!loading && !failed && !complete && controlsVisible && (
         <ReaderNav
