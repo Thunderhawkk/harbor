@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { List, Star, type LucideIcon } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useMangaFavorites } from "@/lib/manga-favorites";
@@ -8,7 +8,9 @@ import { hasAnyMangaSource } from "@/lib/manga/sources";
 import { useView } from "@/lib/view";
 import type { MangaSummary } from "@/lib/manga/types";
 import { MyListsTab } from "../library/my-lists-tab";
-import { MemoPosterButton } from "./manga-poster-row";
+import { VirtualGrid } from "@/components/virtual-grid";
+import { useContextMenu } from "@/lib/context-menu";
+import { observeWithin } from "@/lib/visibility";
 
 function useOpenTitle() {
   const { openManga } = useView();
@@ -39,17 +41,74 @@ function useOpenTitle() {
 
 type LibrarySection = "favorites" | "lists";
 
+// Lightweight favorites cell: manga covers are direct full-size URLs, so the
+// shared Poster (TMDB localize, RPDB resolve, anime mapping, proxy, resize
+// bucketing, retry timers, explicit decode) is pure overhead here. This gates
+// the <img> behind a shared viewport observer and lets the browser decode
+// lazily instead of hammering el.decode() for every mounted cell.
+function FavCell({ m, onOpen }: { m: MangaSummary; onOpen: (item: MangaSummary) => void }) {
+  const { open: openContextMenu } = useContextMenu();
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [near, setNear] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return observeWithin(el, "600px", (e) => {
+      if (e.isIntersecting) setNear(true);
+    });
+  }, []);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(m)}
+      onContextMenu={(e) =>
+        openContextMenu(e, { kind: "manga", id: m.id, title: m.title, cover: m.cover })
+      }
+      className="group flex w-full flex-col gap-2 text-start"
+    >
+      <div ref={ref} className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-elevated/60">
+        {!loaded && <span aria-hidden className="harbor-shimmer absolute inset-0" />}
+        {near && m.cover && (
+          <img
+            src={m.cover}
+            alt=""
+            draggable={false}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setLoaded(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={loaded ? { opacity: 1 } : { opacity: 0 }}
+          />
+        )}
+      </div>
+      <p className="line-clamp-2 text-[13px] font-medium leading-snug text-ink">{m.title}</p>
+    </button>
+  );
+}
+
 export function MangaLibrary({ scrollRef }: { scrollRef: React.RefObject<HTMLElement | null> }) {
   const t = useT();
   const openTitle = useOpenTitle();
+  const openRef = useRef(openTitle);
+  openRef.current = openTitle;
+  const openRailTitle = useCallback(
+    (m: MangaSummary) => void openRef.current(m.id, m.title),
+    [],
+  );
   const { items } = useMangaFavorites();
   const favs = useMemo((): MangaSummary[] => [...items.values()].sort((a, b) => b.addedAt - a.addedAt), [items]);
   const [active, setActive] = useState<LibrarySection>("favorites");
-  const [swapKey, setSwapKey] = useState(0);
+  const swapRef = useRef<HTMLDivElement | null>(null);
 
   const jumpTo = (section: LibrarySection) => {
     setActive(section);
-    setSwapKey((k) => k + 1);
+    const wrap = swapRef.current;
+    if (wrap) {
+      wrap.classList.remove("animate-media-swap");
+      void wrap.offsetWidth;
+      wrap.classList.add("animate-media-swap");
+    }
     const root = scrollRef.current;
     const el = root?.querySelector<HTMLElement>(`#manga-${section}`);
     if (!el) return;
@@ -119,7 +178,7 @@ export function MangaLibrary({ scrollRef }: { scrollRef: React.RefObject<HTMLEle
 
   return (
     <div className="flex flex-col gap-8">
-      <div key={swapKey} className="animate-media-swap flex flex-col gap-8">
+      <div ref={swapRef} className="animate-media-swap flex flex-col gap-8">
         <section id="manga-favorites" className="flex flex-col gap-4 -mx-4 px-4 pb-4 -mb-4">
           <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Favorites")}</h2>
           {favs.length === 0 ? (
@@ -127,21 +186,16 @@ export function MangaLibrary({ scrollRef }: { scrollRef: React.RefObject<HTMLEle
               {t("Star any manga and it takes over this screen.")}
             </p>
           ) : (
-            <div
-              className="grid gap-x-4 gap-y-7"
-              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
-            >
-              {favs.map((fav) => (
-                <MemoPosterButton
-                  key={fav.id}
-                  m={fav}
-                  onOpen={(m) => void openTitle(m.id, m.title)}
-                  award={false}
-                  releasePosters={false}
-                  ring={false}
-                />
-              ))}
-            </div>
+            <VirtualGrid
+              items={favs}
+              scrollRef={scrollRef}
+              minColumnWidth={150}
+              gapX={16}
+              gapY={28}
+              estimateRowHeight={270}
+              getKey={(m) => m.id}
+              renderItem={(fav) => <FavCell m={fav} onOpen={openRailTitle} />}
+            />
           )}
         </section>
 

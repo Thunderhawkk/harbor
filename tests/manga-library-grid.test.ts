@@ -23,7 +23,8 @@ test("manga library anchors favorites and lists sections", () => {
 });
 
 test("manga library renders the poster grid with swap animation and jump highlight", () => {
-  assert.match(library, /MemoPosterButton/, "poster grid button missing");
+  assert.match(library, /FavCell/, "lightweight grid cell missing");
+  assert.match(library, /VirtualGrid/, "favorites grid must be virtualized");
   assert.match(library, /animate-media-swap/, "tray swap animation missing");
   assert.match(library, /hset-jumped/, "jump highlight missing");
   assert.match(library, /scrollRef/, "scroll ref wiring missing");
