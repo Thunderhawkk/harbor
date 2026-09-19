@@ -48,18 +48,20 @@ export function MangaPosterRow({
   );
 }
 
-const MemoPosterButton = memo(function PosterButton({
+export const MemoPosterButton = memo(function PosterButton({
   m,
   onOpen,
   award,
   art,
   releasePosters,
+  ring = true,
 }: {
   m: MangaSummary;
   onOpen: (item: MangaSummary) => void;
   award: boolean;
   art?: string | null;
   releasePosters: boolean;
+  ring?: boolean;
 }) {
   const { open: openContextMenu } = useContextMenu();
   return (
@@ -77,7 +79,7 @@ const MemoPosterButton = memo(function PosterButton({
           seed={m.id}
           ratio="portrait"
           lazy={releasePosters ? "release" : true}
-          className="harbor-card-ring rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] transition-[box-shadow] duration-300 group-hover:shadow-[0_24px_48px_-14px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)]"
+          className={`${ring ? "harbor-card-ring " : ""}rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] transition-[box-shadow] duration-300 group-hover:shadow-[0_24px_48px_-14px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)]`}
         />
         {award && art && (
           <img

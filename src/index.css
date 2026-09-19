@@ -2547,6 +2547,12 @@ main[data-kids="on"]::-webkit-scrollbar-thumb:hover {
   animation: media-swap 280ms var(--ease-out) backwards;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-media-swap {
+    animation: none;
+  }
+}
+
 @keyframes xray-open {
   from {
     opacity: 0;

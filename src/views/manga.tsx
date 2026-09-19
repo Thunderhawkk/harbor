@@ -88,6 +88,7 @@ export function MangaView() {
   const detailScrollRef = useRef<HTMLElement>(null);
   const browseScrollRef = useRef<HTMLElement>(null);
   const browseExtensionScrollRef = useRef<HTMLElement>(null);
+  const libraryScrollRef = useRef<HTMLElement>(null);
   const resumeRef = useRef<(entry: MangaProgressEntry) => void>(() => {});
   const isBrowse = mode.screen === "browse";
   const isDetail = mode.screen === "detail";
@@ -459,7 +460,10 @@ export function MangaView() {
       )}
 
       {mode.screen === "library" && (
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24">
+        <main
+          ref={libraryScrollRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24"
+        >
           <button
             type="button"
             onClick={() => setMode({ screen: "browse" })}
@@ -471,7 +475,7 @@ export function MangaView() {
           <h1 className="mb-8 font-display text-[32px] font-medium tracking-tight text-ink">
             {t("Library")}
           </h1>
-          <MangaLibrary />
+          <MangaLibrary scrollRef={libraryScrollRef} />
         </main>
       )}
 

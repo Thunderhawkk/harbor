@@ -1,13 +1,14 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { List, Star, type LucideIcon } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useMangaFavorites } from "@/lib/manga-favorites";
 import { mangaLists } from "@/lib/manga-lists";
-import { searchManga, type MangaSummary } from "@/lib/manga/api";
+import { searchManga } from "@/lib/manga/api";
 import { hasAnyMangaSource } from "@/lib/manga/sources";
 import { useView } from "@/lib/view";
-import { Poster } from "@/components/poster";
+import type { MangaSummary } from "@/lib/manga/types";
 import { MyListsTab } from "../library/my-lists-tab";
-import { MangaPosterRow } from "./manga-poster-row";
+import { MemoPosterButton } from "./manga-poster-row";
 
 function useOpenTitle() {
   const { openManga } = useView();
@@ -36,97 +37,140 @@ function useOpenTitle() {
   };
 }
 
-export function MangaLibrary() {
+type LibrarySection = "favorites" | "lists";
+
+export function MangaLibrary({ scrollRef }: { scrollRef: React.RefObject<HTMLElement | null> }) {
   const t = useT();
   const openTitle = useOpenTitle();
   const { items } = useMangaFavorites();
-  const favs = useMemo(() => [...items.values()].sort((a, b) => b.addedAt - a.addedAt), [items]);
-  const [spotlight, ...rest] = favs;
-  const railItems: MangaSummary[] = rest;
-  const openRailTitle = (m: MangaSummary) => void openTitle(m.id, m.title);
+  const favs = useMemo((): MangaSummary[] => [...items.values()].sort((a, b) => b.addedAt - a.addedAt), [items]);
+  const [active, setActive] = useState<LibrarySection>("favorites");
+  const [swapKey, setSwapKey] = useState(0);
+
+  const jumpTo = (section: LibrarySection) => {
+    setActive(section);
+    setSwapKey((k) => k + 1);
+    const root = scrollRef.current;
+    const el = root?.querySelector<HTMLElement>(`#manga-${section}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "auto", block: "start" });
+    el.classList.remove("hset-jumped");
+    void el.offsetWidth;
+    el.classList.add("hset-jumped");
+    window.setTimeout(() => el.classList.remove("hset-jumped"), 1400);
+  };
+
+  useEffect(() => {
+    let raf = 0;
+    const scrollerOf = (el: HTMLElement): HTMLElement | null => {
+      if (scrollRef.current) return scrollRef.current;
+      let node: HTMLElement | null = el.parentElement;
+      while (node) {
+        if (node.scrollHeight > node.clientHeight + 8) return node;
+        node = node.parentElement;
+      }
+      return null;
+    };
+    const update = () => {
+      raf = 0;
+      const lists = document.getElementById("manga-lists");
+      if (!lists) return;
+      const rect = lists.getBoundingClientRect();
+      if (rect.top <= 160) {
+        setActive("lists");
+        return;
+      }
+      const scroller = scrollerOf(lists);
+      const maxed =
+        scroller != null &&
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= 8;
+      if (maxed && rect.bottom > 160) {
+        setActive("lists");
+        return;
+      }
+      setActive("favorites");
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const pill = (section: LibrarySection, Icon: LucideIcon, label: string) => (
+    <button
+      type="button"
+      onClick={() => jumpTo(section)}
+      title={label}
+      aria-label={label}
+      aria-current={active === section ? "true" : undefined}
+      className={`relative z-10 grid h-10 w-10 place-items-center rounded-full transition-colors motion-reduce:transition-none ${
+        active === section ? "text-canvas" : "text-ink-muted hover:text-ink"
+      }`}
+    >
+      <Icon size={17} strokeWidth={2.2} />
+    </button>
+  );
 
   return (
     <div className="flex flex-col gap-8">
-      {spotlight ? (
-        <div className="relative overflow-hidden rounded-2xl ring-1 ring-edge-soft">
-          {spotlight.cover && (
-            <img
-              src={spotlight.cover}
-              alt=""
-              aria-hidden
-              loading="eager"
-              decoding="async"
-              className="absolute inset-0 h-full w-full scale-125 object-cover opacity-30 blur-2xl [transform:translateZ(0)]"
-            />
-          )}
-          <span
-            aria-hidden
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(to right, color-mix(in oklch, var(--color-canvas), transparent 8%) 30%, color-mix(in oklch, var(--color-canvas), transparent 62%))",
-            }}
-          />
-          <span className="absolute start-6 top-5 text-[11px] font-bold uppercase tracking-[0.24em] text-accent sm:start-8 sm:top-6">
-            {t("Favorites")}
-          </span>
-          <button
-            type="button"
-            onClick={() => void openTitle(spotlight.id, spotlight.title)}
-            className="group relative flex w-full items-center gap-6 p-6 pt-11 text-start sm:p-8 sm:pt-12"
-          >
-            <span className="w-28 shrink-0 sm:w-36">
-              <Poster
-                src={spotlight.cover}
-                seed={spotlight.id}
-                ratio="portrait"
-                className="rounded-xl shadow-[0_24px_50px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-              />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">
-                {t("Latest addition")}
-              </span>
-              <span className="text-[26px] font-semibold leading-[1.05] tracking-tight text-ink drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)] sm:text-[36px]">
-                {spotlight.title}
-              </span>
-              <span className="mt-2 inline-flex w-fit items-center rounded-full bg-ink px-5 py-2 text-[13px] font-semibold text-canvas transition-transform duration-200 group-hover:scale-[1.03] motion-reduce:transition-none">
-                {t("Open")}
-              </span>
-            </span>
-          </button>
-          {rest.length > 0 && (
-            <div className="px-8 [content-visibility:auto] [contain-intrinsic-size:auto_320px]">
-              <MangaPosterRow
-                items={railItems}
-                onOpen={openRailTitle}
-                scrollKey="manga:library:favorites"
-                min={112}
-                alwaysActive
-                releasePosters={false}
-              />
-              <div className="h-3" />
+      <div key={swapKey} className="animate-media-swap flex flex-col gap-8">
+        <section id="manga-favorites" className="flex flex-col gap-4 -mx-4 px-4 pb-4 -mb-4">
+          <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Favorites")}</h2>
+          {favs.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-edge-soft bg-surface/40 px-6 py-10 text-center text-[14px] text-ink-muted">
+              {t("Star any manga and it takes over this screen.")}
+            </p>
+          ) : (
+            <div
+              className="grid gap-x-4 gap-y-7"
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
+            >
+              {favs.map((fav) => (
+                <MemoPosterButton
+                  key={fav.id}
+                  m={fav}
+                  onOpen={(m) => void openTitle(m.id, m.title)}
+                  award={false}
+                  releasePosters={false}
+                  ring={false}
+                />
+              ))}
             </div>
           )}
-        </div>
-      ) : (
-        <p className="rounded-2xl border border-dashed border-edge-soft bg-surface/40 px-6 py-10 text-center text-[14px] text-ink-muted">
-          {t("Star any manga and it takes over this screen.")}
-        </p>
-      )}
+        </section>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Lists")}</h2>
-        <MyListsTab
-          store={mangaLists}
-          showSearch={false}
-          emptyCopy={{
-            title: t("Create your first manga list"),
-            body: t("Group the manga you love. Reading now, backlog, all-time favorites."),
-            action: t("New list"),
-          }}
-        />
-      </section>
+        <section id="manga-lists" className="flex flex-col gap-4 -mx-4 px-4 pb-4 -mb-4">
+          <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Lists")}</h2>
+          <MyListsTab
+            store={mangaLists}
+            showSearch={false}
+            emptyCopy={{
+              title: t("Create your first manga list"),
+              body: t("Group the manga you love. Reading now, backlog, all-time favorites."),
+              action: t("New list"),
+            }}
+          />
+        </section>
+      </div>
+
+      <div className="fixed end-6 top-1/2 z-40 -translate-y-1/2">
+        <div className="relative flex flex-col gap-2">
+          <span
+            aria-hidden
+            className={`absolute left-0 top-0 h-10 w-10 rounded-full bg-accent transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none ${
+              active === "lists" ? "translate-y-[48px] opacity-100" : "translate-y-0 opacity-100"
+            }`}
+          />
+          {pill("favorites", Star, t("Favorites"))}
+          {pill("lists", List, t("Lists"))}
+        </div>
+      </div>
     </div>
   );
 }
