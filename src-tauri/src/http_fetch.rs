@@ -7,7 +7,7 @@ use std::time::Duration;
 use crate::http_redirect::same_origin;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Semaphore, SemaphorePermit};
+use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
 
 const BROWSER_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
@@ -35,6 +35,141 @@ async fn run_with_deadline<T>(
     tokio::time::timeout(duration, work)
         .await
         .unwrap_or_else(|_| Err(format!("timeout after {} ms", duration.as_millis())))
+}
+
+const THUMB_CACHE_MAX_BYTES: usize = 32 * 1024 * 1024;
+const THUMB_CACHE_MAX_ENTRIES: usize = 256;
+
+struct ThumbEntry {
+    body: String,
+    bytes: usize,
+    last_used: u64,
+}
+
+struct ThumbCache {
+    entries: HashMap<String, ThumbEntry>,
+    total_bytes: usize,
+    clock: u64,
+}
+
+impl ThumbCache {
+    fn get(&mut self, key: &str) -> Option<String> {
+        self.clock = self.clock.wrapping_add(1);
+        let tick = self.clock;
+        self.entries.get_mut(key).map(|entry| {
+            entry.last_used = tick;
+            entry.body.clone()
+        })
+    }
+
+    fn insert(&mut self, key: String, body: String) {
+        let bytes = body.len();
+        if bytes > THUMB_CACHE_MAX_BYTES {
+            return;
+        }
+        if let Some(previous) = self.entries.remove(&key) {
+            self.total_bytes = self.total_bytes.saturating_sub(previous.bytes);
+        }
+        while self.entries.len() >= THUMB_CACHE_MAX_ENTRIES
+            || self.total_bytes.saturating_add(bytes) > THUMB_CACHE_MAX_BYTES
+        {
+            let oldest = self
+                .entries
+                .iter()
+                .min_by_key(|(_, entry)| entry.last_used)
+                .map(|(k, _)| k.clone());
+            match oldest {
+                Some(k) => {
+                    if let Some(removed) = self.entries.remove(&k) {
+                        self.total_bytes = self.total_bytes.saturating_sub(removed.bytes);
+                    }
+                }
+                None => break,
+            }
+        }
+        self.clock = self.clock.wrapping_add(1);
+        let tick = self.clock;
+        self.total_bytes = self.total_bytes.saturating_add(bytes);
+        self.entries.insert(key, ThumbEntry { body, bytes, last_used: tick });
+    }
+}
+
+fn thumb_cache() -> &'static Mutex<ThumbCache> {
+    static CACHE: OnceLock<Mutex<ThumbCache>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        Mutex::new(ThumbCache {
+            entries: HashMap::new(),
+            total_bytes: 0,
+            clock: 0,
+        })
+    })
+}
+
+fn make_thumb(bytes: &[u8], width: u32) -> Option<String> {
+    if width == 0 {
+        return None;
+    }
+    let format = image::guess_format(bytes).ok()?;
+    match format {
+        image::ImageFormat::Jpeg | image::ImageFormat::Png | image::ImageFormat::WebP => {}
+        _ => return None,
+    }
+    let img = image::load_from_memory(bytes).ok()?;
+    if img.width() <= width {
+        return None;
+    }
+    let height = ((img.height() as u64 * width as u64) / img.width() as u64).max(1) as u32;
+    let small = img.resize(width, height, image::imageops::FilterType::Triangle);
+    let mut buf = Vec::new();
+    match format {
+        image::ImageFormat::Jpeg => {
+            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 82)
+                .encode_image(&small)
+                .ok()?;
+        }
+        image::ImageFormat::Png => {
+            use image::ImageEncoder;
+            let rgb = small.to_rgb8();
+            let (w, h) = (rgb.width(), rgb.height());
+            image::codecs::png::PngEncoder::new(&mut buf)
+                .write_image(rgb.as_raw(), w, h, image::ExtendedColorType::Rgb8)
+                .ok()?;
+        }
+        _ => {
+            let rgb = small.to_rgb8();
+            let (w, h) = (rgb.width(), rgb.height());
+            image::codecs::webp::WebPEncoder::new_lossless(&mut buf)
+                .encode(rgb.as_raw(), w, h, image::ExtendedColorType::Rgb8)
+                .ok()?;
+        }
+    }
+    if buf.is_empty() {
+        return None;
+    }
+    Some(base64::engine::general_purpose::STANDARD.encode(&buf))
+}
+
+async fn thumb_or_base64(url: &str, width: Option<u32>, bytes: &[u8]) -> String {
+    let encode_original = || base64::engine::general_purpose::STANDARD.encode(bytes);
+    let Some(w) = width.filter(|w| *w > 0) else {
+        return encode_original();
+    };
+    let key = format!("{w}\n{url}");
+    if let Some(hit) = thumb_cache().lock().await.get(&key) {
+        return hit;
+    }
+    let owned = bytes.to_vec();
+    let made = tokio::task::spawn_blocking(move || make_thumb(&owned, w))
+        .await
+        .ok()
+        .flatten();
+    match made {
+        Some(body) => {
+            thumb_cache().lock().await.insert(key, body.clone());
+            body
+        }
+        None => encode_original(),
+    }
 }
 
 fn is_blocked_ip(ip: IpAddr) -> bool {
@@ -287,6 +422,7 @@ pub struct HarborFetchArgs {
     pub public_network_only: Option<bool>,
     pub allow_local_network: Option<bool>,
     pub follow_redirects: Option<bool>,
+    pub thumb_width_px: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -514,13 +650,13 @@ async fn harbor_fetch_inner(
             bytes.extend_from_slice(&chunk);
         }
         if args.response_type.as_deref() == Some("base64") {
-            base64::engine::general_purpose::STANDARD.encode(&bytes)
+            thumb_or_base64(&final_url, args.thumb_width_px, &bytes).await
         } else {
             String::from_utf8_lossy(&bytes).into_owned()
         }
     } else if args.response_type.as_deref() == Some("base64") {
         match res.bytes().await {
-            Ok(bytes) => base64::engine::general_purpose::STANDARD.encode(&bytes),
+            Ok(bytes) => thumb_or_base64(&final_url, args.thumb_width_px, &bytes).await,
             Err(_) => String::new(),
         }
     } else {

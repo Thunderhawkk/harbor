@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { suwayomiAuthFor } from "@/lib/manga/sources/suwayomi/auth-registry";
+import { useSettings } from "@/lib/settings";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -50,11 +51,12 @@ const blobCache = new Map<string, string>();
 const deadUrls = new Set<string>();
 const inflight = new Map<string, Promise<string | null>>();
 
-function proxyImage(url: string): Promise<string | null> {
-  const cached = blobCache.get(url);
+function proxyImage(url: string, thumbWidthPx?: number): Promise<string | null> {
+  const key = cacheKeyFor(url, thumbWidthPx);
+  const cached = blobCache.get(key);
   if (cached) return Promise.resolve(cached);
   if (deadUrls.has(url)) return Promise.resolve(null);
-  const existing = inflight.get(url);
+  const existing = inflight.get(key);
   if (existing) return existing;
   const p = (async () => {
     try {
@@ -67,29 +69,47 @@ function proxyImage(url: string): Promise<string | null> {
           timeoutMs: 30000,
           headers: auth ? { authorization: auth } : undefined,
           allowLocalNetwork: Boolean(auth),
+          thumbWidthPx,
         },
       });
       if (!resp.ok) throw new Error(`status ${resp.status}`);
       const type = resp.headers?.["content-type"] || resp.contentType || "image/jpeg";
       if (type && !type.startsWith("image/")) throw new Error(`type ${type}`);
       const created = URL.createObjectURL(new Blob([base64ToBytes(resp.body)], { type }));
-      blobCache.set(url, created);
+      blobCache.set(key, created);
       return created;
     } catch {
       deadUrls.add(url);
       return null;
     } finally {
-      inflight.delete(url);
+      inflight.delete(key);
     }
   })();
-  inflight.set(url, p);
+  inflight.set(key, p);
   return p;
 }
 
-export function useProxiedImageSrc(url: string | undefined): string | undefined {
-  const need = !!url && needsImageProxy(url);
+const cacheKeyFor = (url: string, thumbWidthPx?: number): string =>
+  `${thumbWidthPx ?? 0}\n${url}`;
+
+export function useProxiedImageSrc(
+  url: string | undefined,
+  opts?: { forceProxy?: boolean },
+): string | undefined {
+  const need =
+    !!url &&
+    (opts?.forceProxy
+      ? url.startsWith("http://") || url.startsWith("https://")
+      : needsImageProxy(url));
+  const { settings } = useSettings();
+  const thumbWidthPx =
+    settings.posterQuality === "max"
+      ? undefined
+      : settings.posterQuality === "high"
+        ? 600
+        : 400;
   const [blob, setBlob] = useState<string | undefined>(() =>
-    url && need ? blobCache.get(url) : undefined,
+    url && need ? blobCache.get(cacheKeyFor(url, thumbWidthPx)) : undefined,
   );
   const [failed, setFailed] = useState(() => !!url && need && deadUrls.has(url));
   useEffect(() => {
@@ -98,7 +118,7 @@ export function useProxiedImageSrc(url: string | undefined): string | undefined 
       setBlob(undefined);
       return;
     }
-    const cached = blobCache.get(url);
+    const cached = blobCache.get(cacheKeyFor(url, thumbWidthPx));
     if (cached) {
       setFailed(false);
       setBlob(cached);
@@ -112,7 +132,7 @@ export function useProxiedImageSrc(url: string | undefined): string | undefined 
     setFailed(false);
     setBlob(undefined);
     let alive = true;
-    void proxyImage(url).then((created) => {
+    void proxyImage(url, thumbWidthPx).then((created) => {
       if (!alive) return;
       if (created) setBlob(created);
       else setFailed(true);
@@ -120,7 +140,7 @@ export function useProxiedImageSrc(url: string | undefined): string | undefined 
     return () => {
       alive = false;
     };
-  }, [url, need]);
+  }, [url, need, thumbWidthPx]);
   if (!need) return url;
   // Loading -> undefined (caller shows its placeholder/shimmer). Failed -> the
   // original url so the <img> errors and the caller's fallback/plate logic runs.

@@ -11,6 +11,7 @@ import { MyListsTab } from "../library/my-lists-tab";
 import { VirtualGrid } from "@/components/virtual-grid";
 import { useContextMenu } from "@/lib/context-menu";
 import { observeWithin } from "@/lib/visibility";
+import { useProxiedImageSrc } from "@/lib/remote-image-proxy";
 
 function useOpenTitle() {
   const { openManga } = useView();
@@ -51,6 +52,7 @@ function FavCell({ m, onOpen }: { m: MangaSummary; onOpen: (item: MangaSummary) 
   const ref = useRef<HTMLDivElement | null>(null);
   const [near, setNear] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const src = useProxiedImageSrc(m.cover, { forceProxy: true });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -69,9 +71,9 @@ function FavCell({ m, onOpen }: { m: MangaSummary; onOpen: (item: MangaSummary) 
     >
       <div ref={ref} className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-elevated/60">
         {!loaded && <span aria-hidden className="harbor-shimmer absolute inset-0" />}
-        {near && m.cover && (
+        {near && src && (
           <img
-            src={m.cover}
+            src={src}
             alt=""
             draggable={false}
             loading="lazy"

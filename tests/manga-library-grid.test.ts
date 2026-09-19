@@ -39,3 +39,10 @@ test("manga view wires the library scroll ref into the screen", () => {
   assert.match(manga, /libraryScrollRef/, "library scroll ref missing");
   assert.match(manga, /scrollRef=\{libraryScrollRef\}/, "scrollRef must be passed to MangaLibrary");
 });
+
+test("proxied covers request server-side thumbnails", () => {
+  const proxy = read("src/lib/remote-image-proxy.ts");
+  assert.match(proxy, /thumbWidthPx/, "proxy must request thumb_width_px");
+  assert.match(proxy, /forceProxy/, "proxy must support forced thumbnailing");
+  assert.match(proxy, /posterQuality/, "proxy must respect the poster quality setting");
+});
