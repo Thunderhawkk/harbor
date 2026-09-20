@@ -26,6 +26,7 @@ export function Dropdown({
   placeholder,
   ariaLabel,
   className = "",
+  menuClassName = "",
   size = "md",
 }: {
   value: string;
@@ -34,6 +35,7 @@ export function Dropdown({
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
+  menuClassName?: string;
   size?: "sm" | "md";
 }) {
   const [open, setOpen] = useState(false);
@@ -218,7 +220,7 @@ export function Dropdown({
               maxHeight: box?.maxHeight,
               visibility: box ? "visible" : "hidden",
             }}
-            className={`z-[9999] w-max overflow-y-auto overscroll-contain rounded-md bg-elevated p-1 shadow-[0_18px_50px_-15px_rgba(0,0,0,0.7)] ${
+            className={`${menuClassName} z-[9999] w-max overflow-y-auto overscroll-contain rounded-md bg-elevated p-1 shadow-[0_18px_50px_-15px_rgba(0,0,0,0.7)] ${
               box ? (box.up ? "animate-menu-in-up" : "animate-menu-in") : ""
             }`}
           >

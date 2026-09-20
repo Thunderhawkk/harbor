@@ -3,7 +3,7 @@ import { Lock, Monitor } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
 import { AccountMenu } from "@/chrome/account-menu/account-menu";
-import { NAV_ITEMS, applyNavCustomization } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization } from "@/chrome/nav-items";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
 import { useBigPictureEntry } from "@/chrome/use-big-picture-entry";
 import { useT } from "@/lib/i18n";
@@ -24,7 +24,10 @@ export function StremioRail() {
     settings.theme.preset !== "custom" ? getThemeById(settings.theme.preset) : null;
   const customMark = themePreset?.logo?.mark ?? null;
 
-  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization));
+  const items = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  );
   const visible = items.filter((item) => {
     if (item.id === "kids") return false;
     if (item.view === "vod" && !settings.showPlaylistsTab) return false;
@@ -48,12 +51,7 @@ export function StremioRail() {
           className="flex h-[5.5rem] shrink-0 items-center justify-center text-white/90"
         >
           {customMark ? (
-            <img
-              src={customMark}
-              alt=""
-              draggable={false}
-              className="h-10 w-10 object-contain"
-            />
+            <img src={customMark} alt="" draggable={false} className="h-10 w-10 object-contain" />
           ) : (
             <HarborMark className="h-10 w-10" />
           )}
@@ -68,9 +66,7 @@ export function StremioRail() {
                 {...item}
                 gated={gated}
                 active={active}
-                onClick={() =>
-                  gated ? setPendingPin(item.view) : setView(item.view)
-                }
+                onClick={() => (gated ? setPendingPin(item.view) : setView(item.view))}
               />
             );
           })}
@@ -97,12 +93,7 @@ export function StremioRail() {
               </span>
             </div>
           ) : (
-            <AccountMenu
-              trigger="avatar"
-              placement="up"
-              align="start"
-              showSettings={false}
-            />
+            <AccountMenu trigger="avatar" placement="up" align="start" showSettings={false} />
           )}
         </div>
       </aside>
@@ -149,12 +140,12 @@ function RailTab({
       aria-label={gated ? t("chrome.lockedRequiresPin", { label: translated }) : translated}
       title={gated ? t("chrome.lockedShort", { label: translated }) : translated}
       className={`group flex h-[4.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl transition-colors duration-150 ${
-        active
-          ? "text-accent"
-          : "text-white/35 hover:bg-white/[0.05] hover:text-white/85"
+        active ? "text-accent" : "text-white/35 hover:bg-white/[0.05] hover:text-white/85"
       }`}
     >
-      <span className={`relative flex h-7 w-7 items-center justify-center ${gated ? "opacity-70" : ""}`}>
+      <span
+        className={`relative flex h-7 w-7 items-center justify-center ${gated ? "opacity-70" : ""}`}
+      >
         {render(Boolean(active || hovered))}
         {gated && (
           <span className="absolute -bottom-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-canvas text-white/55 ring-1 ring-white/15">

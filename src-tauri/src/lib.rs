@@ -1,3 +1,5 @@
+#[cfg(desktop)]
+mod ytmusic;
 // Modules that build on every target, desktop and Android alike. Nothing in
 // here may reach a `#[cfg(desktop)]` tauri API: every Window setter (show,
 // hide, close, set_size, set_position, set_focus, set_always_on_top,
@@ -18,6 +20,7 @@ mod http_redirect;
 mod local_lib;
 mod media_server;
 mod power;
+mod privacy;
 mod proc_guard;
 mod proc_mem;
 mod settings_store;
@@ -85,6 +88,8 @@ mod mpv_render_mac;
 #[cfg(desktop)]
 mod multiview;
 #[cfg(desktop)]
+mod music;
+#[cfg(desktop)]
 mod pip;
 #[cfg(target_os = "macos")]
 mod pip_mac;
@@ -146,6 +151,7 @@ pub(crate) fn shutdown_services(app: &tauri::AppHandle) {
     thumbs::shutdown(app);
     multiview::shutdown(app);
     dvr::shutdown(app);
+    music::shutdown(app);
     stream_proxy::shutdown(app);
     cast_server::stop();
     torrent_engine::stop();
@@ -698,6 +704,7 @@ pub fn run() {
 
 #[cfg(desktop)]
 pub fn run() {
+    if music::try_run_connector_worker() { return; }
     {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if let Some(p) = media_file_from_args(&args) {
@@ -761,7 +768,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin({
-            let builder = tauri_plugin_window_state::Builder::default().with_state_flags(
+            let builder = tauri_plugin_window_state::Builder::default().with_denylist(&["harbor-ytmusic-embed"]).with_state_flags(
                 tauri_plugin_window_state::StateFlags::SIZE
                     | tauri_plugin_window_state::StateFlags::POSITION
                     | tauri_plugin_window_state::StateFlags::MAXIMIZED,
@@ -774,6 +781,7 @@ pub fn run() {
         })
         .manage(proxy_state)
         .manage(mpv_state)
+        .manage(music::MusicState::new())
         .manage(pip_state)
         .manage(fullscreen_state)
         .manage(thumbs_state)
@@ -796,6 +804,7 @@ pub fn run() {
     });
 
     app_builder
+        .plugin(privacy::init())
         .on_page_load(|webview, payload| {
             if webview.label() == "main"
                 && matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
@@ -809,6 +818,7 @@ pub fn run() {
             }
             proc_guard::init();
             proc_guard::reap_orphans();
+            music::initialize(app.handle()).map_err(std::io::Error::other)?;
             #[cfg(windows)]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -888,6 +898,22 @@ pub fn run() {
             }
             use tauri::Manager;
             #[cfg(windows)]
+            if matches!(
+                event,
+                tauri::WindowEvent::Moved(_)
+                    | tauri::WindowEvent::Resized(_)
+                    | tauri::WindowEvent::ScaleFactorChanged { .. }
+            ) && window
+                .app_handle()
+                .get_webview_window(hdr_overlay::HDR_OVERLAY_LABEL)
+                .is_some()
+            {
+                let app = window.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = hdr_overlay::hdr_overlay_sync(app).await;
+                });
+            }
+            #[cfg(windows)]
             match event {
                 tauri::WindowEvent::Resized(_) => log_main_geometry(window.app_handle(), "resized"),
                 tauri::WindowEvent::Moved(_) => log_main_geometry(window.app_handle(), "moved"),
@@ -945,6 +971,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            privacy::privacy_status,
+            privacy::privacy_set_enabled,
             set_maximize_clamp,
             crash_report::take_startup_crash_report,
             fonts::install_sub_font,
@@ -1008,6 +1036,68 @@ pub fn run() {
             diagnostics::diagnostics_collect,
             diagnostics::diagnostics_cleanup,
             trailer::fetch_trailer,
+            music::music_health,
+            music::music_source_candidates,
+            music::music_spotify_status,
+            music::music_spotify_connect,
+            music::music_spotify_disconnect,
+            music::music_spotify_library_page,
+            music::music_spotify_create_playlist,
+            music::music_spotify_add_to_playlist,
+            music::music_lastfm_auth,
+            music::music_lastfm_complete_auth,
+            music::music_lastfm_status,
+            music::run_connector_worker,
+            music::music_search,
+            music::music_resolve_stream,
+            music::music_db_init,
+            music::music_track_upsert,
+            music::music_track_get,
+            music::music_resolve_cached,
+            music::music_get_liked,
+            music::music_set_liked,
+            music::music_get_recents,
+            music::music_add_recent,
+            music::music_get_queue,
+            music::music_set_queue,
+            music::music_list_albums,
+            music::music_list_artists,
+            music::music_list_playlists,
+            music::music_create_playlist,
+            music::music_add_to_playlist,
+            music::music_add_tracks_to_playlist,
+            music::music_rename_playlist,
+            music::music_delete_playlist,
+            music::music_reorder_playlist,
+            music::music_remove_from_playlist,
+            music::music_import_m3u,
+            music::music_export_m3u,
+            music::music_play_track,
+            music::music_engine_pause,
+            music::music_engine_seek,
+            music::music_engine_set_volume,
+            music::music_audio_devices,
+            music::music_audio_settings_get,
+            music::music_audio_meter_set_enabled,
+            music::music_audio_meter_snapshot,
+            music::music_audio_settings_set,
+            music::music_engine_stop,
+            music::music_home_rows,
+            music::music_browse_connector,
+            music::music_album_tracks,
+            music::music_artist_top,
+            music::music_artist_catalog,
+            music::music_artist_rows,
+            music::music_catalog_playlist_tracks,
+            music::music_station_tracks,
+            music::music_search_typed,
+            music::music_video_stream,
+            music::music_search_videos,
+            music::music_connections,
+            music::music_connect,
+            music::music_disconnect,
+            music::music_local_scan,
+            music::music_local_collection,
             temp_prune::temp_usage_bytes,
             temp_prune::temp_clear,
             download::download_start,
@@ -1051,6 +1141,7 @@ pub fn run() {
             modal_overlay::modal_overlay_sync,
             modal_overlay::modal_overlay_get_pending,
             hdr_overlay::hdr_overlay_open,
+            hdr_overlay::hdr_overlay_show,
             hdr_overlay::hdr_overlay_close,
             hdr_overlay::hdr_overlay_hide,
             hdr_overlay::hdr_overlay_sync,
@@ -1071,6 +1162,17 @@ pub fn run() {
             fullscreen::window_fullscreen_exit,
             browser::browser_open,
             browser::browser_close,
+            ytmusic::ytmusic_open,
+            ytmusic::ytmusic_close,
+            ytmusic::ytmusic_is_open,
+            #[cfg(windows)]
+            ytmusic::ytmusic_embed,
+            #[cfg(windows)]
+            ytmusic::ytmusic_set_geometry,
+            #[cfg(windows)]
+            ytmusic::ytmusic_unembed,
+            #[cfg(windows)]
+            ytmusic::ytmusic_set_visible,
             thumbs::thumbs_set_url,
             thumbs::thumbs_spawn_eager,
             thumbs::thumbs_get,

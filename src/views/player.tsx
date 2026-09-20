@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SportsDockControls } from "./sports/dock-controls";
+import { EmbeddedBroadcastPlayer } from "./sports/embedded-broadcast-player";
 import { resolveChromeTheme } from "@/lib/theme";
 import { useBigPicture } from "@/lib/big-picture";
 import { useActiveKid } from "@/lib/profiles";
@@ -83,6 +85,7 @@ import { useTrickplay } from "./player/hooks/use-trickplay";
 import { useStreamPill } from "./player/hooks/use-stream-pill";
 import { useStubDetection } from "./player/hooks/use-stub-detection";
 import { useBridgeLoad } from "./player/hooks/use-bridge-load";
+import { useSportsDockSurface } from "./player/hooks/use-sports-dock-surface";
 import { useVideoFill } from "./player/hooks/use-video-fill";
 import { useLivePictureEq } from "./player/hooks/use-live-picture-eq";
 import { useAnime4k } from "./player/hooks/use-anime4k";
@@ -105,12 +108,21 @@ import { SUBTITLE_FPS_TRANSITION_FAILED_EVENT } from "@/lib/player/subtitle-fps"
 import { PlayerInteractionLockControls } from "@/components/player/player-interaction-lock";
 import { usePlayerInteractionLock } from "./player/hooks/use-player-interaction-lock";
 import { isNextAired } from "@/lib/cw-resurface";
+import { exitAnyFullscreen } from "@/lib/fullscreen-state";
 
 let hdrFallbackNoticeShown = false;
 
 export function PlayerView({ src }: { src: PlayerSrc }) {
+  return src.officialBroadcast ? (
+    <EmbeddedBroadcastPlayer src={src} stream={src.officialBroadcast} />
+  ) : (
+    <NativePlayerView src={src} />
+  );
+}
+
+function NativePlayerView({ src }: { src: PlayerSrc }) {
   const {
-    setChromeHidden,
+    setChromeHidden: setAppChromeHidden,
     topPath,
     openPicker,
     exitPlayback,
@@ -118,6 +130,17 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     exitPlayer,
     picker,
   } = useView();
+  const docked = !!src.sportsDocked;
+  const [dockMinimized, setDockMinimized] = useState(false);
+  const setChromeHidden = useCallback(
+    (hidden: boolean) => setAppChromeHidden(docked ? false : hidden),
+    [docked, setAppChromeHidden],
+  );
+  useEffect(() => {
+    setAppChromeHidden(false);
+    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event("harbor:mpv-refresh-geom"));
+  }, [docked, setAppChromeHidden]);
   const { settings, update } = useSettings();
   const bigPictureActive = useBigPicture().active;
   const isKid = useActiveKid() != null;
@@ -171,6 +194,8 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     src,
     settings,
   });
+  const nativeDock = docked && engine === "mpv" && embedActive;
+  useSportsDockSurface(nativeDock && !dockMinimized, videoMountRef);
   const isP2pEngine =
     (isBundledEngineUrl(src.url) || isLocalEngineUrl(src.url)) &&
     !src.url.includes("/hlsv2/") &&
@@ -220,7 +245,6 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     null,
   );
   const [hasStarted, setHasStarted] = useState(false);
-  const cast = usePlayerCast({ src, debrids, snapRef, bridgeRef, settings });
   const [now, setNow] = useState(() => Date.now());
   const { pipMode, togglePipMode, exitPip } = usePipMode({ bridgeRef, setChromeHidden });
   const { slowLoad, transcodedUrl, sourceError, clearSourceError } = useAutoRetry({
@@ -421,6 +445,14 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
         : { ...src, url: liveUrl, historyUrl: liveHistoryUrl, streamRef: liveStreamRef },
     [src, liveUrl, liveHistoryUrl, liveStreamRef],
   );
+  const castSource = useMemo(
+    () =>
+      liveUrl === src.url && transcodedUrl
+        ? { ...activeMediaSrc, url: transcodedUrl }
+        : activeMediaSrc,
+    [activeMediaSrc, liveUrl, src.url, transcodedUrl],
+  );
+  const cast = usePlayerCast({ src: castSource, debrids, snapRef, bridgeRef, settings });
   const {
     resolvedImdbId,
     subAssNative,
@@ -515,14 +547,24 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     openPicker,
   });
   closePlayerRef.current = () => void closePlayer();
+  const backFromPlayer = useCallback(async () => {
+    if (src.sportsDocked === false) {
+      // Keep the mounted playback engine and current source; only change its surface.
+      setDockMinimized(false);
+      replacePlayerSrc({ ...src, sportsDocked: true });
+      await exitAnyFullscreen();
+      return;
+    }
+    await closePlayer();
+  }, [src, replacePlayerSrc, closePlayer]);
   useEffect(() => {
     const onLocalBack = (e: Event) => {
       e.preventDefault();
-      void closePlayer();
+      void backFromPlayer();
     };
     window.addEventListener("harbor:local-back", onLocalBack);
     return () => window.removeEventListener("harbor:local-back", onLocalBack);
-  }, [closePlayer]);
+  }, [backFromPlayer]);
 
   useKeyboardNavigation({
     // TV focus navigation intentionally owns arrows and Space while enabled.
@@ -531,7 +573,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     wrap: true,
     arrows: chromeVisible && !pipMode,
     onBack: () => {
-      void closePlayer();
+      void backFromPlayer();
       return true;
     },
   });
@@ -924,6 +966,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     drawMode,
     setDrawMode,
     closePlayer,
+    returnToPreview: src.sportsDocked === false ? backFromPlayer : undefined,
     playPauseToggle,
     seekStep,
     seekTo,
@@ -1138,10 +1181,11 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
   });
 
   const { requested: hdrStageRequested, confirmed: hdrStageActive } = useHdrStage({
+    sourceKey: src.url,
     engine,
     embedActive,
     hdrGamma: snap.hdrGamma,
-    playerHdrStage: settings.playerHdrStage,
+    playerHdrStage: docked ? "off" : settings.playerHdrStage,
     playerHdrToSdr: settings.playerHdrToSdr,
     onFallback: () => {
       if (hdrFallbackNoticeShown) return;
@@ -1181,9 +1225,10 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
   // television. Big Picture renders its own.
   const showChrome =
     !screenLocked && !loaderActive && !loaderShowing && !tenFoot && (chromeVisible || drawMode);
-  const liveShellSnap = cast.castDevice
-    ? { ...snap, status: (cast.castPlaying ? "playing" : "paused") as typeof snap.status }
-    : snap;
+  const liveShellSnap =
+    cast.castDevice && !cast.audioRouting
+      ? { ...snap, status: (cast.castPlaying ? "playing" : "paused") as typeof snap.status }
+      : snap;
   if (showChrome) shellSnapRef.current = liveShellSnap;
   const shellSnap = showChrome ? liveShellSnap : shellSnapRef.current;
   const volumeRef = useRef(snap.volume);
@@ -1263,6 +1308,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     swappingEp,
     swapResolvingKey,
     closePlayer,
+    onBack: backFromPlayer,
     cancelToPicker,
     engineStats,
     isP2pEngine,
@@ -1396,14 +1442,18 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     <main
       ref={stageRef}
       data-harbor-player
+      data-docked={docked}
+      data-native-dock={nativeDock}
+      data-audio-only={docked && dockMinimized}
       dir="ltr"
-      className={`fixed inset-0 z-[100] overflow-hidden ${stageBg}`}
+      className={`fixed z-[100] overflow-hidden ${docked ? "sports-player-dock" : "inset-0"} ${stageBg}`}
       style={screenLocked ? { cursor: "default" } : cursorStyle}
       onMouseMove={wakeChrome}
       onMouseEnter={wakeChrome}
     >
       <div
         ref={videoMountRef}
+        data-player-video-mount
         className="absolute inset-0"
         onPointerDown={(e) => {
           if (e.target !== e.currentTarget) return;
@@ -1471,8 +1521,28 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
           if (resuming) hideForResume();
         }}
       />
-      {!hdrStageActive && <PlayerOverlayLayers {...overlayProps} />}
-      {!hdrStageActive && (
+      {docked && (
+        <SportsDockControls
+          src={src}
+          snap={snap}
+          bridge={bridgeRef.current}
+          minimized={dockMinimized}
+          onMinimize={() => setDockMinimized((value) => !value)}
+          onPlayPause={playPauseToggle}
+          onClose={() => void closePlayer()}
+          onExpand={() => {
+            setDockMinimized(false);
+            replacePlayerSrc({ ...src, sportsDocked: false });
+          }}
+          onFullscreen={() => {
+            setDockMinimized(false);
+            replacePlayerSrc({ ...src, sportsDocked: false });
+            toggleFullscreen();
+          }}
+        />
+      )}
+      {!docked && !hdrStageActive && <PlayerOverlayLayers {...overlayProps} />}
+      {!docked && !hdrStageActive && (
         <PlayerInteractionLockControls
           enabled={screenLockEnabled}
           locked={screenLocked}
@@ -1494,7 +1564,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
           onExit={stopWatching}
         />
       )}
-      {sourceError && (
+      {sourceError && !docked && (
         <SourceErrorCard
           error={sourceError}
           onChoose={() => {
@@ -1541,7 +1611,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
             Promise.resolve(false),
           pip: togglePipMode,
           cast: () => cast.openCastMenu(null),
-          back: closePlayer,
+          back: backFromPlayer,
           prevEp: playPrev,
           nextEp: playNext,
           pickAnother: pickAnotherOrGuide,

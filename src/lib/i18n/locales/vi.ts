@@ -1,3 +1,10 @@
+import listenTogether from "./vi/listen-together";
+import music from "./vi/music";
+import sportsConsent from "./vi/sports-consent";
+import sportsStatistics from "./vi/sports-statistics";
+import sportsApi from "./vi/sports-api";
+import esportsArena from "./vi/esports-arena";
+import sportsHub from "./vi/sports-hub";
 import ebookSources from "./vi/ebook-sources";
 import settingsRefinements from "./vi/settings-refinements";
 import coverage from "./vi/coverage";
@@ -37,8 +44,11 @@ import bpSources from "./vi/bp-sources";
 import ageGate from "./vi/age-gate";
 import plugins from "./vi/plugins";
 import brands from "./vi/brands";
+import bpSports from "./vi/bp-sports";
 
 const vi: Record<string, string> = {
+  ...videoCast,
+  ...music,
   ...ebookSources,
   ...coverage,
   ...gap,
@@ -78,6 +88,14 @@ const vi: Record<string, string> = {
   ...settingsRefinements,
   ...plugins,
   ...brands,
+  ...sportsHub,
+  ...sportsConsent,
+  ...sportsStatistics,
+  ...sportsApi,
+  ...esportsArena,
+  ...bpSports,
+  ...listenTogether,
 };
 
 export default vi;
+import videoCast from "./vi/video-cast";

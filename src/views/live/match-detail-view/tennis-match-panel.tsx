@@ -1,41 +1,6 @@
 import { useT } from "@/lib/i18n";
 import type { SportsMatchDetail } from "@/lib/sports/espn";
 
-function SetTable({ detail }: { detail: SportsMatchDetail }) {
-  const t = useT();
-  const sets = detail.allStats;
-  if (sets.length === 0) return null;
-  return (
-    <div className="rounded-2xl border border-edge-soft/50 bg-elevated/20 p-4">
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
-        {t("Set by set")}
-      </div>
-      <div className="flex flex-col gap-1">
-        {sets.map((s, i) => {
-          const h = Number(s.homeValue);
-          const a = Number(s.awayValue);
-          const hWin = Number.isFinite(h) && Number.isFinite(a) && h > a;
-          const aWin = Number.isFinite(h) && Number.isFinite(a) && a > h;
-          return (
-            <div
-              key={i}
-              className="flex items-center justify-between border-b border-edge-soft/40 py-2 text-sm last:border-0"
-            >
-              <span className={`w-12 font-bold tabular-nums ${hWin ? "text-ink" : "text-ink-muted"}`}>
-                {s.homeValue}
-              </span>
-              <span className="text-[12px] uppercase tracking-wider text-ink-subtle">{s.label}</span>
-              <span className={`w-12 text-end font-bold tabular-nums ${aWin ? "text-ink" : "text-ink-muted"}`}>
-                {s.awayValue}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function TennisMatchPanel({ detail }: { detail: SportsMatchDetail }) {
   const t = useT();
   const c = detail.context;
@@ -52,7 +17,6 @@ export function TennisMatchPanel({ detail }: { detail: SportsMatchDetail }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <SetTable detail={detail} />
       {facts.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {facts.map(([label, value]) => (

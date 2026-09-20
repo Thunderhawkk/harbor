@@ -1,20 +1,10 @@
 import { safeFetch } from "@/lib/safe-fetch";
-import type { LeagueDef, MatchTeamStatRow, SportsMatchDetail, SportsSide } from "./espn-types";
+import type { LeagueDef, MatchTeamStatRow, SportsMatchDetail } from "./espn-types";
+import { toSide } from "./espn-parse";
 import { SITE_BASE } from "./espn-leagues";
 import { localStamp } from "./espn-scoreboard";
 
 const WINDOW_DAYS = 21;
-
-function side(c: any): SportsSide {
-  return {
-    id: String(c.athlete?.id ?? c.athlete?.guid ?? c.id ?? ""),
-    name: c.athlete?.displayName || "",
-    abbr: c.athlete?.shortName || "",
-    logo: c.athlete?.flag?.href || "",
-    score: typeof c.score === "string" ? c.score : String(c.score ?? ""),
-    winner: c.winner === true,
-  };
-}
 
 function setRows(homeRaw: any, awayRaw: any): MatchTeamStatRow[] {
   const allStats: MatchTeamStatRow[] = [];
@@ -33,16 +23,22 @@ function setRows(homeRaw: any, awayRaw: any): MatchTeamStatRow[] {
   return allStats;
 }
 
-export async function fetchTennisSummary(def: LeagueDef, eventId: string): Promise<SportsMatchDetail | null> {
+export async function fetchTennisSummary(
+  def: LeagueDef,
+  eventId: string,
+  startMs?: number,
+): Promise<SportsMatchDetail | null> {
   const [evId, cId] = eventId.split("|");
-  const now = Date.now();
+  const now = startMs || Date.now();
   const span = WINDOW_DAYS * 86400000;
   const wide = `${localStamp(new Date(now - span))}-${localStamp(new Date(now + span))}`;
   let event: any = null;
   let comp: any = null;
   let drawName = "";
-  for (const q of ["", `?dates=${wide}`]) {
-    const sres = await safeFetch(`${SITE_BASE}/${def.path}/scoreboard${q}`);
+  for (const q of [`?dates=${localStamp(new Date(now))}`, `?dates=${wide}`]) {
+    const sres = await safeFetch(`${SITE_BASE}/${def.path}/scoreboard${q}`, {
+      signal: AbortSignal.timeout(10000),
+    });
     if (!sres.ok) continue;
     const sdata = await sres.json();
     event = (sdata.events || []).find((e: any) => String(e.id) === evId) ?? null;
@@ -71,8 +67,8 @@ export async function fetchTennisSummary(def: LeagueDef, eventId: string): Promi
     state: tp.state === "in" || tp.state === "post" ? tp.state : "pre",
     detail: [tourName, round, tp.shortDetail || tp.detail].filter(Boolean).join(" · "),
     startMs: Date.parse(comp.date || event?.date || "") || 0,
-    home: side(homeRaw),
-    away: side(awayRaw),
+    home: toSide(homeRaw, "tennis"),
+    away: toSide(awayRaw, "tennis"),
     homeRoster: [],
     awayRoster: [],
     homeStats: {},

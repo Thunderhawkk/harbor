@@ -44,7 +44,12 @@ import { NYT_ATTRIBUTION, type NytList } from "@/lib/ebook/nyt";
 import { isNytPlaceholder } from "@/lib/ebook/nyt-rail";
 import { nytRailItems, nytRankFor } from "@/lib/ebook/nyt-rail";
 import { nytBestsellerFor } from "@/lib/ebook/nyt-match";
-import { useNytAvailability, useNytList, useNytSnapshot, useResolveNytBooks } from "@/lib/ebook/use-nyt";
+import {
+  useNytAvailability,
+  useNytList,
+  useNytSnapshot,
+  useResolveNytBooks,
+} from "@/lib/ebook/use-nyt";
 import { useAnilist } from "@/lib/anilist/provider";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import {
@@ -990,40 +995,40 @@ export function EBookView() {
   return (
     <EBookTitleLanguageContext.Provider value={titleLanguage}>
       <EBookCardMenuContext.Provider value={openCardMenu}>
-      <main
-        ref={listScrollRef}
-        data-ebook-page
-        className="bg-canvas flex-1 overflow-y-auto overflow-x-hidden pb-20"
-      >
-        <EBookLibraryHero
-          ebooks={heroBooks}
-          bestsellers={bestsellerList}
-          onOpen={(ebook) => {
-            if (isNytPlaceholder(String(ebook.id))) {
-              emitListToast("Not available in your sources yet");
-              return;
-            }
-            openEBook(String(ebook.id));
-          }}
-        />
+        <main
+          ref={listScrollRef}
+          data-ebook-page
+          className="bg-canvas flex-1 overflow-y-auto overflow-x-hidden pb-20"
+        >
+          <EBookLibraryHero
+            ebooks={heroBooks}
+            bestsellers={bestsellerList}
+            onOpen={(ebook) => {
+              if (isNytPlaceholder(String(ebook.id))) {
+                emitListToast("Not available in your sources yet");
+                return;
+              }
+              openEBook(String(ebook.id));
+            }}
+          />
 
-        <div className="flex w-full flex-col gap-9 px-12 pt-8">
-          {rails.map((rail) => (
-            <EBookRail
-              key={`${rail.title}:${providerId}`}
-              {...rail}
-              profile={activeId ?? "default"}
-              onOpen={(ebook) => {
-                if (isNytPlaceholder(String(ebook.id))) {
-                  emitListToast("Not available in your sources yet");
-                  return;
-                }
-                if (rail.resumeReading) setReadIntent(ebook.id);
-                openEBook(String(ebook.id));
-              }}
-            />
-          ))}
-          <div className="mb-9 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex w-full flex-col gap-9 px-12 pt-8">
+            {rails.map((rail) => (
+              <EBookRail
+                key={`${rail.title}:${providerId}`}
+                {...rail}
+                profile={activeId ?? "default"}
+                onOpen={(ebook) => {
+                  if (isNytPlaceholder(String(ebook.id))) {
+                    emitListToast("Not available in your sources yet");
+                    return;
+                  }
+                  if (rail.resumeReading) setReadIntent(ebook.id);
+                  openEBook(String(ebook.id));
+                }}
+              />
+            ))}
+            <div className="mb-9 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setScreen("collections")}
@@ -1509,12 +1514,30 @@ function EBookLibraryHero({
           {loading && (
             <div className="ebook-hero-skeleton">
               <span className="harbor-shimmer ebook-hero-sk-title" />
-              <span className="harbor-shimmer ebook-hero-sk-title is-short" style={{ "--ai-delay": "90ms" } as CSSProperties} />
-              <span className="harbor-shimmer ebook-hero-sk-byline" style={{ "--ai-delay": "180ms" } as CSSProperties} />
-              <span className="harbor-shimmer ebook-hero-sk-line" style={{ "--ai-delay": "260ms" } as CSSProperties} />
-              <span className="harbor-shimmer ebook-hero-sk-line is-short" style={{ "--ai-delay": "330ms" } as CSSProperties} />
-              <span className="harbor-shimmer ebook-hero-sk-meta" style={{ "--ai-delay": "400ms" } as CSSProperties} />
-              <span className="harbor-shimmer ebook-hero-sk-button" style={{ "--ai-delay": "470ms" } as CSSProperties} />
+              <span
+                className="harbor-shimmer ebook-hero-sk-title is-short"
+                style={{ "--ai-delay": "90ms" } as CSSProperties}
+              />
+              <span
+                className="harbor-shimmer ebook-hero-sk-byline"
+                style={{ "--ai-delay": "180ms" } as CSSProperties}
+              />
+              <span
+                className="harbor-shimmer ebook-hero-sk-line"
+                style={{ "--ai-delay": "260ms" } as CSSProperties}
+              />
+              <span
+                className="harbor-shimmer ebook-hero-sk-line is-short"
+                style={{ "--ai-delay": "330ms" } as CSSProperties}
+              />
+              <span
+                className="harbor-shimmer ebook-hero-sk-meta"
+                style={{ "--ai-delay": "400ms" } as CSSProperties}
+              />
+              <span
+                className="harbor-shimmer ebook-hero-sk-button"
+                style={{ "--ai-delay": "470ms" } as CSSProperties}
+              />
             </div>
           )}
           {!loading && <h1>{currentTitle}</h1>}
@@ -1756,11 +1779,15 @@ function EBookGrid({
                 />
                 <div
                   className="harbor-shimmer relative mt-3 h-3.5 w-4/5"
-                  style={{ "--ai-delay": `${index * 70 + 60}ms`, borderRadius: 999 } as CSSProperties}
+                  style={
+                    { "--ai-delay": `${index * 70 + 60}ms`, borderRadius: 999 } as CSSProperties
+                  }
                 />
                 <div
                   className="harbor-shimmer relative mt-2 h-3 w-2/5"
-                  style={{ "--ai-delay": `${index * 70 + 120}ms`, borderRadius: 999 } as CSSProperties}
+                  style={
+                    { "--ai-delay": `${index * 70 + 120}ms`, borderRadius: 999 } as CSSProperties
+                  }
                 />
               </div>
             ))
@@ -2657,7 +2684,9 @@ function EBookDetails({
   const detailBestsellers = useNytList();
   const detailSnapshot = useNytSnapshot();
   const detailRank = ebook
-    ? (nytRankFor(detailBestsellers, ebook) ?? nytBestsellerFor(detailSnapshot, ebook)?.book ?? null)
+    ? (nytRankFor(detailBestsellers, ebook) ??
+      nytBestsellerFor(detailSnapshot, ebook)?.book ??
+      null)
     : null;
   const t = useT();
   const [saved, setSaved] = useState(() => (ebook ? ebookInLibrary(ebook.id) : false));
@@ -3356,7 +3385,13 @@ function EBookDetails({
         />
       )}
       {showScrollTop && !reading && (
-        <div className="animate-in fade-in slide-in-from-bottom-3 fixed bottom-7 end-7 z-[60]">
+        <div
+          style={{
+            bottom:
+              "calc(1.75rem + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px))",
+          }}
+          className="animate-in fade-in slide-in-from-bottom-3 fixed bottom-7 end-7 z-[60]"
+        >
           <button
             type="button"
             onClick={() => detailScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}

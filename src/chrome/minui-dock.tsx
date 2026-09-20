@@ -5,7 +5,7 @@ import { useT } from "@/lib/i18n";
 import { useParental } from "@/lib/parental";
 import { useSettings } from "@/lib/settings";
 import { useView, type View } from "@/lib/view";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
 import { DockButton } from "./minui-dock/dock-button";
 import { FloatingTop } from "./minui-dock/floating-top";
 
@@ -30,7 +30,10 @@ export function MinUIDock() {
     return () => window.cancelAnimationFrame(id);
   }, []);
 
-  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization));
+  const items = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  );
   const visible = items.filter((it) => {
     if (it.id === "kids") return false;
     if (it.view === "vod" && !settings.showPlaylistsTab) return false;
@@ -52,9 +55,10 @@ export function MinUIDock() {
 
   let firstPassScales = visible.map(() => 1);
   if (cursor != null) {
-    const centers = buttonCentersRef.current.length === visible.length
-      ? buttonCentersRef.current
-      : computeCenters(firstPassScales);
+    const centers =
+      buttonCentersRef.current.length === visible.length
+        ? buttonCentersRef.current
+        : computeCenters(firstPassScales);
     firstPassScales = centers.map((c) => magnify(Math.abs(cursor - c)));
   }
   buttonCentersRef.current = computeCenters(firstPassScales);
@@ -84,12 +88,10 @@ export function MinUIDock() {
         <div
           className="harbor-minui-shell pointer-events-auto rounded-2xl border border-edge p-1.5 shadow-[0_30px_60px_-22px_rgba(15,15,18,0.32),0_4px_18px_-6px_rgba(15,15,18,0.16)] backdrop-blur-xl"
           style={{
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78))",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78))",
             transform: `translateY(${mounted ? 0 : 28}px)`,
             opacity: mounted ? 1 : 0,
-            transition:
-              "transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease",
+            transition: "transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease",
           }}
         >
           <div

@@ -1,3 +1,10 @@
+import listenTogether from "./hi/listen-together";
+import music from "./hi/music";
+import sportsConsent from "./hi/sports-consent";
+import sportsStatistics from "./hi/sports-statistics";
+import sportsApi from "./hi/sports-api";
+import esportsArena from "./hi/esports-arena";
+import sportsHub from "./hi/sports-hub";
 import ebookSources from "./hi/ebook-sources";
 import settingsRefinements from "./hi/settings-refinements";
 import catalogSymbols from "./hi/catalog-symbols";
@@ -12,8 +19,11 @@ import catalogVZ from "./hi/catalog-v-z";
 import coverage from "./hi/coverage";
 import plugins from "./hi/plugins";
 import brands from "./hi/brands";
+import bpSports from "./hi/bp-sports";
 
 const hi: Record<string, string> = {
+  ...videoCast,
+  ...music,
   ...ebookSources,
   ...catalogSymbols,
   ...catalogAC,
@@ -28,6 +38,14 @@ const hi: Record<string, string> = {
   ...settingsRefinements,
   ...plugins,
   ...brands,
+  ...sportsHub,
+  ...sportsConsent,
+  ...sportsStatistics,
+  ...sportsApi,
+  ...esportsArena,
+  ...bpSports,
+  ...listenTogether,
 };
 
 export default hi;
+import videoCast from "./hi/video-cast";

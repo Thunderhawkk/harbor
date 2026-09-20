@@ -94,6 +94,17 @@ notify-rust = "4"
 # means a cross-compiled OpenSSL on Android. Keep `default-features = false` on
 # both halves or Cargo turns reqwest's defaults back on for every target.
 reqwest = { version = "0.12", default-features = false, features = ["native-tls"] }
+rusqlite = { version = "0.32.0", features = ["bundled"] }
+async-trait = "0.1"
+md5 = "0.7"
+sha2 = "0.10"
+futures = "0.3"
+lofty = "0.22"
+# Spotify Premium playback. Keep librespot component crates in lockstep.
+parking_lot = "0.12"
+librespot-core = "0.8"
+librespot-playback = "0.8"
+librespot-oauth = "0.8"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
@@ -122,11 +133,12 @@ windows = { version = "0.61", features = [
 ] }
 window-vibrancy = "0.6"
 wasapi = "0.15"
-webview2-com = "0.37"
+webview2-com = "0.38"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", features = ["v3_24"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
+
 
 [profile.dev]
 debug = "line-tables-only"
@@ -169,3 +181,10 @@ objc2-app-kit = { version = "0.3", features = [
 objc2-web-kit = { version = "0.3", features = ["WKWebView"] }
 core-foundation = "0.10"
 core-video = "0.4"
+
+# librqbit enables governor's quanta default clock while librespot 0.8 hardcodes
+# MonotonicClock in its rate limiter. The vendored patch uses DefaultClock so
+# both crates can share governor safely. Drop this patch after librespot ships
+# the same fix. Cargo.lock also pins vergen 9.0.6 for librespot's build script.
+[patch.crates-io]
+librespot-core = { path = "vendor/librespot-core" }

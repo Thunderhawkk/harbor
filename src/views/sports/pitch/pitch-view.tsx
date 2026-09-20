@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { TeamProfileLink, teamIdentity } from "../team-profile-link";
+import type { TeamIdentity } from "@/lib/sports/team-profile";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { isRtl, useT, useUiLanguage } from "@/lib/i18n";
 import type { MatchPlayer, SportsMatchDetail } from "@/lib/sports/espn";
@@ -15,6 +17,7 @@ import {
   type SubState,
 } from "./pitch-formation";
 import { PitchPlayer } from "./pitch-player";
+import { AthleteProfileLink, SportsAthleteLeagueContext } from "../athlete-profile";
 import "./pitch.css";
 
 function PitchMarks() {
@@ -43,12 +46,14 @@ function PitchMarks() {
 
 function TeamHeading({
   name,
+  team,
   logo,
   formation,
   inferred,
   align,
 }: {
   name: string;
+  team?: TeamIdentity;
   logo: string;
   formation: string;
   inferred: boolean;
@@ -56,7 +61,10 @@ function TeamHeading({
 }) {
   const t = useT();
   return (
-    <div className={`flex min-w-0 flex-1 items-center gap-2.5 ${align === "end" ? "flex-row-reverse" : ""}`}>
+    <TeamProfileLink
+      team={team}
+      className={`flex min-w-0 flex-1 items-center gap-2.5 ${align === "end" ? "flex-row-reverse" : ""}`}
+    >
       {logo ? (
         <img src={logo} alt="" className="h-6 w-6 shrink-0 object-contain" />
       ) : (
@@ -73,7 +81,7 @@ function TeamHeading({
           {t("Estimated")}
         </span>
       )}
-    </div>
+    </TeamProfileLink>
   );
 }
 
@@ -86,12 +94,18 @@ function BenchRow({
   goals: number;
   sub: SubState | null;
 }) {
+  const league = useContext(SportsAthleteLeagueContext);
   return (
     <div className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-elevated/60">
-      <span dir="ltr" className="w-5 shrink-0 text-center text-[11px] font-semibold tabular-nums text-ink-subtle">
+      <span
+        dir="ltr"
+        className="w-5 shrink-0 text-center text-[11px] font-semibold tabular-nums text-ink-subtle"
+      >
         {player.jersey || "-"}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[12px] text-ink-muted">{player.name}</span>
+      <span className="min-w-0 flex-1 truncate text-[12px] text-ink-muted">
+        <AthleteProfileLink athlete={player} league={league} label={player.name} />
+      </span>
       {goals > 0 && (
         <span className="flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-ink px-[3px] text-[9px] font-bold tabular-nums text-canvas">
           {goals}
@@ -155,6 +169,13 @@ function TeamTokens({
 }
 
 export function PitchView({ detail }: { detail: SportsMatchDetail }) {
+  return (
+    <SportsAthleteLeagueContext.Provider value={detail.league}>
+      <PitchLayoutView detail={detail} />
+    </SportsAthleteLeagueContext.Provider>
+  );
+}
+function PitchLayoutView({ detail }: { detail: SportsMatchDetail }) {
   const t = useT();
   const rtl = isRtl(useUiLanguage());
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -201,7 +222,7 @@ export function PitchView({ detail }: { detail: SportsMatchDetail }) {
     [detail.events, detail.awayRoster],
   );
 
-  if (homeLayout.slots.length === 0 && awayLayout.slots.length === 0) return null;
+  const hasPlayers = homeLayout.slots.length > 0 || awayLayout.slots.length > 0;
 
   const benchColumns: Array<[PitchLayout, Map<string, number>, Map<string, SubState>, string]> = [
     [homeLayout, homeGoals, homeSubs, detail.home.name],
@@ -212,20 +233,22 @@ export function PitchView({ detail }: { detail: SportsMatchDetail }) {
     <div ref={hostRef} className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <TeamHeading
+          team={teamIdentity(detail, "home")}
           name={detail.home.name}
           logo={detail.home.logo}
           formation={homeLayout.formation}
-          inferred={homeLayout.inferred}
+          inferred={homeLayout.inferred && homeLayout.slots.length > 0}
           align="start"
         />
         <span className="shrink-0 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
           {t("Lineups")}
         </span>
         <TeamHeading
+          team={teamIdentity(detail, "away")}
           name={detail.away.name}
           logo={detail.away.logo}
           formation={awayLayout.formation}
-          inferred={awayLayout.inferred}
+          inferred={awayLayout.inferred && awayLayout.slots.length > 0}
           align="end"
         />
       </div>
@@ -256,6 +279,11 @@ export function PitchView({ detail }: { detail: SportsMatchDetail }) {
         </div>
       </div>
 
+      {!hasPlayers && (
+        <p className="sh-muted" role="status">
+          {t("Lineup data is unavailable.")}
+        </p>
+      )}
       <div className={`grid gap-3 ${width >= 560 ? "grid-cols-2" : "grid-cols-1"}`}>
         {benchColumns.map(([layout, goals, subs, name]) =>
           layout.bench.length === 0 ? null : (

@@ -296,14 +296,16 @@ export function BpActionRow({
   label,
   autofocus,
   onPress,
+  flush,
 }: {
   index: number;
   label: string;
   autofocus: boolean;
   onPress: () => void;
+  flush?: boolean;
 }) {
   return (
-    <div data-bp-rail-row={index} className="mt-auto shrink-0">
+    <div data-bp-rail-row={index} className={`shrink-0 ${flush ? "" : "mt-auto"}`}>
       <button
         type="button"
         data-bp-focusable
@@ -312,7 +314,7 @@ export function BpActionRow({
         onClick={onPress}
         className="flex h-[clamp(46px,6.2vh,60px)] w-full items-center justify-center gap-[clamp(7px,0.7vw,12px)] rounded-[var(--bp-r-sm)] border border-[var(--bp-edge-2)] text-[clamp(14px,2vh,20px)] font-bold text-ink transition-colors duration-[var(--bp-dur-fast)]"
       >
-        <LogOut size={17} strokeWidth={2.3} />
+        {!flush && <LogOut size={17} strokeWidth={2.3} />}
         {label}
       </button>
     </div>

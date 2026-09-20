@@ -13,9 +13,11 @@ import library from "@/assets/nav-icons/library.svg?raw";
 import livetv from "@/assets/nav-icons/livetv.svg?raw";
 import manga from "@/assets/nav-icons/manga.svg?raw";
 import movies from "@/assets/nav-icons/movies.svg?raw";
+import music from "@/assets/nav-icons/music.svg?raw";
 import playlist from "@/assets/nav-icons/playlist.svg?raw";
 import search from "@/assets/nav-icons/search.svg?raw";
 import settings from "@/assets/nav-icons/settings.svg?raw";
+import sports from "@/assets/nav-icons/sports.svg?raw";
 import tv from "@/assets/nav-icons/tv.svg?raw";
 
 // Same treatment as the player UI icons in ui-icon.tsx: these ship as solid #fff
@@ -47,9 +49,11 @@ const GLYPHS = {
   livetv: prep(livetv),
   manga: prep(manga),
   movies: prep(movies),
+  music: prep(music),
   playlist: prep(playlist),
   search: prep(search),
   settings: prep(settings),
+  sports: prep(sports),
   tv: prep(tv),
 } as const;
 
