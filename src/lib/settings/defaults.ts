@@ -418,10 +418,8 @@ export const DEFAULT: Settings = {
   songCardDetails: true,
   hideContent: {
     anime: false,
-    liveTv: false,
     sports: false,
     adult: true,
-    manga: false,
   },
   theme: DEFAULT_THEME,
   customLogoMark: "",

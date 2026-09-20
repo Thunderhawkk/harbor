@@ -289,12 +289,12 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
   const gates = useMemo<BpSourceGates>(
     () => ({
       anime: !hiddenTabs.anime && !settings.hideContent.anime,
-      manga: settings.mangaEnabled && !settings.hideContent.manga,
+      manga: settings.mangaEnabled,
       liveTv: !hiddenTabs.liveTv && settings.iptvPlaylists.length > 0,
     }),
     // length, not the array. Only the count is read, and depending on the array
     // identity would rebuild every slot on any unrelated settings write.
-    [hiddenTabs.anime, hiddenTabs.liveTv, settings.hideContent.anime, settings.hideContent.manga, settings.mangaEnabled, settings.iptvPlaylists.length],
+    [hiddenTabs.anime, hiddenTabs.liveTv, settings.hideContent.anime, settings.mangaEnabled, settings.iptvPlaylists.length],
   );
 
   useEffect(() => {

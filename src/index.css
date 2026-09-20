@@ -7341,4 +7341,4 @@ button.hset-rail-me:hover,
 }
 
 [data-nav-editing="true"] [data-harbor-nav]:hover { animation: none !important; }
-[data-nav-editing="true"] [data-harbor-nav] { transition: transform 160ms ease-out !important; margin: 4px 6px !important; }
+[data-nav-editing="true"] [data-harbor-nav] { transition: transform 160ms ease-out !important; margin: 1px 2px !important; }

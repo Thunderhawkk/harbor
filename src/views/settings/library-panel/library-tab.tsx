@@ -1,7 +1,6 @@
 import animeCatIcon from "@/assets/category/anime.svg";
-import livetvCatIcon from "@/assets/category/livetv.svg";
 import adultCatIcon from "@/assets/category/adult.svg";
-import { BookOpen, Download, HardDrive, Minus, Plus } from "../icons";
+import { Download, HardDrive, Minus, Plus } from "../icons";
 import { useProfiles } from "@/lib/profiles";
 import { useSettings } from "@/lib/settings";
 import { useSampleArtwork } from "@/lib/sample-artwork";
@@ -37,7 +36,7 @@ export function LibraryTab() {
     update({ localMinFileSizeMb: Math.max(0, Math.round(v)) });
 
   const pushHideContent = (
-    key: "anime" | "liveTv" | "adult" | "manga",
+    key: "anime" | "adult",
     value: boolean,
   ) => {
     const next = { ...settings.hideContent, [key]: value };
@@ -57,24 +56,10 @@ export function LibraryTab() {
           label={t("Hide anime")}
           leading={<CatIcon src={animeCatIcon} />}
           sub={t(
-            "Removes the Anime tab and every anime title from all rows everywhere: Home, Discover, Top 10, and catalogs. Western animation like Pixar is kept, and you can still find anime by searching.",
+            "Removes every anime title from all rows everywhere: Home, Discover, Top 10, and catalogs. Western animation like Pixar is kept, and you can still find anime by searching. The Anime tab itself stays — hide it from the sidebar if you want it gone."
           )}
           value={settings.hideContent.anime}
           onChange={(v) => pushHideContent("anime", v)}
-        />
-        <ToggleRow
-          label={t("Hide manga")}
-          leading={<BookOpen size={20} strokeWidth={2} />}
-          sub={t("Removes the Manga tab from the sidebar.")}
-          value={settings.hideContent.manga}
-          onChange={(v) => pushHideContent("manga", v)}
-        />
-        <ToggleRow
-          label={t("Hide Live TV")}
-          leading={<CatIcon src={livetvCatIcon} />}
-          sub={t("Removes the Live TV tab from the sidebar.")}
-          value={settings.hideContent.liveTv}
-          onChange={(v) => pushHideContent("liveTv", v)}
         />
         <ToggleRow
           label={t("Hide adult content")}

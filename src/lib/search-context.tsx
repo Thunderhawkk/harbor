@@ -216,7 +216,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setAddonQueries([]);
     setStatus("typing");
     const animeAllowed = !hiddenTabs.anime && !settings.hideContent.anime;
-    const mangaAllowed = settings.mangaEnabled && !settings.hideContent.manga;
+    const mangaAllowed = settings.mangaEnabled;
     const franchiseAllowed = animeAllowed || mangaAllowed;
     const liveTvAllowed = !hiddenTabs.liveTv && playlists.length > 0;
     debounceRef.current = window.setTimeout(() => {
@@ -409,7 +409,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         debounceRef.current = null;
       }
     };
-  }, [query, aiHold, retryNonce, settings.tmdbKey, settings.tmdbLanguage, settings.translateTitles, playlists, excludeGenres, hiddenTabs.anime, settings.hideContent.anime, hiddenTabs.liveTv, settings.mangaEnabled, settings.hideContent.manga, authKey]);
+  }, [query, aiHold, retryNonce, settings.tmdbKey, settings.tmdbLanguage, settings.translateTitles, playlists, excludeGenres, hiddenTabs.anime, settings.hideContent.anime, hiddenTabs.liveTv, settings.mangaEnabled, authKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
