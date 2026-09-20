@@ -60,6 +60,18 @@ export async function clearThumbCache(): Promise<void> {
   await invoke("clear_thumb_cache");
 }
 
+export type ThumbCacheSize = { bytes: number; files: number };
+
+export async function getThumbCacheSize(): Promise<ThumbCacheSize | null> {
+  try {
+    const size = await invoke<ThumbCacheSize>("thumb_cache_size");
+    if (!size || typeof size.bytes !== "number" || typeof size.files !== "number") return null;
+    return size;
+  } catch {
+    return null;
+  }
+}
+
 function proxyImage(url: string, thumbWidthPx?: number): Promise<string | null> {
   const key = cacheKeyFor(url, thumbWidthPx);
   const cached = blobCache.get(key);

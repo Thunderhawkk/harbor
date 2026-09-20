@@ -969,6 +969,7 @@ pub fn run() {
             http_fetch::harbor_fetch,
             http_fetch::harbor_upload,
             http_fetch::clear_thumb_cache,
+            http_fetch::thumb_cache_size,
             subtitle_credentials::subtitle_credential_bind,
             subtitle_credentials::subtitle_credentials_clear,
             cf_solver::cf_report,

@@ -1,10 +1,10 @@
 import { useSubTabs } from "./sub-tabs";
 import { StreamCacheSection } from "./player-panel/p2p-advanced-section";
 import { Check, Database, HardDrive, Trash2 } from "./icons";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useT } from "@/lib/i18n";
-import { clearPickerCache } from "@/lib/picker-cache";
-import { clearThumbCache } from "@/lib/remote-image-proxy";
+import { clearPickerCache, pickerCacheCount } from "@/lib/picker-cache";
+import { clearThumbCache, getThumbCacheSize, type ThumbCacheSize } from "@/lib/remote-image-proxy";
 import { clearMangaCache } from "@/lib/manga/api";
 import { clearEpg } from "@/lib/iptv/epg-store";
 import { clearPlaylistCache } from "@/lib/iptv/store";
@@ -78,10 +78,12 @@ function friendlyKey(key: string): string {
 function ClearRow({
   title,
   sub,
+  usage,
   onClear,
 }: {
   title: string;
   sub: string;
+  usage?: ReactNode;
   onClear: () => void;
 }) {
   const t = useT();
@@ -118,7 +120,7 @@ function ClearRow({
   };
 
   return (
-    <SettingRow label={title} desc={<>{sub}{failed && <span role="alert" className="mt-1 block text-danger">{t("Could not clear this cache. Try again.")}</span>}</>}>
+    <SettingRow label={title} desc={<>{sub}{failed && <span role="alert" className="mt-1 block text-danger">{t("Could not clear this cache. Try again.")}</span>}{usage && <span className="mt-1.5 block text-[12.5px] tabular-nums text-ink-subtle">{usage}</span>}</>}>
       <button
         type="button"
         onClick={click}
@@ -159,6 +161,43 @@ export function StoragePanel() {
   }, [tick]);
 
   const ls = useMemo(() => localStorageBreakdown(), [tick]);
+  const THUMB_CACHE_CAP_BYTES = 256 * 1024 * 1024;
+
+  const cacheUsage = useMemo(() => {
+    const bytesOfKey = (key: string) => {
+      try {
+        return (localStorage.getItem(key)?.length ?? 0) * 2 + key.length * 2;
+      } catch {
+        return 0;
+      }
+    };
+    const bytesOfPrefix = (prefix: string) => {
+      let total = 0;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(prefix)) total += bytesOfKey(key);
+        }
+      } catch {}
+      return total;
+    };
+    return {
+      picker: pickerCacheCount(),
+      manga: bytesOfPrefix("harbor.manga.cache.v2."),
+      dead: bytesOfKey("harbor.dead-streams.v1"),
+    };
+  }, [tick]);
+
+  const [thumbSize, setThumbSize] = useState<ThumbCacheSize | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void getThumbCacheSize().then((size) => {
+      if (alive) setThumbSize(size);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
   const pct = estimate && estimate.quota > 0 ? Math.min(100, (estimate.usage / estimate.quota) * 100) : 0;
 
   useSubTabs(
@@ -253,6 +292,7 @@ export function StoragePanel() {
               sub={t(
                 "Remembered source lists per title. Clears stale results after changing addons or debrid.",
               )}
+              usage={t("{n} entries", { n: cacheUsage.picker })}
               onClear={() => {
                 clearPickerCache();
                 refresh();
@@ -261,6 +301,7 @@ export function StoragePanel() {
             <ClearRow
               title={t("Manga browse cache")}
               sub={t("Cached chapter lists and browse pages. Downloads stay untouched.")}
+              usage={fmtBytes(cacheUsage.manga)}
               onClear={() => {
                 clearMangaCache();
                 refresh();
@@ -271,6 +312,24 @@ export function StoragePanel() {
               sub={t(
                 "Resized cover cache, kept 30 days up to size limits. Rebuilds as you browse.",
               )}
+              usage={
+                thumbSize == null ? undefined : (
+                  <>
+                    {t("{size} across {n} files", {
+                      size: fmtBytes(thumbSize.bytes),
+                      n: thumbSize.files,
+                    })}
+                    <span className="mt-1.5 block h-1.5 w-full max-w-[280px] overflow-hidden rounded-full bg-raised">
+                      <span
+                        className="block h-full rounded-full bg-accent"
+                        style={{
+                          width: `${Math.min(100, (thumbSize.bytes / THUMB_CACHE_CAP_BYTES) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                  </>
+                )
+              }
               onClear={() => {
                 void clearThumbCache().finally(() => refresh());
               }}
@@ -290,6 +349,7 @@ export function StoragePanel() {
             <ClearRow
               title={t("Dead stream marks")}
               sub={t("Sources Harbor flagged as broken. Clear to give them another chance.")}
+              usage={fmtBytes(cacheUsage.dead)}
               onClear={() => {
                 clearDeadStreams();
                 refresh();

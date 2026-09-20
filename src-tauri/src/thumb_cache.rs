@@ -80,7 +80,27 @@ pub fn write_thumb(app: &tauri::AppHandle, url: &str, width: u32, bytes: &[u8]) 
 }
 
 fn enforce_caps(dir: &PathBuf) {
-    let entries = std::fs::read_dir(dir)
+    let mut listed = list_files(dir);
+    let total: u64 = listed.iter().map(|(_, len, _)| len).sum();
+    if listed.len() <= MAX_FILES && total <= MAX_BYTES {
+        return;
+    }
+    listed.sort_by_key(|(_, _, mtime)| *mtime);
+    let mut bytes = total;
+    let mut count = listed.len();
+    for (path, len, _) in listed {
+        if count <= MAX_FILES && bytes <= MAX_BYTES {
+            break;
+        }
+        if std::fs::remove_file(&path).is_ok() {
+            bytes = bytes.saturating_sub(len);
+            count = count.saturating_sub(1);
+        }
+    }
+}
+
+fn list_files(dir: &PathBuf) -> Vec<(PathBuf, u64, SystemTime)> {
+    std::fs::read_dir(dir)
         .map(|rd| {
             rd.filter_map(|entry| {
                 let e = entry.ok()?;
@@ -92,24 +112,16 @@ fn enforce_caps(dir: &PathBuf) {
             })
             .collect::<Vec<_>>()
         })
-        .unwrap_or_default();
-    let total: u64 = entries.iter().map(|(_, len, _)| len).sum();
-    if entries.len() <= MAX_FILES && total <= MAX_BYTES {
-        return;
-    }
-    let mut sorted = entries;
-    sorted.sort_by_key(|(_, _, mtime)| *mtime);
-    let mut bytes = total;
-    let mut count = sorted.len();
-    for (path, len, _) in sorted {
-        if count <= MAX_FILES && bytes <= MAX_BYTES {
-            break;
-        }
-        if std::fs::remove_file(&path).is_ok() {
-            bytes = bytes.saturating_sub(len);
-            count = count.saturating_sub(1);
-        }
-    }
+        .unwrap_or_default()
+}
+
+pub fn thumb_cache_size(app: &tauri::AppHandle) -> (u64, usize) {
+    let Some(dir) = dir(app) else {
+        return (0, 0);
+    };
+    let listed = list_files(&dir);
+    let bytes = listed.iter().map(|(_, len, _)| len).sum();
+    (bytes, listed.len())
 }
 
 pub fn clear_thumb_dir(app: &tauri::AppHandle) {

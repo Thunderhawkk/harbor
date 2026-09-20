@@ -212,6 +212,23 @@ pub async fn clear_thumb_cache(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThumbCacheSize {
+    pub bytes: u64,
+    pub files: usize,
+}
+
+#[tauri::command]
+pub async fn thumb_cache_size(app: tauri::AppHandle) -> Result<ThumbCacheSize, String> {
+    let app = app.clone();
+    let (bytes, files) =
+        tokio::task::spawn_blocking(move || crate::thumb_cache::thumb_cache_size(&app))
+            .await
+            .map_err(|error| format!("size: {error}"))?;
+    Ok(ThumbCacheSize { bytes, files })
+}
+
 fn is_blocked_ip(ip: IpAddr) -> bool {
     let ip = match ip {
         IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
