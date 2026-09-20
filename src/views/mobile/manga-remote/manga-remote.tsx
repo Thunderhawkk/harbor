@@ -37,6 +37,34 @@ const MangaSettingsSheet = lazy(() =>
   import("./manga-settings-sheet").then((m) => ({ default: m.MangaSettingsSheet })),
 );
 
+function TapPagesIcon({ size = 18, double = false }: { size?: number; double?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="7.5" height="16" rx="1.5" fill="currentColor" stroke="none" />
+      <rect
+        x="13.5"
+        y="4"
+        width="7.5"
+        height="16"
+        rx="1.5"
+        fill="currentColor"
+        stroke="none"
+        opacity={double ? 1 : 0.35}
+      />
+    </svg>
+  );
+}
+
 export function MangaRemote({
   standalone = false,
   onReadHere,
@@ -59,6 +87,10 @@ export function MangaRemote({
   const hintTimer = useRef(0);
   const [zoomFlash, setZoomFlash] = useState(false);
   const zoomFlashTimer = useRef(0);
+  const panRaf = useRef(0);
+  const panAcc = useRef({ x: 0, y: 0 });
+  const zoomRaf = useRef(0);
+  const zoomPending = useRef<number | null>(null);
   const zoomPct = m ? Math.round(m.zoom * 100) : 100;
   useEffect(() => {
     if (!chromeHidden) {
@@ -71,6 +103,15 @@ export function MangaRemote({
     zoomFlashTimer.current = window.setTimeout(() => setZoomFlash(false), 1500);
     return () => window.clearTimeout(zoomFlashTimer.current);
   }, [zoomPct, chromeHidden]);
+  useEffect(
+    () => () => {
+      if (panRaf.current) cancelAnimationFrame(panRaf.current);
+      panRaf.current = 0;
+      if (zoomRaf.current) cancelAnimationFrame(zoomRaf.current);
+      zoomRaf.current = 0;
+    },
+    [],
+  );
   const [layout, setLayout] = useRemoteLayout();
   const [showPreview, setShowPreview] = useStripPreview();
   const prevMode = useRef<string | null>(null);
@@ -85,9 +126,7 @@ export function MangaRemote({
           ? "strip-h"
           : mode === "paged" || mode === "double"
             ? "tap"
-            : mode === "book"
-              ? "swipe"
-              : "strip";
+            : "swipe";
     setLayout(mapped);
   }, [m?.mode, setLayout]);
   const [feedPage, setFeedPage] = useState<number | null>(null);
@@ -111,7 +150,7 @@ export function MangaRemote({
   useEffect(() => {
     if (feedPage == null || displayPage === feedPage) return;
     if ((m?.seq ?? -1) === feedState.current.seq) return;
-    if (performance.now() - feedState.current.t < 1200) return;
+    if (performance.now() - feedState.current.t < 500) return;
     setFeedPage(null);
   }, [displayPage, feedPage, m?.seq]);
 
@@ -129,6 +168,7 @@ export function MangaRemote({
     { id: "strip-h", label: t("Horizontal strip"), Icon: GalleryHorizontal },
     { id: "tap", label: t("Tap sides to turn"), Icon: MousePointerClick },
   ];
+  const isDouble = m?.mode === "double";
   const turn = (dir: TurnDir) => {
     const sent = sendCommand({ action: "mangaTurnPage", dir });
     if (sent) advance(dir);
@@ -160,7 +200,31 @@ export function MangaRemote({
     if (commit && sent) advance(dir);
     else if (!sent) flash(t("Reconnecting to your computer"));
   };
-  const zoomAbs = (z: number) => sendCommand({ action: "mangaSetZoom", zoom: clampZoom(z) });
+  const zoomAbs = (z: number) => {
+    zoomPending.current = clampZoom(z);
+    if (zoomRaf.current) return;
+    zoomRaf.current = requestAnimationFrame(() => {
+      zoomRaf.current = 0;
+      const next = zoomPending.current;
+      zoomPending.current = null;
+      if (next != null) sendCommand({ action: "mangaSetZoom", zoom: next });
+    });
+  };
+  const sendPan = (dx: number, dy: number) => {
+    const acc = panAcc.current;
+    acc.x += dx;
+    acc.y += dy;
+    if (panRaf.current) return;
+    panRaf.current = requestAnimationFrame(() => {
+      panRaf.current = 0;
+      const x = acc.x;
+      const y = acc.y;
+      acc.x = 0;
+      acc.y = 0;
+      if (Math.abs(x) < 0.5 && Math.abs(y) < 0.5) return;
+      sendCommand({ action: "mangaPan", dx: x, dy: y });
+    });
+  };
   const chromeCls = `${reduce ? "" : "transition-opacity duration-200 "}${chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"}`;
   const chromeVisible = !chromeHidden;
   const zoomBadgeVisible = (chromeVisible && zoomPct !== 100) || zoomFlash;
@@ -271,6 +335,7 @@ export function MangaRemote({
             tapZones: layout === "tap",
             onTurn: turn,
             onZoom: zoomAbs,
+            onPan: sendPan,
             onToggleChrome: () => setChromeHidden((v) => !v),
             progressive: layout === "swipe" && m.mode === "book",
             onDrag: flipProgress,
@@ -310,20 +375,24 @@ export function MangaRemote({
                       sendCommand({ action: "mangaSetMode", mode: "long" });
                     } else if (id === "strip-h" && desktop !== "long-h") {
                       sendCommand({ action: "mangaSetMode", mode: "long-h" });
-                    } else if (
-                      id === "tap" &&
-                      desktop !== "paged" &&
-                      desktop !== "double" &&
-                      desktop !== "book"
-                    ) {
-                      sendCommand({ action: "mangaSetMode", mode: "paged" });
+                    } else if (id === "tap") {
+                      sendCommand({
+                        action: "mangaSetMode",
+                        mode: desktop === "paged" ? "double" : "paged",
+                      });
+                    } else if (id === "swipe" && desktop !== "book") {
+                      sendCommand({ action: "mangaSetMode", mode: "book" });
                     }
                   }}
                   className={`grid h-10 min-w-0 flex-1 place-items-center rounded-full transition-transform active:scale-90 ${
                     active ? "bg-accent text-canvas" : "text-ink-muted"
                   }`}
                 >
-                  <Icon size={18} strokeWidth={2.2} />
+                  {id === "tap" ? (
+                    <TapPagesIcon size={18} double={isDouble} />
+                  ) : (
+                    <Icon size={18} strokeWidth={2.2} />
+                  )}
                 </button>
               );
             })}

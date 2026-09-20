@@ -114,6 +114,7 @@ export function MangaReader({
   const didSeek = useRef(false);
   const settled = useRef(false);
   const bookApi = useRef<BookApi | null>(null);
+  const pendingBookPage = useRef<number | null>(null);
   const { activeId } = useProfiles();
   const pid = activeId ?? "default";
   const { settings } = useSettings();
@@ -583,11 +584,13 @@ export function MangaReader({
   const [bookStart, setBookStart] = useState(bookResume);
   const wasBookRef = useRef(book);
   useEffect(() => {
-    if (book && !wasBookRef.current) setBookStart(pageRef.current);
+    if (book && !wasBookRef.current)
+      setBookStart((prev) => (prev === pageRef.current ? prev : pageRef.current));
     wasBookRef.current = book;
   }, [book]);
   useEffect(() => {
-    setBookStart(didSeek.current ? 0 : bookResume);
+    const next = didSeek.current ? 0 : bookResume;
+    setBookStart((prev) => (prev === next ? prev : next));
   }, [bookResume]);
   useEffect(() => {
     if ((effMode !== "long" && effMode !== "long-h") || loading || failed) return;
@@ -732,10 +735,33 @@ export function MangaReader({
     [],
   );
 
+  useEffect(() => {
+    if (!book || complete) bookApi.current = null;
+  }, [book, complete]);
+
   const remoteSetPage = (page: number, scroll?: number, vel?: number) => {
     const clamped = Math.max(0, Math.min(Math.max(0, total - 1), page));
     if (book) {
-      bookApi.current?.goToPage(clamped + 1);
+      const api = bookApi.current;
+      if (!api) {
+        pendingBookPage.current = clamped;
+        setCurrentPage(clamped);
+        return;
+      }
+      if (api && api.view() !== 1) {
+        // Wide desktop shows two-page spreads while single-page callers
+        // advance one page per turn: step across spread boundaries with the
+        // same queued turns the on-screen buttons use, instead of absolute
+        // targets the flipbook silently normalizes into no-ops.
+        const spreadOf = (p: number) => Math.floor(p / 2);
+        const d = spreadOf(clamped) - spreadOf(currentPage);
+        if (d !== 0) {
+          if (Math.abs(d) === 1) bookTurn(d > 0 ? "next" : "prev");
+          else api.goToPage(clamped + 2 - (clamped % 2));
+        }
+      } else {
+        bookApi.current?.goToPage(clamped + 1);
+      }
       setCurrentPage(clamped);
       return;
     }
@@ -917,6 +943,11 @@ export function MangaReader({
               }}
               onReady={(api) => {
                 bookApi.current = api;
+                const pending = pendingBookPage.current;
+                if (pending != null) {
+                  pendingBookPage.current = null;
+                  remoteSetPage(pending);
+                }
               }}
             />
           </div>

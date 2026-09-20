@@ -11,6 +11,7 @@ export function ModeBook({
   zoom = 1,
   onZoom,
   onToggleChrome,
+  onPan,
   onTurn,
   onReady,
 }: {
@@ -21,11 +22,12 @@ export function ModeBook({
   zoom?: number;
   onZoom?: (z: number) => void;
   onToggleChrome: () => void;
+  onPan?: (dx: number, dy: number) => void;
   onTurn?: (dir: "next" | "prev") => void;
   onReady?: (api: BookApi) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const pinch = usePinchZoom({ zoom, onZoom, rootRef: wrapRef });
+  const pinch = usePinchZoom({ zoom, onZoom, onPan, rootRef: wrapRef });
   const proxiedPages = useMemo(() => pages.map(proxied), [pages]);
   const turnRef = useRef(onTurn);
   turnRef.current = onTurn;
@@ -88,7 +90,7 @@ export function ModeBook({
     <div
       ref={wrapRef}
       className="h-full w-full"
-      style={onZoom ? { touchAction: "pan-x pan-y" } : undefined}
+      style={{ touchAction: "none" }}
       onClickCapture={() => {
         if (pinch.shouldSuppressClick()) return;
         onToggleChrome();

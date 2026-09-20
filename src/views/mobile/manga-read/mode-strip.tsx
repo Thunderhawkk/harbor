@@ -17,6 +17,7 @@ export function ModeStrip({
   zoom = 1,
   applyZoom = false,
   onZoom,
+  onPan,
 }: {
   pages: string[];
   initialPage: number;
@@ -29,6 +30,7 @@ export function ModeStrip({
   zoom?: number;
   applyZoom?: boolean;
   onZoom?: (z: number) => void;
+  onPan?: (dx: number, dy: number) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const els = useRef<Array<HTMLDivElement | null>>([]);
@@ -36,7 +38,7 @@ export function ModeStrip({
   change.current = onPageChange;
   const scrollState = useRef(onScrollState);
   scrollState.current = onScrollState;
-  const pinch = usePinchZoom({ zoom, onZoom, rootRef });
+  const pinch = usePinchZoom({ zoom, onZoom, onPan, rootRef });
 
   const onRootClick = () => {
     if (pinch.shouldSuppressClick()) return;

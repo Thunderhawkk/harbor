@@ -98,6 +98,7 @@ function sampledAspect(srcs: string[]): Promise<number> {
 
 export type BookApi = {
   goToPage: (page: number) => void;
+  view: () => number;
   next: () => void;
   prev: () => void;
   pan: (dx: number, dy: number) => void;
@@ -322,6 +323,15 @@ export function BookFlip({
             local?.goToPage?.(n);
           } catch {
             /* noop */
+          }
+        },
+        view: () => {
+          try {
+            if (local == null) return 1;
+            const v = (local as unknown as { view?: unknown }).view;
+            return typeof v === "number" ? v : 1;
+          } catch {
+            return 1;
           }
         },
         next: () => {

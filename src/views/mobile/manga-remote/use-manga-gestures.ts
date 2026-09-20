@@ -26,6 +26,7 @@ export type MangaGestureInput = {
   tapZones?: boolean;
   onTurn: (dir: TurnDir) => void;
   onZoom: (zoom: number) => void;
+  onPan?: (dx: number, dy: number) => void;
   onToggleChrome: () => void;
   progressive?: boolean;
   onDrag?: (progress: number) => void;
@@ -60,6 +61,8 @@ export function useMangaGestures(input: MangaGestureInput) {
     pinchD0: 0,
     pinchZoom0: 1,
     lastSentZoom: -1,
+    panX: Number.NaN,
+    panY: Number.NaN,
     raf: 0,
     streamRaf: 0,
     streamVal: 0,
@@ -209,6 +212,8 @@ export function useMangaGestures(input: MangaGestureInput) {
         st.current.pinchD0 = 0;
       }
       setVisual((v) => ({ ...v, tx: 0, ty: 0, hintDir: null }));
+      st.current.panX = Number.NaN;
+      st.current.panY = Number.NaN;
       return;
     }
 
@@ -248,6 +253,20 @@ export function useMangaGestures(input: MangaGestureInput) {
       if (z !== st.current.lastSentZoom) {
         st.current.lastSentZoom = z;
         input.onZoom(z);
+      }
+      if (input.onPan) {
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        if (Number.isNaN(st.current.panX)) {
+          st.current.panX = mx;
+          st.current.panY = my;
+        } else {
+          const dx = mx - st.current.panX;
+          const dy = my - st.current.panY;
+          st.current.panX = mx;
+          st.current.panY = my;
+          if (dx !== 0 || dy !== 0) input.onPan(dx, dy);
+        }
       }
       return;
     }
@@ -297,6 +316,8 @@ export function useMangaGestures(input: MangaGestureInput) {
       if (remaining === 0) {
         st.current.pinchD0 = 0;
         st.current.lastSentZoom = -1;
+        st.current.panX = Number.NaN;
+        st.current.panY = Number.NaN;
         st.current.mode = "idle";
         setVisual((v) => ({ ...v, scale: 1, tx: 0, ty: 0, hintDir: null }));
       }
@@ -353,6 +374,8 @@ export function useMangaGestures(input: MangaGestureInput) {
       s.ty = 0;
       s.lastSentZoom = -1;
       s.lastTapAt = 0;
+      s.panX = Number.NaN;
+      s.panY = Number.NaN;
       if (s.raf) cancelAnimationFrame(s.raf);
       s.raf = 0;
       if (s.streamRaf) cancelAnimationFrame(s.streamRaf);
