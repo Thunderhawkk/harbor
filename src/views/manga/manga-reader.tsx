@@ -149,6 +149,13 @@ export function MangaReader({
 
   const total = pages.length;
   const pageUrls = useMemo(() => pages.map((p) => p.url), [pages]);
+  const pageHeaders = useMemo(() => {
+    const map: Record<string, Record<string, string>> = {};
+    for (const p of pages) {
+      if (p.headers && Object.keys(p.headers).length > 0) map[p.url] = p.headers;
+    }
+    return map;
+  }, [pages]);
   // The reader collapses provider copies itself: callers pass the raw
   // interleaved list, and navigation walks one representative per chapter
   // group - the group's newest winner. When the caller opened a specific
@@ -902,6 +909,7 @@ export function MangaReader({
               resumePage={bookStart}
               soundEnabled={prefs.flipSound}
               zoom={prefs.zoom}
+              pageHeaders={pageHeaders}
               onProgress={(p, sp) => {
                 setCurrentPage(p);
                 setBookSpread(sp);
