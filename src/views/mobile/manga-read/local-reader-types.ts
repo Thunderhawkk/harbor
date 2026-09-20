@@ -63,7 +63,6 @@ export function saveStripPreview(show: boolean): void {
 }
 
 export const LOCAL_ZOOM_KEY = "harbor.localreader.zoom.v1";
-
 export function loadLocalZoom(): number {
   try {
     const v = Number(localStorage.getItem(LOCAL_ZOOM_KEY));
@@ -77,6 +76,27 @@ export function loadLocalZoom(): number {
 export function saveLocalZoom(zoom: number): void {
   try {
     localStorage.setItem(LOCAL_ZOOM_KEY, String(zoom));
+  } catch {
+    return;
+  }
+}
+
+export const LOCAL_RTL_KEY = "harbor.localreader.rtl.v1";
+
+export function loadLocalRtl(): boolean | null {
+  try {
+    const v = localStorage.getItem(LOCAL_RTL_KEY);
+    if (v === "rtl") return true;
+    if (v === "ltr") return false;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function saveLocalRtl(rtl: boolean): void {
+  try {
+    localStorage.setItem(LOCAL_RTL_KEY, rtl ? "rtl" : "ltr");
   } catch {
     return;
   }

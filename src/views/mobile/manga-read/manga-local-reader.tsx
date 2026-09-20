@@ -7,8 +7,9 @@ import { ReaderDock } from "./reader-dock";
 import { ModeStrip } from "./mode-strip";
 import { ModePaged } from "./mode-paged";
 import { ModeBook } from "./mode-book";
+import type { BookApi } from "@/views/manga/manga-reader/book-view";
 import { useLocalPager } from "./hooks/use-local-pager";
-import { loadLocalMode, loadLocalZoom, loadStripPreview, mapDesktopMode, mapLocalToDesktopMode, saveLocalMode, saveLocalZoom, saveStripPreview, type LocalMode } from "./local-reader-types";
+import { loadLocalMode, loadLocalRtl, loadLocalZoom, loadStripPreview, mapDesktopMode, mapLocalToDesktopMode, saveLocalMode, saveLocalRtl, saveLocalZoom, saveStripPreview, type LocalMode } from "./local-reader-types";
 
 export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   const { snapshot, sendCommand } = useMobileRemote();
@@ -38,11 +39,13 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
   }, [zoomPct, chromeHidden]);
   const [bookSpread, setBookSpread] = useState("");
   const [bookStart, setBookStart] = useState(() => m?.pageIndex ?? 0);
+  const bookApiLocal = useRef<BookApi | null>(null);
 
   const chapterId = m?.chapterId ?? "";
   const chapterIndex = m?.chapterIndex ?? 0;
   const chapterLabel = m?.chapterLabel ?? "";
-  const rtl = m?.rtl ?? true;
+  const [localRtl, setLocalRtl] = useState<boolean | null>(loadLocalRtl);
+  const rtl = localRtl ?? m?.rtl ?? true;
   const hasPrev = m?.hasPrev ?? false;
   const hasNext = m?.hasNext ?? false;
 
@@ -164,6 +167,13 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
     sendCommand({ action: "mangaSetPagesHidden", hidden: !next });
   };
 
+  const toggleDirection = () => {
+    const next = !rtl;
+    setLocalRtl(next);
+    saveLocalRtl(next);
+    sendCommand({ action: "mangaSetRtl", rtl: next });
+  };
+
   const handleExit = () => {
     setShowPreview(true);
     saveStripPreview(true);
@@ -220,6 +230,13 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
               reportStripPage(p);
               setBookSpread(sp);
             }}
+            onTurn={(dir) => {
+              if (dir === "next") bookApiLocal.current?.next();
+              else bookApiLocal.current?.prev();
+            }}
+            onReady={(api) => {
+              bookApiLocal.current = api;
+            }}
           />
         ) : (
           <ModePaged
@@ -243,9 +260,11 @@ export function MangaLocalReader({ onExit }: { onExit: () => void }) {
           mode={mode}
           reduce={reduce}
           showPreview={showPreview}
+          rtl={rtl}
           onExit={handleExit}
           onPickMode={pickMode}
           onTogglePreview={togglePreview}
+          onToggleDirection={toggleDirection}
         />
       </div>
 
