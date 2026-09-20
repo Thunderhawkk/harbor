@@ -34,7 +34,13 @@ import {
 } from "./shared";
 import { useReportFeatured } from "./featured-context";
 
-export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
+export function WatchlistTab({
+  mode,
+  scrollRef,
+}: {
+  mode: "library" | "watchlist";
+  scrollRef?: React.RefObject<HTMLElement | null>;
+}) {
   const tr = useT();
   const { authKey } = useAuth();
   const { settings } = useSettings();
@@ -175,7 +181,11 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
           {tr("No matches for these filters.")}
         </p>
       ) : settings.librarySort !== "recent" ? (
-        <GroupedGrid groups={sortedGroups(visible, settings.librarySort)} onRemove={handleRemove} />
+        <GroupedGrid
+          groups={sortedGroups(visible, settings.librarySort)}
+          onRemove={handleRemove}
+          scrollRef={scrollRef}
+        />
       ) : flat ? (
         <GroupedGrid
           groups={[
@@ -185,9 +195,10 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
             },
           ]}
           onRemove={handleRemove}
+          scrollRef={scrollRef}
         />
       ) : (
-        <GroupedGrid groups={groupByDate(visible)} onRemove={handleRemove} />
+        <GroupedGrid groups={groupByDate(visible)} onRemove={handleRemove} scrollRef={scrollRef} />
       )}
     </section>
   );
