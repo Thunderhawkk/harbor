@@ -1,13 +1,13 @@
 # Music, Sports and HDR work-in-progress checkpoint
 
-Date: 2026-09-20. Branch: `codex/j-music-sports-hdr`.
+Date: 2026-09-20. Branch: `codex/music-sports-hdr`.
 
 This checkpoint preserves the current work; it is not approval to publish a release.
 
 ## Included
 
-- J's selectively integrated Music and Sports features, their shared/native dependencies, assets, translations, and tests.
-- J's HDR display-restoration work and the subsequent overlay startup/handshake changes: companion profile context, forwarded player navigation, listener ordering, readiness-gated display, attempt IDs, cleanup/recovery, and physical client-bound positioning.
+- The selectively integrated Music and Sports features, their shared/native dependencies, assets, translations, and tests.
+- The imported HDR display-restoration work and the subsequent overlay startup/handshake changes: companion profile context, forwarded player navigation, listener ordering, readiness-gated display, attempt IDs, cleanup/recovery, and physical client-bound positioning.
 - The existing beta 0.9.127 base and regression coverage. No version bump or release-note publication.
 
 ## Unresolved
