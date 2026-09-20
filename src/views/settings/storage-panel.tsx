@@ -4,6 +4,7 @@ import { Check, Database, HardDrive, Trash2 } from "./icons";
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { clearPickerCache } from "@/lib/picker-cache";
+import { clearThumbCache } from "@/lib/remote-image-proxy";
 import { clearMangaCache } from "@/lib/manga/api";
 import { clearEpg } from "@/lib/iptv/epg-store";
 import { clearPlaylistCache } from "@/lib/iptv/store";
@@ -263,6 +264,15 @@ export function StoragePanel() {
               onClear={() => {
                 clearMangaCache();
                 refresh();
+              }}
+            />
+            <ClearRow
+              title={t("Poster thumbnails")}
+              sub={t(
+                "Resized cover cache, kept 30 days up to size limits. Rebuilds as you browse.",
+              )}
+              onClear={() => {
+                void clearThumbCache().finally(() => refresh());
               }}
             />
             <ClearRow

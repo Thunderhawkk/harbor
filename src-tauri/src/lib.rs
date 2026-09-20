@@ -26,6 +26,7 @@ mod streams;
 mod stremio_auth;
 mod subtitle_credentials;
 mod temp_prune;
+mod thumb_cache;
 mod torrent_engine;
 mod transcode;
 mod web_server;
@@ -967,6 +968,7 @@ pub fn run() {
             multiview::multiview_stop_all,
             http_fetch::harbor_fetch,
             http_fetch::harbor_upload,
+            http_fetch::clear_thumb_cache,
             subtitle_credentials::subtitle_credential_bind,
             subtitle_credentials::subtitle_credentials_clear,
             cf_solver::cf_report,

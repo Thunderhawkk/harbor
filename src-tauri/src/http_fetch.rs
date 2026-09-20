@@ -62,8 +62,7 @@ impl ThumbCache {
         })
     }
 
-    fn insert(&mut self, key: String, body: String) {
-        let bytes = body.len();
+    fn insert(&mut self, key: String, body: String) {        let bytes = body.len();
         if bytes > THUMB_CACHE_MAX_BYTES {
             return;
         }
@@ -92,6 +91,11 @@ impl ThumbCache {
         self.total_bytes = self.total_bytes.saturating_add(bytes);
         self.entries.insert(key, ThumbEntry { body, bytes, last_used: tick });
     }
+
+    fn clear(&mut self) {
+        self.entries.clear();
+        self.total_bytes = 0;
+    }
 }
 
 fn thumb_cache() -> &'static Mutex<ThumbCache> {
@@ -105,7 +109,7 @@ fn thumb_cache() -> &'static Mutex<ThumbCache> {
     })
 }
 
-fn make_thumb(bytes: &[u8], width: u32) -> Option<String> {
+fn make_thumb(bytes: &[u8], width: u32) -> Option<Vec<u8>> {
     if width == 0 {
         return None;
     }
@@ -146,10 +150,15 @@ fn make_thumb(bytes: &[u8], width: u32) -> Option<String> {
     if buf.is_empty() {
         return None;
     }
-    Some(base64::engine::general_purpose::STANDARD.encode(&buf))
+    Some(buf)
 }
 
-async fn thumb_or_base64(url: &str, width: Option<u32>, bytes: &[u8]) -> String {
+async fn thumb_or_base64(
+    app: &tauri::AppHandle,
+    url: &str,
+    width: Option<u32>,
+    bytes: &[u8],
+) -> String {
     let encode_original = || base64::engine::general_purpose::STANDARD.encode(bytes);
     let Some(w) = width.filter(|w| *w > 0) else {
         return encode_original();
@@ -158,18 +167,49 @@ async fn thumb_or_base64(url: &str, width: Option<u32>, bytes: &[u8]) -> String 
     if let Some(hit) = thumb_cache().lock().await.get(&key) {
         return hit;
     }
+    let disk_app = app.clone();
+    let disk_url = url.to_string();
+    if let Some(disk) = tokio::task::spawn_blocking(move || {
+        crate::thumb_cache::read_thumb(&disk_app, &disk_url, w)
+    })
+    .await
+    .ok()
+    .flatten()
+    {
+        let body = base64::engine::general_purpose::STANDARD.encode(&disk);
+        thumb_cache().lock().await.insert(key, body.clone());
+        return body;
+    }
     let owned = bytes.to_vec();
     let made = tokio::task::spawn_blocking(move || make_thumb(&owned, w))
         .await
         .ok()
         .flatten();
     match made {
-        Some(body) => {
+        Some(buf) => {
+            let body = base64::engine::general_purpose::STANDARD.encode(&buf);
+            let write_app = app.clone();
+            let write_url = url.to_string();
+            tokio::task::spawn_blocking(move || {
+                crate::thumb_cache::write_thumb(&write_app, &write_url, w, &buf);
+            })
+            .await
+            .ok();
             thumb_cache().lock().await.insert(key, body.clone());
             body
         }
         None => encode_original(),
     }
+}
+
+#[tauri::command]
+pub async fn clear_thumb_cache(app: tauri::AppHandle) -> Result<(), String> {
+    thumb_cache().lock().await.clear();
+    let app = app.clone();
+    tokio::task::spawn_blocking(move || crate::thumb_cache::clear_thumb_dir(&app))
+        .await
+        .map_err(|error| format!("clear: {error}"))?;
+    Ok(())
 }
 
 fn is_blocked_ip(ip: IpAddr) -> bool {
@@ -650,13 +690,13 @@ async fn harbor_fetch_inner(
             bytes.extend_from_slice(&chunk);
         }
         if args.response_type.as_deref() == Some("base64") {
-            thumb_or_base64(&final_url, args.thumb_width_px, &bytes).await
+            thumb_or_base64(&app, &final_url, args.thumb_width_px, &bytes).await
         } else {
             String::from_utf8_lossy(&bytes).into_owned()
         }
     } else if args.response_type.as_deref() == Some("base64") {
         match res.bytes().await {
-            Ok(bytes) => thumb_or_base64(&final_url, args.thumb_width_px, &bytes).await,
+            Ok(bytes) => thumb_or_base64(&app, &final_url, args.thumb_width_px, &bytes).await,
             Err(_) => String::new(),
         }
     } else {

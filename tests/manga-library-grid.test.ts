@@ -45,4 +45,16 @@ test("proxied covers request server-side thumbnails", () => {
   assert.match(proxy, /thumbWidthPx/, "proxy must request thumb_width_px");
   assert.match(proxy, /forceProxy/, "proxy must support forced thumbnailing");
   assert.match(proxy, /posterQuality/, "proxy must respect the poster quality setting");
+  assert.match(proxy, /clearThumbCache/, "proxy must expose thumbnail cache clearing");
+});
+
+test("thumbnail disk cache persists resizes with age and size caps", () => {
+  const disk = read("src-tauri/src/thumb_cache.rs");
+  assert.match(disk, /MAX_AGE/, "disk cache must bound entry age");
+  assert.match(disk, /MAX_BYTES/, "disk cache must bound total size");
+  assert.match(disk, /clear_thumb_dir/, "disk cache must support clearing");
+  const lib = read("src-tauri/src/lib.rs");
+  assert.match(lib, /clear_thumb_cache/, "clear command must be registered");
+  const panel = read("src/views/settings/storage-panel.tsx");
+  assert.match(panel, /Poster thumbnails/, "caches tab must offer poster thumbnail clearing");
 });

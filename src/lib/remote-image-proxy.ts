@@ -50,6 +50,15 @@ const blobCache = new Map<string, string>();
 // image body. The in-flight map is for the row where twenty cells share a logo.
 const deadUrls = new Set<string>();
 const inflight = new Map<string, Promise<string | null>>();
+// Keys written through the thumbnail path, so "clear poster cache" can drop
+// exactly those entries without disturbing other proxied images.
+const thumbKeys = new Set<string>();
+
+export async function clearThumbCache(): Promise<void> {
+  for (const key of thumbKeys) blobCache.delete(key);
+  thumbKeys.clear();
+  await invoke("clear_thumb_cache");
+}
 
 function proxyImage(url: string, thumbWidthPx?: number): Promise<string | null> {
   const key = cacheKeyFor(url, thumbWidthPx);
@@ -77,6 +86,7 @@ function proxyImage(url: string, thumbWidthPx?: number): Promise<string | null> 
       if (type && !type.startsWith("image/")) throw new Error(`type ${type}`);
       const created = URL.createObjectURL(new Blob([base64ToBytes(resp.body)], { type }));
       blobCache.set(key, created);
+      if (thumbWidthPx != null) thumbKeys.add(key);
       return created;
     } catch {
       deadUrls.add(url);
