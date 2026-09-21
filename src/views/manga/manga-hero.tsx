@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePageVisible } from "@/lib/visibility";
 import { useT } from "@/lib/i18n";
 import { NavArrow } from "@/components/nav-arrow";
+import { useContextMenu } from "@/lib/context-menu";
 import { useIsMangaFavorite, useMangaFavorites } from "@/lib/manga-favorites";
 import type { MangaSummary } from "@/lib/manga/model";
 import { CollectionBadges } from "./collection-badge";
@@ -34,6 +35,7 @@ export function MangaHero({
   const [visible, setVisible] = useState(true);
   const [paused, setPaused] = useState(false);
   const { toggle } = useMangaFavorites();
+  const { open: openContextMenu } = useContextMenu();
 
   const pageVisible = usePageVisible();
   useEffect(() => {
@@ -78,6 +80,15 @@ export function MangaHero({
       className="group relative harbor-hero-bleed harbor-hero-bleed-top overflow-hidden"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onContextMenu={(e) => {
+        if (!current) return;
+        openContextMenu(e, {
+          kind: "manga",
+          id: current.id,
+          title: current.title,
+          cover: current.cover,
+        });
+      }}
     >
       <div className="absolute inset-0 z-0">
         <img

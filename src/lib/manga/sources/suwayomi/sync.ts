@@ -70,11 +70,12 @@ export async function pushChapterProgress(
   chapterId: string,
   page: number,
   totalPages: number,
+  completed?: boolean,
 ): Promise<boolean> {
   const parsed = decodeChapterId(chapterId);
   if (!parsed) return false;
   const server = makeServer(baseUrl);
-  const finished = totalPages > 0 && page >= totalPages - 1;
+  const finished = completed ?? (totalPages > 0 && page >= totalPages - 1);
   const lastPageRead = Math.max(0, page);
   if (await gqlUpdate(server, parsed.key, finished, lastPageRead)) return true;
   return restUpdate(server, parsed.mangaId, parsed.key, finished, lastPageRead);

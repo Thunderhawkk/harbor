@@ -18,6 +18,12 @@ import { mangaBackdrop } from "@/lib/manga/backdrop";
 import { collectionsForTitle } from "@/lib/manga/collections";
 import { useIsMangaFavorite, useMangaFavorites } from "@/lib/manga-favorites";
 import { useMangaProgressEntry, type MangaProgressEntry } from "@/lib/manga-progress";
+import { chapterNumberKey } from "@/lib/manga/chapter-identity";
+import {
+  MANGA_READ_CHAPTER_EVENT,
+  setMangaChapterIntent,
+  takeMangaChapterIntent,
+} from "@/lib/manga/read-intent";
 import { setMangaDetails } from "@/lib/manga-downloads";
 import {
   chapterLanguages,
@@ -167,6 +173,7 @@ export function MangaDetail({
   onBack,
   onOpenManga,
   onOpenDownloads,
+  scrollRoot,
 }: {
   mangaId: string;
   onRead: (
@@ -178,6 +185,7 @@ export function MangaDetail({
   onBack: () => void;
   onOpenManga: (id: string) => void;
   onOpenDownloads?: () => void;
+  scrollRoot?: React.RefObject<HTMLElement | null>;
 }) {
   const t = useT();
   const [detail, setDetail] = useState<MangaSummary | null>(null);
@@ -279,6 +287,29 @@ export function MangaDetail({
     void setMangaDetails(mangaId, detail.title, detail.cover);
   }, [mangaId, detail?.title, detail?.cover]);
 
+  useEffect(() => {
+    const openChapter = (chapterId: string) => {
+      if (chapters.length === 0) return false;
+      const pool = chapters.filter((c) => c.language === selectedLang);
+      const list = pool.length > 0 ? pool : chapters;
+      const i = list.findIndex((c) => c.id === chapterId);
+      if (i < 0) return false;
+      onRead(list, i, { id: mangaId, title: detail?.title ?? "", cover: detail?.cover });
+      return true;
+    };
+    if (chapters.length > 0) {
+      const intent = takeMangaChapterIntent(mangaId);
+      if (intent) openChapter(intent.chapterId);
+    }
+    const onRequest = (e: Event) => {
+      const req = (e as CustomEvent<{ mangaId: string; chapterId: string }>).detail;
+      if (!req || req.mangaId !== mangaId) return;
+      if (!openChapter(req.chapterId)) setMangaChapterIntent(req);
+    };
+    window.addEventListener(MANGA_READ_CHAPTER_EVENT, onRequest);
+    return () => window.removeEventListener(MANGA_READ_CHAPTER_EVENT, onRequest);
+  }, [mangaId, chapters, selectedLang]);
+
   const langs = useMemo(() => chapterLanguages(chapters), [chapters]);
   const langFiltered = useMemo(
     () => chapters.filter((c) => c.language === selectedLang),
@@ -311,6 +342,24 @@ export function MangaDetail({
     : "";
   const bannerSrc = backdrop || detail?.cover;
   const canRead = langFiltered.length > 0;
+  const handleResume = (entry: MangaProgressEntry) => {
+    const pool = langFiltered.length > 0 ? langFiltered : chapters;
+    let i = pool.findIndex((c) => c.id === entry.chapterId);
+    if (i < 0) {
+      const want = chapterNumberKey(entry.chapterNumber) ?? chapterNumberKey(entry.chapterLabel);
+      if (want != null) {
+        i = pool.findIndex((c) => chapterNumberKey(c.chapter ?? c.title ?? "") === want);
+      }
+    }
+    if (i < 0 && entry.chapterNumber != null) {
+      i = pool.findIndex((c) => c.chapter != null && c.chapter === entry.chapterNumber);
+    }
+    if (i >= 0) {
+      onRead(pool, i, mangaMeta);
+      return;
+    }
+    onResume?.(entry);
+  };
   const longDesc = (enriched.description?.length ?? 0) > 280;
 
   const pills: string[] = [];
@@ -451,7 +500,7 @@ export function MangaDetail({
                 {progress && onResume ? (
                   <button
                     type="button"
-                    onClick={() => onResume(progress)}
+                    onClick={() => handleResume(progress)}
                     className="inline-flex h-12 items-center gap-2 rounded-full bg-white/[0.06] px-6 text-[15px] font-semibold text-ink ring-1 ring-inset ring-edge-soft transition-colors duration-150 hover:bg-white/[0.10] active:scale-[0.98]"
                   >
                     <RotateCcw size={17} strokeWidth={2.2} />
@@ -569,6 +618,7 @@ export function MangaDetail({
         mangaCover={detail?.cover}
         animeEndChapter={coverage?.endChapter}
         pending={chaptersPending}
+        scrollRoot={scrollRoot}
       />
 
       {detail?.title && <MangaRecommendedRail title={detail.title} onOpen={onOpenManga} />}

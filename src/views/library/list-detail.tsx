@@ -4,10 +4,9 @@ import { flushSync } from "react-dom";
 import type { Meta } from "@/lib/cinemeta";
 import {
   MAX_ITEMS,
-  removeFromList,
-  reorderListItems,
-  useList,
+  sharedLists,
   type ListItem,
+  type ListStore,
 } from "@/lib/custom-lists";
 import { relativeTime } from "@/lib/dates";
 import { useT } from "@/lib/i18n";
@@ -27,9 +26,19 @@ function itemToMeta(it: ListItem): Meta {
   };
 }
 
-export function ListDetail({ listId, onBack }: { listId: string; onBack: () => void }) {
+export function ListDetail({
+  listId,
+  onBack,
+  store = sharedLists,
+  showSearch = true,
+}: {
+  listId: string;
+  onBack: () => void;
+  store?: ListStore;
+  showSearch?: boolean;
+}) {
   const t = useT();
-  const list = useList(listId);
+  const list = store.useList(listId);
   const itemElsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const dragCleanupRef = useRef<(() => void) | null>(null);
   const suppressClick = useRef(false);
@@ -143,7 +152,7 @@ export function ListDetail({ listId, onBack }: { listId: string; onBack: () => v
         el.style.willChange = "";
       }
       if (changed && list) {
-        reorderListItems(list.id, curOrder);
+        store.reorderListItems(list.id, curOrder);
       }
     }
 
@@ -182,10 +191,10 @@ export function ListDetail({ listId, onBack }: { listId: string; onBack: () => v
               ` · ${t("Updated {when}", { when: relativeTime(list.updatedAt) })}`}
           </p>
         </div>
-        <ListSettingsMenu list={list} onDeleted={onBack} />
+        <ListSettingsMenu list={list} onDeleted={onBack} store={store} />
       </div>
 
-      <AddTitleSearch list={list} />
+      {showSearch && <AddTitleSearch list={list} store={store} />}
 
       {orderedItems.length === 0 ? (
         <EmptyList />
@@ -214,7 +223,7 @@ export function ListDetail({ listId, onBack }: { listId: string; onBack: () => v
               <button
                 type="button"
                 aria-label={t("Remove from list")}
-                onClick={() => removeFromList(list.id, it.id)}
+                onClick={() => store.removeFromList(list.id, it.id)}
                 className="absolute end-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-canvas/85 text-ink opacity-0 ring-1 ring-edge-soft/70 backdrop-blur-sm transition-opacity hover:bg-canvas hover:text-danger group-hover/item:opacity-100 focus:opacity-100"
               >
                 <X size={14} strokeWidth={2.4} />

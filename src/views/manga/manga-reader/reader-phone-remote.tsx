@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { Check, Copy, Smartphone, X } from "lucide-react";
 import { mangaRemoteUiUrl } from "@/lib/remote/protocol";
+import { QR_DARK, QR_LIGHT, buildHandoffQr } from "@/lib/tv-handoff/handoff-qr";
 import { Tooltip } from "@/views/detail/tooltip";
 import { useT } from "@/lib/i18n";
 
@@ -24,6 +25,23 @@ export function PhoneRemoteButton() {
       </Tooltip>
       {open && <PhoneRemoteModal onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+function Qr({ url }: { url: string }) {
+  const qr = useMemo(() => buildHandoffQr(url), [url]);
+  if (!qr) return null;
+  return (
+    <svg
+      viewBox={qr.viewBox}
+      shapeRendering="crispEdges"
+      className="h-full w-full"
+      role="img"
+      aria-hidden
+    >
+      <rect width={qr.extent} height={qr.extent} rx={1.5} fill={QR_LIGHT} />
+      <path d={qr.path} fill={QR_DARK} />
+    </svg>
   );
 }
 
@@ -107,16 +125,24 @@ function PhoneRemoteModal({ onClose }: { onClose: () => void }) {
         {loading ? (
           <div className="mt-5 h-[52px] animate-pulse rounded-xl bg-elevated motion-reduce:animate-none" />
         ) : url ? (
-          <div className="mt-5 flex items-center gap-2 rounded-xl border border-edge-soft bg-canvas px-3.5 py-3">
-            <span className="min-w-0 flex-1 truncate font-mono text-[14px] text-ink">{url}</span>
-            <button
-              type="button"
-              onClick={copy}
-              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-ink px-2.5 text-[12.5px] font-semibold text-canvas transition-all hover:opacity-90 active:scale-[0.97]"
-            >
-              {copied ? <Check size={14} strokeWidth={2.6} /> : <Copy size={14} />}
-              {copied ? t("Copied") : t("Copy")}
-            </button>
+          <div className="mt-5 flex flex-col items-center gap-3">
+            <span className="block h-[160px] w-[160px] shrink-0 overflow-hidden rounded-xl border border-edge-soft bg-white p-1.5">
+              <Qr url={url} />
+            </span>
+            <p className="text-center text-[12.5px] leading-relaxed text-ink-muted">
+              {t("Scan with your phone camera, or type the address below.")}
+            </p>
+            <div className="flex w-full items-center gap-2 rounded-xl border border-edge-soft bg-canvas px-3.5 py-3">
+              <span className="min-w-0 flex-1 truncate font-mono text-[14px] text-ink">{url}</span>
+              <button
+                type="button"
+                onClick={copy}
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-ink px-2.5 text-[12.5px] font-semibold text-canvas transition-all hover:opacity-90 active:scale-[0.97]"
+              >
+                {copied ? <Check size={14} strokeWidth={2.6} /> : <Copy size={14} />}
+                {copied ? t("Copied") : t("Copy")}
+              </button>
+            </div>
           </div>
         ) : (
           <p className="mt-5 rounded-xl border border-edge-soft bg-canvas px-3.5 py-3 text-[13px] leading-relaxed text-ink-muted">

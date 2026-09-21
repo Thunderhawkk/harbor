@@ -50,7 +50,9 @@ gilrs = { version = "0.11", default-features = false, features = ["xinput"] }
 libc = "0.2"
 socket2 = "0.5"
 base64 = "0.22"
+sha2 = "0.10"
 png = "0.17"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 hound = "3.5"
 kothok-edge-tts = "0.2.10"
 discord-rich-presence = "1.1"

@@ -59,6 +59,7 @@ function titleKeyOf(title: string): string {
  * modules (remote-behind) based on the tracker's recorded progress.
  */
 function candidateChapter(entry: MangaProgressEntry): number | null {
+  if (entry.upNext) return null;
   const cur = chapterValue(entry.chapterNumber);
   if (cur == null) return null;
   if (entry.totalPages <= 0) return cur;
