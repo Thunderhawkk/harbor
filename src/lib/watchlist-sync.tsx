@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { library } from "@/lib/stremio";
 import { fetchWatchlist } from "@/lib/trakt/watchlist";
+import type { TraktItem } from "@/lib/trakt/types";
 import { useTrakt } from "@/lib/trakt/provider";
 import { fetchWatchlist as fetchSimklWatchlist } from "@/lib/simkl/watchlist";
 import { useSimkl } from "@/lib/simkl/provider";
@@ -15,6 +16,73 @@ const STORE: { stremio: string[]; trakt: string[]; simkl: string[] } = {
 
 function pushAggregate() {
   setWatchlistAggregate([...STORE.stremio, ...STORE.trakt, ...STORE.simkl]);
+}
+
+export function setStremioAggregate(ids: string[]): void {
+  STORE.stremio = ids;
+  pushAggregate();
+}
+
+export async function refreshWatchlistAggregates(
+  authKey: string | null,
+  traktConnected: boolean,
+  simklConnected: boolean,
+): Promise<TraktItem[]> {
+  const jobs: Array<Promise<void>> = [];
+  if (authKey) {
+    jobs.push(
+      library(authKey)
+        .then((items) => {
+          STORE.stremio = items
+            .filter((i) => !i.removed && !i.temp)
+            .map((i) => i._id);
+        })
+        .catch(() => {}),
+    );
+  } else {
+    STORE.stremio = [];
+  }
+  let traktItems: TraktItem[] = [];
+  if (traktConnected) {
+    jobs.push(
+      fetchWatchlist()
+        .then((items) => {
+          traktItems = items;
+          const ids: string[] = [];
+          for (const t of items) {
+            if (t.ids.imdb) ids.push(t.ids.imdb);
+            if (t.ids.tmdb) {
+              ids.push(t.type === "movie" ? `tmdb:movie:${t.ids.tmdb}` : `tmdb:tv:${t.ids.tmdb}`);
+            }
+          }
+          STORE.trakt = ids;
+        })
+        .catch(() => {}),
+    );
+  } else {
+    STORE.trakt = [];
+  }
+  if (simklConnected) {
+    jobs.push(
+      fetchSimklWatchlist()
+        .then((items) => {
+          const ids: string[] = [];
+          for (const it of items) {
+            if (it.ids.imdb) ids.push(it.ids.imdb);
+            if (it.ids.tmdb) {
+              ids.push(it.type === "movie" ? `tmdb:movie:${it.ids.tmdb}` : `tmdb:tv:${it.ids.tmdb}`);
+            }
+          }
+          STORE.simkl = ids;
+        })
+        .catch(() => {}),
+    );
+  } else {
+    STORE.simkl = [];
+  }
+  await Promise.all(jobs);
+  pushAggregate();
+  return traktItems;
 }
 
 export function WatchlistSync() {
