@@ -16,6 +16,7 @@ export function usePlayerHotkeys(params: {
   drawMode: boolean;
   setDrawMode: Dispatch<SetStateAction<boolean>>;
   closePlayer: () => Promise<void>;
+  returnToPreview?: () => void;
   playPauseToggle: () => void;
   seekStep: (delta: number) => void;
   seekTo: (sec: number) => void;
@@ -52,6 +53,7 @@ export function usePlayerHotkeys(params: {
     drawMode,
     setDrawMode,
     closePlayer,
+    returnToPreview,
     playPauseToggle,
     seekStep,
     seekTo,
@@ -88,6 +90,7 @@ export function usePlayerHotkeys(params: {
     drawMode,
     setDrawMode,
     closePlayer,
+    returnToPreview,
     playPauseToggle,
     seekStep,
     seekTo,

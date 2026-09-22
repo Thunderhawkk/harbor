@@ -47,6 +47,9 @@ export function ControllerConnectedToast() {
 
   return createPortal(
     <div
+      style={{
+        bottom: "calc(2rem + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px))",
+      }}
       className="pointer-events-none fixed inset-x-0 bottom-8 z-[9998] flex justify-center px-6"
       onTransitionEnd={() => {
         if (!shown) setPad(null);

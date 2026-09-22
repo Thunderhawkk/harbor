@@ -14,6 +14,8 @@ import { ChatPanel } from "./together-modal/chat-panel";
 import { GuestPickToggle } from "./together-modal/guest-pick-toggle";
 import { InvitePanel } from "./together-modal/invite-panel";
 import { ReturnToVideo } from "./together-modal/return-to-video";
+import { ListenTogetherCta } from "./together-modal/listen-together-cta";
+import { useListenTogether } from "@/lib/listen-together/provider";
 import { TogetherRelayBanner } from "./together-relay-banner";
 import { ThreeLiquidGlassSurface } from "@/components/ThreeLiquidGlassSurface";
 
@@ -38,10 +40,7 @@ export function TogetherModalShell() {
     };
   }, [closeModal]);
   return createPortal(
-    <div
-      ref={panelRef}
-      className="animate-panel-in fixed end-4 top-[88px] z-[220]"
-    >
+    <div ref={panelRef} className="animate-panel-in fixed end-4 top-[88px] z-[220]">
       <TogetherPopover modal />
     </div>,
     document.body,
@@ -57,7 +56,20 @@ export function TogetherPopover({
   connectStyle?: "tab" | "popover";
   modal?: boolean;
 } = {}) {
-  const { enabled, snapshot, chat, displayName, setDisplayName, startSession, joinSession, leaveSession, retrySession, sendChat, closeModal, clientId } = useTogether();
+  const {
+    enabled,
+    snapshot,
+    chat,
+    displayName,
+    setDisplayName,
+    startSession,
+    joinSession,
+    leaveSession,
+    retrySession,
+    sendChat,
+    closeModal,
+    clientId,
+  } = useTogether();
   const { openSettings, openPicker, topKind } = useView();
   const { settings, update } = useSettings();
   const { avatar: selfAvatar, color: selfColor } = useSelfIdentity();
@@ -86,7 +98,11 @@ export function TogetherPopover({
     if (!value) return;
     if (/^https?:\/\//i.test(value) || value.includes("harbor-relay=")) {
       try {
-        const url = new URL(value.startsWith("http") ? value : `https://x${value.startsWith("?") ? value : `?${value}`}`);
+        const url = new URL(
+          value.startsWith("http")
+            ? value
+            : `https://x${value.startsWith("?") ? value : `?${value}`}`,
+        );
         const relay = url.searchParams.get("harbor-relay");
         const room = url.searchParams.get("harbor-room");
         if (relay && room) {
@@ -122,8 +138,12 @@ export function TogetherPopover({
     openSettings("relay");
   };
 
-  const participants = useMemo(() => snapshot.participants.slice().sort((a, b) => a.joinedAt - b.joinedAt), [snapshot.participants]);
+  const participants = useMemo(
+    () => snapshot.participants.slice().sort((a, b) => a.joinedAt - b.joinedAt),
+    [snapshot.participants],
+  );
 
+  const listen = useListenTogether();
   const roomMedia = snapshot.syncState;
   const canReturn = inSession && !!roomMedia?.mediaId && topKind !== "player";
   const surfaceShape = modal
@@ -180,7 +200,12 @@ export function TogetherPopover({
   };
 
   return (
-    <TogetherSurface liquid={settings.liquidGlass} label={t("Watch together")} shapeClass={surfaceShape} cornerStyle={surfaceCorners}>
+    <TogetherSurface
+      liquid={settings.liquidGlass}
+      label={t("Watch together")}
+      shapeClass={surfaceShape}
+      cornerStyle={surfaceCorners}
+    >
       <header className="flex items-center justify-between gap-3">
         <h2 className="text-[14px] font-semibold tracking-tight text-ink">
           {view === "link" ? t("Invite via link") : t("Watch together")}
@@ -189,7 +214,9 @@ export function TogetherPopover({
           <button
             type="button"
             onClick={() => setView((v) => (v === "link" ? "default" : "link"))}
-            aria-label={view === "link" ? t("Close invite link panel") : t("Open invite link panel")}
+            aria-label={
+              view === "link" ? t("Close invite link panel") : t("Open invite link panel")
+            }
             aria-pressed={view === "link"}
             className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[10.5px] font-bold uppercase tracking-[0.16em] transition-colors ${
               view === "link"
@@ -204,207 +231,238 @@ export function TogetherPopover({
 
       <TogetherRelayBanner />
 
-      <div
-        key={view}
-        className="flex flex-col gap-4 animate-in fade-in duration-200 ease-out"
-      >
-      {view === "link" && (
-        <InvitePanel
-          relayUrl={settings.togetherRelayUrl}
-          room={snapshot.room}
-          onClose={() => setView("default")}
-        />
-      )}
-      {view === "default" && !enabled && (
-        <div className="flex flex-col gap-3 rounded-lg bg-canvas/50 p-3.5">
-          <div>
-            <p className="text-[13px] text-ink">{t("Watch Together needs a relay.")}</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-ink-muted">
-              {t(
-                "A relay is a tiny Cloudflare Worker that passes play/pause/seek messages between you and your friends. No video data ever touches it. Deploy your own in one click (free tier is plenty), or paste a friend's invite link to use theirs.",
-              )}
-            </p>
-          </div>
-          <input
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-            placeholder={t("Paste invite link")}
-            className="h-10 rounded-lg bg-canvas px-3 text-[12px] text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/50"
+      <div key={view} className="flex flex-col gap-4 animate-in fade-in duration-200 ease-out">
+        {view === "link" && (
+          <InvitePanel
+            relayUrl={settings.togetherRelayUrl}
+            room={snapshot.room}
+            onClose={() => setView("default")}
           />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleJoin}
-              disabled={!joinCode.trim()}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-ink px-3 text-[13px] font-medium text-canvas transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
-            >
-              {t("Join")}
-            </button>
-            <button
-              onClick={goToSettings}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-white/[0.06] px-3 text-[13px] font-medium text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
-            >
-              {t("Open Settings")}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {view === "default" && enabled && !inSession && (
-        <>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-ink-subtle">{t("Your name")}</span>
+        )}
+        {view === "default" && !enabled && (
+          <div className="flex flex-col gap-3 rounded-lg bg-canvas/50 p-3.5">
+            <div>
+              <p className="text-[13px] text-ink">{t("Watch Together needs a relay.")}</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-ink-muted">
+                {t(
+                  "A relay is a tiny Cloudflare Worker that passes play/pause/seek messages between you and your friends. No video data ever touches it. Deploy your own in one click (free tier is plenty), or paste a friend's invite link to use theirs.",
+                )}
+              </p>
+            </div>
             <input
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              onBlur={commitName}
-              onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-              maxLength={32}
-              className="h-10 rounded-lg bg-canvas px-3 text-[13.5px] text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/50"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+              placeholder={t("Paste invite link")}
+              className="h-10 rounded-lg bg-canvas px-3 text-[12px] text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/50"
             />
-          </label>
-
-          <button
-            onClick={handleStart}
-            disabled={connecting}
-            className="harbor-press-pop flex h-11 items-center justify-center gap-2 rounded-xl bg-ink text-[13.5px] font-medium text-canvas transition-transform hover:scale-[1.01] disabled:opacity-40 disabled:hover:scale-100"
-          >
-            <Plus size={15} strokeWidth={2.2} />
-            {connecting ? t("Starting…") : t("Start a new room")}
-          </button>
-
-          <div className="flex items-center gap-3 text-[10.5px] uppercase tracking-wider text-ink-subtle">
-            <span className="h-px flex-1 bg-edge-soft" />
-            <span>{t("or join")}</span>
-            <span className="h-px flex-1 bg-edge-soft" />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <div className="flex gap-2">
-              <input
-                value={joinCode}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setJoinCode(v.includes("/") || v.length > 6 ? v : v.toUpperCase());
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-                placeholder="ABCD23"
-                className={`h-10 flex-1 rounded-lg bg-canvas px-3 text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/50 ${
-                  joinCode.length > 6 || joinCode.includes("/")
-                    ? "text-[12px]"
-                    : "text-center text-[15px] font-mono tracking-[0.3em]"
-                }`}
-              />
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleJoin}
-                disabled={joinCode.trim().length === 0 || connecting}
-                className="harbor-press-pop h-10 rounded-lg bg-white/[0.06] px-4 text-[13px] font-medium text-ink transition-colors hover:bg-white/[0.10] disabled:opacity-40 disabled:hover:bg-white/[0.06]"
+                disabled={!joinCode.trim()}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-ink px-3 text-[13px] font-medium text-canvas transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
               >
                 {t("Join")}
               </button>
-            </div>
-            <p className="px-1 text-[10.5px] text-ink-subtle">
-              {t("or paste an invite link")}
-            </p>
-          </div>
-
-          {errored && snapshot.lastError && (
-            <div className="flex flex-col gap-2 rounded-lg bg-danger/15 px-3 py-2.5">
-              <p className="text-[12px] leading-snug text-danger">{snapshot.lastError}</p>
               <button
-                onClick={retrySession}
-                className="self-start rounded-md bg-danger/15 px-2.5 py-1 text-[11.5px] font-medium text-danger transition-colors hover:bg-danger/25"
+                onClick={goToSettings}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-white/[0.06] px-3 text-[13px] font-medium text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
               >
-                {t("Try again")}
+                {t("Open Settings")}
               </button>
             </div>
-          )}
-        </>
-      )}
-
-      {view === "default" && enabled && inSession && (
-        <>
-          {canReturn && roomMedia && <ReturnToVideo media={roomMedia} onReturn={returnToVideo} />}
-
-          <div className="flex items-center justify-between rounded-lg bg-canvas/50 px-3.5 py-2.5">
-            <div className="flex flex-col">
-              <span className="text-[10.5px] uppercase tracking-wider text-ink-subtle">{t("Room code")}</span>
-              <span className="font-mono text-[18px] tracking-[0.35em] text-ink">{snapshot.room}</span>
-            </div>
-            <button
-              onClick={handleCopy}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.06] text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
-              aria-label={t("Copy room code")}
-            >
-              {copied ? <Check size={15} strokeWidth={2.4} /> : <Copy size={14} strokeWidth={1.9} />}
-            </button>
           </div>
+        )}
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[10.5px] uppercase tracking-wider text-ink-subtle">
-              {t("{n} watching", { n: participants.length })}
-            </span>
-            <ul className="flex flex-wrap gap-1.5">
-              {participants.map((p) => {
-                const self = p.id === clientId;
-                const avatarSrc = self ? selfAvatar : p.avatar ?? null;
-                const color = self ? selfColor : p.color ?? null;
-                return (
-                  <li
-                    key={p.id}
-                    className="flex items-center gap-1.5 rounded-full bg-elevated/70 py-0.5 ps-0.5 pe-2.5"
-                  >
-                    <Avatar name={p.name} src={avatarSrc} color={color} />
-                    <span className="text-[12px] text-ink">{p.name}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-
-          <ChatPanel
-            chat={chat}
-            participants={snapshot.participants}
-            clientId={clientId}
-            selfAvatar={selfAvatar}
-            selfColor={selfColor}
-            onSend={sendChat}
-          />
-
-          {snapshot.hostClientId === clientId && <GuestPickToggle />}
-
-          <button
-            onClick={() => update({ togetherShareCursors: !settings.togetherShareCursors })}
-            className="flex h-10 items-center justify-between gap-2 rounded-lg bg-white/[0.06] px-3 text-[12.5px] text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
-            aria-pressed={settings.togetherShareCursors}
-          >
-            <span className="flex items-center gap-2">
-              <MousePointer2 size={13} strokeWidth={1.9} />
-              {t("Show cursors")}
-            </span>
-            <span
-              aria-hidden
-              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors ${
-                settings.togetherShareCursors ? "bg-accent" : "bg-edge"
-              }`}
-            >
-              <span
-                className={`block h-4 w-4 rounded-full bg-white shadow-sm ${
-                  settings.togetherShareCursors ? "translate-x-4 rtl:-translate-x-4" : "translate-x-0"
-                } ${cursorKnob}`}
+        {view === "default" && enabled && !inSession && (
+          <>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
+                {t("Your name")}
+              </span>
+              <input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                maxLength={32}
+                className="h-10 rounded-lg bg-canvas px-3 text-[13.5px] text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/50"
               />
-            </span>
-          </button>
+            </label>
 
-          <button
-            onClick={leaveSession}
-            className="flex h-10 items-center justify-center gap-1.5 rounded-lg bg-white/[0.06] text-[12.5px] text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
-          >
-            <LogOut size={13} strokeWidth={1.9} />
-            {t("Leave room")}
-          </button>
-        </>
-      )}
+            <button
+              onClick={handleStart}
+              disabled={connecting}
+              className="harbor-press-pop flex h-11 items-center justify-center gap-2 rounded-xl bg-ink text-[13.5px] font-medium text-canvas transition-transform hover:scale-[1.01] disabled:opacity-40 disabled:hover:scale-100"
+            >
+              <Plus size={15} strokeWidth={2.2} />
+              {connecting ? t("Starting…") : t("Start a new room")}
+            </button>
+
+            <div className="flex items-center gap-3 text-[10.5px] uppercase tracking-wider text-ink-subtle">
+              <span className="h-px flex-1 bg-edge-soft" />
+              <span>{t("or join")}</span>
+              <span className="h-px flex-1 bg-edge-soft" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex gap-2">
+                <input
+                  value={joinCode}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setJoinCode(v.includes("/") || v.length > 6 ? v : v.toUpperCase());
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+                  placeholder="ABCD23"
+                  className={`h-10 flex-1 rounded-lg bg-canvas px-3 text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/50 ${
+                    joinCode.length > 6 || joinCode.includes("/")
+                      ? "text-[12px]"
+                      : "text-center text-[15px] font-mono tracking-[0.3em]"
+                  }`}
+                />
+                <button
+                  onClick={handleJoin}
+                  disabled={joinCode.trim().length === 0 || connecting}
+                  className="harbor-press-pop h-10 rounded-lg bg-white/[0.06] px-4 text-[13px] font-medium text-ink transition-colors hover:bg-white/[0.10] disabled:opacity-40 disabled:hover:bg-white/[0.06]"
+                >
+                  {t("Join")}
+                </button>
+              </div>
+              <p className="px-1 text-[10.5px] text-ink-subtle">{t("or paste an invite link")}</p>
+            </div>
+
+            {listen.relayReady && !listen.watchingBlocks && (
+              <ListenTogetherCta
+                room={listen.room}
+                listeners={listen.listeners}
+                nowPlaying={listen.nowPlaying}
+                artwork={listen.nowPlaying?.artwork ?? null}
+                busy={listen.busy}
+                onStart={listen.start}
+                onOpen={() => setView("default")}
+              />
+            )}
+
+            {errored && snapshot.lastError && (
+              <div className="flex flex-col gap-2 rounded-lg bg-danger/15 px-3 py-2.5">
+                <p className="text-[12px] leading-snug text-danger">{snapshot.lastError}</p>
+                <button
+                  onClick={retrySession}
+                  className="self-start rounded-md bg-danger/15 px-2.5 py-1 text-[11.5px] font-medium text-danger transition-colors hover:bg-danger/25"
+                >
+                  {t("Try again")}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {view === "default" && enabled && inSession && (
+          <>
+            {canReturn && roomMedia && <ReturnToVideo media={roomMedia} onReturn={returnToVideo} />}
+
+            {listen.relayReady && !listen.watchingBlocks && (
+              <ListenTogetherCta
+                room={listen.room}
+                listeners={listen.listeners}
+                nowPlaying={listen.nowPlaying}
+                artwork={listen.nowPlaying?.artwork ?? null}
+                busy={listen.busy}
+                onStart={listen.start}
+                onOpen={() => setView("default")}
+              />
+            )}
+
+            <div className="flex items-center justify-between rounded-lg bg-canvas/50 px-3.5 py-2.5">
+              <div className="flex flex-col">
+                <span className="text-[10.5px] uppercase tracking-wider text-ink-subtle">
+                  {t("Room code")}
+                </span>
+                <span className="font-mono text-[18px] tracking-[0.35em] text-ink">
+                  {snapshot.room}
+                </span>
+              </div>
+              <button
+                onClick={handleCopy}
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.06] text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
+                aria-label={t("Copy room code")}
+              >
+                {copied ? (
+                  <Check size={15} strokeWidth={2.4} />
+                ) : (
+                  <Copy size={14} strokeWidth={1.9} />
+                )}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10.5px] uppercase tracking-wider text-ink-subtle">
+                {t("{n} watching", { n: participants.length })}
+              </span>
+              <ul className="flex flex-wrap gap-1.5">
+                {participants.map((p) => {
+                  const self = p.id === clientId;
+                  const avatarSrc = self ? selfAvatar : (p.avatar ?? null);
+                  const color = self ? selfColor : (p.color ?? null);
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-1.5 rounded-full bg-elevated/70 py-0.5 ps-0.5 pe-2.5"
+                    >
+                      <Avatar name={p.name} src={avatarSrc} color={color} />
+                      <span className="text-[12px] text-ink">{p.name}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <ChatPanel
+              chat={chat}
+              participants={snapshot.participants}
+              clientId={clientId}
+              selfAvatar={selfAvatar}
+              selfColor={selfColor}
+              onSend={sendChat}
+            />
+
+            {snapshot.hostClientId === clientId && <GuestPickToggle />}
+
+            <button
+              onClick={() => update({ togetherShareCursors: !settings.togetherShareCursors })}
+              className="flex h-10 items-center justify-between gap-2 rounded-lg bg-white/[0.06] px-3 text-[12.5px] text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
+              aria-pressed={settings.togetherShareCursors}
+            >
+              <span className="flex items-center gap-2">
+                <MousePointer2 size={13} strokeWidth={1.9} />
+                {t("Show cursors")}
+              </span>
+              <span
+                aria-hidden
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors ${
+                  settings.togetherShareCursors ? "bg-accent" : "bg-edge"
+                }`}
+              >
+                <span
+                  className={`block h-4 w-4 rounded-full bg-white shadow-sm ${
+                    settings.togetherShareCursors
+                      ? "translate-x-4 rtl:-translate-x-4"
+                      : "translate-x-0"
+                  } ${cursorKnob}`}
+                />
+              </span>
+            </button>
+
+            <button
+              onClick={leaveSession}
+              className="flex h-10 items-center justify-center gap-1.5 rounded-lg bg-white/[0.06] text-[12.5px] text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
+            >
+              <LogOut size={13} strokeWidth={1.9} />
+              {t("Leave room")}
+            </button>
+          </>
+        )}
       </div>
     </TogetherSurface>
   );
@@ -424,7 +482,8 @@ function TogetherSurface({
   children: React.ReactNode;
 }) {
   const surfaceClass = `harbor-together-surface w-[400px] max-w-[calc(100vw-2rem)] ${shapeClass}`;
-  const contentClass = "flex max-h-[85vh] w-full flex-col gap-4 overflow-y-auto p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  const contentClass =
+    "flex max-h-[85vh] w-full flex-col gap-4 overflow-y-auto p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
   if (!liquid) {
     return (

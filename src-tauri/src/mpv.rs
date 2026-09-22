@@ -8,7 +8,7 @@ use libmpv2::events::{Event, EventContext, PropertyData};
 use libmpv2::mpv_node::MpvNode;
 use libmpv2::{Format, Mpv, MpvInitializer};
 
-fn mpv_argv_command(mpv: &Mpv, argv: &[&str]) -> Result<(), String> {
+pub(crate) fn mpv_argv_command(mpv: &Mpv, argv: &[&str]) -> Result<(), String> {
     let cstrings: Vec<CString> = argv
         .iter()
         .map(|s| CString::new(*s).map_err(|e| format!("cstring: {}", e)))
@@ -148,6 +148,10 @@ pub struct MpvSub {
 
 pub struct MpvState {
     inner: Arc<Mutex<Option<MpvSession>>>,
+    // Serialize start/stop while the session lock is released for a display switch.
+    // Property reads still use only `inner`, so they remain responsive.
+    #[cfg(windows)]
+    lifecycle: Mutex<()>,
 }
 
 struct MpvSession {
@@ -165,6 +169,8 @@ impl MpvState {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(None)),
+            #[cfg(windows)]
+            lifecycle: Mutex::new(()),
         }
     }
 }
@@ -310,6 +316,12 @@ pub async fn mpv_audio_devices(state: State<'_, MpvState>) -> Result<Vec<AudioDe
     Ok(read_audio_devices(&mpv))
 }
 
+fn mpv_header_field(name: &str, value: &str) -> String {
+    // mpv parses this option as a comma-separated string list. An unescaped
+    // Accept-Language comma creates an invalid second HTTP header (HTTP 400).
+    format!("{name}: {value}").replace('\\', "\\\\").replace(',', "\\,")
+}
+
 fn apply_pre_init(
     init: &MpvInitializer,
     args: &MpvStartArgs,
@@ -348,7 +360,7 @@ fn apply_pre_init(
             if k.eq_ignore_ascii_case("user-agent") {
                 user_agent = v.clone();
             } else {
-                header_fields.push(format!("{}: {}", k, v));
+                header_fields.push(mpv_header_field(k, v));
             }
         }
     }
@@ -658,6 +670,8 @@ pub async fn mpv_start(
     state: State<'_, MpvState>,
     args: MpvStartArgs,
 ) -> Result<(), String> {
+    #[cfg(windows)]
+    let _lifecycle = state.lifecycle.lock().await;
     // OS-level HDR state before this transition begins. Compared at teardown
     // against the script-reported state: only off->on waits for restore.
     #[cfg(windows)]
@@ -666,8 +680,18 @@ pub async fn mpv_start(
         .and_then(|w| w.hwnd().ok())
         .map(|h| monitor_hdr_active(h.0 as isize))
         .unwrap_or(false);
+    if let Err(error) = crate::music::pause_for_video(&app).await {
+        eprintln!("[harbor::music] could not pause for video: {error}");
+    }
     let mut g = state.inner.lock().await;
-    if let Some(prev) = g.take() {
+    let prev = g.take();
+    // Windows releases the session lock across the SDR restore: a display mode
+    // switch can take seconds, and every property poll would queue behind it.
+    #[cfg(windows)]
+    {
+        drop(g);
+    }
+    if let Some(prev) = prev {
         #[cfg(target_os = "macos")]
         {
             let (tx, rx) = std::sync::mpsc::sync_channel::<()>(1);
@@ -700,9 +724,11 @@ pub async fn mpv_start(
             let was_off = !prev.hdr_baseline_on;
             let _ = prev.mpv.command("quit", &[]);
             drop(prev);
-            restore_display_sdr_if_flipped(&app, was_off);
+            restore_display_sdr_if_flipped(&app, was_off).await;
         }
     }
+    #[cfg(windows)]
+    let mut g = state.inner.lock().await;
 
     let want_embed = args.embed.unwrap_or(false);
     let embed_hwnd = if want_embed {
@@ -1077,14 +1103,14 @@ fn reassert_hdr_colorspace(mpv: &Arc<Mpv>) {
 /// opened on the same display (via the `screen` option), so the same monitor
 /// check works for both modes.
 #[cfg(windows)]
-fn restore_display_sdr_if_flipped(app: &AppHandle, was_off: bool) {
+async fn restore_display_sdr_if_flipped(app: &AppHandle, was_off: bool) {
     if !was_off {
         eprintln!("[harbor::mpv] skip display restore (baseline HDR was on)");
         return;
     }
     // Give mpv's teardown (and the script's own shutdown toggle) a moment to
     // settle, then force the display back to SDR ourselves if it is still on.
-    std::thread::sleep(Duration::from_millis(150));
+    tokio::time::sleep(Duration::from_millis(150)).await;
     // The Harbor window's monitor is the one the script flipped in both
     // modes: embedded mpv renders as a child of "main", and the
     // separate-window player is placed on "main"'s display at init.
@@ -1092,18 +1118,24 @@ fn restore_display_sdr_if_flipped(app: &AppHandle, was_off: bool) {
         Some(w) => w,
         None => return,
     };
-    let hwnd = match window.hwnd() {
-        Ok(h) => h,
+    let hwnd_raw = match window.hwnd() {
+        Ok(h) => h.0 as isize,
         Err(_) => return,
     };
-    if !monitor_hdr_active(hwnd.0 as isize) {
-        eprintln!("[harbor::mpv] display already SDR after quit");
-        return;
-    }
-    if set_monitor_advanced_color(hwnd.0 as isize, false) {
-        eprintln!("[harbor::mpv] display restored to SDR via DisplayConfig");
-    } else {
-        eprintln!("[harbor::mpv] DisplayConfig SDR restore failed");
+    // DisplayConfig drives a display mode switch that can block for seconds;
+    // it never runs on the async runtime's worker threads.
+    let restored = tokio::task::spawn_blocking(move || {
+        if !monitor_hdr_active(hwnd_raw) {
+            return None;
+        }
+        Some(set_monitor_advanced_color(hwnd_raw, false))
+    })
+    .await
+    .unwrap_or(None);
+    match restored {
+        None => eprintln!("[harbor::mpv] display already SDR after quit"),
+        Some(true) => eprintln!("[harbor::mpv] display restored to SDR via DisplayConfig"),
+        Some(false) => eprintln!("[harbor::mpv] DisplayConfig SDR restore failed"),
     }
 }
 
@@ -2768,6 +2800,8 @@ pub async fn sub_download(
 
 #[tauri::command]
 pub async fn mpv_stop(app: AppHandle, state: State<'_, MpvState>) -> Result<(), String> {
+    #[cfg(windows)]
+    let _lifecycle = state.lifecycle.lock().await;
     let mut g = state.inner.lock().await;
     if let Some(session) = g.take() {
         #[cfg(target_os = "macos")]
@@ -2803,7 +2837,7 @@ pub async fn mpv_stop(app: AppHandle, state: State<'_, MpvState>) -> Result<(), 
             let _ = session.mpv.command("quit", &[]);
             drop(session);
             drop(g);
-            restore_display_sdr_if_flipped(&app, was_off);
+            restore_display_sdr_if_flipped(&app, was_off).await;
         }
     }
     #[cfg(windows)]
@@ -3100,6 +3134,7 @@ fn position_embedded_mpv_child(app: &AppHandle, css: MpvGeometry) -> Result<(), 
     // there was nothing to position at all.
     if found.is_empty() {
         eprintln!("[harbor::mpv] no mpv child window to position");
+        return Err("Native video window is not ready".to_string());
     }
     if let Some(&first) = found.first() {
         for &leftover in found.iter().skip(1) {
@@ -3270,6 +3305,13 @@ mod geometry_tests {
 mod event_backoff_tests {
     use super::{record_event_poll_success, EventErrorBackoff, MPV_EVENT_MAX_CONSECUTIVE_ERRORS};
     use std::time::Duration;
+
+    #[test]
+    fn http_headers_preserve_commas_and_backslashes_in_mpv_string_lists() {
+        assert_eq!(super::mpv_header_field("Accept-Language", "en-US,en;q=0.9"), "Accept-Language: en-US\\,en;q=0.9");
+        assert_eq!(super::mpv_header_field("X-Path", r"one\two,three"), r"X-Path: one\\two\,three");
+        assert_eq!(super::mpv_header_field("Accept", "*/*"), "Accept: */*");
+    }
 
     #[test]
     fn event_error_backoff_grows_caps_and_resets() {

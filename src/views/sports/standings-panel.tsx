@@ -1,3 +1,4 @@
+import { TeamProfileLink } from "./team-profile-link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import {
@@ -122,7 +123,9 @@ function Table({
   group,
   columns,
   highlight,
+  leagueTag,
 }: {
+  leagueTag: string;
   group: StandingsGroup;
   columns: Column[];
   highlight: Set<string>;
@@ -135,7 +138,10 @@ function Table({
     const host = box.current;
     const marked = host?.querySelector<HTMLElement>("[data-standings-mark]");
     if (!host || !marked) return;
-    host.scrollTop = Math.max(0, marked.offsetTop - host.clientHeight / 2 + marked.offsetHeight / 2);
+    host.scrollTop = Math.max(
+      0,
+      marked.offsetTop - host.clientHeight / 2 + marked.offsetHeight / 2,
+    );
   }, [group]);
 
   return (
@@ -174,7 +180,10 @@ function Table({
             >
               {row.rank}
             </span>
-            <span className="flex min-w-0 flex-1 items-center gap-2.5">
+            <TeamProfileLink
+              className="flex min-w-0 flex-1 items-center gap-2.5"
+              team={{ id: row.teamId, name: row.name, logo: row.logo, league: leagueTag }}
+            >
               <Crest logo={row.logo} />
               <span
                 className={`truncate text-[12.5px] ${
@@ -183,7 +192,7 @@ function Table({
               >
                 {row.shortName || row.name}
               </span>
-            </span>
+            </TeamProfileLink>
             {shown.map((col) => (
               <span
                 key={col.key}
@@ -257,7 +266,12 @@ export function StandingsPanel({
       {table.groups.length > 1 && (
         <GroupTabs groups={table.groups} selected={group.id} onSelect={setGroupId} />
       )}
-      <Table group={group} columns={headerSet(t, table.sport)} highlight={marks} />
+      <Table
+        leagueTag={leagueTag}
+        group={group}
+        columns={headerSet(t, table.sport)}
+        highlight={marks}
+      />
     </section>
   );
 }

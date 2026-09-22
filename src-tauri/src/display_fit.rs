@@ -13,8 +13,8 @@ fn clamp_origin(current: f64, visible_start: f64, visible_len: f64, window_len: 
 }
 
 /// True when the window-state plugin has a non-default saved geometry for the
-/// `main` window. `tauri-plugin-window-state` restores that saved geometry
-/// while the window is being created (before our `setup` code runs) and only
+/// `main` window. The window-state restore runs before `install` (explicitly
+/// after the maximize guard on Windows, during creation elsewhere) and only
 /// ever persists a state that differs from `WindowState::default()`, so when
 /// this returns true the restore already happened and fitting must not run.
 fn has_saved_window_state(app: &tauri::AppHandle) -> bool {
@@ -197,8 +197,8 @@ pub fn install(app: &tauri::AppHandle) {
         return;
     };
     // Only fit on the very first launch, when there is no saved geometry yet.
-    // Once the user has a saved position/size, the plugin's restore already
-    // ran during window creation and fitting would clobber it.
+    // Once the user has a saved position/size, restoration already ran and
+    // fitting would clobber it.
     if has_saved_window_state(app) {
         return;
     }

@@ -57,6 +57,7 @@ pub async fn download_start(
     dest: String,
     headers: Option<HashMap<String, String>>,
     on_event: Channel<DownloadEvent>,
+    media_kind: Option<String>,
 ) -> Result<(), String> {
     let cancel = Arc::new(AtomicBool::new(false));
     state
@@ -71,6 +72,7 @@ pub async fn download_start(
         &headers.unwrap_or_default(),
         &cancel,
         &on_event,
+        media_kind.as_deref() == Some("audio"),
     )
     .await;
     state.tasks.lock().unwrap().remove(&id);
@@ -103,6 +105,7 @@ async fn run_download(
     headers: &HashMap<String, String>,
     cancel: &Arc<AtomicBool>,
     on_event: &Channel<DownloadEvent>,
+    audio: bool,
 ) -> Result<(), DownloadEnd> {
     let part = format!("{}.part", dest);
 
@@ -183,7 +186,7 @@ async fn run_download(
         || content_type.contains("html")
         || content_type.contains("json")
         || content_type.contains("xml");
-    if non_video || declared.map(|n| n < 65_536).unwrap_or(false) {
+    if non_video || (audio && (content_type.contains("mpegurl") || content_type.contains("dash+xml"))) || declared.map(|n| n < if audio { 1024 } else { 65_536 }).unwrap_or(false) {
         let body = resp.text().await.unwrap_or_default();
         let snippet: String = body.chars().take(500).collect();
         eprintln!(
@@ -253,10 +256,13 @@ async fn run_download(
         }
     }
 
-    let _ = writer.flush().await;
+    writer.flush().await.map_err(|e| DownloadEnd::Failed(format!("flush: {}", e)))?;
     drop(writer);
+    if audio && total.is_some_and(|expected| expected != received) {
+        return Err(DownloadEnd::Failed("audio download was incomplete".to_string()));
+    }
 
-    if received < MIN_VIDEO_BYTES {
+    if received < if audio { 1024 } else { MIN_VIDEO_BYTES } {
         eprintln!(
             "[harbor::download] refusing {} bytes (not a video file)",
             received

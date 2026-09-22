@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 import en from "./locales/en";
-import { getUiLanguage, useUiLanguage } from "./store";
+import { getUiLanguage, getUiRegion, useUiLanguage, useUiRegion } from "./store";
 import { isRtl, LANGUAGES, type UiLanguage } from "./languages";
+import { associationFootballEnglishLabel } from "./regional-labels";
 
 type Vars = Record<string, string | number>;
 
@@ -123,7 +124,8 @@ function interpolate(template: string, vars?: Vars): string {
   return out;
 }
 
-function resolve(lang: UiLanguage, key: string, vars?: Vars): string {
+function resolve(lang: UiLanguage, key: string, vars?: Vars, region = getUiRegion()): string {
+  if (lang === "en" && key === "Soccer") return associationFootballEnglishLabel(lang, region);
   const catalog = catalogs[lang];
   if (catalog) {
     const rule = PLURAL_RULES[lang];
@@ -147,13 +149,16 @@ export function t(key: string, vars?: Vars): string {
 }
 
 export function sourceTranslationKey(value: string): string {
+  if (getUiLanguage() === "en" && value === associationFootballEnglishLabel("en", getUiRegion()))
+    return "Soccer";
   return reverseFor(getUiLanguage()).get(value) ?? value;
 }
 
 export function useT(): (key: string, vars?: Vars) => string {
   const lang = useUiLanguage();
+  const region = useUiRegion();
   useSyncExternalStore(subscribeUiCatalog, uiCatalogVersion, uiCatalogVersion);
-  return (key: string, vars?: Vars) => interpolate(resolve(lang, key, vars), vars);
+  return (key: string, vars?: Vars) => interpolate(resolve(lang, key, vars, region), vars);
 }
 
 export { useUiLanguage, isRtl, LANGUAGES };

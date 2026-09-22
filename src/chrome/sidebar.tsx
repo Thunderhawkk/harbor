@@ -13,7 +13,7 @@ import { useView, type View } from "@/lib/view";
 import { KidsSidebarDoodles } from "./kids-sidebar-doodles";
 import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
 
 const PRIMARY_IDS = new Set([
   "home",
@@ -24,6 +24,7 @@ const PRIMARY_IDS = new Set([
   "kids",
   "anime",
   "live",
+  "sports",
   "vod",
 ]);
 
@@ -218,7 +219,7 @@ function ScrollableNav({
   const kid = useActiveKid();
   const t = useT();
   const items = applyNavCustomization(
-    NAV_ITEMS,
+    useAvailableNavItems(),
     usePreviewNavCustomization(settings.navCustomization),
   );
   const isItemVisible = (item: NavItem) => {

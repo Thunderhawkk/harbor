@@ -98,7 +98,8 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   const onLiveRoot = topKind === "live";
   const sidebarHidden = connecting || view === "settings" || onLiveRoot || topKind === "picker";
   const inSettings = view === "settings";
-  const hideSearch = view === "addons" || connecting || topKind === "picker" || inSettings;
+  const hideSearch =
+    view === "music" || view === "addons" || connecting || topKind === "picker" || inSettings;
   const sidebarOffset =
     layout === "stremio"
       ? "ps-[80px]"

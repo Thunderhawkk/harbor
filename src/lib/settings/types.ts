@@ -486,6 +486,7 @@ export type Settings = {
   profilePromptInterval: "launch" | "15m" | "30m" | "never";
   defaultProfileId: string;
   sportsLeagues: string[];
+  sportsShowOdds: boolean;
   hideSpoilers: boolean;
   spoilerHideThumbnails: boolean;
   spoilerHideTitles: boolean;

@@ -1,7 +1,12 @@
+import music from "./en/music";
 import settingsRefinements from "./en/settings-refinements";
 
 const en: Record<string, string> = {
-  "Build identity. Useful when filing a bug report.": "Build identity. Useful when filing a bug report.",
+  ...videoCast,
+  ...music,
+  Soccer: "Football",
+  "Build identity. Useful when filing a bug report.":
+    "Build identity. Useful when filing a bug report.",
   "nav.home": "Home",
   "nav.discover": "Discover",
   "nav.catalogs": "Catalogs",
@@ -296,3 +301,4 @@ const en: Record<string, string> = {
 };
 
 export default en;
+import videoCast from "./en/video-cast";

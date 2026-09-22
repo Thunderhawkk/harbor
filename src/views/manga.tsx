@@ -2,6 +2,7 @@ import { ArrowDownToLine, BookOpen, ChevronLeft, ChevronRight, Layers } from "lu
 import { CoverImg } from "@/components/cover-img";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
+import { LazyMount } from "@/components/lazy-mount";
 import { useMangaDownloadsCount } from "@/lib/manga-downloads";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
@@ -24,6 +25,7 @@ import {
   type MangaSummary,
 } from "@/lib/manga/api";
 import { listMangaProgress, type MangaProgressEntry } from "@/lib/manga-progress";
+import { chapterNumberKey } from "@/lib/manga/chapter-identity";
 import { useProfiles } from "@/lib/profiles";
 import { takeMangaReadIntent } from "@/lib/manga/read-intent";
 import { MangaHero } from "./manga/manga-hero";
@@ -32,6 +34,7 @@ import { MangaBrowse } from "./manga/manga-browse";
 import { BrowseResults } from "./manga/manga-sources-panel/suwayomi/browse-results";
 import type { SuwayomiSource } from "@/lib/manga/sources/suwayomi/provider";
 import { MangaCollections } from "./manga/manga-collections";
+import { MangaLibrary } from "./manga/manga-library";
 import { MangaContinue } from "./manga/manga-continue";
 import { MangaDetail } from "./manga/manga-detail";
 import { MangaDownloadsView } from "./manga/manga-downloads";
@@ -42,15 +45,15 @@ import { MangaUniverses, UniversesCta } from "./manga/manga-universes";
 import { AnilistMangaRows } from "./manga/anilist-manga-rows";
 import { MangaHiddenRows } from "./manga/manga-row-visibility";
 import { BecauseYouWatched } from "./manga/because-you-watched";
-import { MyListsTab } from "./library/my-lists-tab";
-import { useCustomLists } from "@/lib/custom-lists";
+import { useMangaFavorites } from "@/lib/manga-favorites";
+import { mangaLists } from "@/lib/manga-lists";
 
 type MangaMeta = { id: string; title: string; cover?: string };
 
 type Mode =
   | { screen: "browse" }
   | { screen: "collections" }
-  | { screen: "lists" }
+  | { screen: "library" }
   | { screen: "universes" }
   | { screen: "sources" }
   | { screen: "downloads"; from?: string }
@@ -85,6 +88,7 @@ export function MangaView() {
   const detailScrollRef = useRef<HTMLElement>(null);
   const browseScrollRef = useRef<HTMLElement>(null);
   const browseExtensionScrollRef = useRef<HTMLElement>(null);
+  const libraryScrollRef = useRef<HTMLElement>(null);
   const resumeRef = useRef<(entry: MangaProgressEntry) => void>(() => {});
   const isBrowse = mode.screen === "browse";
   const isDetail = mode.screen === "detail";
@@ -125,6 +129,18 @@ export function MangaView() {
   }, []);
 
   useEffect(() => subscribeMangaSources(() => setSourceTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    const suppressNativeMenu = (e: MouseEvent) => {
+      if (topKindRef.current !== "manga") return;
+      const t = e.target;
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+      if (t instanceof HTMLElement && t.isContentEditable) return;
+      e.preventDefault();
+    };
+    document.addEventListener("contextmenu", suppressNativeMenu, true);
+    return () => document.removeEventListener("contextmenu", suppressNativeMenu, true);
+  }, []);
 
   useEffect(() => {
     const onLocalBack = (e: Event) => {
@@ -241,12 +257,21 @@ export function MangaView() {
     const target = entry.sourceId || activeMangaSourceId();
     if (target && activeMangaSourceId() !== target) setActiveMangaSource(target);
     try {
-      let chs = await resumeChapters(entry.id);
+      const chs = await resumeChapters(entry.id);
       let i = chs.findIndex((c) => c.id === entry.chapterId);
       if (i < 0) {
+        const want =
+          chapterNumberKey(entry.chapterNumber) ?? chapterNumberKey(entry.chapterLabel);
+        if (want != null) {
+          i = chs.findIndex(
+            (c) => chapterNumberKey(c.chapter ?? c.title ?? "") === want,
+          );
+        }
+      }
+      if (i < 0 && entry.chapterNumber != null) {
         i = chs.findIndex(
           (c) =>
-            entry.chapterNumber != null && c.chapter != null && c.chapter === entry.chapterNumber,
+            c.chapter != null && c.chapter === entry.chapterNumber,
         );
       }
       if (i >= 0) {
@@ -256,6 +281,18 @@ export function MangaView() {
           manga: { id: entry.id, title: entry.title, cover: entry.cover },
           chapters: chs,
           index: i,
+          startPage: Math.max(0, entry.page - 1),
+          startScroll: entry.scroll,
+        });
+        return;
+      }
+      if (chs.length > 0) {
+        setMode({
+          screen: "reader",
+          mangaId: entry.id,
+          manga: { id: entry.id, title: entry.title, cover: entry.cover },
+          chapters: chs,
+          index: 0,
           startPage: Math.max(0, entry.page - 1),
           startScroll: entry.scroll,
         });
@@ -286,18 +323,24 @@ export function MangaView() {
           <MangaContinue onResume={resume} />
         </div>
         <MangaHiddenRows />
-        <AnilistMangaRows onOpen={openMangaByTitle} />
-        <BecauseYouWatched onOpen={openMangaItem} />
+        <LazyMount minHeight={280}>
+          <AnilistMangaRows onOpen={openMangaByTitle} />
+        </LazyMount>
+        <LazyMount minHeight={280}>
+          <BecauseYouWatched onOpen={openMangaItem} />
+        </LazyMount>
         <div className="mt-8">
-          <MangaRail
-            title={t("Popular Manga")}
-            subtitle={t("Most read right now")}
-            collapsibleKey="harbor.manga.popularRowOpen"
-            hideKey="popular"
-            scrollKey="manga:Popular Manga"
-            load={() => popularManga(0)}
-            onOpen={openMangaItem}
-          />
+          <LazyMount minHeight={300}>
+            <MangaRail
+              title={t("Popular Manga")}
+              subtitle={t("Most read right now")}
+              collapsibleKey="harbor.manga.popularRowOpen"
+              hideKey="popular"
+              scrollKey="manga:Popular Manga"
+              load={() => popularManga(0)}
+              onOpen={openMangaItem}
+            />
+          </LazyMount>
         </div>
         <div className="mb-9 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <button
@@ -334,7 +377,7 @@ export function MangaView() {
             />
           </button>
           <UniversesCta onClick={() => setMode({ screen: "universes" })} />
-          <MyListsCta onClick={() => setMode({ screen: "lists" })} />
+          <LibraryCta onClick={() => setMode({ screen: "library" })} />
         </div>
         <div className="mb-6 mt-3 flex items-center justify-between gap-4">
           <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Browse manga")}</h2>
@@ -356,6 +399,7 @@ export function MangaView() {
           onOpen={(id) => setMode({ screen: "detail", mangaId: id })}
           onManageSources={() => setMode({ screen: "sources" })}
           onBrowseExtension={(source) => setMode({ screen: "browse-extension", source })}
+          onOpenLibrary={() => setMode({ screen: "library" })}
         />
         <BackToTop scrollRef={browseScrollRef} />
       </main>
@@ -383,6 +427,7 @@ export function MangaView() {
             onResume={resume}
             onOpenDownloads={() => setMode({ screen: "downloads", from: mode.mangaId })}
             onOpenManga={(id) => setMode({ screen: "detail", mangaId: id })}
+            scrollRoot={detailScrollRef}
             onRead={(chapters, index, manga) =>
               setMode({
                 screen: "reader",
@@ -414,8 +459,11 @@ export function MangaView() {
         </main>
       )}
 
-      {mode.screen === "lists" && (
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24">
+      {mode.screen === "library" && (
+        <main
+          ref={libraryScrollRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24"
+        >
           <button
             type="button"
             onClick={() => setMode({ screen: "browse" })}
@@ -425,9 +473,9 @@ export function MangaView() {
             {t("Back")}
           </button>
           <h1 className="mb-8 font-display text-[32px] font-medium tracking-tight text-ink">
-            {t("My lists")}
+            {t("Library")}
           </h1>
-          <MyListsTab />
+          <MangaLibrary scrollRef={libraryScrollRef} />
         </main>
       )}
 
@@ -486,25 +534,26 @@ function EnableGate({ onEnable }: { onEnable: () => void }) {
   );
 }
 
-function MyListsCta({ onClick }: { onClick: () => void }) {
+function LibraryCta({ onClick }: { onClick: () => void }) {
   const t = useT();
-  const lists = useCustomLists();
+  const { items } = useMangaFavorites();
+  const lists = mangaLists.useLists();
   const covers = useMemo(() => {
-    const manga = lists
-      .flatMap((l) => l.items)
-      .filter((it) => it.type === "manga" && it.poster)
-      .map((it) => it.poster!);
-    const any = lists
+    const fav = [...items.values()]
+      .sort((a, b) => b.addedAt - a.addedAt)
+      .map((e) => e.cover)
+      .filter((c): c is string => !!c);
+    const listed = lists
       .flatMap((l) => l.items)
       .filter((it) => it.poster)
       .map((it) => it.poster!);
     const seen = new Set<string>();
-    for (const c of [...manga, ...any]) {
+    for (const c of [...fav, ...listed]) {
       if (c && !seen.has(c)) seen.add(c);
       if (seen.size === 3) break;
     }
     return [...seen];
-  }, [lists]);
+  }, [items, lists]);
 
   const [a, b, center] = covers;
   return (
@@ -537,9 +586,9 @@ function MyListsCta({ onClick }: { onClick: () => void }) {
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15.5px] font-semibold text-ink">{t("My lists")}</span>
+        <span className="text-[15.5px] font-semibold text-ink">{t("Library")}</span>
         <span className="truncate text-[13px] text-ink-muted">
-          {t("The lists you created, full of saved manga")}
+          {t("Your favorites and manga lists")}
         </span>
       </div>
       <ChevronRight

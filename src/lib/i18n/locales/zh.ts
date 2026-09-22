@@ -1,3 +1,10 @@
+import listenTogether from "./zh/listen-together";
+import music from "./zh/music";
+import sportsConsent from "./zh/sports-consent";
+import sportsStatistics from "./zh/sports-statistics";
+import sportsApi from "./zh/sports-api";
+import esportsArena from "./zh/esports-arena";
+import sportsHub from "./zh/sports-hub";
 import ebookSources from "./zh/ebook-sources";
 import settingsRefinements from "./zh/settings-refinements";
 import coverage from "./zh/coverage";
@@ -19,8 +26,11 @@ import books from "./zh/books";
 import system from "./zh/system";
 import plugins from "./zh/plugins";
 import brands from "./zh/brands";
+import bpSports from "./zh/bp-sports";
 
 const zh: Record<string, string> = {
+  ...videoCast,
+  ...music,
   ...ebookSources,
   ...coverage,
   ...sweepA,
@@ -42,6 +52,14 @@ const zh: Record<string, string> = {
   ...settingsRefinements,
   ...plugins,
   ...brands,
+  ...sportsHub,
+  ...sportsConsent,
+  ...sportsStatistics,
+  ...sportsApi,
+  ...esportsArena,
+  ...bpSports,
+  ...listenTogether,
 };
 
 export default zh;
+import videoCast from "./zh/video-cast";

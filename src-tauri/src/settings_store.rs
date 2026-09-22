@@ -48,6 +48,19 @@ pub fn secrets_write(app: tauri::AppHandle, content: String) -> Result<(), Strin
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
 }
 
+pub(crate) fn secret_value(app: &tauri::AppHandle, key: &str) -> Result<Option<String>, String> {
+    let Some(content) = secrets_read(app.clone())? else {
+        return Ok(None);
+    };
+    let value =
+        serde_json::from_str::<serde_json::Value>(&content).map_err(|error| error.to_string())?;
+    Ok(value
+        .as_object()
+        .and_then(|items| items.get(key))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string))
+}
+
 pub fn read_torrents_disabled(app: &tauri::AppHandle) -> bool {
     let Ok(path) = settings_path(app) else {
         return false;

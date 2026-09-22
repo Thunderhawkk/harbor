@@ -14,6 +14,8 @@ pub fn match_main<'a>(
     app: &AppHandle,
     builder: WebviewWindowBuilder<'a, Wry, AppHandle>,
 ) -> WebviewWindowBuilder<'a, Wry, AppHandle> {
+    #[cfg(target_os = "windows")]
+    let builder = builder.browser_extensions_enabled(true);
     match main_browser_args(app) {
         Some(args) => builder.additional_browser_args(&args),
         None => builder,

@@ -162,9 +162,7 @@ function toRow(entry: Raw, index: number): StandingsRow | null {
     name,
     shortName: str(subject.shortDisplayName) || str(subject.shortName) || name,
     abbr: str(subject.abbreviation),
-    logo: isAthlete
-      ? str(headshot.href) || str(flag.href)
-      : str(team.logo) || str(logos[0]?.href),
+    logo: isAthlete ? str(headshot.href) || str(flag.href) : str(team.logo) || str(logos[0]?.href),
     rank: seeded != null && seeded > 0 ? seeded : index + 1,
     note: str(note.description),
     played: pickNumber(cells, PICK.played),
@@ -238,10 +236,15 @@ function parseTable(data: Raw, def: LeagueDef): StandingsTable | null {
   };
 }
 
+export { parseTable as parseStandingsTable };
+
 const cache = new Map<string, { at: number; table: StandingsTable | null }>();
 const inflight = new Map<string, Promise<StandingsTable | null>>();
 
-async function fetchStandingsRaw(leagueTag: string, season?: number): Promise<StandingsTable | null> {
+async function fetchStandingsRaw(
+  leagueTag: string,
+  season?: number,
+): Promise<StandingsTable | null> {
   const def = defForTag(leagueTag);
   if (!def) return null;
   const query = season ? `?season=${season}` : "";

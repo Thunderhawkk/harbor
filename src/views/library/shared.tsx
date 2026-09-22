@@ -1,7 +1,9 @@
 import { Bookmark, RefreshCw } from "lucide-react";
+import type { RefObject } from "react";
 import { type Meta } from "@/lib/cinemeta";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
+import { VirtualGrid } from "@/components/virtual-grid";
 import { WatchlistCard } from "./watchlist-card";
 
 export { WatchlistCard } from "./watchlist-card";
@@ -241,9 +243,11 @@ export function GroupedGrid<
 >({
   groups,
   onRemove,
+  scrollRef,
 }: {
   groups: Array<{ label: string; items: T[] }>;
   onRemove?: (stremioId: string) => void;
+  scrollRef?: RefObject<HTMLElement | null>;
 }) {
   const t = useT();
   return (
@@ -253,17 +257,37 @@ export function GroupedGrid<
           <h3 className="text-[11px] font-bold uppercase tracking-[0.24em] text-ink-subtle">
             {t(g.label)} <span className="ms-1 text-ink-subtle/70">{g.items.length}</span>
           </h3>
-          <Grid>
-            {g.items.map((it) => (
-              <WatchlistCard
-                key={it.key}
-                meta={it.meta}
-                onRemove={
-                  onRemove && it.stremioId ? () => onRemove(it.stremioId as string) : undefined
-                }
-              />
-            ))}
-          </Grid>
+          {scrollRef ? (
+            <VirtualGrid
+              items={g.items}
+              scrollRef={scrollRef}
+              minColumnWidth={150}
+              gapX={16}
+              gapY={28}
+              estimateRowHeight={300}
+              getKey={(it) => it.key}
+              renderItem={(it) => (
+                <WatchlistCard
+                  meta={it.meta}
+                  onRemove={
+                    onRemove && it.stremioId ? () => onRemove(it.stremioId as string) : undefined
+                  }
+                />
+              )}
+            />
+          ) : (
+            <Grid>
+              {g.items.map((it) => (
+                <WatchlistCard
+                  key={it.key}
+                  meta={it.meta}
+                  onRemove={
+                    onRemove && it.stremioId ? () => onRemove(it.stremioId as string) : undefined
+                  }
+                />
+              ))}
+            </Grid>
+          )}
         </div>
       ))}
     </div>

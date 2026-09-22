@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePreviewNavCustomization } from "@/lib/theme-preview";
 import { Monitor } from "lucide-react";
 import { Search } from "@/components/icons/search-icon";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -15,7 +16,7 @@ import { useView, type View } from "@/lib/view";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
 import { close, minimize, toggleMaximize, useMaximized } from "@/lib/window";
 import { OverflowNav, type NavEntry } from "@/chrome/nav-overflow";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
 import { useBigPictureEntry } from "@/chrome/use-big-picture-entry";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -42,7 +43,10 @@ export function TopDock() {
     setView(item.view);
   };
 
-  const navEntries: NavEntry[] = applyNavCustomization(NAV_ITEMS, settings.navCustomization)
+  const navEntries: NavEntry[] = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  )
     .filter(
       (item) =>
         item.id !== "settings" &&

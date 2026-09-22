@@ -1,4 +1,4 @@
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, Eye, EyeOff } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { ModeSwitcher } from "./mode-switcher";
 import type { LocalMode } from "./local-reader-types";
@@ -8,15 +8,23 @@ export function ReaderTopbar({
   pageLabel,
   mode,
   reduce,
+  showPreview,
+  rtl,
   onExit,
   onPickMode,
+  onTogglePreview,
+  onToggleDirection,
 }: {
   chapterLabel: string;
   pageLabel: string;
   mode: LocalMode;
   reduce: boolean;
+  showPreview: boolean;
+  rtl: boolean;
   onExit: () => void;
   onPickMode: (m: LocalMode) => void;
+  onTogglePreview: (v: boolean) => void;
+  onToggleDirection: () => void;
 }) {
   const t = useT();
   return (
@@ -41,7 +49,24 @@ export function ReaderTopbar({
             <span className="text-[12px] tabular-nums text-ink-subtle">{pageLabel}</span>
           )}
         </div>
-        <div className="h-11 w-11 shrink-0" />
+        <button
+          type="button"
+          aria-label={t("Reading direction")}
+          aria-pressed={rtl}
+          onClick={onToggleDirection}
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-transform active:scale-90 motion-reduce:transition-none ${rtl ? "text-accent" : "text-ink-muted"}`}
+        >
+          <ArrowLeftRight size={20} strokeWidth={2.2} />
+        </button>
+        <button
+          type="button"
+          aria-label={showPreview ? t("Hide pages") : t("Show pages")}
+          aria-pressed={showPreview}
+          onClick={() => onTogglePreview(!showPreview)}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-muted transition-transform active:scale-90 motion-reduce:transition-none"
+        >
+          {showPreview ? <Eye size={20} strokeWidth={2.2} /> : <EyeOff size={20} strokeWidth={2.2} />}
+        </button>
       </div>
       <div className="mt-2.5 flex justify-center px-3">
         <ModeSwitcher mode={mode} onPick={onPickMode} reduce={reduce} />

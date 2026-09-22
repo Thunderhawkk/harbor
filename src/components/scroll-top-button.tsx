@@ -56,7 +56,11 @@ export function ScrollTopButton({
           onClick={toTop}
           aria-label={label}
           title={label}
-          style={{ zIndex: z }}
+          style={{
+            zIndex: z,
+            bottom:
+              "calc(24px + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px))",
+          }}
           className={`fixed bottom-6 end-6 flex h-11 w-11 items-center justify-center rounded-full border border-edge bg-elevated/90 text-ink shadow-[0_16px_44px_-16px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-[opacity,transform] duration-200 hover:bg-raised active:scale-[0.94] motion-reduce:transition-none ${
             show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
           }`}

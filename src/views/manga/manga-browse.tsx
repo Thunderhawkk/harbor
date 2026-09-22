@@ -48,10 +48,12 @@ export function MangaBrowse({
   onOpen,
   onManageSources,
   onBrowseExtension,
+  onOpenLibrary,
 }: {
   onOpen: (mangaId: string) => void;
   onManageSources: () => void;
   onBrowseExtension: (source: SuwayomiSource) => void;
+  onOpenLibrary?: () => void;
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
@@ -338,7 +340,7 @@ export function MangaBrowse({
           />
         </div>
         <SourceDropdown />
-        <TagDropdown tagId={tagId} onSelect={setTagId} />
+        <TagDropdown tagId={tagId} onSelect={setTagId} onOpenLibrary={onOpenLibrary} />
         {activeSource?.kind === "suwayomi" && <LanguageDropdown />}
         <ManageServersButton onClick={onManageSources} className="ms-auto me-2" />
       </div>

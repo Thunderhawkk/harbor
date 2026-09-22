@@ -1,3 +1,6 @@
+import { useSportsEnabled } from "@/lib/sports/enabled";
+import { SportsAccessGate } from "@/views/sports/access-gate";
+import { SportsReminderLoop } from "@/components/sports-reminder-loop";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { startIdleAway } from "@/lib/social/idle-away";
 import { FloatingBack } from "@/chrome/floating-back";
@@ -53,6 +56,7 @@ import { ScreensaverRoot } from "@/components/screensaver/screensaver-root";
 import { CustomCodeMount } from "@/components/custom-code-mount";
 import { MemoryHud } from "@/components/memory-hud";
 import { OfflineBanner } from "@/chrome/offline-banner";
+
 const MobileShell = lazy(() =>
   import("@/views/mobile/mobile-shell").then((m) => ({ default: m.MobileShell })),
 );
@@ -108,6 +112,7 @@ import { SearchOverlay } from "@/components/search/search-overlay";
 import { SearchHotkey } from "@/components/search/search-hotkey";
 import { LinkOutInterstitial } from "@/components/link-out-interstitial";
 import { TogetherProvider, useTogether } from "@/lib/together/provider";
+import { ListenTogetherProvider } from "@/lib/listen-together/provider";
 import { DvrProvider } from "@/lib/dvr/provider";
 import { FavoritesProvider } from "@/lib/iptv/favorites";
 import { MediaFavoritesProvider } from "@/lib/media-favorites";
@@ -137,6 +142,7 @@ import type { MetaType } from "@/lib/cinemeta";
 import { useDiscordPresence } from "@/lib/discord/use-discord-presence";
 import { useWatchShare } from "@/lib/social/watch-presence";
 import { Home } from "@/views/home";
+import { MusicDock } from "@/components/music/music-dock";
 import { ParentalProvider } from "@/lib/parental";
 import { TraktProvider } from "@/lib/trakt/provider";
 import { AnilistProvider } from "@/lib/anilist/provider";
@@ -181,8 +187,10 @@ const importQueue = () => import("@/views/queue");
 const importService = () => import("@/views/service");
 const importSettings = () => import("@/views/settings");
 const importShows = () => import("@/views/shows");
+const importMusic = () => import("@/views/music");
 const importLibrary = () => import("@/views/library");
 const importCommunityCollections = () => import("@/views/collections/community-hub");
+const importSports = () => import("@/views/sports");
 const importLive = () => import("@/views/live");
 const importMatchDetail = () => import("@/views/live/match-detail-view");
 const importVod = () => import("@/views/playlist-vod");
@@ -237,11 +245,13 @@ const ServiceView = lazy(() => importService().then((m) => ({ default: m.Service
 const Settings = lazy(() => importSettings().then((m) => ({ default: m.Settings })));
 const Shows = lazy(() => importShows().then((m) => ({ default: m.Shows })));
 const LibraryView = lazy(() => importLibrary().then((m) => ({ default: m.LibraryView })));
+const MusicView = lazy(() => importMusic().then((m) => ({ default: m.MusicView })));
 const LiveView = lazy(() => importLive().then((m) => ({ default: m.LiveView })));
 const MatchDetailView = lazy(() =>
   importMatchDetail().then((m) => ({ default: m.MatchDetailView })),
 );
 const PlaylistVodView = lazy(() => importVod().then((m) => ({ default: m.PlaylistVodView })));
+const SportsView = lazy(() => importSports().then((m) => ({ default: m.SportsView })));
 const DownloadsView = lazy(() => importDownloads().then((m) => ({ default: m.DownloadsView })));
 const MangaView = lazy(() => import("@/views/manga").then((m) => ({ default: m.MangaView })));
 const EBookView = lazy(() => import("@/views/ebook").then((m) => ({ default: m.EBookView })));
@@ -363,101 +373,103 @@ export function App({ onReady }: { onReady?: () => void }) {
                         <OnboardingProvider>
                           <TogetherProvider>
                             <ViewProvider>
-                              <SearchProvider>
-                                <DvrProvider>
-                                  <FavoritesProvider>
-                                    <MediaFavoritesProvider>
-                                      <CharacterFavoritesProvider>
-                                        <MangaFavoritesProvider>
-                                          <LocalWatchlistProvider>
-                                            <ContextMenuProvider>
-                                              <TopRankModalProvider>
-                                                <HarborErrorBoundary>
-                                                  <ProfileIdentitySync />
-                                                  <HarborAvatarSync />
-                                                  <HarborNameSync />
-                                                  <SettingsProfileBridge />
-                                                  <TrackerProfileBridge />
-                                                  <AnilistAvatarSync />
-                                                  <MalAvatarSync />
-                                                  <MiddleClickScroll />
-                                                  <ThemeBackdrop />
-                                                  <WatchlistSync />
-                                                  {isMobileWeb() || isRemoteRoute() ? (
-                                                    <>
+                              <ListenTogetherProvider>
+                                <SearchProvider>
+                                  <DvrProvider>
+                                    <FavoritesProvider>
+                                      <MediaFavoritesProvider>
+                                        <CharacterFavoritesProvider>
+                                          <MangaFavoritesProvider>
+                                            <LocalWatchlistProvider>
+                                              <ContextMenuProvider>
+                                                <TopRankModalProvider>
+                                                  <HarborErrorBoundary>
+                                                    <ProfileIdentitySync />
+                                                    <HarborAvatarSync />
+                                                    <HarborNameSync />
+                                                    <SettingsProfileBridge />
+                                                    <TrackerProfileBridge />
+                                                    <AnilistAvatarSync />
+                                                    <MalAvatarSync />
+                                                    <MiddleClickScroll />
+                                                    <ThemeBackdrop />
+                                                    <WatchlistSync />
+                                                    {isMobileWeb() || isRemoteRoute() ? (
+                                                      <>
+                                                        <Suspense fallback={null}>
+                                                          <MobileShell />
+                                                        </Suspense>
+                                                        <RevealOnMount onReady={onReady} />
+                                                      </>
+                                                    ) : (
+                                                      <Shell onReady={onReady} />
+                                                    )}
+                                                    {!isMobileWeb() && !isRemoteRoute() && (
                                                       <Suspense fallback={null}>
-                                                        <MobileShell />
+                                                        <OnboardingModal />
                                                       </Suspense>
-                                                      <RevealOnMount onReady={onReady} />
-                                                    </>
-                                                  ) : (
-                                                    <Shell onReady={onReady} />
-                                                  )}
-                                                  {!isMobileWeb() && !isRemoteRoute() && (
-                                                    <Suspense fallback={null}>
-                                                      <OnboardingModal />
-                                                    </Suspense>
-                                                  )}
-                                                  <TogetherInviteToast />
-                                                  <TogetherFloater />
-                                                  <TogetherHostLeavingPrompt />
-                                                  <TogetherSummonToast />
-                                                  <TogetherParticipantLeftToast />
-                                                  <AnilistSyncToast />
-                                                  <MalSyncToast />
-                                                  <MangaSyncToast tracker="anilist" />
-                                                  <MangaSyncToast tracker="mal" />
-                                                  <ListToastHost />
-                                                  <DiagnosticsConsentHost />
-                                                  <TogetherLeaveForLiveModal />
-                                                  <TogetherLocationPublisher />
-                                                  <IdleAwayRunner />
-                                                  <SessionRefreshRunner />
-                                                  <StatsSyncRunner />
-                                                  <FeaturedListsSyncRunner />
-                                                  <RatingsSyncRunner />
-                                                  <ActivitySyncRunner />
-                                                  <MediaServerSyncRunner />
-                                                  <AutoDownloadRunner />
-                                                  <RemindersRunner />
-                                                  <MangaTrackingRunner />
-                                                  <RemoteHostMount />
-                                                  <RemoteOpenBridge />
-                                                  <PlayOnModal />
-                                                  <GamepadRunner />
-                                                  <ControllerConnectedToast />
-                                                  <DiscordPresence />
-                                                  <WatchPresenceRunner />
-                                                  <ContextMenu />
-                                                  <AnnouncementGlobal />
-                                                  <WatchLocalModal />
-                                                  <LocalEpisodesModal />
-                                                  <LocalVersionsModal />
-                                                  <HoverPreview />
-                                                  <CustomHoverCssMount />
-                                                  <TopRankModal />
-                                                  <ProfilePickerModal />
-                                                  <CurfewGuard />
-                                                  <SearchOverlay />
-                                                  <SearchHotkey />
-                                                  <LinkOutInterstitial />
-                                                  <EmbedViewportRoot />
-                                                  <InstallerViewportRoot />
-                                                  <UpdateRoot />
-                                                  <VoyageRoot />
-                                                  <ScreensaverRoot />
-                                                </HarborErrorBoundary>
-                                                <ErrorView />
-                                                <DevErrorTrigger />
-                                              </TopRankModalProvider>
-                                            </ContextMenuProvider>
-                                          </LocalWatchlistProvider>
-                                        </MangaFavoritesProvider>
-                                      </CharacterFavoritesProvider>
-                                    </MediaFavoritesProvider>
-                                  </FavoritesProvider>
-                                </DvrProvider>
-                              </SearchProvider>
+                                                    )}
+                                                    <TogetherInviteToast />
+                                                    <TogetherFloater />
+                                                    <TogetherHostLeavingPrompt />
+                                                    <TogetherSummonToast />
+                                                    <TogetherParticipantLeftToast />
+                                                    <AnilistSyncToast />
+                                                    <MalSyncToast />
+                                                    <MangaSyncToast tracker="anilist" />
+                                                    <MangaSyncToast tracker="mal" />
+                                                    <ListToastHost />
+                                                    <DiagnosticsConsentHost />
+                                                    <TogetherLeaveForLiveModal />
+                                                    <TogetherLocationPublisher />
+                                                    <IdleAwayRunner />
+                                                    <SessionRefreshRunner />
+                                                    <StatsSyncRunner />
+                                                    <FeaturedListsSyncRunner />
+                                                    <RatingsSyncRunner />
+                                                    <ActivitySyncRunner />
+                                                    <MediaServerSyncRunner />
+                                                    <AutoDownloadRunner />
+                                                    <RemindersRunner />
+                                                    <MangaTrackingRunner />
+                                                    <RemoteHostMount />
+                                                    <RemoteOpenBridge />
+                                                    <PlayOnModal />
+                                                    <GamepadRunner />
+                                                    <ControllerConnectedToast />
+                                                    <DiscordPresence />
+                                                    <WatchPresenceRunner />
+                                                    <ContextMenu />
+                                                    <AnnouncementGlobal />
+                                                    <WatchLocalModal />
+                                                    <LocalEpisodesModal />
+                                                    <LocalVersionsModal />
+                                                    <HoverPreview />
+                                                    <CustomHoverCssMount />
+                                                    <TopRankModal />
+                                                    <ProfilePickerModal />
+                                                    <CurfewGuard />
+                                                    <SearchOverlay />
+                                                    <SearchHotkey />
+                                                    <LinkOutInterstitial />
+                                                    <EmbedViewportRoot />
+                                                    <InstallerViewportRoot />
+                                                    <UpdateRoot />
+                                                    <VoyageRoot />
+                                                    <ScreensaverRoot />
+                                                  </HarborErrorBoundary>
+                                                  <ErrorView />
+                                                  <DevErrorTrigger />
+                                                </TopRankModalProvider>
+                                              </ContextMenuProvider>
+                                            </LocalWatchlistProvider>
+                                          </MangaFavoritesProvider>
+                                        </CharacterFavoritesProvider>
+                                      </MediaFavoritesProvider>
+                                    </FavoritesProvider>
+                                  </DvrProvider>
+                                </SearchProvider>
+                              </ListenTogetherProvider>
                             </ViewProvider>
                           </TogetherProvider>
                         </OnboardingProvider>
@@ -1286,7 +1298,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
     }
   }, [activeProfile?.id]);
 
-  const playerActive = !!player;
+  const playerActive = !!player && !player.sportsDocked;
   useEffect(() => setNativeMemoryActive(playerActive), [playerActive]);
   useEffect(() => {
     if (!playerActive) void exitWindowFullscreenOnPlayerClose();
@@ -1326,8 +1338,14 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const moviesTop = topKind === "movies";
   const kidsTop = topKind === "kids";
   const showsTop = topKind === "shows";
+  const musicTop = topKind === "music";
   const libraryTop = topKind === "library";
   const collectionsHubTop = topKind === "collections-hub";
+  const sportsEnabled = useSportsEnabled();
+  const sportsTop = topKind === "sports" && sportsEnabled;
+  useEffect(() => {
+    if (!sportsEnabled && (topKind === "sports" || topKind === "match-detail")) setView("live");
+  }, [sportsEnabled, topKind, setView]);
   const liveTop = topKind === "live";
   const matchDetailTop = topKind === "match-detail";
   const vodTop = topKind === "vod";
@@ -1381,6 +1399,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const settingsAlive = useIdleEvict(settingsTop, overlayPinned);
   const animeAlive = useIdleEvict(animeTop);
   const discoverAlive = useIdleEvict(discoverTop);
+  const musicAlive = useIdleEvict(musicTop);
   const catalogsAlive = useIdleEvict(catalogsTop);
   const addonsAlive = useIdleEvict(addonsTop);
   const calendarAlive = useIdleEvict(calendarTop);
@@ -1422,6 +1441,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const showsAlive = useIdleEvict(showsTop);
   const libraryAlive = useIdleEvict(libraryTop);
   const collectionsHubAlive = useIdleEvict(collectionsHubTop);
+  const sportsAlive = useIdleEvict(sportsTop);
   const liveAlive = useIdleEvict(liveTop);
   const vodAlive = useIdleEvict(vodTop);
   const downloadsAlive = useIdleEvict(downloadsTop);
@@ -1435,424 +1455,467 @@ function Shell({ onReady }: { onReady?: () => void }) {
       data-kids={kidsTop || kid ? "on" : undefined}
       className="relative flex h-full"
     >
-      {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "sidebar" && (
-        <Sidebar />
-      )}
-      {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "dracula" && (
-        <DraculaSidebar />
-      )}
-      {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "nord" && (
-        <NordSidebar />
-      )}
-      {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "forest" && (
-        <ForestSidebar />
-      )}
-      {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "stremio" && (
-        <StremioRail />
-      )}
-      {!settingsTop && !playerActive && !pickerTop && layout === "topdock" && !immersive && (
-        <TopDock />
-      )}
-      {!settingsTop && !playerActive && !pickerTop && layout === "cinematic" && !immersive && (
-        <CinematicOverlay />
-      )}
-      {!settingsTop && !playerActive && !pickerTop && layout === "royal" && !immersive && (
-        <RoyalTopbar />
-      )}
-      {!settingsTop && !playerActive && !pickerTop && layout === "rail" && !immersive && (
-        <SideRail />
-      )}
-      {!playerActive && !pickerTop && layout === "minui" && !immersive && <MinUIDock />}
-      {!playerActive && !pickerTop && layout === "topdock" && !immersive && (
-        <FloatingBack offsetTop={92} />
-      )}
-      {!playerActive && !pickerTop && layout === "cinematic" && !immersive && (
-        <FloatingBack offsetTop={92} />
-      )}
-      {!playerActive && !pickerTop && layout === "royal" && !immersive && (
-        <FloatingBack offsetTop={92} />
-      )}
-      {!playerActive && !pickerTop && layout === "rail" && !immersive && (
-        <FloatingBack offsetLeft={settings.sidebarCollapsed ? 88 : 220} offsetTop={28} />
-      )}
-      {!playerActive && !pickerTop && layout === "custom" && !immersive && (
-        <FloatingBack offsetLeft={20} offsetTop={20} />
-      )}
-      {!playerActive && !pickerTop && layout === "custom" && !immersive && (
-        <div className="fixed end-3 top-3 z-[120]">
-          <WindowControls />
-        </div>
-      )}
-      {!playerActive && <WindowResizeEdges />}
-      <HybridTitleBar suppressed={playerActive || immersive || chromeHidden} />
-      <div
-        className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${playerActive ? "invisible" : ""}`}
-      >
-        <div {...parkLayerProps(homeTop)}>
-          <Home active={homeTop} onReady={onReady} />
-        </div>
-        {settingsAlive && (
-          <div {...layerProps(settingsTop)}>
-            <Suspense fallback={null}>
-              <Settings visible={settingsTop} />
-            </Suspense>
-          </div>
+      <div data-harbor-native-backdrop className="relative flex h-full min-w-0 flex-1">
+        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "sidebar" && (
+          <Sidebar />
         )}
-        {animeAlive && (
-          <div {...layerProps(animeTop)}>
-            <Suspense fallback={null}>
-              <AnimeView active={animeTop} />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "dracula" && (
+          <DraculaSidebar />
         )}
-        {discoverAlive && (
-          <div {...parkLayerProps(discoverTop)}>
-            <Suspense fallback={null}>
-              <Discover active={discoverTop} />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "nord" && (
+          <NordSidebar />
         )}
-        {catalogsAlive && (
-          <div {...layerProps(catalogsTop)}>
-            <Suspense fallback={null}>
-              <Catalogs active={catalogsTop} />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "forest" && (
+          <ForestSidebar />
         )}
-        {addonsAlive && (
-          <div {...layerProps(addonsTop)}>
-            <Suspense fallback={null}>
-              <AddonsView />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "stremio" && (
+          <StremioRail />
         )}
-        {calendarAlive && (
-          <div {...layerProps(calendarTop)}>
-            <Suspense fallback={null}>
-              <CalendarView />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !pickerTop && layout === "topdock" && !immersive && (
+          <TopDock />
         )}
-        {wrappedAlive && (
-          <div {...layerProps(wrappedTop)}>
-            <Suspense fallback={null}>
-              <WrappedView active={wrappedTop} />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !pickerTop && layout === "cinematic" && !immersive && (
+          <CinematicOverlay />
         )}
-        {moviesAlive && (
-          <div {...layerProps(moviesTop)}>
-            <Suspense fallback={null}>
-              <Movies active={moviesTop} />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !pickerTop && layout === "royal" && !immersive && (
+          <RoyalTopbar />
         )}
-        {kidsAlive && (
-          <div {...layerProps(kidsTop)}>
-            <Suspense fallback={null}>
-              <Kids active={kidsTop} />
-            </Suspense>
-          </div>
+        {!settingsTop && !playerActive && !pickerTop && layout === "rail" && !immersive && (
+          <SideRail />
         )}
-        {showsAlive && (
-          <div {...layerProps(showsTop)}>
-            <Suspense fallback={null}>
-              <Shows active={showsTop} />
-            </Suspense>
-          </div>
+        {!playerActive && !pickerTop && layout === "minui" && !immersive && <MinUIDock />}
+        {!playerActive && !pickerTop && layout === "topdock" && !immersive && (
+          <FloatingBack offsetTop={92} />
         )}
-        {libraryAlive && (
-          <div {...layerProps(libraryTop)}>
-            <Suspense fallback={null}>
-              <LibraryView active={libraryTop} />
-            </Suspense>
-          </div>
+        {!playerActive && !pickerTop && layout === "cinematic" && !immersive && (
+          <FloatingBack offsetTop={92} />
         )}
-        {collectionsHubAlive && (
-          <div {...layerProps(collectionsHubTop)}>
-            <Suspense fallback={null}>
-              <CommunityCollectionsView active={collectionsHubTop} />
-            </Suspense>
-          </div>
+        {!playerActive && !pickerTop && layout === "royal" && !immersive && (
+          <FloatingBack offsetTop={92} />
         )}
-        {liveAlive && (
-          <div {...layerProps(liveTop)}>
-            <Suspense fallback={null}>
-              <LiveView active={liveTop} />
-            </Suspense>
-          </div>
+        {!playerActive && !pickerTop && layout === "rail" && !immersive && (
+          <FloatingBack offsetLeft={settings.sidebarCollapsed ? 88 : 220} offsetTop={28} />
         )}
-        {vodAlive && (
-          <div {...layerProps(vodTop)}>
-            <Suspense fallback={null}>
-              <PlaylistVodView active={vodTop} />
-            </Suspense>
-          </div>
+        {!playerActive && !pickerTop && layout === "custom" && !immersive && (
+          <FloatingBack offsetLeft={20} offsetTop={20} />
         )}
-        {downloadsAlive && (
-          <div {...layerProps(downloadsTop)}>
-            <Suspense fallback={null}>
-              <DownloadsView active={downloadsTop} />
-            </Suspense>
-          </div>
-        )}
-        {mangaAlive && (
-          <div {...layerProps(mangaTop)}>
-            <Suspense fallback={null}>
-              <MangaView />
-            </Suspense>
-          </div>
-        )}
-        {ebookAlive && (
-          <div {...layerProps(ebookTop)}>
-            <Suspense fallback={null}>
-              <EBookView />
-            </Suspense>
-          </div>
-        )}
-        {peopleAlive && (
-          <div {...layerProps(peopleTop)}>
-            <Suspense fallback={null}>
-              <PeopleView init={peopleInit} />
-            </Suspense>
-          </div>
-        )}
-        {queueAlive && (
-          <div {...layerProps(queueTop)}>
-            <Suspense fallback={null}>
-              <QueueView />
-            </Suspense>
-          </div>
-        )}
-        {serviceAlive && service && (
-          <div {...layerProps(serviceTop)}>
-            <Suspense fallback={null}>
-              <ServiceView key={service} service={service} />
-            </Suspense>
-          </div>
-        )}
-        {detailAlive && meta && (
-          <div {...layerProps(detailTop)}>
-            <Suspense fallback={null}>
-              {kid ? (
-                <KidsDetailView
-                  key={`kid-meta-${meta.id}`}
-                  meta={meta}
-                  episodeHint={metaEpisodeHint ?? undefined}
-                />
-              ) : (
-                <DetailView
-                  key={`meta-${meta.id}`}
-                  meta={meta}
-                  liveContext={metaLiveContext}
-                  episodeHint={metaEpisodeHint ?? undefined}
-                />
-              )}
-            </Suspense>
-          </div>
-        )}
-        {personAlive && personId !== null && (
-          <div {...layerProps(personTop)}>
-            <Suspense fallback={null}>
-              <PersonView key={`person-${personId}`} personId={personId} />
-            </Suspense>
-          </div>
-        )}
-        {profileAlive && profileHandle !== null && (
-          <div {...layerProps(profileTop)}>
-            <Suspense fallback={null}>
-              <ProfileView
-                key={`profile-${profileHandle}`}
-                handle={profileHandle}
-                onOpenProfile={requestOpenProfile}
-                onOpenMeta={(id, kind, hint) => {
-                  if (kind === "manga") {
-                    openManga(id);
-                    return;
-                  }
-                  const animeIsh = /^(kitsu|mal|anilist|anidb):/i.test(id);
-                  const t: MetaType =
-                    kind === "series" || kind === "tv" || kind === "anime" || animeIsh
-                      ? "series"
-                      : "movie";
-                  openMeta({ id, type: t, name: hint?.name ?? "", poster: hint?.poster });
-                }}
-              />
-            </Suspense>
-          </div>
-        )}
-        {feedAlive && (
-          <div {...layerProps(feedTop)}>
-            <Suspense fallback={null}>
-              <FeedView onOpenProfile={requestOpenProfile} />
-            </Suspense>
-          </div>
-        )}
-        {groupsAlive && (
-          <div {...layerProps(groupsTop)}>
-            <Suspense fallback={null}>
-              <GroupsView />
-            </Suspense>
-          </div>
-        )}
-        {groupAlive && groupId !== null && (
-          <div {...layerProps(groupTop)}>
-            <Suspense fallback={null}>
-              <GroupView key={`group-${groupId}`} id={groupId} onOpenProfile={requestOpenProfile} />
-            </Suspense>
-          </div>
-        )}
-        {listAlive && listHandle !== null && listId !== null && (
-          <div {...layerProps(listTop)}>
-            <Suspense fallback={null}>
-              <SharedListView
-                key={`list-${listHandle}-${listId}`}
-                handle={listHandle}
-                listId={listId}
-                onOpenProfile={requestOpenProfile}
-                onOpenMeta={(id, kind, hint) => {
-                  if (kind === "manga") {
-                    openManga(id);
-                    return;
-                  }
-                  const animeIsh = /^(kitsu|mal|anilist|anidb):/i.test(id);
-                  const t: MetaType =
-                    kind === "series" || kind === "tv" || kind === "anime" || animeIsh
-                      ? "series"
-                      : "movie";
-                  openMeta({ id, type: t, name: hint?.name ?? "", poster: hint?.poster });
-                }}
-              />
-            </Suspense>
-          </div>
-        )}
-        {collectionAlive && collectionId !== null && (
-          <div {...layerProps(collectionTop)}>
-            <Suspense fallback={null}>
-              <CollectionView key={`collection-${collectionId}`} collectionId={collectionId} />
-            </Suspense>
-          </div>
-        )}
-        {addonCollectionAlive && addonCollectionMeta && (
-          <div {...layerProps(addonCollectionTop)}>
-            <Suspense fallback={null}>
-              <AddonCollectionView
-                key={`addon-collection-${addonCollectionMeta.id}`}
-                meta={addonCollectionMeta}
-              />
-            </Suspense>
-          </div>
-        )}
-        {episodeDetailAlive && episodeDetail && (
-          <div {...layerProps(episodeDetailTop)}>
-            <Suspense fallback={null}>
-              <EpisodeDetailView
-                key={`episode-${episodeDetail.seriesId}-${episodeDetail.season}-${episodeDetail.episode}`}
-                seriesId={episodeDetail.seriesId}
-                season={episodeDetail.season}
-                episode={episodeDetail.episode}
-                seriesMeta={episodeDetail.seriesMeta}
-              />
-            </Suspense>
-          </div>
-        )}
-        {filterAlive && filter && (
-          <div {...layerProps(filterTop)}>
-            <Suspense fallback={null}>
-              <FilterView key={filterReactKey(filter)} filter={filter} />
-            </Suspense>
-          </div>
-        )}
-        {brandsAlive && brands && (
-          <div className={layer(brandsTop)}>
-            <Suspense fallback={null}>
-              <BrandsView key={`brands-${brands}`} brand={brands} />
-            </Suspense>
-          </div>
-        )}
-        {matchDetailAlive && matchDetailGame && (
-          <div className={layer(matchDetailTop)}>
-            <Suspense fallback={null}>
-              <MatchDetailView key={`match-${matchDetailGame.id}`} game={matchDetailGame} />
-            </Suspense>
-          </div>
-        )}
-        {gridAlive && grid && (
-          <div {...layerProps(gridTop)}>
-            <Suspense fallback={null}>
-              <GridView key={`grid-${grid.title}`} grid={grid} />
-            </Suspense>
-          </div>
-        )}
-        {collectionsIndexAlive && (
-          <div {...layerProps(collectionsIndexTop)}>
-            <Suspense fallback={null}>
-              <CollectionsView />
-            </Suspense>
-          </div>
-        )}
-        {awardAlive && awardType && (
-          <div {...layerProps(awardTop)}>
-            <Suspense fallback={null}>
-              <AwardView key={`award-${awardType}`} awardType={awardType} />
-            </Suspense>
-          </div>
-        )}
-        {animeAwardAlive && animeAwardSource && (
-          <div {...layerProps(animeAwardTop)}>
-            <Suspense fallback={null}>
-              <AnimeAwardView key={`anime-award-${animeAwardSource}`} sourceId={animeAwardSource} />
-            </Suspense>
-          </div>
-        )}
-        {pickerAlive && picker && (
-          <div {...layerProps(pickerTop)}>
-            <Suspense fallback={null}>
-              <PlayPicker
-                key={`picker-${picker.meta.id}-${picker.episode?.season ?? ""}-${picker.episode?.episode ?? ""}-${picker.attempt ?? 0}-${picker.intent ?? "play"}-${picker.seasonEpisodes?.length ?? 0}`}
-                meta={picker.meta}
-                episode={picker.episode}
-                autoPlay={picker.intent === "download" ? false : picker.autoPlay}
-                attempt={picker.attempt}
-                intent={picker.intent}
-                seasonEpisodes={picker.seasonEpisodes}
-                resume={picker.resume}
-                playerActive={playerActive}
-              />
-            </Suspense>
-          </div>
-        )}
-        {pickerTop && !themeHasTopbar && (
+        {!playerActive && !pickerTop && layout === "custom" && !immersive && (
           <div className="fixed end-3 top-3 z-[120]">
             <WindowControls />
           </div>
         )}
-        {!immersive && !settingsTop && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 z-30 h-24 bg-gradient-to-b from-canvas/85 via-canvas/40 to-transparent"
-          />
-        )}
-        {!immersive &&
-          (themeHasTopbar || (settingsTop && layout !== "minui" && layout !== "custom")) && (
-            <Topbar />
+        <MusicDock />
+        {!playerActive && <WindowResizeEdges />}
+        <HybridTitleBar suppressed={playerActive || immersive || chromeHidden} />
+        <div
+          className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${playerActive ? "invisible" : ""}`}
+        >
+          <div {...parkLayerProps(homeTop)}>
+            <Home active={homeTop} onReady={onReady} />
+          </div>
+          {settingsAlive && (
+            <div {...layerProps(settingsTop)}>
+              <Suspense fallback={null}>
+                <Settings visible={settingsTop} />
+              </Suspense>
+            </div>
           )}
-        {!immersive && !playerActive && !pickerTop && layout === "custom" && (
-          <div aria-hidden className="harbor-chrome-proxy fixed end-3 top-3 z-[40]">
-            <TogetherButton />
-          </div>
-        )}
-        {!immersive && !playerActive && !pickerTop && !bigPicture && layout === "custom" && (
-          <div className="harbor-bp-proxy">
-            <BigPictureEntryButton hidden={chromeHidden} />
-          </div>
-        )}
-        {!immersive && layout === "rail" && !settingsTop && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-canvas/90 via-canvas/40 to-transparent"
-          />
-        )}
+          {animeAlive && (
+            <div {...layerProps(animeTop)}>
+              <Suspense fallback={null}>
+                <AnimeView active={animeTop} />
+              </Suspense>
+            </div>
+          )}
+          {discoverAlive && (
+            <div {...parkLayerProps(discoverTop)}>
+              <Suspense fallback={null}>
+                <Discover active={discoverTop} />
+              </Suspense>
+            </div>
+          )}
+          {catalogsAlive && (
+            <div {...layerProps(catalogsTop)}>
+              <Suspense fallback={null}>
+                <Catalogs active={catalogsTop} />
+              </Suspense>
+            </div>
+          )}
+          {addonsAlive && (
+            <div {...layerProps(addonsTop)}>
+              <Suspense fallback={null}>
+                <AddonsView />
+              </Suspense>
+            </div>
+          )}
+          {calendarAlive && (
+            <div {...layerProps(calendarTop)}>
+              <Suspense fallback={null}>
+                <CalendarView />
+              </Suspense>
+            </div>
+          )}
+          {wrappedAlive && (
+            <div {...layerProps(wrappedTop)}>
+              <Suspense fallback={null}>
+                <WrappedView active={wrappedTop} />
+              </Suspense>
+            </div>
+          )}
+          {moviesAlive && (
+            <div {...layerProps(moviesTop)}>
+              <Suspense fallback={null}>
+                <Movies active={moviesTop} />
+              </Suspense>
+            </div>
+          )}
+          {kidsAlive && (
+            <div {...layerProps(kidsTop)}>
+              <Suspense fallback={null}>
+                <Kids active={kidsTop} />
+              </Suspense>
+            </div>
+          )}
+          {showsAlive && (
+            <div {...layerProps(showsTop)}>
+              <Suspense fallback={null}>
+                <Shows active={showsTop} />
+              </Suspense>
+            </div>
+          )}
+          {musicAlive && (
+            <div className={layer(musicTop)}>
+              <Suspense fallback={null}>
+                <MusicView
+                  active={musicTop}
+                  shellBackAvailable={
+                    canGoBack &&
+                    !chromeHidden &&
+                    !immersive &&
+                    (themeHasTopbar || layout === "minui")
+                  }
+                />
+              </Suspense>
+            </div>
+          )}
+          {libraryAlive && (
+            <div {...layerProps(libraryTop)}>
+              <Suspense fallback={null}>
+                <LibraryView active={libraryTop} />
+              </Suspense>
+            </div>
+          )}
+          {collectionsHubAlive && (
+            <div {...layerProps(collectionsHubTop)}>
+              <Suspense fallback={null}>
+                <CommunityCollectionsView active={collectionsHubTop} />
+              </Suspense>
+            </div>
+          )}
+          {liveAlive && (
+            <div {...layerProps(liveTop)}>
+              <Suspense fallback={null}>
+                <LiveView active={liveTop} />
+              </Suspense>
+            </div>
+          )}
+          {vodAlive && (
+            <div {...layerProps(vodTop)}>
+              <Suspense fallback={null}>
+                <PlaylistVodView active={vodTop} />
+              </Suspense>
+            </div>
+          )}
+          {sportsAlive && (
+            <div className={parkLayer(sportsTop)}>
+              <Suspense fallback={null}>
+                <SportsView active={sportsTop} />
+              </Suspense>
+            </div>
+          )}
+          {downloadsAlive && (
+            <div {...layerProps(downloadsTop)}>
+              <Suspense fallback={null}>
+                <DownloadsView active={downloadsTop} />
+              </Suspense>
+            </div>
+          )}
+          {mangaAlive && (
+            <div {...layerProps(mangaTop)}>
+              <Suspense fallback={null}>
+                <MangaView />
+              </Suspense>
+            </div>
+          )}
+          {ebookAlive && (
+            <div {...layerProps(ebookTop)}>
+              <Suspense fallback={null}>
+                <EBookView />
+              </Suspense>
+            </div>
+          )}
+          {peopleAlive && (
+            <div {...layerProps(peopleTop)}>
+              <Suspense fallback={null}>
+                <PeopleView init={peopleInit} />
+              </Suspense>
+            </div>
+          )}
+          {queueAlive && (
+            <div {...layerProps(queueTop)}>
+              <Suspense fallback={null}>
+                <QueueView />
+              </Suspense>
+            </div>
+          )}
+          {serviceAlive && service && (
+            <div {...layerProps(serviceTop)}>
+              <Suspense fallback={null}>
+                <ServiceView key={service} service={service} />
+              </Suspense>
+            </div>
+          )}
+          {detailAlive && meta && (
+            <div {...layerProps(detailTop)}>
+              <Suspense fallback={null}>
+                {kid ? (
+                  <KidsDetailView
+                    key={`kid-meta-${meta.id}`}
+                    meta={meta}
+                    episodeHint={metaEpisodeHint ?? undefined}
+                  />
+                ) : (
+                  <DetailView
+                    key={`meta-${meta.id}`}
+                    meta={meta}
+                    liveContext={metaLiveContext}
+                    episodeHint={metaEpisodeHint ?? undefined}
+                  />
+                )}
+              </Suspense>
+            </div>
+          )}
+          {personAlive && personId !== null && (
+            <div {...layerProps(personTop)}>
+              <Suspense fallback={null}>
+                <PersonView key={`person-${personId}`} personId={personId} />
+              </Suspense>
+            </div>
+          )}
+          {profileAlive && profileHandle !== null && (
+            <div {...layerProps(profileTop)}>
+              <Suspense fallback={null}>
+                <ProfileView
+                  key={`profile-${profileHandle}`}
+                  handle={profileHandle}
+                  onOpenProfile={requestOpenProfile}
+                  onOpenMeta={(id, kind, hint) => {
+                    if (kind === "manga") {
+                      openManga(id);
+                      return;
+                    }
+                    const animeIsh = /^(kitsu|mal|anilist|anidb):/i.test(id);
+                    const t: MetaType =
+                      kind === "series" || kind === "tv" || kind === "anime" || animeIsh
+                        ? "series"
+                        : "movie";
+                    openMeta({ id, type: t, name: hint?.name ?? "", poster: hint?.poster });
+                  }}
+                />
+              </Suspense>
+            </div>
+          )}
+          {feedAlive && (
+            <div {...layerProps(feedTop)}>
+              <Suspense fallback={null}>
+                <FeedView onOpenProfile={requestOpenProfile} />
+              </Suspense>
+            </div>
+          )}
+          {groupsAlive && (
+            <div {...layerProps(groupsTop)}>
+              <Suspense fallback={null}>
+                <GroupsView />
+              </Suspense>
+            </div>
+          )}
+          {groupAlive && groupId !== null && (
+            <div {...layerProps(groupTop)}>
+              <Suspense fallback={null}>
+                <GroupView
+                  key={`group-${groupId}`}
+                  id={groupId}
+                  onOpenProfile={requestOpenProfile}
+                />
+              </Suspense>
+            </div>
+          )}
+          {listAlive && listHandle !== null && listId !== null && (
+            <div {...layerProps(listTop)}>
+              <Suspense fallback={null}>
+                <SharedListView
+                  key={`list-${listHandle}-${listId}`}
+                  handle={listHandle}
+                  listId={listId}
+                  onOpenProfile={requestOpenProfile}
+                  onOpenMeta={(id, kind, hint) => {
+                    if (kind === "manga") {
+                      openManga(id);
+                      return;
+                    }
+                    const animeIsh = /^(kitsu|mal|anilist|anidb):/i.test(id);
+                    const t: MetaType =
+                      kind === "series" || kind === "tv" || kind === "anime" || animeIsh
+                        ? "series"
+                        : "movie";
+                    openMeta({ id, type: t, name: hint?.name ?? "", poster: hint?.poster });
+                  }}
+                />
+              </Suspense>
+            </div>
+          )}
+          {collectionAlive && collectionId !== null && (
+            <div {...layerProps(collectionTop)}>
+              <Suspense fallback={null}>
+                <CollectionView key={`collection-${collectionId}`} collectionId={collectionId} />
+              </Suspense>
+            </div>
+          )}
+          {addonCollectionAlive && addonCollectionMeta && (
+            <div {...layerProps(addonCollectionTop)}>
+              <Suspense fallback={null}>
+                <AddonCollectionView
+                  key={`addon-collection-${addonCollectionMeta.id}`}
+                  meta={addonCollectionMeta}
+                />
+              </Suspense>
+            </div>
+          )}
+          {episodeDetailAlive && episodeDetail && (
+            <div {...layerProps(episodeDetailTop)}>
+              <Suspense fallback={null}>
+                <EpisodeDetailView
+                  key={`episode-${episodeDetail.seriesId}-${episodeDetail.season}-${episodeDetail.episode}`}
+                  seriesId={episodeDetail.seriesId}
+                  season={episodeDetail.season}
+                  episode={episodeDetail.episode}
+                  seriesMeta={episodeDetail.seriesMeta}
+                />
+              </Suspense>
+            </div>
+          )}
+          {filterAlive && filter && (
+            <div {...layerProps(filterTop)}>
+              <Suspense fallback={null}>
+                <FilterView key={filterReactKey(filter)} filter={filter} />
+              </Suspense>
+            </div>
+          )}
+          {brandsAlive && brands && (
+            <div className={layer(brandsTop)}>
+              <Suspense fallback={null}>
+                <BrandsView key={`brands-${brands}`} brand={brands} />
+              </Suspense>
+            </div>
+          )}
+          {matchDetailAlive && matchDetailGame && (
+            <div className={layer(matchDetailTop)}>
+              <Suspense fallback={null}>
+                <SportsAccessGate active={matchDetailTop}>
+                  <MatchDetailView
+                    key={`match-${matchDetailGame.id}`}
+                    game={matchDetailGame}
+                    shellBackAvailable={
+                      canGoBack &&
+                      !chromeHidden &&
+                      !immersive &&
+                      (themeHasTopbar || layout === "minui")
+                    }
+                  />
+                </SportsAccessGate>
+              </Suspense>
+            </div>
+          )}
+          {gridAlive && grid && (
+            <div {...layerProps(gridTop)}>
+              <Suspense fallback={null}>
+                <GridView key={`grid-${grid.title}`} grid={grid} />
+              </Suspense>
+            </div>
+          )}
+          {collectionsIndexAlive && (
+            <div {...layerProps(collectionsIndexTop)}>
+              <Suspense fallback={null}>
+                <CollectionsView />
+              </Suspense>
+            </div>
+          )}
+          {awardAlive && awardType && (
+            <div {...layerProps(awardTop)}>
+              <Suspense fallback={null}>
+                <AwardView key={`award-${awardType}`} awardType={awardType} />
+              </Suspense>
+            </div>
+          )}
+          {animeAwardAlive && animeAwardSource && (
+            <div {...layerProps(animeAwardTop)}>
+              <Suspense fallback={null}>
+                <AnimeAwardView
+                  key={`anime-award-${animeAwardSource}`}
+                  sourceId={animeAwardSource}
+                />
+              </Suspense>
+            </div>
+          )}
+          {pickerAlive && picker && (
+            <div {...layerProps(pickerTop)}>
+              <Suspense fallback={null}>
+                <PlayPicker
+                  key={`picker-${picker.meta.id}-${picker.episode?.season ?? ""}-${picker.episode?.episode ?? ""}-${picker.attempt ?? 0}-${picker.intent ?? "play"}-${picker.seasonEpisodes?.length ?? 0}`}
+                  meta={picker.meta}
+                  episode={picker.episode}
+                  autoPlay={picker.intent === "download" ? false : picker.autoPlay}
+                  attempt={picker.attempt}
+                  intent={picker.intent}
+                  seasonEpisodes={picker.seasonEpisodes}
+                  resume={picker.resume}
+                  playerActive={playerActive}
+                />
+              </Suspense>
+            </div>
+          )}
+          {pickerTop && !themeHasTopbar && (
+            <div className="fixed end-3 top-3 z-[120]">
+              <WindowControls />
+            </div>
+          )}
+          {!immersive && !settingsTop && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 z-30 h-24 bg-gradient-to-b from-canvas/85 via-canvas/40 to-transparent"
+            />
+          )}
+          {!immersive &&
+            (themeHasTopbar || (settingsTop && layout !== "minui" && layout !== "custom")) && (
+              <Topbar />
+            )}
+          {!immersive && !playerActive && !pickerTop && layout === "custom" && (
+            <div aria-hidden className="harbor-chrome-proxy fixed end-3 top-3 z-[40]">
+              <TogetherButton />
+            </div>
+          )}
+          {!immersive && !playerActive && !pickerTop && !bigPicture && layout === "custom" && (
+            <div className="harbor-bp-proxy">
+              <BigPictureEntryButton hidden={chromeHidden} />
+            </div>
+          )}
+          {!immersive && layout === "rail" && !settingsTop && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-canvas/90 via-canvas/40 to-transparent"
+            />
+          )}
+        </div>
       </div>
       {player && (
         <Suspense fallback={null}>
@@ -1872,6 +1935,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
       <CustomCodeMount />
       <ThemeChromeBridge />
       <WebhookLoopMount />
+      <SportsReminderLoop />
       <MemoryHud />
       {!player && <OfflineBanner />}
     </div>

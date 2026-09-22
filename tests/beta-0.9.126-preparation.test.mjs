@@ -8,20 +8,23 @@ const read = (path) =>
 const notes = JSON.parse(read("src/lib/updater/bundled-release-notes.json"));
 
 test("beta app and managed installer versions agree", () => {
+  const version = JSON.parse(read("package.json")).version;
   for (const path of [
     "package.json",
     "src-tauri/tauri.conf.json",
     "installer/package.json",
     "installer/src-tauri/tauri.conf.json",
   ]) {
-    assert.equal(JSON.parse(read(path)).version, "0.9.126", path);
+    assert.equal(JSON.parse(read(path)).version, version, path);
   }
   for (const [path, name] of [
     ["src-tauri", "harbor"],
     ["installer/src-tauri", "harbor-setup"],
   ]) {
-    assert.match(read(path + "/Cargo.toml"), /^version = "0\.9\.126"$/m);
-    assert.ok(read(path + "/Cargo.lock").includes('name = "' + name + '"\nversion = "0.9.126"'));
+    assert.ok(read(path + "/Cargo.toml").includes('version = "' + version + '"'));
+    assert.ok(
+      read(path + "/Cargo.lock").includes('name = "' + name + '"\nversion = "' + version + '"'),
+    );
   }
 });
 

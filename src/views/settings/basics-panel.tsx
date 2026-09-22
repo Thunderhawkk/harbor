@@ -13,6 +13,7 @@ import { getThemeById } from "@/lib/theme";
 import { ROW_ACTION } from "./kit";
 import { Section, useSettingsActiveContext } from "./shared";
 import { SRow } from "./ui";
+import { SportsAccessRow } from "./sports-access-row";
 
 const ENGINE_LABEL: Record<string, string> = {
   auto: "Auto",
@@ -66,9 +67,12 @@ export function BasicsPanel() {
           title={t("Stremio account")}
           description={
             user
-              ? t("Signed in as {email}. Your library, add-ons and watch history sync with Stremio.", {
-                  email: maskEmail(user.email, reveal),
-                })
+              ? t(
+                  "Signed in as {email}. Your library, add-ons and watch history sync with Stremio.",
+                  {
+                    email: maskEmail(user.email, reveal),
+                  },
+                )
               : t("Sign in to sync your library, add-ons and watch history with Stremio.")
           }
           trailing={
@@ -158,17 +162,23 @@ export function BasicsPanel() {
       >
         <SRow
           title={t("Instant")}
-          description={t("Harbor picks the best stream it can find and starts playing straight away.")}
+          description={t(
+            "Harbor picks the best stream it can find and starts playing straight away.",
+          )}
           onClick={() => update({ instantPlay: true })}
           trailing={<Picked on={settings.instantPlay} />}
         />
         <SRow
           title={t("Pick a source")}
-          description={t("Harbor shows the full list of streams every time so you choose one yourself.")}
+          description={t(
+            "Harbor shows the full list of streams every time so you choose one yourself.",
+          )}
           onClick={() => update({ instantPlay: false })}
           trailing={<Picked on={!settings.instantPlay} />}
         />
       </Section>
+
+      <SportsAccessRow />
 
       <Section title={t("Make it yours")} subtitle={t("Colors, posters, fonts and wallpaper.")}>
         <SRow

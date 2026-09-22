@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Columns2,
+  GalleryHorizontal,
   GalleryVertical,
   RectangleVertical,
   type LucideIcon,
@@ -10,6 +11,7 @@ import type { LocalMode } from "./local-reader-types";
 
 const ITEMS: { mode: LocalMode; Icon: LucideIcon }[] = [
   { mode: "strip", Icon: GalleryVertical },
+  { mode: "strip-h", Icon: GalleryHorizontal },
   { mode: "single", Icon: RectangleVertical },
   { mode: "double", Icon: Columns2 },
   { mode: "book", Icon: BookOpen },
@@ -32,11 +34,13 @@ export function ModeSwitcher({
         const label =
           m === "strip"
             ? t("Webtoon strip")
-            : m === "single"
-              ? t("Single page")
-              : m === "double"
-                ? t("Two pages")
-                : t("Book flip");
+            : m === "strip-h"
+              ? t("Horizontal strip")
+              : m === "single"
+                ? t("Single page")
+                : m === "double"
+                  ? t("Two pages")
+                  : t("Book flip");
         return (
           <button
             key={m}

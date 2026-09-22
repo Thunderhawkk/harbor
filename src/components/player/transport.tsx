@@ -10,7 +10,7 @@ import { TransportKids } from "./transport-kids";
 import { useActiveKid } from "@/lib/profiles";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { useView } from "@/lib/view";
+import { usePlayerNavigation } from "@/lib/view";
 import { resolveChromeTheme } from "@/lib/theme";
 import { SeekBar } from "./transport/seek-bar";
 import { LiveBadge, GoToLive, LiveSeekBar } from "./transport/live-controls";
@@ -178,7 +178,7 @@ export function Transport({
   );
   const isLiveChannel = !!meta?.id?.startsWith("iptv:");
   const titleClickable = !!meta && !isLiveChannel;
-  const { openMeta, exitPlayer } = useView();
+  const { openMeta, exitPlayer } = usePlayerNavigation();
   const castModalPlay = useCastModalPlay();
   const controlsRef = useRef<HTMLDivElement>(null);
   const [mid, setMid] = useState(false);

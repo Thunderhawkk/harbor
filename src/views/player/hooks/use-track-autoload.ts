@@ -735,8 +735,20 @@ export function useTrackAutoload(params: {
   }, [engine, settings.audioDevice, bridgeRef]);
   useEffect(() => {
     const subIdSig = subtitleAutoSelectionSignature(snap.subtitleTracks);
-    const audioIdSig = snap.audioTracks.map((t) => t.id).join(",");
-    const key = `${src.url}|${audioIdSig}|${subIdSig}`;
+    const audioIdSig = JSON.stringify(
+      snap.audioTracks.map((t) => [t.id, t.lang, t.title, t.label, t.default]),
+    );
+    const preferenceSig = JSON.stringify([
+      settings.preferredAudioLangs,
+      settings.preferredSubLangs,
+      settings.preferredLanguages,
+      settings.preferEmbeddedSubs,
+      settings.subtitleAutoUpgrade,
+      settings.forcedSubsWhenNativeAudio,
+      settings.subtitlesOffByDefault,
+      settings.trackBlockWords,
+    ]);
+    const key = `${src.url}|${audioIdSig}|${subIdSig}|${preferenceSig}`;
     if (autoTrackKeyRef.current === key) return;
     if (snap.audioTracks.length === 0 && snap.subtitleTracks.length === 0) return;
     autoTrackKeyRef.current = key;

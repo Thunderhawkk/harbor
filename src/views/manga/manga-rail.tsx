@@ -1,5 +1,5 @@
 import { Award } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import type { MangaSummary } from "@/lib/manga/types";
 import { CollapsibleSection } from "./collapsible-section";
 import { MangaPosterRow } from "./manga-poster-row";
@@ -37,14 +37,22 @@ export function MangaRail({
   useEffect(() => {
     const el = sectionRef.current;
     if (!el || seen) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setSeen(true);
+      return;
+    }
     const obs = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) setSeen(true);
       },
-      { rootMargin: "300px 0px" },
+      { rootMargin: "1000px 0px" },
     );
     obs.observe(el);
-    return () => obs.disconnect();
+    const retry = window.setTimeout(() => setSeen(true), 8000);
+    return () => {
+      obs.disconnect();
+      window.clearTimeout(retry);
+    };
   }, [seen]);
 
   useEffect(() => {
@@ -53,11 +61,13 @@ export function MangaRail({
     if (loadStream) {
       loadStream((chunk) => {
         if (cancelled || chunk.length === 0) return;
-        setLoaded((prev) => {
-          const base = prev ?? [];
-          const ids = new Set(base.map((m) => m.id));
-          const fresh = chunk.filter((m) => !ids.has(m.id));
-          return fresh.length ? [...base, ...fresh] : base;
+        startTransition(() => {
+          setLoaded((prev) => {
+            const base = prev ?? [];
+            const ids = new Set(base.map((m) => m.id));
+            const fresh = chunk.filter((m) => !ids.has(m.id));
+            return fresh.length ? [...base, ...fresh] : base;
+          });
         });
       })
         .catch(() => {})
@@ -67,10 +77,12 @@ export function MangaRail({
     } else if (load) {
       load()
         .then((list) => {
-          if (!cancelled) setLoaded(list);
+          if (cancelled) return;
+          startTransition(() => setLoaded(list));
         })
         .catch(() => {
-          if (!cancelled) setLoaded([]);
+          if (cancelled) return;
+          startTransition(() => setLoaded([]));
         });
     }
     return () => {
