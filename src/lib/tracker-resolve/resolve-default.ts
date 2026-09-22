@@ -1,6 +1,6 @@
 import { meta as fetchMeta } from "@/lib/cinemeta";
 import { resolveEpisode, type CatalogDeps } from "./resolve";
-import { fetchShowSeasons, searchShows } from "./trakt-catalog";
+import { fetchShowSeasons, searchShows, showIdsByTmdb } from "./trakt-catalog";
 import type { EpisodeIdentity, ResolutionResult } from "./types";
 
 const defaultDeps: CatalogDeps = { searchShows, fetchShowSeasons };
@@ -14,9 +14,17 @@ function yearOf(releaseInfo?: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function bareMetaId(metaId: string): string {
+const TMDB_META_ID = /^tmdb:(?:tv|movie):(\d+)/;
+
+// Cinemeta only serves imdb ids, and a tmdb-sourced play is numbered by the catalog
+// that owns it, so the show id has to be bridged before the identity can be read.
+async function cinemetaSeriesId(metaId: string): Promise<string | null> {
   const head = metaId.split(":")[0];
-  return /^tt\d+$/.test(head) ? head : metaId;
+  if (/^tt\d+$/.test(head)) return head;
+  const tmdb = metaId.match(TMDB_META_ID);
+  if (!tmdb) return null;
+  const ids = await showIdsByTmdb(Number(tmdb[1])).catch(() => null);
+  return ids?.imdb ?? null;
 }
 
 /**
@@ -29,7 +37,9 @@ export async function hydrateIdentity(
   season: number,
   number: number,
 ): Promise<EpisodeIdentity | null> {
-  const series = await fetchMeta("series", bareMetaId(metaId)).catch(() => null);
+  const seriesId = await cinemetaSeriesId(metaId);
+  if (!seriesId) return null;
+  const series = await fetchMeta("series", seriesId).catch(() => null);
   if (!series) return null;
   const video = series.videos?.find(
     (entry) => (entry.season ?? 0) === season && (entry.episode ?? entry.number) === number,

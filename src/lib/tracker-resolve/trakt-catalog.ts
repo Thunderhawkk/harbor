@@ -64,6 +64,34 @@ export async function searchShows(title: string): Promise<ShowCandidate[]> {
   return out;
 }
 
+const tmdbShowCache = new Map<number, ExternalShowIds>();
+
+// /shows/{id} only accepts a trakt id or slug, so a foreign id has to go through
+// /search/{id_type}/{id}. Successes are kept in memory because show ids never move.
+export async function showIdsByTmdb(tmdbId: number): Promise<ExternalShowIds | null> {
+  if (!Number.isFinite(tmdbId)) return null;
+  const cached = tmdbShowCache.get(tmdbId);
+  if (cached) return cached;
+  try {
+    const rows = await traktRequest<unknown>(`/search/tmdb/${tmdbId}?type=show`, {
+      authed: false,
+    });
+    if (!Array.isArray(rows)) return null;
+    for (const row of rows) {
+      const show = asRecord(asRecord(row)?.show);
+      if (!show) continue;
+      const ids = parseShowIds(show.ids);
+      if (ids.imdb || ids.trakt) {
+        tmdbShowCache.set(tmdbId, ids);
+        return ids;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export type MovieCandidate = {
   ids: ExternalShowIds;
   title: string;
