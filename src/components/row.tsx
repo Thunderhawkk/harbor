@@ -702,7 +702,21 @@ export function Row({
   return (
     <div className={`flex min-w-0 flex-col gap-5 ps-[9px] ${className}`}>
       {(title || onViewAll || headerRight) && (
-        <div className="flex items-baseline justify-between gap-4 pe-1">
+        <div
+          className="relative z-20 flex items-baseline justify-between gap-4 pe-1"
+          onPointerEnter={() => {
+            if (dockEnabled) {
+              dockPointerXRef.current = null;
+              resetPosterDock();
+            }
+          }}
+          onPointerMove={() => {
+            if (dockEnabled) {
+              dockPointerXRef.current = null;
+              resetPosterDock();
+            }
+          }}
+        >
           {title && (
             <div className="flex min-w-0 flex-col gap-1">
               <div className="flex min-w-0 items-center gap-2">
