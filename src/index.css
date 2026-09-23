@@ -4189,7 +4189,11 @@ html[data-theme-layout="minui"] .anime-award-banner-logo {
 
 html:not([data-input-modality="pointer"])
   :is(button, a, select, summary, input, textarea, [tabindex]):focus-visible:not(
-    :where([data-profile-picker][role="dialog"][tabindex="-1"], .hset-title[tabindex="-1"])
+    :where(
+      [data-profile-picker][role="dialog"][tabindex="-1"],
+      .hset-title[tabindex="-1"],
+      [data-search-overlay] input
+    )
   ) {
   outline: 2px solid var(--color-accent) !important;
   outline-offset: 2px;
@@ -7369,6 +7373,12 @@ button.hset-rail-me:hover,
 
 .harbor-queue-tile {
   --poster-radius: var(--radius-md);
+}
+
+/* Search overlay draws its own panel chrome; never outline its header container. */
+[data-search-overlay] [data-tv-search-editing-focused="true"],
+[data-search-overlay] [data-tv-search-nav-focused="true"] {
+  outline: none !important;
 }
 
 .music-eq-bars {
