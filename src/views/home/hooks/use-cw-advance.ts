@@ -173,7 +173,17 @@ export function useCwAdvance(
       return;
     }
     let cancelled = false;
-    const candidates = items.filter((i) => currentEpisode(i) != null && isFinishedSeries(i));
+    // Local completion alone must not decide eligibility: a completion on another device
+    // leaves local progress mid-episode, so the remote watched maps have to admit it too.
+    const candidates = items.filter((i) => {
+      const cur = currentEpisode(i);
+      if (!cur) return false;
+      if (isFinishedSeries(i)) return true;
+      return watchedPredicate(i, cur, traktWatched, simklWatched, anilistWatched, simklStatus)(
+        cur.season,
+        cur.episode,
+      );
+    });
     void (async () => {
       const next = new Map<string, LibraryItem>();
       const remove = new Set<string>();
@@ -263,12 +273,9 @@ export function useCwAdvance(
           effCur,
           (s: number, e: number): boolean => {
             if (s === effCur.season && e === effCur.episode) return true;
-            const prog = getEpisodeProgress(i._id, s, e, null, null, new Set());
-            if (prog.watched) return true;
+            if (checkWatched(s, e)) return true;
             if (!scoped) return false;
-            return providerAliasCoords(list, s, e).some(
-              (a) => getEpisodeProgress(i._id, a.season, a.episode, null, null, new Set()).watched,
-            );
+            return providerAliasCoords(list, s, e).some((a) => checkWatched(a.season, a.episode));
           },
           episodeHiding ? (s, e) => isEpisodeHidden(i._id, s, e) : undefined,
         );
