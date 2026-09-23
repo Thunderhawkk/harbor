@@ -1,4 +1,9 @@
-import { resetOmdbBudget, subscribeOmdbBudget, type OmdbBudget, omdbBudget as readOmdbBudget } from "@/lib/providers/omdb";
+import {
+  resetOmdbBudget,
+  subscribeOmdbBudget,
+  type OmdbBudget,
+  omdbBudget as readOmdbBudget,
+} from "@/lib/providers/omdb";
 import { useEffect, useState } from "react";
 import { Music, Check, RotateCw } from "../icons";
 import { useSettings } from "@/lib/settings";
@@ -7,6 +12,7 @@ import { useT } from "@/lib/i18n";
 import { Section, Segmented, ToggleRow } from "../shared";
 import { ROW_ACTION, SettingGroup, SettingRow, Nested } from "../kit";
 import { EpisodeOrderSetting } from "../episode-order-setting";
+import { SportsApiSetting } from "../sports-api-setting";
 import { useProviderKeys, type ProviderKeysArgs } from "./provider-keys";
 
 export function ProvidersTab(props: ProviderKeysArgs) {
@@ -36,6 +42,8 @@ export function ProvidersTab(props: ProviderKeysArgs) {
           {keyRow("nyt")}
         </SettingGroup>
       </Section>
+
+      <SportsApiSetting />
 
       <Section title={t("Titles and descriptions")}>
         <SettingGroup>

@@ -197,10 +197,16 @@ function slimManifest(manifest: Addon["manifest"] | undefined): Addon["manifest"
         id: c.id,
         type: c.type,
         name: c.name,
+        extraSupported: Array.isArray(c.extraSupported)
+          ? c.extraSupported.filter((name): name is string => typeof name === "string")
+          : undefined,
         extra: Array.isArray(c.extra)
           ? (c.extra as Array<Record<string, unknown>>).map((e) => ({
               name: e.name,
               isRequired: e.isRequired,
+              options: Array.isArray(e.options)
+                ? e.options.filter((option): option is string => typeof option === "string")
+                : undefined,
             }))
           : undefined,
       }));

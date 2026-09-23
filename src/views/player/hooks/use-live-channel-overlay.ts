@@ -4,6 +4,7 @@ import { headersFromChannel } from "@/lib/iptv/channel-headers";
 import type { IptvChannel, IptvPlaylistSource } from "@/lib/iptv/types";
 import type { Meta } from "@/lib/cinemeta";
 import type { PlayerSrc } from "@/lib/view";
+import { preservePreviewMode } from "@/lib/player/docked-navigation";
 
 export function useLiveChannelOverlay(params: {
   src: PlayerSrc;
@@ -97,8 +98,8 @@ export function useLiveChannelOverlay(params: {
     const stack = prevStackRef.current;
     let prev = stack.pop();
     while (prev && prev.meta.id === lastSrcRef.current?.meta.id) prev = stack.pop();
-    if (prev) replacePlayerSrc(prev);
-  }, [replacePlayerSrc]);
+    if (prev) replacePlayerSrc(preservePreviewMode(lastSrcRef.current ?? src, prev));
+  }, [replacePlayerSrc, src]);
 
   const switchChannel = useCallback(
     (channel: IptvChannel, program?: string) => {
@@ -122,10 +123,10 @@ export function useLiveChannelOverlay(params: {
         headers: headersFromChannel(channel),
         liveProgram: program,
       };
-      replacePlayerSrc(newSrc);
+      replacePlayerSrc(preservePreviewMode(src, newSrc));
       setOpen(false);
     },
-    [replacePlayerSrc],
+    [replacePlayerSrc, src],
   );
 
   return {

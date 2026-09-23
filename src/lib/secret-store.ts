@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
 const SECRET_PREFIXES = [
+  "harbor.lastfm.v1",
+  "harbor.sports.api-sports.v1",
   "harbor.simkl.session.v1",
   "harbor.trakt.session.v1",
   "harbor.mal.session.v1",

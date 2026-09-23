@@ -5,10 +5,15 @@ import { LibraryIcon } from "@/components/icons/library-icon";
 import { MoviesIcon } from "@/components/icons/movies-icon";
 import { SettingsIcon } from "@/components/icons/settings-icon";
 import { TvIcon } from "@/components/icons/tv-icon";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useGamepads } from "@/lib/gamepad/store";
 import { useParental, type HiddenTabs, type LockableTab } from "@/lib/parental";
 import { useSettings } from "@/lib/settings";
+import {
+  getSportsConsentServerSnapshot,
+  getSportsConsentSnapshot,
+  subscribeSportsConsent,
+} from "@/lib/sports/consent";
 import { BpStatus } from "./bp-status";
 import { BpProfileMenu } from "./bp-profile-menu";
 import { useBpT } from "./bp-i18n";
@@ -63,6 +68,12 @@ const TABS: BpTab[] = [
     icon: () => <NavGlyph name="livetv" className="h-[26px] w-[26px] p-[2px]" />,
   },
   {
+    kind: "sports",
+    label: "Sports",
+    icon: () => <NavGlyph name="sports" className="h-[26px] w-[26px] p-[2px]" />,
+    parentalKey: "sports",
+  },
+  {
     kind: "search",
     label: "Search",
     icon: () => <NavGlyph name="search" className="h-[26px] w-[26px] p-[2px]" />,
@@ -85,6 +96,7 @@ const TABS: BpTab[] = [
 
 export type BpTabGate = {
   animeHidden: boolean;
+  sportsDeclined: boolean;
   locked: boolean;
   hiddenTabs: HiddenTabs;
 };
@@ -95,12 +107,22 @@ export function useBpTabGate(): BpTabGate {
   const { settings } = useSettings();
   const { locked, hiddenTabs } = useParental();
   const animeHidden = Boolean(settings.hideContent.anime);
-  return useMemo(() => ({ animeHidden, locked, hiddenTabs }), [animeHidden, locked, hiddenTabs]);
+  const consent = useSyncExternalStore(
+    subscribeSportsConsent,
+    getSportsConsentSnapshot,
+    getSportsConsentServerSnapshot,
+  );
+  const sportsDeclined = consent.status === "declined";
+  return useMemo(
+    () => ({ animeHidden, sportsDeclined, locked, hiddenTabs }),
+    [animeHidden, sportsDeclined, locked, hiddenTabs],
+  );
 }
 
 function visibleTabs(gate: BpTabGate): BpTab[] {
   return TABS.filter((tab) => {
     if (tab.hiddenByAnime && gate.animeHidden) return false;
+    if (tab.kind === "sports" && gate.sportsDeclined) return false;
     if (gate.locked && tab.parentalKey && gate.hiddenTabs[tab.parentalKey]) return false;
     return true;
   });
@@ -193,22 +215,24 @@ function BpTabButton({
       onBlur={() => onHint(null, "")}
       aria-label={title}
       className={`${TAB_BASE} justify-center ${
-        !compact && on ? "gap-[clamp(6px,0.5vw,9px)] px-[clamp(11px,1vw,20px)]" : "aspect-square"
+        !compact && on
+          ? "aspect-square min-[1400px]:aspect-auto min-[1400px]:gap-[clamp(6px,0.5vw,9px)] min-[1400px]:px-[clamp(11px,1vw,20px)]"
+          : "aspect-square"
       } ${on ? "bg-[var(--bp-on)] text-ink" : "text-ink-subtle hover:text-ink"}`}
     >
       <span data-bp-tab-icon className={ICON_BOX}>
         {tab.icon(on)}
       </span>
-      {!compact && on && <span>{title}</span>}
+      {!compact && on && <span className="hidden min-[1400px]:inline">{title}</span>}
     </button>
   );
 }
 
-function BpShoulderHint({ label, usingPad }: { label: string; usingPad?: boolean }) {
+function BpShoulderHint({ label }: { label: string }) {
   return (
     <span
       aria-hidden
-      className={`${usingPad ? "flex" : "hidden min-[1400px]:flex"} ${ITEM_HEIGHT} min-w-[clamp(44px,5vh,58px)] shrink-0 items-center justify-center rounded-[var(--bp-r-sm)] border border-[var(--bp-edge-2)] px-2 text-[clamp(11px,1.5vh,16px)] font-bold tracking-wide text-ink-muted`}
+      className={`hidden min-[1400px]:flex ${ITEM_HEIGHT} min-w-[clamp(44px,5vh,58px)] shrink-0 items-center justify-center rounded-[var(--bp-r-sm)] border border-[var(--bp-edge-2)] px-2 text-[clamp(11px,1.5vh,16px)] font-bold tracking-wide text-ink-muted`}
     >
       {label}
     </span>
@@ -318,7 +342,7 @@ export function BpTopBar({ active }: { active: BigPictureTabKind }) {
         data-bp-row
         className="pointer-events-auto relative col-start-2 flex min-w-0 items-center gap-[clamp(8px,0.9vw,16px)]"
       >
-        {usingPad && <BpShoulderHint label="L1" usingPad={usingPad} />}
+        {usingPad && <BpShoulderHint label="L1" />}
         <div ref={trackRef} data-bp-scroll-x className={TAB_TRACK}>
           {strip.map((tab) => (
             <BpTabButton
@@ -351,7 +375,7 @@ export function BpTopBar({ active }: { active: BigPictureTabKind }) {
             )}
           </span>
         </div>
-        {usingPad && <BpShoulderHint label="R1" usingPad={usingPad} />}
+        {usingPad && <BpShoulderHint label="R1" />}
         <BpTabHint hint={hint} />
       </nav>
 

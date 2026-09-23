@@ -49,6 +49,8 @@ import {
   BpService,
   BpSettings,
   BpShows,
+  BpSports,
+  BpSportsEvent,
   BpRouteFallback,
   BpStreams,
   bpWarmRoutes,
@@ -90,6 +92,8 @@ const HINTS: Record<string, BpAction[]> = {
   shows: ["select", "back", "tabs"],
   movies: ["select", "back", "tabs"],
   live: ["select", "back", "tabs"],
+  sports: ["select", "back", "tabs"],
+  "sports-event": ["select", "back"],
   discover: ["select", "back", "tabs"],
   search: ["type", "phone", "back", "tabs"],
   library: ["select", "back", "tabs"],
@@ -411,9 +415,12 @@ export function BigPictureShell() {
           {/* The guide is a dense grid read at ten feet. Artwork behind it competes
               with every cell and there is nowhere for it to sit that is not under
               text, so Live TV gets the flat canvas and no ambient at all. */}
-          {route.kind !== "search" && route.kind !== "live" && (
-            <BpAmbient pool={mosaicPool} still={route.kind === "anime"} />
-          )}
+          {route.kind !== "search" &&
+            route.kind !== "live" &&
+            route.kind !== "sports" &&
+            route.kind !== "sports-event" && (
+              <BpAmbient pool={mosaicPool} still={route.kind === "anime"} />
+            )}
           <BpTopBar active={activeTab} />
           <main
             key={routeId}
@@ -439,6 +446,8 @@ export function BigPictureShell() {
               {route.kind === "shows" && <BpShows onSelect={openDetail} />}
               {route.kind === "movies" && <BpMovies onSelect={openDetail} />}
               {route.kind === "live" && <BpLive />}
+              {route.kind === "sports" && <BpSports />}
+              {route.kind === "sports-event" && <BpSportsEvent game={route.game} />}
               {route.kind === "discover" && <BpDiscover onSelect={openDetail} />}
               {route.kind === "search" && <BpSearch onSelect={openDetail} />}
               {route.kind === "library" && <BpLibrary onSelect={openDetail} />}

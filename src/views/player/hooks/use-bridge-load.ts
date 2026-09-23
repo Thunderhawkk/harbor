@@ -8,6 +8,7 @@ import { useSettings } from "@/lib/settings";
 import { playbackStartupProfile } from "@/lib/player/startup-profile";
 import { isLivePlaybackSrc } from "@/lib/player/live-src";
 import { releaseStreamProxy, retainStreamProxy } from "@/lib/stream-proxy";
+import { playerLoadIdentity } from "@/lib/player/load-identity";
 
 const RESUME_PROMPT_MIN_SEC = 30;
 const RESTART_THRESHOLD = 0.8;
@@ -53,6 +54,7 @@ export function useBridgeLoad(params: {
   const [pendingResumeSec, setPendingResumeSec] = useState<number | null>(null);
   const [pendingSeekSec, setPendingSeekSec] = useState<number | null>(null);
   const ackRef = useRef<((action: "resume" | "start-over") => void) | null>(null);
+  const sourceIdentity = playerLoadIdentity(src, transcodedUrl ?? src.url, season, episode);
 
   useEffect(() => {
     const sessionId = src.proxySessionId;
@@ -68,7 +70,7 @@ export function useBridgeLoad(params: {
     const bridge = bridgeRef.current;
     if (!bridge) return;
     const playUrl = transcodedUrl ?? src.url;
-    const loadKey = `${playUrl}|s${season ?? ""}e${episode ?? ""}`;
+    const loadKey = `${bridgeKey}|${sourceIdentity}`;
     if (lastLoadedUrlRef.current === loadKey) return;
     lastLoadedUrlRef.current = loadKey;
     const isFirstLoad = firstLoadRef.current;
@@ -113,6 +115,7 @@ export function useBridgeLoad(params: {
           shouldResolveResume && !!authKey && !isResumeStartReady(resumeIdentity);
         if (waitBeforeLoad) {
           resolved = await resumePromise;
+          if (cancelled) return;
           await loadMedia();
         } else {
           [resolved] = await Promise.all([resumePromise, loadMedia()]);
@@ -175,6 +178,7 @@ export function useBridgeLoad(params: {
   }, [
     bridgeReady,
     bridgeKey,
+    sourceIdentity,
     src.url,
     src.notWebReady,
     src.playbackTraceId,

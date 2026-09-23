@@ -27,26 +27,28 @@ export async function refreshWatchlistAggregates(
   authKey: string | null,
   traktConnected: boolean,
   simklConnected: boolean,
+  isCurrent: () => boolean = () => true,
 ): Promise<TraktItem[]> {
   const jobs: Array<Promise<void>> = [];
+  const nextStore = { ...STORE };
   if (authKey) {
     jobs.push(
       library(authKey)
         .then((items) => {
-          STORE.stremio = items
-            .filter((i) => !i.removed && !i.temp)
-            .map((i) => i._id);
+          if (!isCurrent()) return;
+          nextStore.stremio = items.filter((i) => !i.removed && !i.temp).map((i) => i._id);
         })
         .catch(() => {}),
     );
   } else {
-    STORE.stremio = [];
+    nextStore.stremio = [];
   }
   let traktItems: TraktItem[] = [];
   if (traktConnected) {
     jobs.push(
       fetchWatchlist()
         .then((items) => {
+          if (!isCurrent()) return;
           traktItems = items;
           const ids: string[] = [];
           for (const t of items) {
@@ -55,33 +57,39 @@ export async function refreshWatchlistAggregates(
               ids.push(t.type === "movie" ? `tmdb:movie:${t.ids.tmdb}` : `tmdb:tv:${t.ids.tmdb}`);
             }
           }
-          STORE.trakt = ids;
+          nextStore.trakt = ids;
         })
         .catch(() => {}),
     );
   } else {
-    STORE.trakt = [];
+    nextStore.trakt = [];
   }
   if (simklConnected) {
     jobs.push(
       fetchSimklWatchlist()
         .then((items) => {
+          if (!isCurrent()) return;
           const ids: string[] = [];
           for (const it of items) {
             if (it.ids.imdb) ids.push(it.ids.imdb);
             if (it.ids.tmdb) {
-              ids.push(it.type === "movie" ? `tmdb:movie:${it.ids.tmdb}` : `tmdb:tv:${it.ids.tmdb}`);
+              ids.push(
+                it.type === "movie" ? `tmdb:movie:${it.ids.tmdb}` : `tmdb:tv:${it.ids.tmdb}`,
+              );
             }
           }
-          STORE.simkl = ids;
+          nextStore.simkl = ids;
         })
         .catch(() => {}),
     );
   } else {
-    STORE.simkl = [];
+    nextStore.simkl = [];
   }
   await Promise.all(jobs);
-  pushAggregate();
+  if (isCurrent()) {
+    Object.assign(STORE, nextStore);
+    pushAggregate();
+  }
   return traktItems;
 }
 

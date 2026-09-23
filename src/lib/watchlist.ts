@@ -241,7 +241,11 @@ function writeAggregateCache(set: Set<string>) {
 }
 
 export function setWatchlistAggregate(ids: Iterable<string>): void {
-  aggregateIds = new Set(ids);
+  const next = new Set(ids);
+  // Library refreshes publish here and watchlist subscribers refresh the library.
+  // Do not turn an unchanged server response into another refresh cycle.
+  if (next.size === aggregateIds.size && [...next].every((id) => aggregateIds.has(id))) return;
+  aggregateIds = next;
   writeAggregateCache(aggregateIds);
   for (const s of subs) s();
 }

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { setUiLanguage, type UiLanguage } from "@/lib/i18n";
 import { useSettings, type StreamingService } from "@/lib/settings";
+import { declineSportsConsent, resetSportsConsent } from "@/lib/sports/consent";
 import type { Settings } from "@/lib/settings/types";
 import { SFX } from "@/lib/sfx";
 import { bpOverscan, setBpOverscan } from "./bp-safe-area";
@@ -104,6 +105,11 @@ export function useBpSettingsWriter(): BpSettingsWriter {
         const next = value as Settings["bigPictureSound"];
         update({ bigPictureSound: next });
         SFX.setTheme(next);
+        return;
+      }
+      if (id === "sportsTab") {
+        if (on) resetSportsConsent();
+        else declineSportsConsent();
         return;
       }
       if (id === "controller") {

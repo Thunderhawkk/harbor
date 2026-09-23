@@ -542,7 +542,9 @@ export function DetailView({
           !!meta.animeFormat ||
           (meta.genres ?? []).some((g) => g.toLowerCase() === "animation") ||
           (detail?.genres ?? []).some((g) => g.toLowerCase() === "animation") ||
-          (detail?.genresRich ?? []).some((g) => g.id === 16 || g.name.toLowerCase() === "animation");
+          (detail?.genresRich ?? []).some(
+            (g) => g.id === 16 || g.name.toLowerCase() === "animation",
+          );
         if (animeLike && name && name.trim().length >= 2) {
           const hits = await searchAnime(name).catch(() => []);
           const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");

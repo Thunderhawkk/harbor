@@ -589,6 +589,7 @@ export async function fireWebhook(
   kind: WebhookKind,
   url: string,
   payload: WebhookPayload,
+  signal?: AbortSignal,
 ): Promise<{ ok: boolean; status: number; error: string | null }> {
   if (kind === "desktop") {
     const granted = await ensureDesktopNotifyPermission();
@@ -661,6 +662,7 @@ export async function fireWebhook(
       if (embeds.length > 0) body.embeds = embeds;
       const res = await fetch(url, {
         method: "POST",
+        signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -675,6 +677,7 @@ export async function fireWebhook(
       const text = lines.join("\n");
       const res = await fetch(url, {
         method: "POST",
+        signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: extractTelegramChatId(url),

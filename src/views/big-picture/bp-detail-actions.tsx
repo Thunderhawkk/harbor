@@ -10,6 +10,12 @@ import type { BpDetailAction } from "./use-bp-detail-actions";
 const PRIMARY_H = "var(--bp-action-h)";
 const ICON_BOX = "var(--bp-action-box)";
 
+export const BP_ACTION_TRACK =
+  "flex items-center gap-[8px] overflow-x-auto py-[12px] ps-[12px] pe-[12px] -my-[12px] -ms-[12px] -me-[12px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
+export const BP_ACTION_HINT =
+  "pt-[10px] text-[12.5px] font-semibold tracking-[0.04em] text-ink-subtle";
+
 function scrollHeroIntoView(el: HTMLElement): void {
   const page = el.closest<HTMLElement>("[data-bp-scroll-y]");
   if (!page || page.scrollTop === 0) return;
@@ -21,12 +27,14 @@ function scrollHeroIntoView(el: HTMLElement): void {
   });
 }
 
-function BpSecondaryAction({
+export function BpSecondaryAction({
   action,
   onHint,
+  seed,
 }: {
   action: BpDetailAction;
   onHint: (label: string) => void;
+  seed?: boolean;
 }) {
   const Icon = action.icon;
   return (
@@ -34,6 +42,7 @@ function BpSecondaryAction({
       type="button"
       data-bp-focusable
       data-bp-action-icon
+      data-bp-autofocus={seed ? "true" : undefined}
       aria-label={action.label}
       onFocus={() => onHint(action.label)}
       onClick={() => {
@@ -48,15 +57,9 @@ function BpSecondaryAction({
       } ${FOCUS_RING}`}
     >
       {action.badge ? (
-        <span className="text-[13.4px] font-bold leading-none tabular-nums">
-          {action.badge}
-        </span>
+        <span className="text-[13.4px] font-bold leading-none tabular-nums">{action.badge}</span>
       ) : action.logo ? (
-        <img
-          src={action.logo}
-          alt=""
-          className="h-[20px] w-[20px] rounded-[4px] object-contain"
-        />
+        <img src={action.logo} alt="" className="h-[20px] w-[20px] rounded-[4px] object-contain" />
       ) : (
         <Icon
           size={20}
@@ -101,10 +104,7 @@ export function BpDetailActions({
       }}
       style={{ containIntrinsicSize: "auto 90px" }}
     >
-      <div
-        data-bp-scroll-x
-        className="flex items-center gap-[8px] overflow-x-auto py-[12px] ps-[12px] pe-[12px] -my-[12px] -ms-[12px] -me-[12px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
+      <div data-bp-scroll-x className={BP_ACTION_TRACK}>
         <button
           type="button"
           data-bp-focusable
@@ -138,7 +138,7 @@ export function BpDetailActions({
         </div>
       </div>
 
-      <p data-bp-action-hint className="pt-[10px] text-[12.5px] font-semibold tracking-[0.04em] text-ink-subtle">
+      <p data-bp-action-hint className={BP_ACTION_HINT}>
         {hint || " "}
       </p>
     </section>

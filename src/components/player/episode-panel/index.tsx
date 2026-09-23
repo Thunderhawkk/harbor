@@ -17,7 +17,7 @@ import {
   markPlaybackTrace,
 } from "@/lib/perf/playback-trace";
 import type { ScoredStream } from "@/lib/streams/types";
-import { useView, type PlayEpisode } from "@/lib/view";
+import { usePlayerNavigation, type PlayEpisode } from "@/lib/view";
 import { parseKitsuId } from "@/lib/providers/kitsu";
 import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useQueue } from "@/lib/queue";
@@ -74,7 +74,7 @@ export function EpisodePanel({
 }) {
   const t = useT();
   const { settings, update } = useSettings();
-  const { openPicker, replacePlayerSrc } = useView();
+  const { openPicker, replacePlayerSrc } = usePlayerNavigation();
   const queue = useQueue();
   const debrids = useDebridClients();
   const { seasons, season, setSeason, episodes, loading, imdbRatings } = useSeasonBrowser(

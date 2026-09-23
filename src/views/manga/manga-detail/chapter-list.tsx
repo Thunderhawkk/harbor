@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   BookOpen,
   Check,
@@ -16,8 +17,13 @@ import { Play } from "@/components/icons/play-filled";
 import { Search } from "@/components/icons/search-icon";
 import { t, useT } from "@/lib/i18n";
 import { Flag, flagSrc } from "@/components/flag";
+import { useContextMenu } from "@/lib/context-menu";
 import { languageName, type MangaChapter } from "@/lib/manga/model";
-import { useMangaProgressEntry, type MangaProgressEntry } from "@/lib/manga-progress";
+import {
+  useMangaProgressEntry,
+  useReadMangaChapterIds,
+  type MangaProgressEntry,
+} from "@/lib/manga-progress";
 import {
   downloadAllChapters,
   downloadChapter,
@@ -28,10 +34,12 @@ import {
   type MangaDownloadInfo,
 } from "@/lib/manga-downloads";
 import { listMangaSources, sourceIconUrl } from "@/lib/manga/sources";
-import { chapterGroupKey, chapterNumberKey } from "@/lib/manga/chapter-identity";
+import { chapterGroupKey } from "@/lib/manga/chapter-identity";
 
 type ChapterView = "grid" | "list";
 const VIEW_KEY = "harbor.manga.chapterview";
+const PAGE_SIZE = 200;
+const VIRTUALIZE_AT = 200;
 
 function readView(): ChapterView {
   const v = typeof localStorage !== "undefined" ? localStorage.getItem(VIEW_KEY) : null;
@@ -196,12 +204,7 @@ function chapterSourceId(id: string): string {
 
 function isCurrentChapter(progress: MangaProgressEntry | undefined, c: MangaChapter): boolean {
   if (!progress) return false;
-  if (progress.chapterId === c.id) return true;
-  if (progress.chapterNumber == null || c.chapter == null) return false;
-  const a = chapterNumberKey(progress.chapterNumber);
-  const b = chapterNumberKey(c.chapter);
-  if (a != null && b != null) return a === b;
-  return progress.chapterNumber === c.chapter;
+  return progress.chapterId === c.id;
 }
 
 function ChapterDownloadButton({
@@ -371,6 +374,19 @@ function AnimeEndTag() {
   );
 }
 
+function ReadTag() {
+  const t = useT();
+  return (
+    <span
+      title={t("Read")}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success/15 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-wide text-success ring-1 ring-success/25"
+    >
+      <Check size={11} strokeWidth={2.6} />
+      {t("Read")}
+    </span>
+  );
+}
+
 export function ChapterList({
   chapters,
   langs,
@@ -382,6 +398,7 @@ export function ChapterList({
   mangaCover,
   animeEndChapter,
   pending = false,
+  scrollRoot,
 }: {
   chapters: MangaChapter[];
   langs: Array<{ code: string; count: number }>;
@@ -393,12 +410,14 @@ export function ChapterList({
   mangaCover?: string;
   animeEndChapter?: number;
   pending?: boolean;
+  scrollRoot?: RefObject<HTMLElement | null>;
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"newest" | "oldest">("oldest");
   const [view, setView] = useState<ChapterView>(readView);
   const [range, setRange] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [sourceFilter, setSourceFilter] = useState("");
   const [scanFilter, setScanFilter] = useState("");
   const batch = useMangaDownloadBatch(mangaId ?? "");
@@ -409,9 +428,17 @@ export function ChapterList({
 
   useEffect(() => {
     setRange(null);
-  }, [selectedLang, scanFilter]);
+    setVisibleCount(PAGE_SIZE);
+  }, [selectedLang, scanFilter, mangaId]);
 
   const progress = useMangaProgressEntry(mangaId, mangaTitle);
+  const readIds = useReadMangaChapterIds(mangaId);
+  const isRead = (c: MangaChapter) => c.serverRead === true || readIds.has(c.id);
+  const { open: openContextMenu } = useContextMenu();
+  const chapterMenu = (e: ReactMouseEvent, c: MangaChapter) => {
+    if (!mangaId) return;
+    openContextMenu(e, { kind: "manga-chapter", mangaId, mangaTitle, mangaCover, chapter: c });
+  };
 
   const sourceOptions = useMemo(() => {
     const all = listMangaSources();
@@ -518,10 +545,22 @@ export function ChapterList({
     () => (sort === "newest" ? [...ascending].reverse() : ascending),
     [ascending, sort],
   );
+  const visible = useMemo(() => ordered.slice(0, visibleCount), [ordered, visibleCount]);
+  const remaining = ordered.length - visible.length;
+  const useVirtual = view === "list" && ordered.length > VIRTUALIZE_AT && scrollRoot != null;
+  const renderSource = useVirtual ? ordered : visible;
+  const listVirtualizer = useVirtualizer({
+    count: useVirtual ? ordered.length : 0,
+    getScrollElement: () => scrollRoot?.current ?? null,
+    estimateSize: () => 92,
+    measureElement: (el) => el.getBoundingClientRect().height,
+    overscan: 8,
+  });
   const readChapter = (chapter: MangaChapter) => {
     const index = ascending.findIndex((c) => c.id === chapter.id);
     onRead(ascending, index >= 0 ? index : 0);
   };
+  const showMore = () => setVisibleCount((n) => n + PAGE_SIZE);
 
   if (chapters.length === 0) {
     return (
@@ -546,9 +585,77 @@ export function ChapterList({
   }
 
   const volumeSizes = new Map<string, number>();
-  for (const c of ordered)
+  for (const c of renderSource)
     if (c.volume) volumeSizes.set(c.volume, (volumeSizes.get(c.volume) ?? 0) + 1);
   const volumeCount = volumeSizes.size;
+
+  const renderListRow = (c: MangaChapter, i: number, source: MangaChapter[], last: boolean) => {
+    const cur = isCurrentChapter(progress, c);
+    const volumeHead =
+      volumeCount > 1 && c.volume && (i === 0 || source[i - 1].volume !== c.volume) ? (
+        <div
+          key={`vol:${c.volume}:${c.id}`}
+          className="flex items-center gap-3 border-b border-edge-soft/60 bg-canvas/50 px-5 py-2"
+        >
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
+            {t("Volume {n}", { n: c.volume })}
+          </span>
+          <span className="text-[11px] tabular-nums text-ink-subtle">
+            {t("{n} chapters", { n: volumeSizes.get(c.volume) ?? 0 })}
+          </span>
+        </div>
+      ) : null;
+    const row = (
+      <button
+        key={c.id}
+        type="button"
+        onClick={() => readChapter(c)}
+        onContextMenu={(e) => chapterMenu(e, c)}
+        className={`group relative flex min-h-[64px] w-full items-center justify-between gap-4 ${last ? "" : "border-b border-edge-soft/60 "}px-5 py-3.5 text-start transition-colors hover:bg-elevated/40 ${
+          cur ? "bg-accent/5" : ""
+        }`}
+      >
+        {!cur && isRead(c) && (
+          <span className="absolute end-3 top-2">
+            <ReadTag />
+          </span>
+        )}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <span className={`text-[12px] ${cur ? "text-accent" : "text-ink-subtle"}`}>
+              {c.chapter == null ? t("Oneshot") : t("Ch. {n}", { n: c.chapter })}
+            </span>
+            {c.id === animeEndId && <AnimeEndTag />}
+          </div>
+          <span className="truncate text-[16px] font-semibold text-ink">
+            {c.title?.trim() ? c.title : chapterLabel(c.chapter)}
+          </span>
+          {cur && progress && !progress.upNext && (
+            <div className="mt-1 w-56">
+              <ChapterProgress page={progress.page} total={progress.totalPages} />
+            </div>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2.5">
+          <ChapterMeta chapter={c} />
+          <ChapterDownloadButton
+            mangaId={mangaId ?? ""}
+            chapterId={c.id}
+            altChapterIds={(sameChapterIds.get(chapterGroupKey(c)) ?? [c.id]).filter(
+              (id) => id !== c.id,
+            )}
+            info={{ title: mangaTitle, cover: mangaCover, chapter: c.chapter }}
+            serverDownloaded={c.downloaded}
+          />
+          <BookOpen
+            size={18}
+            className="shrink-0 text-ink-subtle transition-colors group-hover:text-accent"
+          />
+        </div>
+      </button>
+    );
+    return volumeHead ? [volumeHead, row] : row;
+  };
 
   return (
     <section className="flex flex-col gap-5">
@@ -745,84 +852,50 @@ export function ChapterList({
         </div>
       ) : view === "list" ? (
         <div className="overflow-hidden rounded-2xl border border-edge-soft bg-surface/40">
-          {ordered.map((c, i) => {
-            const cur = isCurrentChapter(progress, c);
-            const volumeHead =
-              volumeCount > 1 && c.volume && (i === 0 || ordered[i - 1].volume !== c.volume) ? (
-                <div
-                  key={`vol:${c.volume}:${c.id}`}
-                  className="flex items-center gap-3 border-b border-edge-soft/60 bg-canvas/50 px-5 py-2"
-                >
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
-                    {t("Volume {n}", { n: c.volume })}
-                  </span>
-                  <span className="text-[11px] tabular-nums text-ink-subtle">
-                    {t("{n} chapters", { n: volumeSizes.get(c.volume) ?? 0 })}
-                  </span>
-                </div>
-              ) : null;
-            const row = (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => readChapter(c)}
-                className={`group flex min-h-[64px] w-full items-center justify-between gap-4 border-b border-edge-soft/60 px-5 py-3.5 text-start transition-colors last:border-b-0 hover:bg-elevated/40 ${
-                  cur ? "bg-accent/5" : ""
-                }`}
-              >
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[12px] ${cur ? "text-accent" : "text-ink-subtle"}`}>
-                      {c.chapter == null ? t("Oneshot") : t("Ch. {n}", { n: c.chapter })}
-                    </span>
-                    {c.id === animeEndId && <AnimeEndTag />}
+          {useVirtual ? (
+            <div className="relative w-full" style={{ height: listVirtualizer.getTotalSize() }}>
+              {listVirtualizer.getVirtualItems().map((v) => {
+                const c = ordered[v.index];
+                if (!c) return null;
+                return (
+                  <div
+                    key={v.key}
+                    data-index={v.index}
+                    ref={listVirtualizer.measureElement}
+                    className="absolute start-0 top-0 w-full"
+                    style={{ transform: `translateY(${v.start}px)` }}
+                  >
+                    {renderListRow(c, v.index, ordered, v.index === ordered.length - 1)}
                   </div>
-                  <span className="truncate text-[16px] font-semibold text-ink">
-                    {c.title?.trim() ? c.title : chapterLabel(c.chapter)}
-                  </span>
-                  {cur && progress && (
-                    <div className="mt-1 w-56">
-                      <ChapterProgress page={progress.page} total={progress.totalPages} />
-                    </div>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2.5">
-                  <ChapterMeta chapter={c} />
-                  <ChapterDownloadButton
-                    mangaId={mangaId ?? ""}
-                    chapterId={c.id}
-                    altChapterIds={(sameChapterIds.get(chapterGroupKey(c)) ?? [c.id]).filter(
-                      (id) => id !== c.id,
-                    )}
-                    info={{ title: mangaTitle, cover: mangaCover, chapter: c.chapter }}
-                    serverDownloaded={c.downloaded}
-                  />
-                  <BookOpen
-                    size={18}
-                    className="shrink-0 text-ink-subtle transition-colors group-hover:text-accent"
-                  />
-                </div>
-              </button>
-            );
-            return volumeHead ? [volumeHead, row] : row;
-          })}
+                );
+              })}
+            </div>
+          ) : (
+            renderSource.map((c, i) => renderListRow(c, i, renderSource, i === renderSource.length - 1))
+          )}
         </div>
       ) : (
         <div
           className="grid gap-3"
           style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
         >
-          {ordered.map((c) => {
+          {visible.map((c) => {
             const cur = isCurrentChapter(progress, c);
             return (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => readChapter(c)}
-                className={`group flex min-h-[64px] flex-col justify-between gap-2 rounded-xl border bg-surface/60 px-4 py-3.5 text-start transition-colors hover:bg-elevated/60 ${
+                onContextMenu={(e) => chapterMenu(e, c)}
+                className={`group relative flex min-h-[64px] flex-col justify-between gap-2 rounded-xl border bg-surface/60 px-4 py-3.5 text-start transition-colors hover:bg-elevated/60 ${
                   cur ? "border-accent/70" : "border-edge-soft hover:border-edge"
                 }`}
               >
+                {!cur && isRead(c) && (
+                  <span className="absolute end-3 top-2.5">
+                    <ReadTag />
+                  </span>
+                )}
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <span className={`text-[12px] ${cur ? "text-accent" : "text-ink-subtle"}`}>
@@ -835,13 +908,12 @@ export function ChapterList({
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  {cur && progress ? (
-                    <div className="min-w-0 flex-1">
-                      <ChapterProgress page={progress.page} total={progress.totalPages} />
-                    </div>
-                  ) : (
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <ChapterMeta chapter={c} />
-                  )}
+                    {cur && progress && !progress.upNext && (
+                      <ChapterProgress page={progress.page} total={progress.totalPages} />
+                    )}
+                  </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <ChapterDownloadButton
                       mangaId={mangaId ?? ""}
@@ -862,6 +934,15 @@ export function ChapterList({
             );
           })}
         </div>
+      )}
+      {remaining > 0 && (view === "grid" || !useVirtual) && (
+        <button
+          type="button"
+          onClick={showMore}
+          className="h-11 w-full rounded-xl border border-edge-soft bg-surface/60 text-[13.5px] font-semibold text-ink-muted transition-colors hover:border-edge hover:bg-elevated/60 hover:text-ink"
+        >
+          {t("Show more chapters ({n} remaining)", { n: remaining })}
+        </button>
       )}
     </section>
   );

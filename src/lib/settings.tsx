@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { applyTheme, isKnownPreset, nextColorTheme } from "@/lib/theme";
 import { applyAppIcon } from "@/lib/app-icon";
 import { getCustomThemes, subscribeCustomThemes } from "@/lib/custom-themes";
@@ -64,25 +73,37 @@ function readActiveSource(): SettingsSource {
 
 const Ctx = createContext<SettingsValue | null>(null);
 
-export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: { children: ReactNode; syncTorrentEnginePolicy?: boolean }) {
+export function SettingsProvider({
+  children,
+  syncTorrentEnginePolicy = false,
+}: {
+  children: ReactNode;
+  syncTorrentEnginePolicy?: boolean;
+}) {
   const sourceRef = useRef<SettingsSource>({ profileId: "default", linked: true });
   const [settings, setSettings] = useState<Settings>(() => {
     seedSharedFromLegacy();
     const src = readActiveSource();
     sourceRef.current = src;
     const s = loadEffective(src.profileId, src.linked);
-    setUiLanguage(s.uiLanguage);
+    setUiLanguage(s.uiLanguage, s.region);
     return s;
   });
   const [settingsReady, setSettingsReady] = useState(false);
   const settingsReadyRef = useRef(settingsReady);
-  useEffect(() => { settingsReadyRef.current = settingsReady; }, [settingsReady]);
+  useEffect(() => {
+    settingsReadyRef.current = settingsReady;
+  }, [settingsReady]);
   const [torrentEnginePolicyPending, setTorrentEnginePolicyPending] = useState(false);
   const [torrentEnginePolicyError, setTorrentEnginePolicyError] = useState(false);
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    setUiLanguage(settings.uiLanguage, settings.region);
+  }, [settings.uiLanguage, settings.region]);
 
   setTmdbLanguage(settings.tmdbLanguage);
 
@@ -97,7 +118,9 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
     void loadBgImage(activeId).then((img) => {
       if (cancelled || !img) return;
       lastSavedImageRef.current = { profileId: activeId, image: img };
-      setSettings((s) => (s.theme.backgroundImage ? s : { ...s, theme: { ...s.theme, backgroundImage: img } }));
+      setSettings((s) =>
+        s.theme.backgroundImage ? s : { ...s, theme: { ...s.theme, backgroundImage: img } },
+      );
     });
     return () => {
       cancelled = true;
@@ -147,7 +170,11 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
   useEffect(() => {
     if (!settingsReady) return;
     try {
-      const json = persistEffective(settings, sourceRef.current.profileId, sourceRef.current.linked);
+      const json = persistEffective(
+        settings,
+        sourceRef.current.profileId,
+        sourceRef.current.linked,
+      );
       window.clearTimeout(fileTimerRef.current);
       fileTimerRef.current = window.setTimeout(() => void writeSettingsFile(json), 600);
     } catch (e) {
@@ -175,7 +202,9 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
           setTorrentEnginePolicyError(true);
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [settings.torrentsDisabled, settingsReady, syncTorrentEnginePolicy]);
 
   const tmdbLangRef = useRef<string | null>(null);
@@ -213,7 +242,9 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
 
   useEffect(() => {
     const scale = settings.uiScale > 0 ? settings.uiScale : 1;
-    const root = document.getElementById("root") as (HTMLElement & { style: CSSStyleDeclaration & { zoom?: string } }) | null;
+    const root = document.getElementById("root") as
+      | (HTMLElement & { style: CSSStyleDeclaration & { zoom?: string } })
+      | null;
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
       void import("@tauri-apps/api/webview")
         .then(({ getCurrentWebview }) => getCurrentWebview().setZoom(scale))
@@ -319,12 +350,16 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
     })();
   }, [settings.customFonts]);
 
-
   useEffect(() => {
     void import("@/lib/privacy/blocklist").then(({ setTrackerBlocking }) => {
       setTrackerBlocking(settings.blockTrackers);
     });
-  }, [settings.blockTrackers]);
+    if (settingsReady && "__TAURI_INTERNALS__" in window) {
+      void import("@tauri-apps/api/core")
+        .then(({ invoke }) => invoke("privacy_set_enabled", { enabled: settings.blockTrackers }))
+        .catch((error) => console.warn("Stream blocker preference could not be applied", error));
+    }
+  }, [settings.blockTrackers, settingsReady]);
 
   useEffect(() => {
     void import("@/lib/snapshots").then(({ setSnapshotRetentionDays }) => {
@@ -336,8 +371,8 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
     window.__harborStremioDeeplink = settings.stremioDeeplinkInstall;
     if (!("__TAURI_INTERNALS__" in window)) return;
     void import("@tauri-apps/api/core").then(({ invoke }) => {
-      void invoke("deeplink_set_stremio", { enabled: settings.stremioDeeplinkInstall }).catch(
-        (e) => console.warn("[harbor] deeplink_set_stremio failed", e),
+      void invoke("deeplink_set_stremio", { enabled: settings.stremioDeeplinkInstall }).catch((e) =>
+        console.warn("[harbor] deeplink_set_stremio failed", e),
       );
     });
   }, [settings.stremioDeeplinkInstall]);
@@ -367,7 +402,12 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
         },
       }).catch((e) => console.warn("[harbor] tray_set_prefs failed", e));
     });
-  }, [settings.closeToTray, settings.trayAlwaysOnTop, settings.pauseMinimized, settings.pauseUnfocused]);
+  }, [
+    settings.closeToTray,
+    settings.trayAlwaysOnTop,
+    settings.pauseMinimized,
+    settings.pauseUnfocused,
+  ]);
 
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return;
@@ -379,21 +419,26 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
       else unlisteners.push(u);
     };
     void import("@tauri-apps/api/event").then(({ listen }) => {
-      void listen<{ closeToTray: boolean; alwaysOnTop: boolean; pauseMinimized: boolean; pauseUnfocused: boolean }>(
-        "harbor://tray-prefs",
-        (e) => {
-          const p = e.payload;
-          setSettings((s) => ({
-            ...s,
-            closeToTray: p.closeToTray,
-            trayAlwaysOnTop: p.alwaysOnTop,
-            pauseMinimized: p.pauseMinimized,
-            pauseUnfocused: p.pauseUnfocused,
-          }));
-        },
-      ).then(track);
+      void listen<{
+        closeToTray: boolean;
+        alwaysOnTop: boolean;
+        pauseMinimized: boolean;
+        pauseUnfocused: boolean;
+      }>("harbor://tray-prefs", (e) => {
+        const p = e.payload;
+        setSettings((s) => ({
+          ...s,
+          closeToTray: p.closeToTray,
+          trayAlwaysOnTop: p.alwaysOnTop,
+          pauseMinimized: p.pauseMinimized,
+          pauseUnfocused: p.pauseUnfocused,
+        }));
+      }).then(track);
       void listen("harbor://cycle-theme", () => {
-        setSettings((s) => ({ ...s, theme: { ...s.theme, preset: nextColorTheme(s.theme.preset) } }));
+        setSettings((s) => ({
+          ...s,
+          theme: { ...s.theme, preset: nextColorTheme(s.theme.preset) },
+        }));
       }).then(track);
       void listen<string>("harbor://set-theme", (e) => {
         const id = e.payload;
@@ -478,9 +523,10 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
     if (sourceKeyFor(cur.profileId, cur.linked) === sourceKeyFor(profileId, linked)) {
       sourceRef.current = { profileId, linked };
     } else {
-      if (settingsReadyRef.current) persistEffective(settingsRef.current, cur.profileId, cur.linked);
+      if (settingsReadyRef.current)
+        persistEffective(settingsRef.current, cur.profileId, cur.linked);
       const next = loadEffective(profileId, linked);
-      setUiLanguage(next.uiLanguage);
+      setUiLanguage(next.uiLanguage, next.region);
       setTmdbLanguage(next.tmdbLanguage);
       tmdbLangRef.current = effectiveTmdbLanguage();
       imgLangRef.current = next.tmdbImageLangs.join(",");
@@ -519,8 +565,24 @@ export function SettingsProvider({ children, syncTorrentEnginePolicy = false }: 
   );
 
   const value = useMemo(
-    () => ({ settings, torrentEnginePolicyPending, torrentEnginePolicyError, update, toggleStreaming, switchProfile, setSettingsLinked }),
-    [settings, torrentEnginePolicyPending, torrentEnginePolicyError, update, toggleStreaming, switchProfile, setSettingsLinked],
+    () => ({
+      settings,
+      torrentEnginePolicyPending,
+      torrentEnginePolicyError,
+      update,
+      toggleStreaming,
+      switchProfile,
+      setSettingsLinked,
+    }),
+    [
+      settings,
+      torrentEnginePolicyPending,
+      torrentEnginePolicyError,
+      update,
+      toggleStreaming,
+      switchProfile,
+      setSettingsLinked,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -109,12 +109,56 @@ export function updatePosterDock({
     const x = -normalized * SPREAD * smooth;
     const y = -LIFT * smooth;
 
+    const isLast = index === track.children.length - 1;
+    const isFirst = index === 0;
+
+    let distFromLeft = rtl
+      ? rect.width - (index * stride - scrollPosition + cellWidth)
+      : index * stride - scrollPosition;
+    let distFromRight = rtl
+      ? index * stride - scrollPosition
+      : rect.width - (index * stride - scrollPosition + cellWidth);
+
+    if (typeof element.getBoundingClientRect === "function") {
+      const elRect = element.getBoundingClientRect();
+      if (elRect.width > 0 && rect.width > 0) {
+        distFromLeft = elRect.left - rect.left;
+        distFromRight = rect.right - elRect.right;
+      }
+    }
+
+    const isRightEdge =
+      distFromRight <= 36 ||
+      (isLast && !rtl && distFromRight <= 80) ||
+      (isFirst && rtl && distFromRight <= 80);
+
+    const isLeftEdge =
+      distFromLeft <= 36 ||
+      (isLast && rtl && distFromLeft <= 80) ||
+      (isFirst && !rtl && distFromLeft <= 80);
+
+    let finalX = x;
+    let targetOrigin = "center bottom";
+
+    if (isRightEdge && !isLeftEdge) {
+      targetOrigin = "right bottom";
+      finalX = Math.min(0, x);
+    } else if (isLeftEdge && !isRightEdge) {
+      targetOrigin = "left bottom";
+      finalX = Math.max(0, x);
+    } else if (isRightEdge && isLeftEdge) {
+      targetOrigin = "center bottom";
+      finalX = 0;
+    }
+
     nextItems.add(element);
 
     const visual = resolveVisual(element);
     if (!previousItems?.has(element) || visual.style.willChange !== "transform") {
-      visual.style.transformOrigin = "center bottom";
       visual.style.willChange = "transform";
+    }
+    if (visual.style.transformOrigin !== targetOrigin) {
+      visual.style.transformOrigin = targetOrigin;
     }
     if (transitionDurations.get(visual) !== transitionMs) {
       visual.style.transition = transitionFor(transitionMs);
@@ -122,7 +166,7 @@ export function updatePosterDock({
     }
     element.style.zIndex = String(Math.round(1 + smooth * 99));
 
-    move(visual, x, y, scale);
+    move(visual, finalX, y, scale);
   }
 
   for (const element of previousItems ?? []) {

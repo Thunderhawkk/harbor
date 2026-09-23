@@ -22,6 +22,10 @@ use uuid::Uuid;
 
 use crate::cast_hls::HlsState;
 use crate::transcode::{handle_transcode, TranscodeProfile};
+#[path = "cast_audio.rs"]
+mod cast_audio;
+pub(crate) use cast_audio::{AudioCastFormat, AudioCastInput};
+use cast_audio::AudioCastState;
 
 #[derive(Clone)]
 struct Session {
@@ -65,6 +69,7 @@ pub struct ProxyState {
     local_port: u16,
     client: reqwest::Client,
     hls: HlsState,
+    audio: AudioCastState,
 }
 
 #[derive(Serialize)]
@@ -109,6 +114,7 @@ impl ProxyState {
                 .build()
                 .expect("proxy HTTP client"),
             hls: HlsState::new(),
+            audio: AudioCastState::default(),
         }
     }
 
@@ -150,6 +156,7 @@ impl ProxyState {
             local_port,
             client,
             hls: hls.clone(),
+            audio: AudioCastState::default(),
         };
         let proxy_routes = Router::new()
             .route("/s/{id}", get(handle_stream).head(handle_stream))
@@ -159,7 +166,7 @@ impl ProxyState {
             )
             .route("/health", get(handle_health))
             .with_state(state.clone());
-        let app = proxy_routes.merge(crate::cast_hls::router(hls));
+        let app = proxy_routes.merge(crate::cast_hls::router(hls)).merge(state.audio.clone().router());
         #[cfg(target_os = "linux")]
         let local_media = Router::new()
             .route(
@@ -354,11 +361,26 @@ impl ProxyState {
         self.sessions.write().await.remove(session_id);
     }
 
+    pub(crate) async fn register_audio_cast(&self, input: AudioCastInput) -> Result<RegisterResult, String> {
+        let host = reachable_ip_for(&input.target_host).or_else(lan_ip)
+            .ok_or("No network route to the speaker")?;
+        if self.port == 0 { return Err("Speaker audio server is not ready".into()); }
+        let session_id = self.audio.register(input).await?;
+        let url = format!("http://{host}:{}/cast/audio/{session_id}", self.port);
+        Ok(RegisterResult { session_id, url })
+    }
+
+    pub(crate) async fn audio_cast_input(&self, id: &str) -> Option<AudioCastInput> {
+        self.audio.input(id).await
+    }
+
     pub async fn stop_hls_session(&self, session_id: &str) -> bool {
+        if session_id.starts_with("audio-") { return self.audio.stop(session_id).await; }
         self.hls.stop_session(session_id).await
     }
 
     pub async fn stop_all_hls(&self) -> usize {
+        self.audio.stop_all().await;
         self.hls.stop_all().await
     }
 
@@ -386,6 +408,7 @@ impl ProxyState {
             removed += before - map.len();
         }
         removed += self.hls.evict_idle(HLS_IDLE).await;
+        removed += self.audio.gc().await;
         removed
     }
 }

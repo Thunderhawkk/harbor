@@ -415,3 +415,196 @@ MIT OR Apache-2.0  (9 components)
   @tauri-apps/plugin-updater 2.10.1
       https://github.com/tauri-apps/plugins-workspace#readme
 
+SPORTS BACKGROUND IMAGES
+
+Generic sport scenery; these backgrounds do not represent the displayed event or its actual venue.
+
+athletics — Close-up Photo of an Athletic Track · Free Stock Photo - Pexels
+  Creator: Jan van der Wolf
+  Source: https://www.pexels.com/photo/close-up-photo-of-an-athletic-track-18526556/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+aussie — Panoramic View of Melbourne Cricket Ground · Free Stock Photo - Pexels
+  Creator: Kushie In Vietnam
+  Source: https://www.pexels.com/photo/panoramic-view-of-melbourne-cricket-ground-33370012/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+badminton — Shuttlecock and badminton racket. Active games in the park in ... - Pexels
+  Creator: Саша Алалыкин
+  Source: https://www.pexels.com/photo/shuttlecock-and-badminton-racket-active-games-in-the-park-in-the-fresh-air-16688911/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+baseball — Aerial View of an Empty Baseball Stadium · Free Stock Photo - Pexels
+  Creator: Robert Medford
+  Source: https://www.pexels.com/photo/aerial-view-of-an-empty-baseball-stadium-36584172/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+basketball — Close-up professional basketball court hardwood
+  Creator: OpenAI image generation, directed for Harbor
+  Source:
+  License: User-authorized generated asset
+
+  Created for Harbor following explicit user permission for photoreal generated backgrounds. This is not a documentary photograph of an actual venue or event.
+
+boxing — An Empty Boxing Ring · Free Stock Photo - Pexels
+  Creator: Stanislav Kondratiev
+  Source: https://www.pexels.com/photo/an-empty-boxing-ring-9968139/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+combat — Empty MMA octagon and arena
+  Creator: OpenAI image generation, directed for Harbor
+  Source:
+  License: User-authorized generated asset
+
+  Created for Harbor following explicit user permission for photoreal generated backgrounds. This is not a documentary photograph of an actual venue or event.
+
+cricket — Panoramic View of Famous Cricket Stadium · Free Stock Photo - Pexels
+  Creator: Noor Zaman
+  Source: https://www.pexels.com/photo/panoramic-view-of-famous-cricket-stadium-31739439/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+cycling — Blue Road Bike in a Parking Lot · Free Stock Photo - Pexels
+  Creator: Sebastian
+  Source: https://www.pexels.com/photo/blue-road-bike-in-a-parking-lot-10969098/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+darts — Bullseye on Dartboard with Red and Green Darts · Free Stock Photo
+  Creator: Ab Pixels
+  Source: https://www.pexels.com/photo/bullseye-on-dartboard-with-red-and-green-darts-32623458/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+esports — An Empty Gaming Computer Room With Blue Light - Pexels
+  Creator: Nathan b Caldeira
+  Source: https://www.pexels.com/photo/an-empty-gaming-computer-room-with-blue-light-6125335/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+fieldhockey — Close-Up of Field Hockey Stick on Turf · Free Stock Photo - Pexels
+  Creator: Writchid Snipes
+  Source: https://www.pexels.com/photo/close-up-of-field-hockey-stick-on-turf-31519274/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+football — American Football Players on Stadium Â· Free Stock Photo - Pexels
+  Creator: Wendy Wei
+  Source: https://www.pexels.com/photo/american-football-players-on-stadium-4428563/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+golf — Scenic Golf Course Fairway with Clubhouse View · Free Stock Photo
+  Creator: Hanwei Zhang
+  Source: https://www.pexels.com/photo/scenic-golf-course-fairway-with-clubhouse-view-31803613/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+handball — Interior Design of an Indoors Handball Court · Free Stock Photo - Pexels
+  Creator: Bence Szemerey
+  Source: https://www.pexels.com/photo/interior-design-of-an-indoors-handball-court-7513413/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+hockey — An Empty Ice Rink for Winter Sports and Ice Skate - Pexels
+  Creator: Pavel Danilyuk
+  Source: https://www.pexels.com/photo/an-empty-ice-rink-for-winter-sports-and-ice-skate-6539269/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+lacrosse — Lacrosse equipment with regulation ball
+  Creator: OpenAI image generation, directed for Harbor
+  Source:
+  License: User-authorized generated asset
+
+  Created for Harbor following explicit user permission for photoreal generated backgrounds. This is not a documentary photograph of an actual venue or event.
+
+motorsport — Aerial View of Interlagos Circuit, Brazil · Free Stock Photo - Pexels
+  Creator: Sérgio Souza
+  Source: https://www.pexels.com/photo/aerial-view-of-interlagos-circuit-brazil-32284224/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+netball — A netball goes through the hoop!
+  Creator: Luke Madziwa
+  Source: https://unsplash.com/photos/a-netball-goes-through-the-hoop-uzg113cB78M
+  License: Unsplash License
+  https://unsplash.com/license
+  Resized and cropped above players to show only the netball hoop and ball; converted to WebP.
+
+rugby — Rugby Ball on a Pitch · Free Stock Photo - Pexels
+  Creator: Pablo Hsm
+  Source: https://www.pexels.com/photo/rugby-ball-on-a-pitch-16566770/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Cropped to grass and goalposts, omitting the branded foreground ball; resized and compressed to WebP.
+
+snooker — Colored Snooker Balls on Green Table Surface · Free Stock Photo
+  Creator: Fahad Puthawala
+  Source: https://www.pexels.com/photo/colored-snooker-balls-on-green-table-surface-31616779/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+soccer — Panoramic View of an Empty Football Stadium · Free Stock Photo
+  Creator: Szcze hoo
+  Source: https://www.pexels.com/photo/panoramic-view-of-an-empty-football-stadium-39336548/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+softball — Yellow and Black Tennis Ball in Brown Soil · Free Stock Photo - Pexels
+  Creator: Pixabay
+  Source: https://www.pexels.com/photo/yellow-and-black-tennis-ball-in-brown-soil-47813/
+  License: CC0
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+tabletennis — Green Ping Pong Tables · Free Stock Photo - Pexels
+  Creator: Picography
+  Source: https://www.pexels.com/photo/ping-pong-table-tennis-3026/
+  License: CC0
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+tennis — Empty Tennis Court · Free Stock Photo - Pexels
+  Creator: Ellie Burgin
+  Source: https://www.pexels.com/photo/empty-tennis-court-19872965/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+volleyball — Minimalist Volleyball Net Against Clear Blue Sky · Free Stock Photo
+  Creator: Madzery Ma
+  Source: https://www.pexels.com/photo/minimalist-volleyball-net-against-clear-blue-sky-31550545/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+
+winter — Snowy Mountain Ski Resort with Chairlifts · Free Stock Photo - Pexels
+  Creator: Laura Manzi
+  Source: https://www.pexels.com/photo/snowy-mountain-ski-resort-with-chairlifts-35889106/
+  License: Pexels License
+  https://www.pexels.com/license/
+  Resized and compressed to WebP; displayed with CSS cropping and readability overlays.
+

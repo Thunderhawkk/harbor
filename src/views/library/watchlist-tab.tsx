@@ -42,7 +42,13 @@ import {
 } from "./shared";
 import { useReportFeatured } from "./featured-context";
 
-export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
+export function WatchlistTab({
+  mode,
+  scrollRef,
+}: {
+  mode: "library" | "watchlist";
+  scrollRef?: React.RefObject<HTMLElement | null>;
+}) {
   const tr = useT();
   const { authKey } = useAuth();
   const { settings } = useSettings();
@@ -56,11 +62,13 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
   // revalidate instead of applying when a removal landed mid-flight, so a
   // stale response can never resurrect a just-removed card for a beat.
   const guardSeq = useRef(0);
+  const pendingRemovals = useRef(0);
+  const [refreshSeq, setRefreshSeq] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     const loadStremio = () => {
-      if (!authKey || cancelled) return;
+      if (!authKey || cancelled || pendingRemovals.current > 0) return;
       const mySeq = guardSeq.current;
       library(authKey)
         .then((items) => {
@@ -71,9 +79,7 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
           }
           setRawCount(items.filter((i) => !i.removed).length);
           setStremio(filterLibrary(items, settings.libraryBookmarkedOnly, mode));
-          setStremioAggregate(
-            items.filter((i) => !i.removed && !i.temp).map((i) => i._id),
-          );
+          setStremioAggregate(items.filter((i) => !i.removed && !i.temp).map((i) => i._id));
         })
         .catch(() => {});
     };
@@ -91,12 +97,13 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
       window.removeEventListener("storage", onChange);
       unsub();
     };
-  }, [authKey, settings.libraryBookmarkedOnly, mode]);
+  }, [authKey, settings.libraryBookmarkedOnly, mode, refreshSeq]);
 
   const handleRemove = useCallback(
     async (stremioId: string) => {
       if (!authKey) return;
       guardSeq.current += 1;
+      pendingRemovals.current += 1;
       const allLocals = readLocalEntries();
       const closure = filmClosure([stremioId], allLocals, trakt);
       evictWatchlistAggregate(closure);
@@ -117,38 +124,40 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
           const sr = stremioIdToSimklTarget(stremioId);
           return sr.ok ? sr.target : null;
         })();
-        await Promise.all([
-          removeStremioLibraryItem(authKey, stremioId),
+        const results = await Promise.allSettled([
+          ...Array.from(
+            new Set([
+              stremioId,
+              ...stremio.filter((item) => closure.has(item._id)).map((item) => item._id),
+            ]),
+            (id) => removeStremioLibraryItem(authKey, id),
+          ),
           ...(tr.ok ? [removeTraktWatchlist(tr.target).catch(() => false)] : []),
           ...(simklTarget ? [removeSimklWatchlist(simklTarget).catch(() => false)] : []),
         ]);
+        if (results.some((result) => result.status === "rejected"))
+          throw new Error("Watchlist removal failed");
         for (const l of twins) removeFromWatchlist(l.id);
       } catch {
-        const mySeq = guardSeq.current;
         setLocalEntries(readLocalEntries());
-        library(authKey)
-          .then((items) => {
-            if (guardSeq.current !== mySeq) return;
-            setRawCount(items.filter((i) => !i.removed).length);
-            setStremio(filterLibrary(items, settings.libraryBookmarkedOnly, mode));
-          })
-          .catch(() => {});
+      } finally {
+        pendingRemovals.current -= 1;
+        guardSeq.current += 1;
+        setRefreshSeq((value) => value + 1);
       }
       const revalidate = () => {
         const s = guardSeq.current;
-        void refreshWatchlistAggregates(authKey, traktConnected, simklConnected())
+        const isCurrent = () => guardSeq.current === s && pendingRemovals.current === 0;
+        void refreshWatchlistAggregates(authKey, traktConnected, simklConnected(), isCurrent)
           .then((items) => {
-            if (guardSeq.current !== s) {
-              revalidate();
-              return;
-            }
+            if (!isCurrent()) return;
             setTrakt(items);
           })
           .catch(() => {});
       };
       revalidate();
     },
-    [authKey, settings.libraryBookmarkedOnly, mode, trakt, traktConnected],
+    [authKey, settings.libraryBookmarkedOnly, mode, stremio, trakt, traktConnected],
   );
 
   const handleRemoveLocal = useCallback(
@@ -157,11 +166,7 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
       const e = all.find((x) => x.id === localId);
       if (!e) return;
       guardSeq.current += 1;
-      const closure = filmClosure(
-        e.imdbId ? [e.id, e.imdbId] : [e.id],
-        all,
-        trakt,
-      );
+      const closure = filmClosure(e.imdbId ? [e.id, e.imdbId] : [e.id], all, trakt);
       evictWatchlistAggregate(closure);
       setLocalEntries((prev) => prev.filter((x) => !closure.has(x.id)));
       setStremio((prev) => prev.filter((i) => !closure.has(i._id)));
@@ -191,7 +196,7 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
     let cancelled = false;
     setTraktStatus("loading");
     const loadTrakt = () => {
-      if (cancelled) return;
+      if (cancelled || pendingRemovals.current > 0) return;
       const mySeq = guardSeq.current;
       fetchWatchlist()
         .then((items) => {
@@ -211,7 +216,7 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
     return () => {
       cancelled = true;
     };
-  }, [traktConnected]);
+  }, [traktConnected, refreshSeq]);
 
   const merged = useMemo(
     () => mergeWatchlist(localEntries, stremio, trakt),
@@ -278,6 +283,7 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
           groups={sortedGroups(visible, settings.librarySort)}
           onRemove={handleRemove}
           onRemoveLocal={handleRemoveLocal}
+          scrollRef={scrollRef}
         />
       ) : flat ? (
         <GroupedGrid
@@ -289,12 +295,14 @@ export function WatchlistTab({ mode }: { mode: "library" | "watchlist" }) {
           ]}
           onRemove={handleRemove}
           onRemoveLocal={handleRemoveLocal}
+          scrollRef={scrollRef}
         />
       ) : (
         <GroupedGrid
           groups={groupByDate(visible)}
           onRemove={handleRemove}
           onRemoveLocal={handleRemoveLocal}
+          scrollRef={scrollRef}
         />
       )}
     </section>
@@ -430,19 +438,31 @@ export function mergeWatchlist(
     typeForKey: string,
     nameForKey: string,
   ) => {
-    for (const k of identityKeys(entry.meta.id, imdb)) {
-      const slot = filmSlot.get(k);
-      if (slot === undefined) continue;
-      const existing = byKey.get(slot);
-      if (!existing) {
-        byKey.set(slot, entry);
-      } else {
-        const kept = !existing.stremioId && entry.stremioId ? entry : existing;
-        const dropped = kept === existing ? entry : existing;
-        byKey.set(slot, { ...kept, key: existing.key, localId: kept.localId ?? dropped.localId });
+    const keys = identityKeys(entry.meta.id, imdb);
+    const slots = new Set(
+      keys.map((key) => filmSlot.get(key)).filter((slot) => slot !== undefined),
+    );
+    const slot = slots.values().next().value;
+    if (slot !== undefined) {
+      let merged = entry;
+      for (const matchedSlot of slots) {
+        const existing = byKey.get(matchedSlot);
+        if (!existing) continue;
+        const kept = !existing.stremioId && merged.stremioId ? merged : existing;
+        const dropped = kept === existing ? merged : existing;
+        merged = { ...kept, key: existing.key, localId: kept.localId ?? dropped.localId };
+        byKey.delete(matchedSlot);
+      }
+      byKey.set(slot, merged);
+      // A newly learned IMDb/TMDB pair can connect two cards already placed.
+      // Redirect every alias of both cards to the single retained slot.
+      if (slots.size > 1) {
+        for (const [id, previousSlot] of filmSlot) {
+          if (slots.has(previousSlot)) filmSlot.set(id, slot);
+        }
       }
       seenIds.add(entry.meta.id);
-      for (const k2 of identityKeys(entry.meta.id, imdb)) filmSlot.set(k2, slot);
+      for (const key of keys) filmSlot.set(key, slot);
       return;
     }
     const key = dedupKey(typeForKey, nameForKey, year, entry.meta.id);

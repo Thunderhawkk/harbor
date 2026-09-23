@@ -1,5 +1,25 @@
 {
   "notes": {
+    "0.9.127": {
+      "title": "Harbor Beta 0.9.127",
+      "intro": "A focused update for Windows HDR playback, window startup, and embedded subtitle selection.",
+      "sections": [
+        {
+          "heading": "What's in this one",
+          "items": [
+            "Fixed the extra Harbor loading window during True HDR embedded playback on Windows.",
+            "Fixed the thin light line at the bottom of Harbor when reopening maximized with Windows taskbar auto-hide enabled.",
+            "Fixed automatic embedded subtitle selection when track information arrives late. With Prefer embedded subtitles enabled, matching embedded tracks take priority over external results."
+          ]
+        },
+        {
+          "heading": "A note from Talal",
+          "items": [
+            "Thank you for the reports and for testing these fixes. Please check HDR playback, reopening Harbor maximized, and automatic subtitle selection on your setup. If an issue returns, include your version, Windows display settings, and clear steps in our Discord support channel. Hide private links and account details before sharing. — Talal"
+          ]
+        }
+      ]
+    },
     "0.9.126": {
       "title": "Harbor Beta 0.9.126",
       "intro": "Account, playback, subtitle, and browsing improvements, with more reliable name saving and session handling.",

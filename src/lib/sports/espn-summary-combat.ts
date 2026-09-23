@@ -1,5 +1,11 @@
 import { safeFetch } from "@/lib/safe-fetch";
-import type { LeagueDef, MatchTeamStatRow, MMAFighterProfile, SportsMatchDetail, SportsSide } from "./espn-types";
+import type {
+  LeagueDef,
+  MatchTeamStatRow,
+  MMAFighterProfile,
+  SportsMatchDetail,
+  SportsSide,
+} from "./espn-types";
 import { SITE_BASE } from "./espn-leagues";
 
 const HEADSHOTS = "https://a.espncdn.com/i/headshots/mma/players/full";
@@ -19,7 +25,7 @@ function gameSide(c: any): SportsSide {
 async function fetchProfile(id: string): Promise<MMAFighterProfile | undefined> {
   if (!id) return undefined;
   try {
-    const r = await safeFetch(`${ATHLETES}/${id}`);
+    const r = await safeFetch(`${ATHLETES}/${id}`, { signal: AbortSignal.timeout(8000) });
     if (!r.ok) return undefined;
     const d = await r.json();
     return {
@@ -50,14 +56,21 @@ function recordRows(homeRaw: any, awayRaw: any): MatchTeamStatRow[] {
   return allStats;
 }
 
-export async function fetchCombatSummary(def: LeagueDef, eventId: string): Promise<SportsMatchDetail | null> {
+export async function fetchCombatSummary(
+  def: LeagueDef,
+  eventId: string,
+  startMs?: number,
+): Promise<SportsMatchDetail | null> {
   let actualEventId = eventId;
   let compId = "";
   if (eventId.includes("|")) {
     [actualEventId, compId] = eventId.split("|");
   }
 
-  const res = await safeFetch(`${SITE_BASE}/${def.path}/scoreboard`);
+  const year = new Date(startMs || Date.now()).getFullYear();
+  const res = await safeFetch(`${SITE_BASE}/${def.path}/scoreboard?dates=${year}&limit=1000`, {
+    signal: AbortSignal.timeout(10000),
+  });
   if (!res.ok) return null;
   const data = await res.json();
   const event = data.events?.find((e: any) => e.id === actualEventId);
@@ -86,7 +99,7 @@ export async function fetchCombatSummary(def: LeagueDef, eventId: string): Promi
   return {
     id: eventId,
     league: def.tag,
-    state: (t.state === "in" || t.state === "post") ? t.state : "pre",
+    state: t.state === "in" || t.state === "post" ? t.state : "pre",
     detail: t.shortDetail || t.detail || "",
     startMs: Date.parse(event.date || "") || 0,
     home: gameSide(homeRaw),

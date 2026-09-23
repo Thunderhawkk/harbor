@@ -24,11 +24,13 @@ export type RemoteMangaBinding = {
   zoom: number;
   canZoom: boolean;
   rtl: boolean;
+  fit: RemoteMangaState["fit"];
+  bg: RemoteMangaState["bg"];
   mode: RemoteMangaState["mode"];
   hasPrev: boolean;
   hasNext: boolean;
   turnPage: (dir: "next" | "prev") => void;
-  setPage: (page: number) => void;
+  setPage: (page: number, scroll?: number, vel?: number) => void;
   jumpChapter: (index: number) => void;
   zoomBy: (delta: number) => void;
   setZoom: (zoom: number) => void;
@@ -36,9 +38,14 @@ export type RemoteMangaBinding = {
   flipProgress: (p: number) => void;
   flipEnd: (commit: boolean, dir: "next" | "prev") => void;
   setRtl: (rtl: boolean) => void;
+  setMode: (mode: RemoteMangaState["mode"]) => void;
+  setPagesHidden: (hidden: boolean) => void;
+  setFit: (fit: RemoteMangaState["fit"]) => void;
+  setBg: (bg: RemoteMangaState["bg"]) => void;
   bookmarkCurrent: () => Omit<MangaBookmark, "id" | "name" | "createdAt">;
   jumpBookmark: (bm: MangaBookmark) => void;
   close: () => void;
+  exitLocalReader: number;
 };
 
 type Listener = () => void;
@@ -104,10 +111,13 @@ export function buildRemoteMangaState(): RemoteMangaState | null {
     zoom: b.zoom,
     canZoom: b.canZoom,
     rtl: b.rtl,
+    fit: b.fit,
+    bg: b.bg,
     mode: b.mode,
     hasPrev: b.hasPrev,
     hasNext: b.hasNext,
     bookmarks,
+    exitLocalReader: b.exitLocalReader,
   };
 }
 
@@ -119,7 +129,7 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
       b.turnPage(command.dir);
       return;
     case "mangaSetPage":
-      b.setPage(command.page);
+      b.setPage(command.page, command.scroll, command.vel);
       return;
     case "mangaJumpChapter":
       if (command.index >= 0 && command.index < b.chapters.length) b.jumpChapter(command.index);
@@ -145,6 +155,18 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
     case "mangaSetRtl":
       b.setRtl(command.rtl);
       return;
+    case "mangaSetMode":
+      b.setMode(command.mode);
+      return;
+    case "mangaSetPagesHidden":
+      b.setPagesHidden(command.hidden);
+      return;
+    case "mangaSetFit":
+      b.setFit(command.fit);
+      return;
+    case "mangaSetBg":
+      b.setBg(command.bg);
+      return;
     case "mangaBookmark": {
       const base = b.bookmarkCurrent();
       addMangaBookmark(b.pid, command.page != null ? { ...base, page: command.page } : base);
@@ -162,6 +184,7 @@ export async function dispatchMangaCommand(command: RemoteCommand): Promise<void
       b.close();
       return;
     default:
+      console.warn(`[manga/remote] unhandled command ${(command as { action: string }).action}`);
       return;
   }
 }

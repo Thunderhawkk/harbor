@@ -127,9 +127,11 @@ export function ManageServersButton({
 export function TagDropdown({
   tagId,
   onSelect,
+  onOpenLibrary,
 }: {
   tagId: string;
   onSelect: (id: string) => void;
+  onOpenLibrary?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [tags, setTags] = useState<MangaTag[]>([]);
@@ -176,7 +178,7 @@ export function TagDropdown({
       <button type="button" onClick={() => setOpen((v) => !v)} className={TRIGGER}>
         <Layers size={15} className="text-ink-subtle" />
         <span className="max-w-[140px] truncate font-medium">
-          {tagId === FAVORITES ? t("Favorites") : active ? active.name : t(allLabel)}
+          {tagId === FAVORITES ? t("Library") : active ? active.name : t(allLabel)}
         </span>
         <ChevronDown size={14} className="text-ink-subtle" />
       </button>
@@ -187,19 +189,23 @@ export function TagDropdown({
               autoFocus
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder={t("Filter sources...")}
+              placeholder={t("Filter extensions...")}
               className="w-full rounded-md bg-elevated/50 px-3 py-1.5 text-[12.5px] text-ink placeholder:text-ink-subtle outline-none focus:ring-1 focus:ring-edge"
             />
           </div>
           <div className="max-h-72 overflow-y-auto py-1">
             <button
               type="button"
-              onClick={() => (onSelect(FAVORITES), setOpen(false))}
+              onClick={() => {
+                setOpen(false);
+                if (onOpenLibrary) onOpenLibrary();
+                else onSelect(FAVORITES);
+              }}
               className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-start text-[13px] text-ink hover:bg-elevated/60"
             >
               <span className="flex items-center gap-2">
                 <Star size={14} className="fill-amber-400 text-amber-400" />
-                {t("Favorites")}
+                {t("Library")}
               </span>
               {tagId === FAVORITES && <Check size={14} className="text-accent" />}
             </button>

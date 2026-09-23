@@ -237,3 +237,52 @@ test("home search overlay disables TV spatial navigation and binds modal close t
   );
   assert.match(searchOverlaySource, /data-tv-text-auto="true"/);
 });
+
+test("search Tab navigation stays scoped, wraps both ways, and removes its listener", () => {
+  assert.match(searchOverlaySource, /ref=\{panelRef\}/);
+  assert.match(searchOverlaySource, /if \(!open \|\| closing \|\| !mounted\) return;/);
+  assert.match(searchOverlaySource, /if \(e.key !== "Tab" \|\| e.defaultPrevented\) return;/);
+  assert.match(searchOverlaySource, /!root.contains\(e.target\)/);
+  assert.match(searchOverlaySource, /el.getClientRects\(\).length > 0/);
+  assert.match(
+    searchOverlaySource,
+    /e.shiftKey[\s\S]*?els\[els.length - 1\][\s\S]*?els\[idx - 1\]/,
+  );
+  assert.match(
+    searchOverlaySource,
+    /idx === -1 \|\| idx === els.length - 1[\s\S]*?els\[0\][\s\S]*?els\[idx \+ 1\]/,
+  );
+  assert.match(searchOverlaySource, /root.removeEventListener\("keydown", onKeyDown\)/);
+});
+
+test("focus restoration never borrows a rounded radius onto page roots", () => {
+  assert.match(
+    navigationSource,
+    /function borrowRadius\(el: HTMLElement\) \{\s*\/\/[\s\S]*?if \(el === document.body \|\| el === document.documentElement\) \{\s*el.style.borderRadius = "";\s*return;/,
+  );
+});
+
+test("F6 blocks the native default without stopping custom shortcut propagation", () => {
+  const handler = navigationSource.match(
+    /const swallowF6 = \(e: KeyboardEvent\) => \{([\s\S]*?)\n    \};/,
+  )?.[1];
+  assert.ok(handler);
+  assert.match(handler, /e.key !== "F6" \|\| e.defaultPrevented/);
+  assert.match(handler, /e.preventDefault\(\)/);
+  assert.doesNotMatch(handler, /stopPropagation|stopImmediatePropagation/);
+  assert.match(navigationSource, /window.removeEventListener\("keydown", swallowF6\)/);
+});
+
+test("search focus overrides coexist with Music styles and reduced-motion support", () => {
+  assert.match(globalStylesSource, /\[data-search-overlay\] input/);
+  assert.match(
+    globalStylesSource,
+    /\[data-search-overlay\] \[data-tv-search-editing-focused="true"\],\s*\[data-search-overlay\] \[data-tv-search-nav-focused="true"\] \{\s*outline: none !important;\s*\}/,
+  );
+  assert.match(globalStylesSource, /\.music-eq-bars \{/);
+  assert.match(globalStylesSource, /@keyframes music-eq-bounce/);
+  assert.match(
+    globalStylesSource,
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\.music-eq-bars i \{\s*animation: none;/,
+  );
+});
