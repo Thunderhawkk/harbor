@@ -7375,6 +7375,22 @@ button.hset-rail-me:hover,
   --poster-radius: var(--radius-md);
 }
 
+[data-nav-editing="true"] [data-harbor-nav]:hover {
+  animation: none !important;
+}
+[data-nav-editing="true"] [data-harbor-nav] {
+  margin: 1px 2px !important;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-nav-editing="true"] [data-harbor-nav] {
+    transition: transform 160ms ease-out !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-nav-editing="true"] [data-harbor-nav] {
+    transition: none !important;
+  }
+}
 /* Search overlay draws its own panel chrome; never outline its header container. */
 [data-search-overlay] [data-tv-search-editing-focused="true"],
 [data-search-overlay] [data-tv-search-nav-focused="true"] {

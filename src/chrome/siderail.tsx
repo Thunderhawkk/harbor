@@ -1,4 +1,5 @@
 import { usePreviewNavCustomization } from "@/lib/theme-preview";
+import { useContextMenu } from "@/lib/context-menu";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -8,7 +9,14 @@ import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
 import { RecordingPill } from "@/chrome/recording-pill";
 import { TogetherButton } from "@/chrome/topbar";
-import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import {
+  useAvailableNavItems,
+  applyNavCustomization,
+  type NavItem,
+  type NavItemId,
+} from "@/chrome/nav-items";
+import { NavHiddenTray, NavEditableItem, useNavDrag } from "@/chrome/nav-edit";
+import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { useSearch } from "@/lib/search-context";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
@@ -32,11 +40,17 @@ const PRIMARY_IDS = new Set([
 ]);
 
 export function SideRail() {
+  const editing = useNavEditMode();
   const { view, setView, chromeHidden } = useView();
   const { settings } = useSettings();
   const { locked, unlock, hiddenTabs } = useParental();
   const { setOpen: setSearchOpen } = useSearch();
   const t = useT();
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
   const [pinFor, setPinFor] = useState<View | null>(null);
   const collapsed = settings.sidebarCollapsed;
 
@@ -67,6 +81,7 @@ export function SideRail() {
   return (
     <>
       <aside
+        data-tv-focus-scope={editing || undefined}
         aria-hidden={chromeHidden}
         className={`relative z-[60] flex shrink-0 flex-col border-e border-edge-soft bg-canvas/40 transition-[opacity,width] duration-300 ${
           collapsed ? "w-[68px]" : "w-[200px]"
@@ -104,11 +119,16 @@ export function SideRail() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className="flex-1 overflow-y-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onContextMenu={openEmptyMenu}
+        >
           <nav className="flex flex-col gap-0.5">
             {primary.map((item) => (
               <RailItem
                 key={item.id}
+                itemId={item.id}
+                view={item.view}
                 label={item.label}
                 active={view === item.view}
                 collapsed={collapsed}
@@ -124,6 +144,8 @@ export function SideRail() {
                 {secondary.map((item) => (
                   <RailItem
                     key={item.id}
+                    itemId={item.id}
+                    view={item.view}
                     label={item.label}
                     active={view === item.view}
                     collapsed={collapsed}
@@ -140,6 +162,8 @@ export function SideRail() {
               <nav className="flex flex-col gap-0.5">
                 <RailItem
                   key={settingsItem.id}
+                  itemId={settingsItem.id}
+                  view={settingsItem.view}
                   label={settingsItem.label}
                   active={view === settingsItem.view}
                   collapsed={collapsed}
@@ -151,6 +175,9 @@ export function SideRail() {
         </div>
 
         <div className={`relative flex flex-col gap-2 py-4 ${collapsed ? "px-2" : "px-4"}`}>
+          <div className="mb-1 px-1">
+            <NavHiddenTray orientation="vertical" compact={collapsed} />
+          </div>
           <span
             aria-hidden
             className="absolute inset-x-0 top-0 h-px"
@@ -237,11 +264,15 @@ export function SideRail() {
 }
 
 function RailItem({
+  itemId,
+  view,
   label,
   active,
   collapsed,
   onClick,
 }: {
+  itemId: NavItemId;
+  view: View;
   label: string;
   active: boolean;
   collapsed: boolean;
@@ -249,33 +280,49 @@ function RailItem({
 }) {
   const t = useT();
   const translated = t(label);
+  const { open: openContextMenu } = useContextMenu();
+  const editing = useNavEditMode();
+  const drag = useNavDrag(itemId, "vertical");
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={translated}
-      title={collapsed ? translated : undefined}
-      className={`group relative flex h-10 items-center text-[16px] tracking-tight transition-colors ${
-        collapsed ? "justify-center px-2" : "ps-7 pe-3 text-start"
-      } ${active ? "text-accent" : "text-ink-muted hover:text-ink"}`}
-      style={{ fontFamily: "var(--font-display)" }}
-    >
-      <span
-        aria-hidden
-        className={`absolute inset-y-1 rounded-lg transition-opacity duration-200 ${
-          collapsed ? "inset-x-2" : "start-2.5 end-2"
-        } ${active ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-        style={{ background: active ? "var(--color-accent-soft)" : "var(--color-elevated)" }}
-      />
-      {active && (
+    <NavEditableItem itemId={itemId}>
+      <button
+        type="button"
+        onClick={onClick}
+        onContextMenu={(e) =>
+          openContextMenu(e, { kind: "nav", itemId, view, label: translated, onOpen: onClick })
+        }
+        data-harbor-nav={itemId}
+        data-tauri-drag-region={editing ? "false" : undefined}
+        onPointerDown={drag.onPointerDown}
+        onKeyDown={drag.onKeyDown}
+        data-nav-drop-id={itemId}
+        aria-label={translated}
+        title={collapsed ? translated : undefined}
+        className={`group relative flex h-10 items-center text-[16px] tracking-tight transition-colors ${
+          collapsed ? "justify-center px-2" : "ps-7 pe-3 text-start"
+        } ${drag.over ? "ring-2 ring-accent" : ""} ${active ? "text-accent" : "text-ink-muted hover:text-ink"}`}
+        style={{ fontFamily: "var(--font-display)" }}
+      >
         <span
           aria-hidden
-          className="absolute start-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-e-full"
-          style={{ background: "var(--color-accent)", boxShadow: "0 0 12px 0 var(--color-accent)" }}
+          className={`absolute inset-y-1 rounded-lg transition-opacity duration-200 ${
+            collapsed ? "inset-x-2" : "start-2.5 end-2"
+          } ${active ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+          style={{ background: active ? "var(--color-accent-soft)" : "var(--color-elevated)" }}
         />
-      )}
-      <span className="relative">{collapsed ? translated.slice(0, 1) : translated}</span>
-    </button>
+        {active && (
+          <span
+            aria-hidden
+            className="absolute start-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-e-full"
+            style={{
+              background: "var(--color-accent)",
+              boxShadow: "0 0 12px 0 var(--color-accent)",
+            }}
+          />
+        )}
+        <span className="relative">{collapsed ? translated.slice(0, 1) : translated}</span>
+      </button>
+    </NavEditableItem>
   );
 }
 

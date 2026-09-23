@@ -77,7 +77,7 @@ export type NavItem = {
   label: string;
   render: (active: boolean, hovered?: boolean) => ReactNode;
   view: View;
-  hideKey?: "anime" | "liveTv" | "sports" | "manga";
+  hideKey?: "anime" | "sports";
   parentalKey?: LockableTab;
   pinGated?: boolean;
 };
@@ -146,7 +146,6 @@ const NAV_ITEMS_ALL: NavItem[] = [
       <NavLottie data={lotAnime} hovered={hovered} fallback={<AnimeIcon active={active} />} />
     ),
     view: "anime",
-    hideKey: "anime",
     parentalKey: "anime",
   },
   {
@@ -160,7 +159,6 @@ const NAV_ITEMS_ALL: NavItem[] = [
       />
     ),
     view: "manga",
-    hideKey: "manga",
     parentalKey: "anime",
   },
   {
@@ -200,7 +198,6 @@ const NAV_ITEMS_ALL: NavItem[] = [
       />
     ),
     view: "live",
-    hideKey: "liveTv",
     parentalKey: "liveTv",
   },
   {

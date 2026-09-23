@@ -1,5 +1,14 @@
 // Newly introduced UI copy remains usable until each locale provides an override.
 const uiFallback: Record<string, string> = {
+  "Hide this tab": "Hide this tab",
+  "Show this tab": "Show this tab",
+  "Nothing hidden.": "Nothing hidden.",
+  "Edit sidebar": "Edit sidebar",
+  "Show all tabs": "Show all tabs",
+  "Hide categories from recommendations. Customize tabs separately in the sidebar.":
+    "Hide categories from recommendations. Customize tabs separately in the sidebar.",
+  "Hides anime titles from Home, Discover, Top 10, and catalogs. Western animation stays visible. To hide the Anime tab, edit the sidebar.":
+    "Hides anime titles from Home, Discover, Top 10, and catalogs. Western animation stays visible. To hide the Anime tab, edit the sidebar.",
   "Could not sync your display name. Check your connection and try again.":
     "Could not sync your display name. Check your connection and try again.",
   "Syncing display name…": "Syncing display name…",

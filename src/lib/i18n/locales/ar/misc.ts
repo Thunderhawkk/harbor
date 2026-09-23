@@ -1,4 +1,13 @@
 const misc: Record<string, string> = {
+  "Hide this tab": "إخفاء علامة التبويب هذه",
+  "Show this tab": "إظهار علامة التبويب هذه",
+  "Nothing hidden.": "لا توجد علامات تبويب مخفية.",
+  "Edit sidebar": "تعديل الشريط الجانبي",
+  "Show all tabs": "إظهار كل علامات التبويب",
+  "Hide categories from recommendations. Customize tabs separately in the sidebar.":
+    "إخفاء فئات من التوصيات. يمكنك تخصيص علامات التبويب بشكل منفصل في الشريط الجانبي.",
+  "Hides anime titles from Home, Discover, Top 10, and catalogs. Western animation stays visible. To hide the Anime tab, edit the sidebar.":
+    "يخفي عناوين الأنمي من الرئيسية والاستكشاف وأفضل 10 والكتالوجات، مع إبقاء الرسوم المتحركة الغربية ظاهرة. لإخفاء علامة تبويب الأنمي، عدّل الشريط الجانبي.",
   Collections: "المجموعات",
   "Open settings": "فتح الإعدادات",
   "Collapse sidebar": "طيّ الشريط الجانبي",

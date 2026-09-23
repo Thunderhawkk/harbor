@@ -171,6 +171,7 @@ function parseStoredSettings(raw: string | null): Settings {
       _tennisWtaV1?: boolean;
       _liquidGlassOptIn?: boolean;
       _navThemeRepairV1?: boolean;
+      _navHideMigrateV1?: boolean;
       _playlistsTabV1?: boolean;
       _smoothScrollOptIn?: boolean;
       _streamCacheCapV1?: boolean;
@@ -319,11 +320,26 @@ function parseStoredSettings(raw: string | null): Settings {
       }
     }
     if (!parsed._navThemeRepairV1) {
-      const nav = parsed.navCustomization as Partial<Settings["navCustomization"]> | undefined;
-      if (nav && Array.isArray(nav.hidden) && nav.hidden.length > 0) {
-        parsed.navCustomization = { ...nav, hidden: [] } as Settings["navCustomization"];
-      }
       parsed._navThemeRepairV1 = true;
+    }
+    if (!parsed._navHideMigrateV1) {
+      const legacy = (parsed.hideContent ?? {}) as Record<string, unknown>;
+      const carry: string[] = [];
+      if (legacy.manga === true) carry.push("manga");
+      if (legacy.liveTv === true) carry.push("live");
+      if (carry.length > 0) {
+        const prevNav = (parsed.navCustomization ?? {}) as { hidden?: unknown };
+        const prev = Array.isArray(prevNav.hidden)
+          ? prevNav.hidden.filter((x): x is string => typeof x === "string")
+          : [];
+        parsed.navCustomization = {
+          ...parsed.navCustomization,
+          hidden: [...prev, ...carry.filter((c) => !prev.includes(c))],
+        } as Settings["navCustomization"];
+      }
+      delete legacy.manga;
+      delete legacy.liveTv;
+      parsed._navHideMigrateV1 = true;
     }
     if (parsed.cwSources == null) {
       const ext = parsed.externalContinueWatching === true;
