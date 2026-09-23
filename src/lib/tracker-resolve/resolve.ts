@@ -1,5 +1,5 @@
 import { getResolved, makeKey, resolveOnce } from "./cache";
-import { findEpisodeInSeasons, hasAnyComparableSignal, normalizeTitle } from "./match";
+import { findEpisodeInSeasons, findExactEpisodeInSeasons, hasAnyComparableSignal, normalizeTitle } from "./match";
 import type {
   EpisodeIdentity,
   ExternalShowIds,
@@ -42,6 +42,7 @@ async function runResolution(
 
   let fetches = 0;
   let evaluated = false;
+  let fallback: ResolvedEpisode | null = null;
   for (const candidate of candidates.slice(0, MAX_CANDIDATES)) {
     if (fetches >= MAX_FETCHES) break;
     fetches += 1;
@@ -53,14 +54,23 @@ async function runResolution(
     }
     if (!seasons || seasons.length === 0) continue;
     if (hasAnyComparableSignal(identity, seasons)) evaluated = true;
-    const hit = findEpisodeInSeasons(identity, seasons);
-    if (hit) {
+    // An exact episode id anywhere outranks a date guess anywhere, so an earlier show's
+    // heuristic hit is only held as a fallback while later candidates are still tried.
+    const exact = findExactEpisodeInSeasons(identity, seasons);
+    if (exact) {
       return {
         ok: true,
-        episode: { showIds: candidate.showIds, season: hit.season, number: hit.number },
+        episode: { showIds: candidate.showIds, season: exact.season, number: exact.number },
       };
     }
+    if (!fallback) {
+      const hit = findEpisodeInSeasons(identity, seasons);
+      if (hit) {
+        fallback = { showIds: candidate.showIds, season: hit.season, number: hit.number };
+      }
+    }
   }
+  if (fallback) return { ok: true, episode: fallback };
 
   // A miss we could actually evaluate is a real one, and is worth remembering so the
   // same impossible id is not re-probed. A search where nothing was comparable tells

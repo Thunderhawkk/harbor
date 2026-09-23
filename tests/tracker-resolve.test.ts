@@ -75,6 +75,60 @@ test("findEpisodeInSeasons searches beyond the reported season", () => {
   assert.deepEqual(findEpisodeInSeasons(twinPeaks, seasons), { season: 3, number: 1 });
 });
 
+const dailyShow: EpisodeIdentity = {
+  showTitle: "Daily Show",
+  season: 1,
+  number: 2,
+  airDate: "2026-01-02",
+  episodeTvdbId: 202,
+};
+
+test("an exact episode id wins over a nearer season that only date-matches", () => {
+  const seasons = [
+    season(1, [
+      { number: 1, title: "First", airDate: "2026-01-01", tvdbId: 101 },
+      { number: 2, title: "Second", airDate: "2026-01-02", tvdbId: 202 },
+    ]),
+  ];
+  assert.deepEqual(findEpisodeInSeasons(dailyShow, seasons), { season: 1, number: 2 });
+});
+
+test("a conflicting episode id cannot fall through to the date window", () => {
+  const wrongEpisode = { number: 1, title: "First", airDate: "2026-01-01", tvdbId: 101 };
+  assert.equal(episodeMatches(dailyShow, wrongEpisode), false);
+});
+
+test("same-day releases without episode ids stay unresolved", () => {
+  const batch: EpisodeIdentity = { showTitle: "Batch Show", season: 1, number: 2, airDate: "2026-03-05" };
+  const seasons = [
+    season(1, [
+      { number: 1, title: "One", airDate: "2026-03-05" },
+      { number: 2, title: "Two", airDate: "2026-03-05" },
+      { number: 3, title: "Three", airDate: "2026-03-05" },
+    ]),
+  ];
+  assert.equal(findEpisodeInSeasons(batch, seasons), null);
+});
+
+test("an exact id on a later candidate beats a date guess on an earlier one", async () => {
+  clearResolved();
+  const deps: CatalogDeps = {
+    searchShows: async () => [
+      { showIds: { imdb: "tt1111111", trakt: 1 }, title: "Daily Show", year: 2020 },
+      { showIds: { imdb: "tt2222222", trakt: 2 }, title: "Daily Show", year: 2026 },
+    ],
+    fetchShowSeasons: async (showIds) =>
+      showIds.trakt === 1
+        ? [season(1, [{ number: 1, title: "First", airDate: "2026-01-01" }])]
+        : [season(1, [{ number: 2, title: "Second", airDate: "2026-01-02", tvdbId: 202 }])],
+  };
+  const result = await resolveEpisode(dailyShow, deps);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.episode.showIds.trakt, 2);
+  assert.equal(result.episode.number, 2);
+});
+
 const grandTourDeps: CatalogDeps = {
   searchShows: async () => [
     { showIds: { imdb: "tt5712554", trakt: 108999, tmdb: 67557 }, title: "The Grand Tour", year: 2016 },

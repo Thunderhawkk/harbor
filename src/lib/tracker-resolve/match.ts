@@ -59,8 +59,21 @@ export function hasComparableSignal(
   return isDistinctiveTitle(identity.name) && isDistinctiveTitle(candidate.title);
 }
 
+// Both sides carry an id for the same scheme and they disagree: this is a different
+// episode, so no date or title heuristic may rescue it.
+function conflictingEpisodeId(identity: EpisodeIdentity, candidate: EpisodeCandidate): boolean {
+  if (identity.episodeTvdbId != null && candidate.tvdbId != null) {
+    return identity.episodeTvdbId !== candidate.tvdbId;
+  }
+  if (identity.episodeImdbId && candidate.imdbId) {
+    return identity.episodeImdbId !== candidate.imdbId;
+  }
+  return false;
+}
+
 export function episodeMatches(identity: EpisodeIdentity, candidate: EpisodeCandidate): boolean {
   if (sameEpisodeId(identity, candidate)) return true;
+  if (conflictingEpisodeId(identity, candidate)) return false;
   const delta = daysBetween(identity.airDate, candidate.airDate);
   if (delta != null) return delta <= DATE_WINDOW_DAYS;
   if (!isDistinctiveTitle(identity.name) || !isDistinctiveTitle(candidate.title)) return false;
@@ -106,21 +119,61 @@ export function seasonSearchOrder(target: number): number[] {
   return order;
 }
 
+function orderedCandidates(
+  identity: EpisodeIdentity,
+  seasons: SeasonListing[],
+): Array<{ season: number; candidate: EpisodeCandidate }> {
+  const byNumber = new Map(seasons.map((season) => [season.number, season]));
+  const ordered: Array<{ season: number; candidate: EpisodeCandidate }> = [];
+  for (const seasonNumber of seasonSearchOrder(identity.season)) {
+    const season = byNumber.get(seasonNumber);
+    if (!season) continue;
+    for (const candidate of season.episodes) ordered.push({ season: seasonNumber, candidate });
+  }
+  return ordered;
+}
+
+// The episode's own external id is the tracker's identifier for that exact episode, so it
+// wins wherever it sits in the search order - and for the caller, wherever it sits in the
+// candidate set: a nearer show's date-window guess must not pre-empt it.
+export function findExactEpisodeInSeasons(
+  identity: EpisodeIdentity,
+  seasons: SeasonListing[],
+): { season: number; number: number } | null {
+  for (const { season, candidate } of orderedCandidates(identity, seasons)) {
+    if (sameEpisodeId(identity, candidate)) return { season, number: candidate.number };
+  }
+  return null;
+}
+
 export function findEpisodeInSeasons(
   identity: EpisodeIdentity,
   seasons: SeasonListing[],
 ): { season: number; number: number } | null {
-  const byNumber = new Map(seasons.map((season) => [season.number, season]));
-  for (const seasonNumber of seasonSearchOrder(identity.season)) {
-    const season = byNumber.get(seasonNumber);
-    if (!season) continue;
-    for (const candidate of season.episodes) {
-      if (episodeMatches(identity, candidate)) {
-        return { season: seasonNumber, number: candidate.number };
-      }
+  const ordered = orderedCandidates(identity, seasons);
+
+  for (const { season, candidate } of ordered) {
+    if (sameEpisodeId(identity, candidate)) return { season, number: candidate.number };
+  }
+
+  // Without an id, only a strictly closest candidate is safe. A tie - same-day releases,
+  // or two episodes equidistant from the air date - cannot be told apart, and guessing
+  // would send progress to the wrong episode.
+  let best: { season: number; number: number } | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  let tied = false;
+  for (const { season, candidate } of ordered) {
+    if (!episodeMatches(identity, candidate)) continue;
+    const delta = daysBetween(identity.airDate, candidate.airDate) ?? 0;
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = { season, number: candidate.number };
+      tied = false;
+    } else if (delta === bestDelta) {
+      tied = true;
     }
   }
-  return null;
+  return tied ? null : best;
 }
 
 export function hasAnyComparableSignal(
