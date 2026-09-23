@@ -6,6 +6,10 @@ import { useContextMenu } from "@/lib/context-menu";
 import { useSettings } from "@/lib/settings";
 import { useView } from "@/lib/view";
 import { usePosterChain } from "@/components/poster";
+import { ensureStaticHeroArt, peekStaticHeroArt } from "@/lib/providers/anime-hero-art-static";
+import { prepareExpandingCardArtwork } from "@/lib/expanding-card-artwork";
+
+const ANIME_ID = /^(kitsu|mal|anilist|anidb):/;
 
 const POS = {
   center: "inset-0 items-center justify-center text-center",
@@ -65,6 +69,38 @@ export const TvCard = memo(function TvCard({ meta, kids = false }: { meta: Meta;
   );
 });
 
+// MAL/Kitsu anime metas carry no backdrop; the TV card would otherwise blur the poster.
+function useAnimeBackdrop(meta: Meta): string | undefined {
+  const { settings } = useSettings();
+  const isAnime = ANIME_ID.test(meta.id);
+  const [backdrop, setBackdrop] = useState<string | undefined>(() =>
+    isAnime ? peekStaticHeroArt(meta.id)?.bg : undefined,
+  );
+  useEffect(() => {
+    if (!isAnime || (meta.background && meta.background !== meta.poster)) {
+      setBackdrop(undefined);
+      return;
+    }
+    let cancelled = false;
+    const resolve = async () => {
+      await ensureStaticHeroArt().catch(() => {});
+      if (cancelled) return;
+      const staticBg = peekStaticHeroArt(meta.id)?.bg;
+      if (staticBg) {
+        setBackdrop(staticBg);
+        return;
+      }
+      const url = await prepareExpandingCardArtwork(meta, settings.tmdbKey).catch(() => undefined);
+      if (!cancelled) setBackdrop(url && url !== meta.poster ? url : undefined);
+    };
+    void resolve();
+    return () => {
+      cancelled = true;
+    };
+  }, [meta, isAnime, settings.tmdbKey]);
+  return backdrop;
+}
+
 export function TvCardArtwork({
   meta,
   kids = false,
@@ -80,7 +116,10 @@ export function TvCardArtwork({
 }) {
   const { settings } = useSettings();
   const [artFailed, setArtFailed] = useState(false);
-  const wide = !artFailed && meta.background && meta.background !== meta.poster ? meta.background : undefined;
+  const animeBackdrop = useAnimeBackdrop(meta);
+  const backdrop =
+    meta.background && meta.background !== meta.poster ? meta.background : animeBackdrop;
+  const wide = !artFailed && backdrop ? backdrop : undefined;
   const pos = POS[settings.tvCardLogoPos] ?? POS.bottomStart;
 
   return (
