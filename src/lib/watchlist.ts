@@ -33,6 +33,7 @@ export type LocalEntry = {
   name: string;
   poster?: string;
   addedAt: number;
+  imdbId?: string | null;
   addonOrigin?: Meta["addonOrigin"];
   videos?: Meta["videos"];
 };
@@ -119,6 +120,10 @@ function inferType(id: string): "movie" | "series" {
   return id.includes(":tv:") || id.includes(":series:") ? "series" : "movie";
 }
 
+function validTt(v: unknown): string | null {
+  return typeof v === "string" && /^tt\d+$/.test(v) ? v : null;
+}
+
 function normalizeType(type: string | undefined, id: string): "movie" | "series" {
   if (type === "series" || type === "tv") return "series";
   if (type === "movie") return "movie";
@@ -127,7 +132,7 @@ function normalizeType(type: string | undefined, id: string): "movie" | "series"
 
 function toEntry(input: string | WatchlistInput): LocalEntry {
   if (typeof input === "string") {
-    return { id: input, type: inferType(input), name: "", addedAt: Date.now() };
+    return { id: input, type: inferType(input), name: "", addedAt: Date.now(), imdbId: null };
   }
   return {
     id: input.id,
@@ -135,6 +140,7 @@ function toEntry(input: string | WatchlistInput): LocalEntry {
     name: input.name ?? "",
     poster: input.poster,
     addedAt: Date.now(),
+    imdbId: validTt(input.imdbId),
     addonOrigin: persistableAddonOrigin(input.addonOrigin),
     videos: persistableVideos(input.videos),
   };
@@ -151,7 +157,7 @@ function read(): Map<string, LocalEntry> {
     if (!Array.isArray(arr)) return map;
     for (const el of arr) {
       if (typeof el === "string") {
-        map.set(el, { id: el, type: inferType(el), name: "", addedAt: 0 });
+        map.set(el, { id: el, type: inferType(el), name: "", addedAt: 0, imdbId: null });
       } else if (el && typeof el === "object" && typeof (el as { id?: unknown }).id === "string") {
         const e = el as {
           id: string;
@@ -159,6 +165,7 @@ function read(): Map<string, LocalEntry> {
           name?: string;
           poster?: string;
           addedAt?: number;
+          imdbId?: unknown;
           addonOrigin?: unknown;
           videos?: unknown;
         };
@@ -168,6 +175,7 @@ function read(): Map<string, LocalEntry> {
           name: typeof e.name === "string" ? e.name : "",
           poster: typeof e.poster === "string" ? e.poster : undefined,
           addedAt: typeof e.addedAt === "number" ? e.addedAt : 0,
+          imdbId: validTt(e.imdbId),
           addonOrigin: persistableAddonOrigin(e.addonOrigin),
           videos: persistableVideos(e.videos),
         });
@@ -233,7 +241,11 @@ function writeAggregateCache(set: Set<string>) {
 }
 
 export function setWatchlistAggregate(ids: Iterable<string>): void {
-  aggregateIds = new Set(ids);
+  const next = new Set(ids);
+  // Library refreshes publish here and watchlist subscribers refresh the library.
+  // Do not turn an unchanged server response into another refresh cycle.
+  if (next.size === aggregateIds.size && [...next].every((id) => aggregateIds.has(id))) return;
+  aggregateIds = next;
   writeAggregateCache(aggregateIds);
   for (const s of subs) s();
 }
@@ -255,9 +267,31 @@ export function addToWatchlist(input: string | WatchlistInput): void {
   write(map);
 }
 
+export function noteLocalImdbId(id: string, imdbId: string | null | undefined): void {
+  const tt = validTt(imdbId);
+  if (!tt || tt === id) return;
+  const map = read();
+  const e = map.get(id);
+  if (!e || e.imdbId === tt) return;
+  e.imdbId = tt;
+  write(map);
+}
+
+export function evictWatchlistAggregate(ids: Iterable<string>): void {
+  let changed = false;
+  for (const id of ids) {
+    if (aggregateIds.delete(id)) changed = true;
+  }
+  if (!changed) return;
+  writeAggregateCache(aggregateIds);
+  for (const s of subs) s();
+}
+
 export function removeFromWatchlist(id: string): void {
   const map = read();
   map.delete(id);
+  aggregateIds.delete(id);
+  writeAggregateCache(aggregateIds);
   write(map);
 }
 
@@ -267,9 +301,30 @@ export function toggleWatchlist(input: string | WatchlistInput): boolean {
   const imdb = typeof input === "string" ? null : (input.imdbId ?? null);
   const has = map.has(id) || aggregateIds.has(id) || (!!imdb && aggregateIds.has(imdb));
   if (has) {
-    map.delete(id);
-    aggregateIds.delete(id);
-    if (imdb) aggregateIds.delete(imdb);
+    // Same film can be stored under two ID schemes (tmdb:… locally, tt… on
+    // Stremio); both must go or the card survives the removal.
+    const targets = new Set<string>([id]);
+    if (imdb) targets.add(imdb);
+    for (let pass = 0; pass < 3; pass++) {
+      let grew = false;
+      for (const [k, e] of map) {
+        if (targets.has(k) || (e.imdbId != null && targets.has(e.imdbId))) {
+          if (!targets.has(k)) {
+            targets.add(k);
+            grew = true;
+          }
+          if (e.imdbId != null && !targets.has(e.imdbId)) {
+            targets.add(e.imdbId);
+            grew = true;
+          }
+        }
+      }
+      if (!grew) break;
+    }
+    for (const t of targets) {
+      map.delete(t);
+      aggregateIds.delete(t);
+    }
     writeAggregateCache(aggregateIds);
   } else {
     map.set(id, toEntry(input));
@@ -318,6 +373,11 @@ async function syncWithStremio(input: string | WatchlistInput, added: boolean): 
           ? {}
           : { type: input.type, name: input.name, poster: input.poster };
       await saveStremioBookmark(authKey, writeId, meta);
+      // The server id often differs from the local key (tt… vs tmdb:…);
+      // without this the badge/button checks never see the added title.
+      aggregateIds.add(writeId);
+      writeAggregateCache(aggregateIds);
+      for (const s of subs) s();
     } else {
       const forms = new Set<string>();
       const withImdb = cloudWriteId(id, imdb, !!imdb);
@@ -325,7 +385,12 @@ async function syncWithStremio(input: string | WatchlistInput, added: boolean): 
       if (withImdb) forms.add(withImdb);
       if (withMeta) forms.add(withMeta);
       if (ANIME_CLOUD_ID.test(id)) forms.add(id);
-      for (const rid of forms) await removeStremioBookmark(authKey, rid);
+      for (const rid of forms) {
+        await removeStremioBookmark(authKey, rid);
+        aggregateIds.delete(rid);
+      }
+      writeAggregateCache(aggregateIds);
+      for (const s of subs) s();
     }
   } catch (e) {
     console.warn("[watchlist] stremio sync failed", e);

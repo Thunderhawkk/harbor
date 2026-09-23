@@ -4,12 +4,7 @@ import { useSettings, type ContentFilters } from "./settings";
 import { useTogether } from "./together/provider";
 
 function sameHideContent(a: ContentFilters, b: ContentFilters): boolean {
-  return (
-    a.anime === b.anime &&
-    a.liveTv === b.liveTv &&
-    a.sports === b.sports &&
-    a.adult === b.adult
-  );
+  return a.anime === b.anime && a.sports === b.sports && a.adult === b.adult;
 }
 
 export function ProfileIdentitySync() {

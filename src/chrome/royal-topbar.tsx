@@ -1,6 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePreviewNavCustomization } from "@/lib/theme-preview";
 import { Monitor } from "lucide-react";
+import { useContextMenu } from "@/lib/context-menu";
+import { NavHiddenTray, NavEditableItem, NavEditClose, useNavDrag } from "@/chrome/nav-edit";
+import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { Search } from "@/components/icons/search-icon";
 import { HarborMark } from "@/components/icons/harbor-mark";
 import { NotificationCenter } from "@/components/notification-center/notification-center";
@@ -35,6 +38,12 @@ export function RoyalTopbar() {
   const [pinFor, setPinFor] = useState<View | null>(null);
   const maxed = useMaximized();
   const bigPicture = useBigPictureEntry();
+  const editing = useNavEditMode();
+  const { open: openContextMenu } = useContextMenu();
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    openContextMenu(e, { kind: "nav" });
+  };
 
   const themePreset =
     settings.theme.preset !== "custom" ? getThemeById(settings.theme.preset) : null;
@@ -68,34 +77,14 @@ export function RoyalTopbar() {
       label,
       active,
       onSelect: () => navigate(item),
-      node: (
-        <button
-          type="button"
-          onClick={() => navigate(item)}
-          aria-label={label}
-          title={label}
-          className={`relative flex h-9 items-center gap-2 whitespace-nowrap rounded-md px-2.5 text-[13.5px] font-medium leading-none transition-colors duration-150 ${
-            active ? "text-accent" : "text-ink-muted hover:text-ink"
-          }`}
-        >
-          {active && (
-            <span
-              aria-hidden
-              className="absolute inset-0 -z-10 rounded-md bg-accent-soft ring-1 ring-[color-mix(in_srgb,var(--color-accent)_22%,transparent)]"
-            />
-          )}
-          <span className="grid h-[18px] w-[18px] place-items-center [&>*]:!h-[18px] [&>*]:!w-[18px] [&>*]:!p-0 [&_svg]:h-[18px] [&_svg]:w-[18px]">
-            {item.render(active)}
-          </span>
-          <span className="hidden xl:inline">{label}</span>
-        </button>
-      ),
+      node: <RoyalNavButton item={item} active={active} label={label} navigate={navigate} />,
     };
   });
 
   return (
     <>
       <header
+        data-tv-focus-scope={editing || undefined}
         data-tv-top-chrome
         aria-hidden={chromeHidden}
         className={`fixed inset-x-0 top-0 z-[60] flex h-20 items-center px-4 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
@@ -106,6 +95,7 @@ export function RoyalTopbar() {
       >
         <div
           data-tauri-drag-region
+          onContextMenu={openEmptyMenu}
           className="harbor-royal-bar pointer-events-auto grid h-14 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-[color-mix(in_srgb,var(--color-accent)_22%,var(--color-edge))] bg-canvas/85 ps-3.5 pe-2 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-accent)_14%,transparent),0_22px_60px_-26px_rgba(0,0,0,0.85)] backdrop-blur-xl"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -219,7 +209,15 @@ export function RoyalTopbar() {
             )}
           </div>
         </div>
+        {editing && <NavEditClose />}
       </header>
+      {editing && (
+        <div className="fixed inset-x-0 top-20 z-[59] flex justify-center px-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-edge-soft bg-canvas/90 p-2 shadow-2xl backdrop-blur-xl">
+            <NavHiddenTray orientation="horizontal" />
+          </div>
+        </div>
+      )}
       {pinFor !== null && (
         <ParentalPinModal
           mode={{
@@ -235,6 +233,60 @@ export function RoyalTopbar() {
         />
       )}
     </>
+  );
+}
+
+function RoyalNavButton({
+  item,
+  active,
+  label,
+  navigate,
+}: {
+  item: NavItem;
+  active: boolean;
+  label: string;
+  navigate: (item: NavItem) => void;
+}) {
+  const { open: openContextMenu } = useContextMenu();
+  const editing = useNavEditMode();
+  const drag = useNavDrag(item.id, "horizontal");
+  return (
+    <NavEditableItem itemId={item.id}>
+      <button
+        type="button"
+        onClick={() => navigate(item)}
+        onContextMenu={(e) =>
+          openContextMenu(e, {
+            kind: "nav",
+            itemId: item.id,
+            view: item.view,
+            label,
+            onOpen: () => navigate(item),
+          })
+        }
+        data-tauri-drag-region={editing ? "false" : undefined}
+        onPointerDown={drag.onPointerDown}
+        onKeyDown={drag.onKeyDown}
+        data-nav-drop-id={item.id}
+        aria-label={label}
+        title={label}
+        data-harbor-nav={item.id}
+        className={`relative flex h-9 items-center gap-2 whitespace-nowrap rounded-md px-2.5 text-[13.5px] font-medium leading-none transition-colors duration-150 ${
+          drag.over ? "ring-2 ring-accent" : ""
+        } ${active ? "text-accent" : "text-ink-muted hover:text-ink"}`}
+      >
+        {active && (
+          <span
+            aria-hidden
+            className="absolute inset-0 -z-10 rounded-md bg-accent-soft ring-1 ring-[color-mix(in_srgb,var(--color-accent)_22%,transparent)]"
+          />
+        )}
+        <span className="grid h-[18px] w-[18px] place-items-center [&>*]:!h-[18px] [&>*]:!w-[18px] [&>*]:!p-0 [&_svg]:h-[18px] [&_svg]:w-[18px]">
+          {item.render(active)}
+        </span>
+        <span className="hidden xl:inline">{label}</span>
+      </button>
+    </NavEditableItem>
   );
 }
 

@@ -108,6 +108,12 @@ export function tvHover(el: HTMLElement | null) {
 }
 
 function borrowRadius(el: HTMLElement) {
+  // Focus restore can target top-level containers (e.g. <body> when search
+  // closes). Never reshape the page itself; drop any stale inline radius.
+  if (el === document.body || el === document.documentElement) {
+    el.style.borderRadius = "";
+    return;
+  }
   const existing = el.style.borderRadius || getComputedStyle(el).borderRadius;
   if (existing && existing !== "0px") return;
 
@@ -603,6 +609,16 @@ function ensureFocusStyles() {
       transition: box-shadow 120ms ease;
       z-index: 20;
       position: relative;
+    }
+
+    /*
+     * Search overlay is a direct typing surface with its own panel styling.
+     * Never ring its header container or input while editing.
+     */
+    html:not([data-input-modality="pointer"]) [data-search-overlay] [data-tv-search-editing-focused="true"],
+    html:not([data-input-modality="pointer"]) [data-search-overlay] [data-search-editing="true"] {
+      outline: none !important;
+      box-shadow: none !important;
     }
 
     html:not([data-input-modality="pointer"]) [data-tv-search-editing-focused="true"] [data-search-editing="true"] {
@@ -1174,6 +1190,17 @@ export function useKeyboardNavigation(options: TVNavigationOptions = {}) {
   useEffect(() => {
     if (!enabled) clearTvFocusRing();
   }, [enabled]);
+
+  // F6 is WebView2 pane-focus: on this frameless window it tears down the
+  // renderer instead. Nothing binds F6, so swallow it before default handling.
+  useEffect(() => {
+    const swallowF6 = (e: KeyboardEvent) => {
+      if (e.key !== "F6" || e.defaultPrevented) return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", swallowF6);
+    return () => window.removeEventListener("keydown", swallowF6);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
