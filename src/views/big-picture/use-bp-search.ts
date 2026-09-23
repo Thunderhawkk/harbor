@@ -110,14 +110,22 @@ const GROUP_LABEL: Record<Exclude<BpSearchFilter, "all" | "top">, string> = {
 
 export function bpSectionCount(s: BpSearchSection): number {
   switch (s.kind) {
-    case "top": return s.meta ? 1 : 0;
-    case "titles": return s.metas.length;
-    case "people": return s.people.length;
-    case "anime": return s.anime.length;
-    case "manga": return s.manga.length;
-    case "livetv": return s.channels.length;
-    case "collections": return s.collections.length;
-    case "addonIndex": return s.addons.length;
+    case "top":
+      return s.meta ? 1 : 0;
+    case "titles":
+      return s.metas.length;
+    case "people":
+      return s.people.length;
+    case "anime":
+      return s.anime.length;
+    case "manga":
+      return s.manga.length;
+    case "livetv":
+      return s.channels.length;
+    case "collections":
+      return s.collections.length;
+    case "addonIndex":
+      return s.addons.length;
   }
 }
 
@@ -188,49 +196,83 @@ function buildBpSearchSlots(input: SlotInput): BpSearchSection[] {
 
   const top = r?.topMatch ?? null;
   out.push({
-    key: "top", label: t("Top match"), group: "top", pending: filling(top ? 1 : 0),
-    kind: "top", meta: top?.meta ?? null, backdrop: top?.backdrop, overview: top?.overview,
+    key: "top",
+    label: t("Top match"),
+    group: "top",
+    pending: filling(top ? 1 : 0),
+    kind: "top",
+    meta: top?.meta ?? null,
+    backdrop: top?.backdrop,
+    overview: top?.overview,
   });
 
   const movies = r?.movies ?? [];
   const series = r?.series ?? [];
   const people = r?.people ?? [];
   const movieSlot: BpSearchSection = {
-    key: "movies", label: t("Movies"), group: "movie",
-    pending: filling(movies.length), kind: "titles", metas: movies,
+    key: "movies",
+    label: t("Movies"),
+    group: "movie",
+    pending: filling(movies.length),
+    kind: "titles",
+    metas: movies,
   };
   const seriesSlot: BpSearchSection = {
-    key: "series", label: t("Series"), group: "series",
-    pending: filling(series.length), kind: "titles", metas: series,
+    key: "series",
+    label: t("Series"),
+    group: "series",
+    pending: filling(series.length),
+    kind: "titles",
+    metas: series,
   };
   const peopleSlot: BpSearchSection = {
-    key: "people", label: t("People"), group: "people",
-    pending: filling(people.length), kind: "people", people,
+    key: "people",
+    label: t("People"),
+    group: "people",
+    pending: filling(people.length),
+    kind: "people",
+    people,
   };
   if (promotePerson) out.push(peopleSlot, movieSlot, seriesSlot);
   else out.push(movieSlot, seriesSlot, peopleSlot);
 
   const anime = r?.anime ?? [];
   out.push({
-    key: "anime", label: t("Anime"), group: "anime",
-    pending: filling(anime.length, gates.anime), kind: "anime", anime,
+    key: "anime",
+    label: t("Anime"),
+    group: "anime",
+    pending: filling(anime.length, gates.anime),
+    kind: "anime",
+    anime,
   });
 
   const manga = r?.manga ?? [];
   out.push({
-    key: "manga", label: t("Manga"), group: "manga",
-    pending: filling(manga.length, gates.manga), kind: "manga", manga,
+    key: "manga",
+    label: t("Manga"),
+    group: "manga",
+    pending: filling(manga.length, gates.manga),
+    kind: "manga",
+    manga,
   });
 
   const channels = r?.liveTv ?? [];
   out.push({
-    key: "livetv", label: t("Live TV"), group: "livetv",
-    pending: filling(channels.length, gates.liveTv), kind: "livetv", channels,
+    key: "livetv",
+    label: t("Live TV"),
+    group: "livetv",
+    pending: filling(channels.length, gates.liveTv),
+    kind: "livetv",
+    channels,
   });
 
   out.push({
-    key: "collections", label: t("Collections"), group: "collections",
-    pending: filling(collections.length), kind: "collections", collections,
+    key: "collections",
+    label: t("Collections"),
+    group: "collections",
+    pending: filling(collections.length),
+    kind: "collections",
+    collections,
   });
 
   // Exactly one franchise slot is reserved. anilistCharacterSearch returns at most one
@@ -241,14 +283,23 @@ function buildBpSearchSlots(input: SlotInput): BpSearchSection[] {
   const franchiseQueried = gates.anime || gates.manga;
   if (chars.length === 0) {
     out.push({
-      key: "character:reserved", label: t("Franchise"), group: "characters",
-      pending: franchiseQueried && !fixedSettled, kind: "titles", metas: [],
+      key: "character:reserved",
+      label: t("Franchise"),
+      group: "characters",
+      pending: franchiseQueried && !fixedSettled,
+      kind: "titles",
+      metas: [],
     });
   } else {
     for (const c of chars) {
       out.push({
-        key: `character:${c.id}`, label: c.name, group: "characters",
-        portrait: c.image ?? undefined, pending: false, kind: "titles", metas: characterMetas(c),
+        key: `character:${c.id}`,
+        label: c.name,
+        group: "characters",
+        portrait: c.image ?? undefined,
+        pending: false,
+        kind: "titles",
+        metas: characterMetas(c),
       });
     }
   }
@@ -258,15 +309,25 @@ function buildBpSearchSlots(input: SlotInput): BpSearchSection[] {
   // well-matching addon looks like it answered with nothing.
   for (const q of addonQueries) {
     out.push({
-      key: `addon:${q.id}`, label: q.name, group: "addons", logo: q.logo,
-      addonState: q.state, pending: q.state === "pending", kind: "titles", metas: q.metas,
+      key: `addon:${q.id}`,
+      label: q.name,
+      group: "addons",
+      logo: q.logo,
+      addonState: q.state,
+      pending: q.state === "pending",
+      kind: "titles",
+      metas: q.metas,
     });
   }
 
   const index = r?.addons ?? [];
   out.push({
-    key: "addon-index", label: t("Addons you could install"), group: "addons",
-    pending: filling(index.length), kind: "addonIndex", addons: index,
+    key: "addon-index",
+    label: t("Addons you could install"),
+    group: "addons",
+    pending: filling(index.length),
+    kind: "addonIndex",
+    addons: index,
   });
 
   return out;
@@ -278,7 +339,11 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
   const t = useBpT();
   const lang = useUiLanguage();
   const { query, setQuery, results, addonQueries, status, clear, setAiHold, retry } = useSearch();
-  const { currentResults, hasResults, tmdbUnavailable } = getSearchDisplayState(results, query, status);
+  const { currentResults, hasResults, tmdbUnavailable } = getSearchDisplayState(
+    results,
+    query,
+    status,
+  );
   const collections = useCollectionHits(query.trim());
   const { settings } = useSettings();
   const { hiddenTabs } = useParental();
@@ -294,7 +359,13 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
     }),
     // length, not the array. Only the count is read, and depending on the array
     // identity would rebuild every slot on any unrelated settings write.
-    [hiddenTabs.anime, hiddenTabs.liveTv, settings.hideContent.anime, settings.mangaEnabled, settings.iptvPlaylists.length],
+    [
+      hiddenTabs.anime,
+      hiddenTabs.liveTv,
+      settings.hideContent.anime,
+      settings.mangaEnabled,
+      settings.iptvPlaylists.length,
+    ],
   );
 
   useEffect(() => {
@@ -338,7 +409,15 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
     () =>
       idle
         ? []
-        : buildBpSearchSlots({ t: tt, r, addonQueries, collections, fixedSettled, promotePerson: promote, gates }),
+        : buildBpSearchSlots({
+            t: tt,
+            r,
+            addonQueries,
+            collections,
+            fixedSettled,
+            promotePerson: promote,
+            gates,
+          }),
     // lang stands in for tt, which is stable by design so labels would otherwise
     // never re-translate on a language change.
     [idle, tt, lang, r, addonQueries, collections, fixedSettled, promote, gates],

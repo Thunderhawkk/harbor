@@ -1,5 +1,8 @@
+import { ScoreMetric, ScoreBreakdown } from "./score-breakdown";
+import { sportsLeagueByTag } from "@/lib/sports/provider";
+import { TeamProfileLink, teamIdentity } from "./team-profile-link";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { ArrowLeftRight, Goal } from "lucide-react";
+import { PlayEventIcon } from "./play-event-icon";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import type {
   MatchEvent,
@@ -9,11 +12,12 @@ import type {
   SportsSide,
 } from "@/lib/sports/espn";
 import { fetchHeadToHead, type HeadToHead as H2HResult } from "@/lib/sports/h2h";
-import { fetchMatchSummary } from "@/lib/sports/espn";
+import { fetchGameSummary } from "@/lib/sports/provider";
 import { LiveBadge } from "./live-badge";
 import { matchPlayerByName } from "./pitch/pitch-formation";
 import { PitchView } from "./pitch/pitch-view";
 import { StandingsPanel } from "./standings-panel";
+import { PlayerMatchStats } from "./player-match-stats";
 
 function toNumber(value: string): number {
   const parsed = parseFloat((value || "").replace(/[^0-9.-]/g, ""));
@@ -64,9 +68,18 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ScoreSide({ side, align }: { side: SportsSide; align: "start" | "end" }) {
+function ScoreSide({
+  side,
+  align,
+  detail,
+}: {
+  detail: SportsMatchDetail;
+  side: SportsSide;
+  align: "start" | "end";
+}) {
   return (
-    <div
+    <TeamProfileLink
+      team={teamIdentity(detail, side)}
       className={`flex min-w-0 flex-1 items-center gap-3 ${align === "end" ? "flex-row-reverse text-end" : ""}`}
     >
       {side.logo ? (
@@ -75,14 +88,16 @@ function ScoreSide({ side, align }: { side: SportsSide; align: "start" | "end" }
         <span className="h-9 w-9 shrink-0 rounded-full bg-canvas/60" />
       )}
       <div className="min-w-0">
-        <div className={`truncate text-[15px] font-semibold ${side.winner ? "text-ink" : "text-ink-muted"}`}>
+        <div
+          className={`truncate text-[15px] font-semibold ${side.winner ? "text-ink" : "text-ink-muted"}`}
+        >
           {side.name}
         </div>
         {side.abbr && (
           <div className="text-[11px] uppercase tracking-[0.1em] text-ink-subtle">{side.abbr}</div>
         )}
       </div>
-    </div>
+    </TeamProfileLink>
   );
 }
 
@@ -90,23 +105,26 @@ function Scoreboard({ detail }: { detail: SportsMatchDetail }) {
   const t = useT();
   const live = detail.state === "in";
   const scored = detail.state !== "pre";
+  const sport = sportsLeagueByTag(detail.league)?.group || "";
   return (
     <div className="flex flex-col gap-3 rounded-lg bg-elevated p-4 ring-1 ring-edge-soft">
       <div className="flex items-center gap-4">
-        <ScoreSide side={detail.home} align="start" />
+        <ScoreSide detail={detail} side={detail.home} align="start" />
         <div className="flex shrink-0 items-center gap-2 text-[30px] font-bold tabular-nums text-ink">
           {scored ? (
             <>
-              <span>{detail.home.score || "0"}</span>
+              <span>{detail.home.score || "�"}</span>
               <span className="text-[20px] text-ink-subtle">-</span>
-              <span>{detail.away.score || "0"}</span>
+              <span>{detail.away.score || "�"}</span>
             </>
           ) : (
             <span className="text-[15px] font-semibold text-ink-subtle">{t("vs")}</span>
           )}
         </div>
-        <ScoreSide side={detail.away} align="end" />
+        <ScoreSide detail={detail} side={detail.away} align="end" />
       </div>
+      <ScoreMetric sport={sport} game={detail} />
+      <ScoreBreakdown game={detail} sport={sport} />
       <div className="flex items-center justify-center gap-2">
         {live && <LiveBadge />}
         <span className="text-[12px] font-medium text-ink-muted">
@@ -139,28 +157,31 @@ function StatBar({ row }: { row: MatchTeamStatRow }) {
         <div className="flex h-1.5 gap-px overflow-hidden rounded-full bg-canvas">
           <div
             className={`pitch-bar-grow ${homeLeads ? "bg-ink" : "bg-ink-subtle"}`}
-            style={{ width: `${share}%`, "--pitch-bar-origin": "left center" } as CSSProperties}
+            style={
+              {
+                width: `${share}%`,
+                "--pitch-bar-origin": "left center",
+              } as CSSProperties
+            }
           />
           <div
             className={`pitch-bar-grow ${awayLeads ? "bg-ink" : "bg-ink-subtle"}`}
-            style={{ width: `${100 - share}%`, "--pitch-bar-origin": "right center" } as CSSProperties}
+            style={
+              {
+                width: `${100 - share}%`,
+                "--pitch-bar-origin": "right center",
+              } as CSSProperties
+            }
           />
         </div>
       </div>
-      <span className={`text-[13px] font-semibold tabular-nums ${awayLeads ? "text-ink" : "text-ink-subtle"}`}>
+      <span
+        className={`text-[13px] font-semibold tabular-nums ${awayLeads ? "text-ink" : "text-ink-subtle"}`}
+      >
         {row.awayValue || "0"}
       </span>
     </div>
   );
-}
-
-function EventIcon({ type }: { type: MatchEvent["type"] }) {
-  if (type === "goal") return <Goal size={13} className="shrink-0 text-ink" />;
-  if (type === "yellow_card") return <span className="pitch-card h-[13px] w-[9px] bg-yellow-400" />;
-  if (type === "red_card") return <span className="pitch-card h-[13px] w-[9px] bg-danger" />;
-  if (type === "substitution")
-    return <ArrowLeftRight size={12} className="shrink-0 text-ink-muted" />;
-  return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-subtle" />;
 }
 
 function EventCard({ event, mirrored }: { event: MatchEvent; mirrored: boolean }) {
@@ -168,7 +189,7 @@ function EventCard({ event, mirrored }: { event: MatchEvent; mirrored: boolean }
     <div
       className={`flex max-w-[260px] items-center gap-2 rounded-lg bg-elevated px-2.5 py-1.5 ${mirrored ? "flex-row-reverse text-end" : ""}`}
     >
-      <EventIcon type={event.type} />
+      <PlayEventIcon event={event} size={16} />
       <div className="min-w-0">
         <div className="truncate text-[12px] font-medium text-ink">
           {event.participantName || event.text}
@@ -234,16 +255,25 @@ function HeadToHead({ result, locale }: { result: H2HResult; locale: string }) {
   const t = useT();
   const rows: Array<{ label: string; value: string }> = [
     { label: t("Meetings"), value: String(result.played) },
-    { label: result.teamA.abbr || result.teamA.name, value: String(result.aWins) },
+    {
+      label: result.teamA.abbr || result.teamA.name,
+      value: String(result.aWins),
+    },
     { label: t("Draws"), value: String(result.draws) },
-    { label: result.teamB.abbr || result.teamB.name, value: String(result.bWins) },
+    {
+      label: result.teamB.abbr || result.teamB.name,
+      value: String(result.bWins),
+    },
     { label: t("Goals"), value: `${result.aScored} - ${result.bScored}` },
   ];
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-canvas/50 p-3.5">
       <div className="flex items-center gap-2 pb-1">
         {rows.map((row, index) => (
-          <div key={`${row.label}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-0.5">
+          <div
+            key={`${row.label}-${index}`}
+            className="flex min-w-0 flex-1 flex-col items-center gap-0.5"
+          >
             <span className="text-[15px] font-bold tabular-nums text-ink">{row.value}</span>
             <span className="w-full truncate text-center text-[10px] uppercase tracking-[0.08em] text-ink-subtle">
               {row.label}
@@ -274,7 +304,17 @@ function HeadToHead({ result, locale }: { result: H2HResult; locale: string }) {
   );
 }
 
-export function MatchPanel({ game, detail }: { game: SportsGame; detail?: SportsMatchDetail }) {
+export function MatchPanel({
+  game,
+  detail,
+  hideScoreboard = false,
+  hidePitch = false,
+}: {
+  game: SportsGame;
+  detail?: SportsMatchDetail;
+  hideScoreboard?: boolean;
+  hidePitch?: boolean;
+}) {
   const t = useT();
   const locale = useUiLanguage() === "ar" ? "ar-SA" : "en-US";
   const [loaded, setLoaded] = useState<SportsMatchDetail | null>(detail ?? null);
@@ -289,7 +329,7 @@ export function MatchPanel({ game, detail }: { game: SportsGame; detail?: Sports
     }
     let alive = true;
     setLoading(true);
-    fetchMatchSummary(game.league, game.id)
+    fetchGameSummary(game)
       .then((result) => {
         if (!alive) return;
         setLoaded(result);
@@ -334,13 +374,11 @@ export function MatchPanel({ game, detail }: { game: SportsGame; detail?: Sports
     );
   }
 
-  const hasPitch = [...loaded.homeRoster, ...loaded.awayRoster].some((player) => player.starter);
-
   return (
     <div className="flex flex-col gap-6">
-      <Scoreboard detail={loaded} />
+      {!hideScoreboard && <Scoreboard detail={loaded} />}
 
-      {hasPitch && (
+      {!hidePitch && (
         <Section title={t("On the pitch")}>
           <PitchView detail={loaded} />
         </Section>
@@ -355,6 +393,8 @@ export function MatchPanel({ game, detail }: { game: SportsGame; detail?: Sports
           </div>
         </Section>
       )}
+
+      <PlayerMatchStats detail={loaded} />
 
       {loaded.events.length > 0 && (
         <Section title={t("Timeline")}>

@@ -14,12 +14,13 @@ import { useView, type View } from "@/lib/view";
 import { KidsSidebarDoodles } from "./kids-sidebar-doodles";
 import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
-import { NAV_ITEMS, applyNavCustomization, type NavItem, type NavItemId } from "@/chrome/nav-items";
 import {
-  NavHiddenTray,
-  NavHideBadge,
-  useNavDrag,
-} from "@/chrome/nav-edit";
+  useAvailableNavItems,
+  applyNavCustomization,
+  type NavItem,
+  type NavItemId,
+} from "@/chrome/nav-items";
+import { NavHiddenTray, NavEditableItem, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 
 const PRIMARY_IDS = new Set([
@@ -31,10 +32,12 @@ const PRIMARY_IDS = new Set([
   "kids",
   "anime",
   "live",
+  "sports",
   "vod",
 ]);
 
 export function Sidebar() {
+  const editing = useNavEditMode();
   const { view, setView, chromeHidden } = useView();
   const { locked, unlock, hiddenTabs } = useParental();
   const { settings } = useSettings();
@@ -54,6 +57,7 @@ export function Sidebar() {
   return (
     <>
       <aside
+        data-tv-focus-scope={editing || undefined}
         aria-hidden={chromeHidden}
         data-harbor-sidebar
         data-collapsed={collapsed ? "true" : "false"}
@@ -233,7 +237,7 @@ function ScrollableNav({
     openContextMenu(e, { kind: "nav" });
   };
   const items = applyNavCustomization(
-    NAV_ITEMS,
+    useAvailableNavItems(),
     usePreviewNavCustomization(settings.navCustomization),
   );
   const isItemVisible = (item: NavItem) => {
@@ -319,7 +323,12 @@ function ScrollableNav({
             />
           )}
         </div>
-        <div data-tauri-drag-region aria-hidden className="h-5 shrink-0" onContextMenu={openEmptyMenu} />
+        <div
+          data-tauri-drag-region
+          aria-hidden
+          className="h-5 shrink-0"
+          onContextMenu={openEmptyMenu}
+        />
         <div className="flex flex-col gap-1.5">
           {collections.map((item) => {
             const gated = !!item.pinGated && locked;
@@ -422,56 +431,58 @@ function NavItem({
   const editing = useNavEditMode();
   const drag = useNavDrag(id, "vertical");
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onContextMenu={(e) => {
-        if (!id) return;
-        openContextMenu(e, { kind: "nav", itemId: id, view, label: text });
-      }}
-      data-harbor-nav={view}
-      data-active={active ? "" : undefined}
-      data-tauri-drag-region={editing ? "false" : undefined}
-      onPointerDown={drag.onPointerDown}
-      data-nav-drop-id={id}
-      aria-label={gated ? t("chrome.lockedRequiresPin", { label: text }) : text}
-      title={gated ? t("chrome.lockedShort", { label: text }) : text}
-      className={`group relative flex items-center justify-center gap-4 transition-colors duration-150 ${
-        big ? "h-[68px] rounded-2xl text-[20px] font-bold" : "h-14 rounded-lg text-[16px]"
-      } ${collapsed ? "" : big ? "lg:justify-start lg:px-5" : "lg:justify-start lg:px-4"} ${
-        drag.over ? "ring-2 ring-accent" : ""
-      } ${
-        collapsed
-          ? active
-            ? "text-accent"
-            : "text-ink-muted hover:text-ink"
-          : active
-            ? "bg-elevated text-ink ring-1 ring-edge"
-            : "text-ink-muted hover:bg-elevated/50 hover:text-ink"
-      }`}
-    >
-      {editing && id && <NavHideBadge itemId={id} />}
-      <span
-        data-harbor-sidebar-icon
-        className={`relative ${big ? "scale-110" : ""} ${gated ? "opacity-70" : ""}`}
+    <NavEditableItem itemId={id}>
+      <button
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onContextMenu={(e) => {
+          if (!id) return;
+          openContextMenu(e, { kind: "nav", itemId: id, view, label: text, onOpen: onClick });
+        }}
+        data-harbor-nav={view}
+        data-active={active ? "" : undefined}
+        data-tauri-drag-region={editing ? "false" : undefined}
+        onPointerDown={drag.onPointerDown}
+        onKeyDown={drag.onKeyDown}
+        data-nav-drop-id={id}
+        aria-label={gated ? t("chrome.lockedRequiresPin", { label: text }) : text}
+        title={gated ? t("chrome.lockedShort", { label: text }) : text}
+        className={`group relative flex items-center justify-center gap-4 transition-colors duration-150 ${
+          big ? "h-[68px] rounded-2xl text-[20px] font-bold" : "h-14 rounded-lg text-[16px]"
+        } ${collapsed ? "" : big ? "lg:justify-start lg:px-5" : "lg:justify-start lg:px-4"} ${
+          drag.over ? "ring-2 ring-accent" : ""
+        } ${
+          collapsed
+            ? active
+              ? "text-accent"
+              : "text-ink-muted hover:text-ink"
+            : active
+              ? "bg-elevated text-ink ring-1 ring-edge"
+              : "text-ink-muted hover:bg-elevated/50 hover:text-ink"
+        }`}
       >
-        {render(Boolean(active || hovered), hovered)}
-        {gated && (
-          <span className="absolute -bottom-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle ring-1 ring-edge">
-            <Lock size={9} strokeWidth={2.4} />
+        <span
+          data-harbor-sidebar-icon
+          className={`relative ${big ? "scale-110" : ""} ${gated ? "opacity-70" : ""}`}
+        >
+          {render(Boolean(active || hovered), hovered)}
+          {gated && (
+            <span className="absolute -bottom-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle ring-1 ring-edge">
+              <Lock size={9} strokeWidth={2.4} />
+            </span>
+          )}
+        </span>
+        {(!collapsed || retainLabels) && (
+          <span
+            data-harbor-sidebar-label
+            aria-hidden={collapsed || undefined}
+            className="hidden lg:inline"
+          >
+            {text}
           </span>
         )}
-      </span>
-      {(!collapsed || retainLabels) && (
-        <span
-          data-harbor-sidebar-label
-          aria-hidden={collapsed || undefined}
-          className="hidden lg:inline"
-        >
-          {text}
-        </span>
-      )}
-    </button>
+      </button>
+    </NavEditableItem>
   );
 }

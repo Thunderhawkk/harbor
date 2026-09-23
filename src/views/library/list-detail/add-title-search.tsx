@@ -1,7 +1,7 @@
 import { Check, Plus, Search as SearchIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
-import { addToList, MAX_ITEMS, type CustomList } from "@/lib/custom-lists";
+import { MAX_ITEMS, sharedLists, type CustomList, type ListStore } from "@/lib/custom-lists";
 import { useT } from "@/lib/i18n";
 import { searchAll, type AnimeHit, type SearchResults } from "@/lib/search";
 import { useSettings } from "@/lib/settings";
@@ -19,7 +19,7 @@ function animeToMeta(a: AnimeHit): Meta {
   };
 }
 
-export function AddTitleSearch({ list }: { list: CustomList }) {
+export function AddTitleSearch({ list, store = sharedLists }: { list: CustomList; store?: ListStore }) {
   const t = useT();
   const { settings } = useSettings();
   const [query, setQuery] = useState("");
@@ -68,7 +68,7 @@ export function AddTitleSearch({ list }: { list: CustomList }) {
       emitListToast(t("This list is full ({max} items)", { max: MAX_ITEMS }));
       return;
     }
-    addToList(list.id, {
+    store.addToList(list.id, {
       id: m.id,
       type: m.type,
       name: m.name,

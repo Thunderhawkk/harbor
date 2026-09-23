@@ -127,11 +127,14 @@ export type RemoteMangaState = {
   zoom: number;
   canZoom: boolean;
   rtl: boolean;
-  mode: "long" | "paged" | "double" | "book";
+  fit: "width" | "height" | "original";
+  bg: "dark" | "gray" | "light";
+  mode: "long" | "long-h" | "paged" | "double" | "book";
   hasPrev: boolean;
   hasNext: boolean;
   chapters: RemoteMangaChapter[];
   bookmarks: RemoteMangaBookmark[];
+  exitLocalReader: number;
 };
 
 export type RemoteSnapshot = {
@@ -237,7 +240,7 @@ export type RemoteCommand =
       op: RemoteLibraryAction;
     }
   | { action: "mangaTurnPage"; dir: "next" | "prev" }
-  | { action: "mangaSetPage"; page: number }
+  | { action: "mangaSetPage"; page: number; scroll?: number; vel?: number }
   | { action: "mangaJumpChapter"; index: number }
   | { action: "mangaZoomIn" }
   | { action: "mangaZoomOut" }
@@ -246,6 +249,10 @@ export type RemoteCommand =
   | { action: "mangaFlipProgress"; p: number }
   | { action: "mangaFlipEnd"; commit: boolean; dir: "next" | "prev" }
   | { action: "mangaSetRtl"; rtl: boolean }
+  | { action: "mangaSetMode"; mode: RemoteMangaState["mode"] }
+  | { action: "mangaSetFit"; fit: "width" | "height" | "original" }
+  | { action: "mangaSetBg"; bg: "dark" | "gray" | "light" }
+  | { action: "mangaSetPagesHidden"; hidden: boolean }
   | { action: "mangaBookmark"; page?: number }
   | { action: "mangaJumpBookmark"; id: string }
   | { action: "mangaBookmarkRemove"; id: string }

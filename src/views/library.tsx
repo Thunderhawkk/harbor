@@ -151,8 +151,8 @@ export function LibraryView({ active }: { active: boolean }) {
             simklConnected={simklConnected}
             lbConnected={lb.isActive}
           />
-          {tab === "library" && <WatchlistTab mode="library" />}
-          {tab === "watchlist" && <WatchlistTab mode="watchlist" />}
+          {tab === "library" && <WatchlistTab mode="library" scrollRef={scrollRef} />}
+          {tab === "watchlist" && <WatchlistTab mode="watchlist" scrollRef={scrollRef} />}
           {tab === "history" && <HistoryTab />}
           {tab === "local" && <LocalTab scrollRef={scrollRef} />}
           {tab === "media-servers" && <MediaServersTab scrollRef={scrollRef} />}

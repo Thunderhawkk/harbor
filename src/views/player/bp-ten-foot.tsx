@@ -284,6 +284,10 @@ export function BpTenFootLayer({ p }: { p: PlayerOverlayLayersProps }) {
   const { settings, update } = useSettings();
   const closeRef = useRef<() => void>(() => {});
   closeRef.current = () => {
+    if (p.src.sportsDocked === false && !p.drawMode) {
+      p.onBack();
+      return;
+    }
     void requestPlayerClose({
       drawMode: p.drawMode,
       setDrawMode: (v) => p.setDrawMode(() => v),

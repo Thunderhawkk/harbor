@@ -4,13 +4,9 @@ import { Lock, Monitor } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
 import { AccountMenu } from "@/chrome/account-menu/account-menu";
-import { NAV_ITEMS, applyNavCustomization } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization } from "@/chrome/nav-items";
 import type { NavItemId } from "@/chrome/nav-items";
-import {
-  NavHiddenTray,
-  NavHideBadge,
-  useNavDrag,
-} from "@/chrome/nav-edit";
+import { NavHiddenTray, NavEditableItem, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
 import { useBigPictureEntry } from "@/chrome/use-big-picture-entry";
@@ -21,6 +17,7 @@ import { getThemeById } from "@/lib/theme";
 import { useView, type View } from "@/lib/view";
 
 export function StremioRail() {
+  const editing = useNavEditMode();
   const { view, setView, chromeHidden } = useView();
   const { locked, unlock, hiddenTabs } = useParental();
   const { settings } = useSettings();
@@ -37,7 +34,10 @@ export function StremioRail() {
     settings.theme.preset !== "custom" ? getThemeById(settings.theme.preset) : null;
   const customMark = themePreset?.logo?.mark ?? null;
 
-  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization));
+  const items = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  );
   const visible = items.filter((item) => {
     if (item.id === "kids") return false;
     if (item.view === "vod" && !settings.showPlaylistsTab) return false;
@@ -49,6 +49,7 @@ export function StremioRail() {
   return (
     <>
       <aside
+        data-tv-focus-scope={editing || undefined}
         aria-hidden={chromeHidden}
         className={`relative z-[60] flex w-20 shrink-0 flex-col transition-[opacity,transform] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0.24,1)] ${
           chromeHidden
@@ -61,12 +62,7 @@ export function StremioRail() {
           className="flex h-[5.5rem] shrink-0 items-center justify-center text-white/90"
         >
           {customMark ? (
-            <img
-              src={customMark}
-              alt=""
-              draggable={false}
-              className="h-10 w-10 object-contain"
-            />
+            <img src={customMark} alt="" draggable={false} className="h-10 w-10 object-contain" />
           ) : (
             <HarborMark className="h-10 w-10" />
           )}
@@ -84,9 +80,7 @@ export function StremioRail() {
                 {...item}
                 gated={gated}
                 active={active}
-                onClick={() =>
-                  gated ? setPendingPin(item.view) : setView(item.view)
-                }
+                onClick={() => (gated ? setPendingPin(item.view) : setView(item.view))}
               />
             );
           })}
@@ -116,12 +110,7 @@ export function StremioRail() {
               </span>
             </div>
           ) : (
-            <AccountMenu
-              trigger="avatar"
-              placement="up"
-              align="start"
-              showSettings={false}
-            />
+            <AccountMenu trigger="avatar" placement="up" align="start" showSettings={false} />
           )}
         </div>
       </aside>
@@ -167,44 +156,44 @@ function RailTab({
   const editing = useNavEditMode();
   const drag = useNavDrag(id, "vertical");
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      onContextMenu={(e) =>
-        openContextMenu(e, { kind: "nav", itemId: id, view, label: translated })
-      }
-      data-harbor-nav={id}
-      data-tauri-drag-region={editing ? "false" : undefined}
-      onPointerDown={drag.onPointerDown}
-      data-nav-drop-id={id}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      aria-label={gated ? t("chrome.lockedRequiresPin", { label: translated }) : translated}
-      title={gated ? t("chrome.lockedShort", { label: translated }) : translated}
-      className={`group relative flex h-[4.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl transition-colors duration-150 ${
-        drag.over ? "ring-2 ring-accent" : ""
-      } ${
-        active
-          ? "text-accent"
-          : "text-white/35 hover:bg-white/[0.05] hover:text-white/85"
-      }`}
-    >
-      {editing && <NavHideBadge itemId={id} />}
-      <span className={`relative flex h-7 w-7 items-center justify-center ${gated ? "opacity-70" : ""}`}>
-        {render(Boolean(active || hovered))}
-        {gated && (
-          <span className="absolute -bottom-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-canvas text-white/55 ring-1 ring-white/15">
-            <Lock size={8} strokeWidth={2.4} />
-          </span>
-        )}
-      </span>
-      <span
-        className={`text-[10.5px] font-semibold leading-none tracking-[0.02em] transition-opacity duration-150 ${
-          active ? "opacity-100" : "opacity-0 group-hover:opacity-60"
-        }`}
+    <NavEditableItem itemId={id}>
+      <button
+        type="button"
+        onClick={onClick}
+        onContextMenu={(e) =>
+          openContextMenu(e, { kind: "nav", itemId: id, view, label: translated, onOpen: onClick })
+        }
+        data-harbor-nav={id}
+        data-tauri-drag-region={editing ? "false" : undefined}
+        onPointerDown={drag.onPointerDown}
+        onKeyDown={drag.onKeyDown}
+        data-nav-drop-id={id}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        aria-label={gated ? t("chrome.lockedRequiresPin", { label: translated }) : translated}
+        title={gated ? t("chrome.lockedShort", { label: translated }) : translated}
+        className={`group relative flex h-[4.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl transition-colors duration-150 ${
+          drag.over ? "ring-2 ring-accent" : ""
+        } ${active ? "text-accent" : "text-white/35 hover:bg-white/[0.05] hover:text-white/85"}`}
       >
-        {translated}
-      </span>
-    </button>
+        <span
+          className={`relative flex h-7 w-7 items-center justify-center ${gated ? "opacity-70" : ""}`}
+        >
+          {render(Boolean(active || hovered))}
+          {gated && (
+            <span className="absolute -bottom-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-canvas text-white/55 ring-1 ring-white/15">
+              <Lock size={8} strokeWidth={2.4} />
+            </span>
+          )}
+        </span>
+        <span
+          className={`text-[10.5px] font-semibold leading-none tracking-[0.02em] transition-opacity duration-150 ${
+            active ? "opacity-100" : "opacity-0 group-hover:opacity-60"
+          }`}
+        >
+          {translated}
+        </span>
+      </button>
+    </NavEditableItem>
   );
 }

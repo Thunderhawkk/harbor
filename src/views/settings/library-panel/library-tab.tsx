@@ -32,13 +32,9 @@ export function LibraryTab() {
     { value: "original", label: t("Original") },
   ];
 
-  const setMinFileSize = (v: number) =>
-    update({ localMinFileSizeMb: Math.max(0, Math.round(v)) });
+  const setMinFileSize = (v: number) => update({ localMinFileSizeMb: Math.max(0, Math.round(v)) });
 
-  const pushHideContent = (
-    key: "anime" | "adult",
-    value: boolean,
-  ) => {
+  const pushHideContent = (key: "anime" | "adult", value: boolean) => {
     const next = { ...settings.hideContent, [key]: value };
     update({ hideContent: next });
     if (activeProfile) updateProfile(activeProfile.id, { hideContent: next });
@@ -49,14 +45,14 @@ export function LibraryTab() {
       <Section
         title={t("Content filters")}
         subtitle={t(
-          "Hide entire categories. Toggling these also removes the matching sidebar entries and rails.",
+          "Hide categories from recommendations. Customize tabs separately in the sidebar.",
         )}
       >
         <ToggleRow
           label={t("Hide anime")}
           leading={<CatIcon src={animeCatIcon} />}
           sub={t(
-            "Removes every anime title from all rows everywhere: Home, Discover, Top 10, and catalogs. Western animation like Pixar is kept, and you can still find anime by searching. The Anime tab itself stays — hide it from the sidebar if you want it gone."
+            "Hides anime titles from Home, Discover, Top 10, and catalogs. Western animation stays visible. To hide the Anime tab, edit the sidebar.",
           )}
           value={settings.hideContent.anime}
           onChange={(v) => pushHideContent("anime", v)}

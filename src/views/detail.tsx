@@ -79,7 +79,7 @@ import {
 } from "@/lib/manual-watched";
 import { useTogether } from "@/lib/together/provider";
 import { useTrakt } from "@/lib/trakt/provider";
-import { toggleWatchlist, useInWatchlist } from "@/lib/watchlist";
+import { noteLocalImdbId, toggleWatchlist, useInWatchlist } from "@/lib/watchlist";
 import { PopIcon } from "@/components/pop-icon";
 import { useInLocalLibrary } from "@/lib/local-library";
 import { LocalLibraryBrand } from "@/components/local-library-brand";
@@ -534,14 +534,26 @@ export function DetailView({
       // accept the hit only when the year verdict agrees.
       if (k == null) {
         const name = meta.name || detail?.title;
-        if (name && name.trim().length >= 2) {
+        // Only trust the title-search fallback for titles that already look
+        // animation-like; a live-action show (e.g. Lioness) must never flip
+        // the detail page to an anime via a fuzzy name match.
+        const animeLike =
+          meta.type === "anime" ||
+          !!meta.animeFormat ||
+          (meta.genres ?? []).some((g) => g.toLowerCase() === "animation") ||
+          (detail?.genres ?? []).some((g) => g.toLowerCase() === "animation") ||
+          (detail?.genresRich ?? []).some(
+            (g) => g.id === 16 || g.name.toLowerCase() === "animation",
+          );
+        if (animeLike && name && name.trim().length >= 2) {
           const hits = await searchAnime(name).catch(() => []);
           const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
           const target = norm(name);
           const yr = parseInt(detail?.year ?? meta.releaseInfo ?? "", 10) || null;
-          const candidates = hits.filter((h) => norm(h.name).startsWith(target.slice(0, 8)));
-          const byYear = yr ? candidates.find((h) => parseInt(h.year ?? "", 10) === yr) : undefined;
-          const pick = byYear ?? (candidates.length === 1 ? candidates[0] : undefined);
+          // Strict full normalized-name equality (not an 8-char prefix) plus an
+          // exact year match before accepting a Kitsu hit.
+          const candidates = hits.filter((h) => norm(h.name) === target);
+          const pick = yr ? candidates.find((h) => parseInt(h.year ?? "", 10) === yr) : undefined;
           if (pick?.kitsuId != null && pick.kitsuId !== failedKitsu.current) {
             const verdict = await kitsuYearVerdict(
               pick.kitsuId,
@@ -584,6 +596,8 @@ export function DetailView({
     meta.id,
     detail?.imdbId,
     detail?.year,
+    detail?.genres,
+    detail?.genresRich,
     meta.releaseInfo,
   ]);
 
@@ -666,6 +680,7 @@ export function DetailView({
 
   useEffect(() => {
     setLibraryItem(null);
+    noteLocalImdbId(meta.id, detail?.imdbId);
     if (!authKey || meta.id.startsWith("simkl:")) return;
     const candidates: string[] = [];
     if (meta.id.startsWith("tt")) candidates.push(meta.id);

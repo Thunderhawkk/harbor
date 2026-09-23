@@ -2,15 +2,11 @@ import { usePreviewNavCustomization } from "@/lib/theme-preview";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
 import { ProfileChip } from "@/chrome/sidebar/profile-chip";
 import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { useContextMenu } from "@/lib/context-menu";
-import {
-  NavHiddenTray,
-  NavHideBadge,
-  useNavDrag,
-} from "@/chrome/nav-edit";
+import { NavHiddenTray, NavEditableItem, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
@@ -19,9 +15,20 @@ import { useParental } from "@/lib/parental";
 import { useSettings } from "@/lib/settings";
 import { useView, type View } from "@/lib/view";
 
-const PRIMARY_IDS = new Set(["home", "discover", "movies", "shows", "kids", "anime", "live", "vod"]);
+const PRIMARY_IDS = new Set([
+  "home",
+  "discover",
+  "movies",
+  "shows",
+  "kids",
+  "anime",
+  "live",
+  "sports",
+  "vod",
+]);
 
 export function DraculaSidebar() {
+  const editing = useNavEditMode();
   const { view, setView, chromeHidden } = useView();
   const { locked, unlock, hiddenTabs } = useParental();
   const { settings } = useSettings();
@@ -34,7 +41,10 @@ export function DraculaSidebar() {
     openContextMenu(e, { kind: "nav" });
   };
 
-  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization));
+  const items = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  );
   const primary = items.filter((i) => PRIMARY_IDS.has(i.id));
   const collections = items.filter((i) => !PRIMARY_IDS.has(i.id));
 
@@ -57,21 +67,32 @@ export function DraculaSidebar() {
   return (
     <>
       <aside
+        data-tv-focus-scope={editing || undefined}
         aria-hidden={chromeHidden}
         className={`relative z-[60] flex w-[78px] shrink-0 flex-col transition-[opacity,transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           collapsed ? "" : "lg:w-64"
         } ${
-          chromeHidden ? "pointer-events-none -translate-x-2 rtl:translate-x-2 opacity-0" : "translate-x-0 opacity-100"
+          chromeHidden
+            ? "pointer-events-none -translate-x-2 rtl:translate-x-2 opacity-0"
+            : "translate-x-0 opacity-100"
         }`}
       >
         <div
           className="relative flex min-h-0 flex-1 flex-col rounded-e-[30px] shadow-[8px_0_34px_-18px_rgba(0,0,0,0.65)] rtl:shadow-[-8px_0_34px_-18px_rgba(0,0,0,0.65)] ring-1 ring-inset ring-edge-soft/70"
-          style={{ background: "linear-gradient(180deg, var(--color-surface), var(--color-canvas) 60%)" }}
+          style={{
+            background: "linear-gradient(180deg, var(--color-surface), var(--color-canvas) 60%)",
+          }}
         >
-          <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-e-[30px]">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 overflow-hidden rounded-e-[30px]"
+          >
             <span
               className="absolute inset-x-0 top-0 h-44"
-              style={{ background: "radial-gradient(125% 80% at 50% -8%, var(--color-accent-soft), transparent 72%)" }}
+              style={{
+                background:
+                  "radial-gradient(125% 80% at 50% -8%, var(--color-accent-soft), transparent 72%)",
+              }}
             />
           </span>
 
@@ -94,7 +115,10 @@ export function DraculaSidebar() {
                   style={{ fontFamily: "var(--font-display)", transform: "translateY(1px)" }}
                 >
                   Harb
-                  <span className="inline-block" style={{ transform: "rotate(8deg)", transformOrigin: "50% 65%" }}>
+                  <span
+                    className="inline-block"
+                    style={{ transform: "rotate(8deg)", transformOrigin: "50% 65%" }}
+                  >
                     o
                   </span>
                   r
@@ -139,7 +163,7 @@ export function DraculaSidebar() {
             />
             <div className={`mb-1 flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
               <SidebarBigPictureEntry collapsed={collapsed} />
-            <CollapseToggle collapsed={collapsed} />
+              <CollapseToggle collapsed={collapsed} />
             </div>
             {locked ? (
               <div
@@ -152,8 +176,12 @@ export function DraculaSidebar() {
                 </div>
                 {!collapsed && (
                   <div className="hidden min-w-0 lg:block">
-                    <div className="truncate text-[13px] font-medium text-ink-muted">{t("chrome.locked")}</div>
-                    <div className="truncate text-[11.5px] text-ink-subtle">{t("chrome.parentalOn")}</div>
+                    <div className="truncate text-[13px] font-medium text-ink-muted">
+                      {t("chrome.locked")}
+                    </div>
+                    <div className="truncate text-[11.5px] text-ink-subtle">
+                      {t("chrome.parentalOn")}
+                    </div>
                   </div>
                 )}
               </div>
@@ -201,53 +229,61 @@ function NavPill({
   const editing = useNavEditMode();
   const drag = useNavDrag(item.id, "vertical");
   return (
-    <button
-      onClick={onClick}
-      onContextMenu={(e) =>
-        openContextMenu(e, { kind: "nav", itemId: item.id, view: item.view, label })
-      }
-      data-harbor-nav={item.id}
-      data-tauri-drag-region={editing ? "false" : undefined}
-      onPointerDown={drag.onPointerDown}
-      data-nav-drop-id={item.id}
-      aria-label={gated ? t("chrome.lockedRequiresPin", { label }) : label}
-      title={gated ? t("chrome.lockedShort", { label }) : label}
-      className={`group relative flex h-12 items-center justify-center gap-3.5 rounded-[18px] transition-colors duration-200 ${
-        collapsed ? "" : "lg:justify-start lg:px-4"
-      } ${drag.over ? "ring-2 ring-accent" : ""} ${
-        active ? "text-accent" : "text-ink-muted hover:text-ink"
-      }`}
-    >
-      {editing && <NavHideBadge itemId={item.id} />}
-      {active ? (
-        <span
-          aria-hidden
-          className="absolute inset-0 rounded-[18px]"
-          style={{
-            background: "var(--color-accent-soft)",
-            boxShadow: "inset 0 0 0 1px var(--color-accent-soft), 0 6px 20px -14px var(--color-accent)",
-          }}
-        />
-      ) : (
-        <span
-          aria-hidden
-          className="absolute inset-0 rounded-[18px] bg-elevated/0 transition-colors duration-200 group-hover:bg-elevated/50"
-        />
-      )}
-      <span className={`relative ${gated ? "opacity-70" : ""}`}>
-        {item.render(active)}
-        {gated && (
-          <span className="absolute -bottom-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle ring-1 ring-edge">
-            <Lock size={9} strokeWidth={2.4} />
+    <NavEditableItem itemId={item.id}>
+      <button
+        onClick={onClick}
+        onContextMenu={(e) =>
+          openContextMenu(e, {
+            kind: "nav",
+            itemId: item.id,
+            view: item.view,
+            label,
+            onOpen: onClick,
+          })
+        }
+        data-harbor-nav={item.id}
+        data-tauri-drag-region={editing ? "false" : undefined}
+        onPointerDown={drag.onPointerDown}
+        onKeyDown={drag.onKeyDown}
+        data-nav-drop-id={item.id}
+        aria-label={gated ? t("chrome.lockedRequiresPin", { label }) : label}
+        title={gated ? t("chrome.lockedShort", { label }) : label}
+        className={`group relative flex h-12 items-center justify-center gap-3.5 rounded-[18px] transition-colors duration-200 ${
+          collapsed ? "" : "lg:justify-start lg:px-4"
+        } ${drag.over ? "ring-2 ring-accent" : ""} ${
+          active ? "text-accent" : "text-ink-muted hover:text-ink"
+        }`}
+      >
+        {active ? (
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[18px]"
+            style={{
+              background: "var(--color-accent-soft)",
+              boxShadow:
+                "inset 0 0 0 1px var(--color-accent-soft), 0 6px 20px -14px var(--color-accent)",
+            }}
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[18px] bg-elevated/0 transition-colors duration-200 group-hover:bg-elevated/50"
+          />
+        )}
+        <span className={`relative ${gated ? "opacity-70" : ""}`}>
+          {item.render(active)}
+          {gated && (
+            <span className="absolute -bottom-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle ring-1 ring-edge">
+              <Lock size={9} strokeWidth={2.4} />
+            </span>
+          )}
+        </span>
+        {!collapsed && (
+          <span className="relative hidden flex-1 text-[17px] font-medium tracking-tight lg:inline">
+            {label}
           </span>
         )}
-      </span>
-      {!collapsed && (
-        <span className="relative hidden flex-1 text-[17px] font-medium tracking-tight lg:inline">
-          {label}
-        </span>
-      )}
-    </button>
+      </button>
+    </NavEditableItem>
   );
 }
-

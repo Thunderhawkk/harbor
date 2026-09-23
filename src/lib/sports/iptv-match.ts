@@ -1,6 +1,8 @@
 import { detectCountry, detectCountryFromGroup } from "@/lib/iptv/country-detect";
+import { createEventChannelMatcher } from "./event-match";
+import { yieldToBrowser } from "@/lib/yield-to-browser";
 import { hasArabic, normalizeArabic } from "@/lib/iptv/rtl";
-import type { IptvChannel } from "@/lib/iptv/types";
+import type { IptvChannel, EpgProgram } from "@/lib/iptv/types";
 import type { LeagueDef, SportsGame, SportsSide } from "@/lib/sports/espn";
 import { leagueByTag as sportsLeagueByTag } from "@/lib/sports/espn-leagues";
 import {
@@ -23,7 +25,14 @@ import {
   TEAM_STOP,
 } from "./iptv-networks";
 
-export type MatchReasonKind = "attached" | "team" | "league" | "listing" | "network" | "region";
+export type MatchReasonKind =
+  | "attached"
+  | "team"
+  | "league"
+  | "listing"
+  | "network"
+  | "region"
+  | "event";
 export type MatchReason = { kind: MatchReasonKind; label: string };
 export type MatchTier = "exact" | "likely" | "possible";
 
@@ -52,7 +61,11 @@ export type PreparedChannel = {
   number: number | null;
 };
 
-export type SportsChannelIndex = { channels: PreparedChannel[]; scanned: number };
+export type SportsChannelIndex = {
+  channels: PreparedChannel[];
+  scanned: number;
+  programs?: ReadonlyMap<string, EpgProgram[]>;
+};
 
 export type MatchOptions = {
   attachedIds?: readonly string[];
@@ -168,7 +181,12 @@ function regionStrength(a: string | null, b: string | null): number {
   return ba === b || a === bb || ba === bb ? 1 : 0;
 }
 
-type TeamProfile = { name: string; phrase: string; words: string[]; abbr: string | null };
+type TeamProfile = {
+  name: string;
+  phrase: string;
+  words: string[];
+  abbr: string | null;
+};
 
 function teamProfile(side: SportsSide): TeamProfile {
   const phrase = normalizeChannelName(side.name);
@@ -217,7 +235,7 @@ export function buildSportsChannelIndex(channels: readonly IptvChannel[]): Sport
       SPORTY_RE.test(p.norm) ||
       SPORTY_RE.test(p.groupPad) ||
       SPORTY_RE.test(channel.name.toLowerCase());
-    if (!sporty) continue;
+    if (!sporty && !/\b(?:vs?\.?|versus)\s/i.test(channel.name)) continue;
     out.push(p);
   }
   const index: SportsChannelIndex = { channels: out, scanned: channels.length };
@@ -233,7 +251,11 @@ function listingsOf(names: readonly string[]): Listing[] {
     const norm = normalizeChannelName(raw);
     if (norm.length < 2) continue;
     const compact = norm.replace(/[^\p{L}\p{N}]/gu, "");
-    out.push({ norm, brand: compact.replace(/\d+/g, ""), number: numberOf(norm) });
+    out.push({
+      norm,
+      brand: compact.replace(/\d+/g, ""),
+      number: numberOf(norm),
+    });
   }
   return out;
 }
@@ -274,7 +296,11 @@ function scoreNetworks(
   for (const id of p.networks) {
     const n = NET_BY_ID.get(id);
     if (!n) continue;
-    const base = n.leagues.includes(tag) ? W_NET_LEAGUE : group && n.groups.includes(group) ? W_NET_GROUP : W_NET_ANY;
+    const base = n.leagues.includes(tag)
+      ? W_NET_LEAGUE
+      : group && n.groups.includes(group)
+        ? W_NET_GROUP
+        : W_NET_ANY;
     const total = base + regionStrength(n.region, leagueRegion) * W_NET_REGION;
     if (total > best) {
       best = total;
@@ -322,13 +348,30 @@ export function matchChannelsForGame(
   const leagueRegion = regionForLeague(def);
   const group = def?.group ?? "";
   const teams = [teamProfile(game.home), teamProfile(game.away)];
-  const listings = listingsOf(opts.broadcastNames ?? []);
+  const listings = listingsOf(opts.broadcastNames ?? game.broadcasts ?? []);
   const out: ChannelMatch[] = [];
+  const evidenceFor = createEventChannelMatcher(game);
 
   for (const p of index.channels) {
     const attached = attachedIds.has(p.channel.id);
+    const guide = (index.programs?.get(p.channel.id) ?? []).find(
+      (program) =>
+        program.startMs <= game.startMs + 30 * 60_000 &&
+        program.endMs > game.startMs &&
+        (() => {
+          const evidence = evidenceFor(program.title);
+          return !evidence.conflict && (evidence.both || evidence.numberMatch);
+        })(),
+    );
+    const event = evidenceFor(guide?.title ?? p.channel.name);
+    if (event.conflict && !attached) continue;
     const reasons: MatchReason[] = [];
-    let score = scoreTeams(p, teams, reasons);
+    let score = scoreTeams(p, teams, reasons) + event.score;
+    if (event.both || event.numberMatch)
+      reasons.push({
+        kind: "event",
+        label: guide ? "TV guide matchup" : event.both ? "Event matchup" : "Event number",
+      });
 
     for (const kw of keywords) {
       if (p.pad.includes(` ${kw} `)) {
@@ -359,18 +402,55 @@ export function matchChannelsForGame(
       label: p.label,
       score,
       confidence: Math.round(confidence * 100) / 100,
-      tier: tierOf(confidence, attached),
+      tier:
+        attached || event.both || event.numberMatch
+          ? "exact"
+          : tierOf(Math.min(confidence, 0.84), false),
       attached,
       reasons: attached ? [{ kind: "attached", label: leagueLabel }, ...reasons] : reasons,
     });
   }
 
-  out.sort((a, b) => {
-    if (a.attached !== b.attached) return a.attached ? -1 : 1;
-    if (b.score !== a.score) return b.score - a.score;
-    return a.label.localeCompare(b.label);
-  });
+  out.sort(compareChannelMatches);
   return out.slice(0, opts.limit ?? 8);
+}
+
+export function compareChannelMatches(a: ChannelMatch, b: ChannelMatch): number {
+  if (a.attached !== b.attached) return a.attached ? -1 : 1;
+  const specificity = (match: ChannelMatch) =>
+    match.reasons.some((r) => r.kind === "event" && r.label === "TV guide matchup")
+      ? 3
+      : match.reasons.some((r) => r.kind === "event" && r.label === "Event matchup")
+        ? 2
+        : match.reasons.some((r) => r.kind === "event")
+          ? 1
+          : 0;
+  if (specificity(a) !== specificity(b)) return specificity(b) - specificity(a);
+  if (b.score !== a.score) return b.score - a.score;
+  return a.label.localeCompare(b.label);
+}
+
+/** Yield between bounded batches so large channel libraries never monopolize input. */
+export async function matchChannelsForGameAsync(
+  game: SportsGame,
+  index: SportsChannelIndex,
+  opts: MatchOptions = {},
+  signal?: AbortSignal,
+): Promise<ChannelMatch[]> {
+  const limit = opts.limit ?? 8;
+  let best: ChannelMatch[] = [];
+  for (let offset = 0; offset < index.channels.length; offset += 128) {
+    signal?.throwIfAborted();
+    const matches = matchChannelsForGame(
+      game,
+      { ...index, channels: index.channels.slice(offset, offset + 128) },
+      opts,
+    );
+    best = [...best, ...matches].sort(compareChannelMatches).slice(0, limit);
+    if (offset + 128 < index.channels.length) await yieldToBrowser();
+  }
+  signal?.throwIfAborted();
+  return best;
 }
 
 export function bestChannelForGame(

@@ -1,14 +1,18 @@
 import { useCallback } from "react";
 import { useT } from "@/lib/i18n";
-import { headersFromChannel } from "@/lib/iptv/channel-headers";
+import { liveChannelSource } from "@/lib/iptv/playback-source";
 import { recordChannelPlay } from "@/lib/iptv/channel-stats";
 import type { IptvChannel } from "@/lib/iptv/types";
 import type { SportsGame } from "@/lib/sports/espn";
+import { bestChannelForGame, type SportsChannelIndex } from "@/lib/sports/iptv-match";
 import { useView } from "@/lib/view";
-import type { AttachedStream } from "./source-store";
+import { useStreamPlayer } from "./add-stream-dialog";
+import { useAttachments } from "./source-store";
 
 export function fixtureLabelOf(game: SportsGame): string {
-  return `${game.away.name} v ${game.home.name}`;
+  return game.away.name
+    ? `${game.away.name} v ${game.home.name}`
+    : game.context?.name || game.home.name;
 }
 
 export function useChannelPlayer(): (channel: IptvChannel, subtitle: string) => void {
@@ -18,6 +22,8 @@ export function useChannelPlayer(): (channel: IptvChannel, subtitle: string) => 
     (channel: IptvChannel, subtitle: string) => {
       recordChannelPlay(channel);
       openPlayer({
+        ...liveChannelSource(channel, subtitle),
+        sportsDocked: true,
         meta: {
           id: `iptv:${channel.id}`,
           type: "tv",
@@ -35,44 +41,31 @@ export function useChannelPlayer(): (channel: IptvChannel, subtitle: string) => 
         subtitle,
         notWebReady: true,
         isLive: true,
-        headers: headersFromChannel(channel),
       });
     },
     [openPlayer, t],
   );
 }
 
-export function useStreamPlayer(): (stream: AttachedStream, name: string) => void {
-  const t = useT();
-  const { openPlayer } = useView();
+export function useWatchGame(index: SportsChannelIndex): (game: SportsGame) => boolean {
+  const attachments = useAttachments();
+  const playChannel = useChannelPlayer();
+  const playStream = useStreamPlayer();
   return useCallback(
-    (stream: AttachedStream, name: string) => {
-      openPlayer({
-        meta: {
-          id: `page-stream:${stream.url}`,
-          type: "tv",
-          name,
-          poster: stream.poster || undefined,
-          background: stream.poster || undefined,
-          description: t("Resolved from {host}", { host: hostOf(stream.page) }),
-          releaseInfo: t("Live"),
-        },
-        url: stream.url,
-        title: name,
-        subtitle: hostOf(stream.page),
-        notWebReady: true,
-        isLive: stream.kind !== "file",
-        headers: stream.headers,
+    (game: SportsGame) => {
+      const label = fixtureLabelOf(game);
+      const stream = attachments.streams[game.id];
+      if (stream) {
+        playStream(stream, label);
+        return true;
+      }
+      const best = bestChannelForGame(game, index, {
+        attachedIds: attachments.channels[game.league] ?? [],
       });
+      if (!best || best.tier !== "exact") return false;
+      playChannel(best.channel, label);
+      return true;
     },
-    [openPlayer, t],
+    [attachments, index, playChannel, playStream],
   );
-}
-
-export function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./i, "");
-  } catch {
-    return url;
-  }
 }

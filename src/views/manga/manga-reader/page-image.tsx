@@ -99,7 +99,7 @@ export function PageImage({
     <div
       className={
         inline
-          ? "relative flex justify-center"
+          ? "relative my-auto flex justify-center"
           : fillHeight
             ? "relative flex h-full items-center justify-center"
             : "relative flex w-full justify-center"

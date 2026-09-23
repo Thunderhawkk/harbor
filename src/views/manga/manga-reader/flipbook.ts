@@ -37,6 +37,25 @@ export type FlipInstance = {
 
 export type FlipCtor = new (el: HTMLElement, opts: Record<string, unknown>) => FlipInstance;
 
+type FlipMainInstance = { options?: unknown };
+type FlipMainProto = {
+  pageLoaded?: (this: FlipMainInstance, ...args: Array<unknown>) => unknown;
+  __harborPageLoadedGuard?: boolean;
+};
+
+export function guardPageLoaded(): void {
+  if (typeof window === "undefined") return;
+  const proto = (window as unknown as { FLIPBOOK?: { Main?: { prototype?: FlipMainProto } } })
+    .FLIPBOOK?.Main?.prototype;
+  if (!proto || typeof proto.pageLoaded !== "function" || proto.__harborPageLoadedGuard) return;
+  const orig = proto.pageLoaded;
+  proto.pageLoaded = function (this: FlipMainInstance, ...args: Array<unknown>): unknown {
+    if (!this || this.options == null) return undefined;
+    return orig.apply(this, args);
+  };
+  proto.__harborPageLoadedGuard = true;
+}
+
 export function hasNativeZoom(inst: FlipInstance | null): boolean {
   return !!inst && typeof inst.zoomTo === "function";
 }

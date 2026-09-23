@@ -333,7 +333,7 @@ function parseStoredSettings(raw: string | null): Settings {
           ? prevNav.hidden.filter((x): x is string => typeof x === "string")
           : [];
         parsed.navCustomization = {
-          ...(parsed.navCustomization ?? {}),
+          ...parsed.navCustomization,
           hidden: [...prev, ...carry.filter((c) => !prev.includes(c))],
         } as Settings["navCustomization"];
       }

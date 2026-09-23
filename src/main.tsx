@@ -7,10 +7,12 @@ import { getUiLanguage } from "@/lib/i18n/store";
 import { ensureUiLocale } from "@/lib/i18n/load-locale";
 import { applyOsDataset } from "@/lib/platform";
 import { loadSecrets } from "@/lib/secret-store";
+import { initializeMusic } from "@/lib/music/player";
 import { initSubtitleCache } from "@/lib/subtitles/subtitle-cache";
 import { CaptionsApp } from "@/views/captions-app";
 import { ModalOverlayApp } from "@/views/modal-overlay-app";
 import { HdrOverlayApp } from "@/views/hdr-overlay-app";
+import { hdrOverlayEmitAction } from "@/lib/hdr-overlay";
 import { PipApp } from "@/views/pip";
 import "@/lib/awards-history-eager";
 import "@/index.css";
@@ -175,6 +177,7 @@ async function mount() {
     loadSecrets(),
     hydrateCustomThemes().catch(() => {}),
     ensureUiLocale(getUiLanguage()),
+    !isHdrOverlay && !isModal && !isCaptions && !isPip ? initializeMusic() : Promise.resolve(),
   ]);
   if (!isHdrOverlay && !isModal && !isCaptions) void initSubtitleCache();
   if (!isHdrOverlay && !isModal && !isCaptions && !isPip) startTaskbarProgress();
@@ -191,8 +194,15 @@ async function mount() {
       ) : (
         <MainRoot />
       )}
-      {(isHdrOverlay || isModal || isPip || isCaptions) && <StartupReady />}
+      {(isModal || isPip || isCaptions) && <StartupReady />}
     </StrictMode>,
   );
 }
-void mount();
+void mount().catch(() => {
+  if (isHdrOverlay) {
+    void hdrOverlayEmitAction("hdr-stage://dead", {
+      stageId: new URLSearchParams(window.location.search).get("stageId"),
+    });
+  }
+  console.error("[harbor] application startup failed");
+});

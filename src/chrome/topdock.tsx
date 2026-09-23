@@ -1,11 +1,8 @@
 import { useState } from "react";
+import { usePreviewNavCustomization } from "@/lib/theme-preview";
 import { Monitor } from "lucide-react";
 import { useContextMenu } from "@/lib/context-menu";
-import {
-  NavHiddenTray,
-  NavHideBadge,
-  useNavDrag,
-} from "@/chrome/nav-edit";
+import { NavHiddenTray, NavEditableItem, NavEditClose, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { Search } from "@/components/icons/search-icon";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -22,7 +19,7 @@ import { useView, type View } from "@/lib/view";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
 import { close, minimize, toggleMaximize, useMaximized } from "@/lib/window";
 import { OverflowNav, type NavEntry } from "@/chrome/nav-overflow";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
 import { useBigPictureEntry } from "@/chrome/use-big-picture-entry";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -55,7 +52,10 @@ export function TopDock() {
     setView(item.view);
   };
 
-  const navEntries: NavEntry[] = applyNavCustomization(NAV_ITEMS, settings.navCustomization)
+  const navEntries: NavEntry[] = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  )
     .filter(
       (item) =>
         item.id !== "settings" &&
@@ -72,15 +72,14 @@ export function TopDock() {
         label,
         active,
         onSelect: () => navigate(item),
-        node: (
-          <TopDockNavButton item={item} active={active} label={label} navigate={navigate} />
-        ),
+        node: <TopDockNavButton item={item} active={active} label={label} navigate={navigate} />,
       };
     });
 
   return (
     <>
       <header
+        data-tv-focus-scope={editing || undefined}
         data-tv-top-chrome
         aria-hidden={chromeHidden}
         className={`fixed inset-x-0 top-0 z-[60] flex h-20 items-center px-4 transition-opacity duration-300 ${
@@ -197,6 +196,7 @@ export function TopDock() {
             )}
           </div>
         </div>
+        {editing && <NavEditClose />}
       </header>
       {editing && (
         <div className="fixed inset-x-0 top-20 z-[59] flex justify-center px-4">
@@ -238,34 +238,42 @@ function TopDockNavButton({
   const editing = useNavEditMode();
   const drag = useNavDrag(item.id, "horizontal");
   return (
-    <button
-      type="button"
-      onClick={() => navigate(item)}
-      onContextMenu={(e) =>
-        openContextMenu(e, { kind: "nav", itemId: item.id, view: item.view, label })
-      }
-      data-tauri-drag-region={editing ? "false" : undefined}
-      onPointerDown={drag.onPointerDown}
-      data-nav-drop-id={item.id}
-      aria-label={label}
-      data-harbor-nav={item.id}
-      data-active={active ? "" : undefined}
-      className={`relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12.5px] font-medium transition-colors ${
-        drag.over ? "ring-2 ring-accent" : ""
-      } ${active ? "text-ink" : "text-ink-muted hover:text-ink"}`}
-    >
-      {editing && <NavHideBadge itemId={item.id} />}
-      {active && (
-        <span
-          aria-hidden
-          className="absolute inset-0 -z-10 rounded-full bg-white/15 ring-1 ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_4px_12px_-2px_rgba(0,0,0,0.3)] backdrop-blur-md"
-        />
-      )}
-      <span data-topdock-icon aria-hidden className="hidden">
-        {item.render(active)}
-      </span>
-      <span data-topdock-label>{label}</span>
-    </button>
+    <NavEditableItem itemId={item.id}>
+      <button
+        type="button"
+        onClick={() => navigate(item)}
+        onContextMenu={(e) =>
+          openContextMenu(e, {
+            kind: "nav",
+            itemId: item.id,
+            view: item.view,
+            label,
+            onOpen: () => navigate(item),
+          })
+        }
+        data-tauri-drag-region={editing ? "false" : undefined}
+        onPointerDown={drag.onPointerDown}
+        onKeyDown={drag.onKeyDown}
+        data-nav-drop-id={item.id}
+        aria-label={label}
+        data-harbor-nav={item.id}
+        data-active={active ? "" : undefined}
+        className={`relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12.5px] font-medium transition-colors ${
+          drag.over ? "ring-2 ring-accent" : ""
+        } ${active ? "text-ink" : "text-ink-muted hover:text-ink"}`}
+      >
+        {active && (
+          <span
+            aria-hidden
+            className="absolute inset-0 -z-10 rounded-full bg-white/15 ring-1 ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_4px_12px_-2px_rgba(0,0,0,0.3)] backdrop-blur-md"
+          />
+        )}
+        <span data-topdock-icon aria-hidden className="hidden">
+          {item.render(active)}
+        </span>
+        <span data-topdock-label>{label}</span>
+      </button>
+    </NavEditableItem>
   );
 }
 

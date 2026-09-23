@@ -7,12 +7,8 @@ import { ProfileChip } from "@/chrome/sidebar/profile-chip";
 import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
-import {
-  NavHiddenTray,
-  NavHideBadge,
-  useNavDrag,
-} from "@/chrome/nav-edit";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { NavHiddenTray, NavEditableItem, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { useT } from "@/lib/i18n";
 import { useParental } from "@/lib/parental";
@@ -21,9 +17,20 @@ import { useView, type View } from "@/lib/view";
 
 const FROST = "#88c0d0";
 const RAIL = "linear-gradient(180deg, #8fbcbb59, #88c0d033 44%, #b48ead2b 78%, #81a1c14d)";
-const PRIMARY_IDS = new Set(["home", "discover", "movies", "shows", "kids", "anime", "live", "vod"]);
+const PRIMARY_IDS = new Set([
+  "home",
+  "discover",
+  "movies",
+  "shows",
+  "kids",
+  "anime",
+  "live",
+  "sports",
+  "vod",
+]);
 
 export function NordSidebar() {
+  const editing = useNavEditMode();
   const { view, setView, chromeHidden } = useView();
   const { locked, unlock, hiddenTabs } = useParental();
   const { settings } = useSettings();
@@ -44,7 +51,10 @@ export function NordSidebar() {
     return true;
   };
 
-  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization)).filter(isVisible);
+  const items = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  ).filter(isVisible);
   const primary = items.filter((item) => PRIMARY_IDS.has(item.id));
   const collections = items.filter((item) => !PRIMARY_IDS.has(item.id));
 
@@ -59,16 +69,21 @@ export function NordSidebar() {
   return (
     <>
       <aside
+        data-tv-focus-scope={editing || undefined}
         aria-hidden={chromeHidden}
         className={`relative z-[60] flex w-[78px] shrink-0 flex-col transition-[opacity,transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           collapsed ? "" : "lg:w-56"
         } ${
-          chromeHidden ? "pointer-events-none -translate-x-2 rtl:translate-x-2 opacity-0" : "translate-x-0 opacity-100"
+          chromeHidden
+            ? "pointer-events-none -translate-x-2 rtl:translate-x-2 opacity-0"
+            : "translate-x-0 opacity-100"
         }`}
       >
         <div
           className="relative flex min-h-0 flex-1 flex-col"
-          style={{ background: "linear-gradient(180deg, var(--color-elevated), var(--color-canvas) 46%)" }}
+          style={{
+            background: "linear-gradient(180deg, var(--color-elevated), var(--color-canvas) 46%)",
+          }}
         >
           <GlacierEdge />
 
@@ -107,12 +122,19 @@ export function NordSidebar() {
                 style={{
                   background: RAIL,
                   maskImage: "linear-gradient(180deg, transparent, #000 7%, #000 93%, transparent)",
-                  WebkitMaskImage: "linear-gradient(180deg, transparent, #000 7%, #000 93%, transparent)",
+                  WebkitMaskImage:
+                    "linear-gradient(180deg, transparent, #000 7%, #000 93%, transparent)",
                 }}
               />
 
               {primary.map((item) => (
-                <Station key={item.id} item={item} active={view === item.view} collapsed={collapsed} onClick={() => go(item)} />
+                <Station
+                  key={item.id}
+                  item={item}
+                  active={view === item.view}
+                  collapsed={collapsed}
+                  onClick={() => go(item)}
+                />
               ))}
 
               {collections.map((item) => (
@@ -132,7 +154,7 @@ export function NordSidebar() {
             <FrostLine className="mb-2" />
             <div className={`mb-1 flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
               <SidebarBigPictureEntry collapsed={collapsed} />
-            <CollapseToggle collapsed={collapsed} />
+              <CollapseToggle collapsed={collapsed} />
             </div>
             <div className="px-1">
               <NavHiddenTray orientation="vertical" compact={collapsed} />
@@ -151,8 +173,12 @@ export function NordSidebar() {
                 </div>
                 {!collapsed && (
                   <div className="hidden min-w-0 lg:block">
-                    <div className="truncate text-[13px] font-medium text-ink-muted">{t("chrome.locked")}</div>
-                    <div className="truncate text-[11.5px] text-ink-subtle">{t("chrome.parentalOn")}</div>
+                    <div className="truncate text-[13px] font-medium text-ink-muted">
+                      {t("chrome.locked")}
+                    </div>
+                    <div className="truncate text-[11.5px] text-ink-subtle">
+                      {t("chrome.parentalOn")}
+                    </div>
                   </div>
                 )}
               </div>
@@ -200,61 +226,74 @@ function Station({
   const editing = useNavEditMode();
   const drag = useNavDrag(item.id, "vertical");
   return (
-    <button
-      onClick={onClick}
-      onContextMenu={(e) =>
-        openContextMenu(e, { kind: "nav", itemId: item.id, view: item.view, label })
-      }
-      data-harbor-nav={item.id}
-      data-tauri-drag-region={editing ? "false" : undefined}
-      onPointerDown={drag.onPointerDown}
-      data-nav-drop-id={item.id}
-      aria-label={gated ? t("chrome.lockedRequiresPin", { label }) : label}
-      title={gated ? t("chrome.lockedShort", { label }) : label}
-      className={`group relative z-10 flex h-[52px] w-full items-center ${
-        drag.over ? "ring-2 ring-accent" : ""
-      }`}
-    >
-      {editing && <NavHideBadge itemId={item.id} />}
-      <span className="flex w-[78px] shrink-0 items-center justify-center">
-        <span
-          className={`relative grid h-10 w-10 place-items-center rounded-full transition-colors duration-200 ${
-            active ? "text-canvas" : "text-ink-muted group-hover:text-ink"
-          }`}
-        >
-          {active ? (
-            <span
-              aria-hidden
-              className="absolute inset-0 rounded-full"
-              style={{ background: FROST, boxShadow: `0 0 0 4px ${FROST}1c, 0 0 16px 1px ${FROST}73` }}
-            />
-          ) : (
-            <span
-              aria-hidden
-              className="absolute inset-0 rounded-full bg-canvas ring-[1.5px] ring-[#4c566a] transition-all duration-200 group-hover:ring-[#88c0d0]"
-            />
-          )}
-          <span className="relative overflow-hidden [&_svg]:h-[24px] [&_svg]:w-[24px]">{item.render(active)}</span>
-          {gated && (
-            <span
-              className="absolute -bottom-0.5 -end-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle"
-              style={{ boxShadow: "0 0 0 1px var(--color-edge)" }}
-            >
-              <Lock size={9} strokeWidth={2.4} />
+    <NavEditableItem itemId={item.id}>
+      <button
+        onClick={onClick}
+        onContextMenu={(e) =>
+          openContextMenu(e, {
+            kind: "nav",
+            itemId: item.id,
+            view: item.view,
+            label,
+            onOpen: onClick,
+          })
+        }
+        data-harbor-nav={item.id}
+        data-tauri-drag-region={editing ? "false" : undefined}
+        onPointerDown={drag.onPointerDown}
+        onKeyDown={drag.onKeyDown}
+        data-nav-drop-id={item.id}
+        aria-label={gated ? t("chrome.lockedRequiresPin", { label }) : label}
+        title={gated ? t("chrome.lockedShort", { label }) : label}
+        className={`group relative z-10 flex h-[52px] w-full items-center ${
+          drag.over ? "ring-2 ring-accent" : ""
+        }`}
+      >
+        <span className="flex w-[78px] shrink-0 items-center justify-center">
+          <span
+            className={`relative grid h-10 w-10 place-items-center rounded-full transition-colors duration-200 ${
+              active ? "text-canvas" : "text-ink-muted group-hover:text-ink"
+            }`}
+          >
+            {active ? (
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: FROST,
+                  boxShadow: `0 0 0 4px ${FROST}1c, 0 0 16px 1px ${FROST}73`,
+                }}
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-full bg-canvas ring-[1.5px] ring-[#4c566a] transition-all duration-200 group-hover:ring-[#88c0d0]"
+              />
+            )}
+            <span className="relative overflow-hidden [&_svg]:h-[24px] [&_svg]:w-[24px]">
+              {item.render(active)}
             </span>
-          )}
+            {gated && (
+              <span
+                className="absolute -bottom-0.5 -end-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle"
+                style={{ boxShadow: "0 0 0 1px var(--color-edge)" }}
+              >
+                <Lock size={9} strokeWidth={2.4} />
+              </span>
+            )}
+          </span>
         </span>
-      </span>
-      {!collapsed && (
-        <span
-          className={`hidden flex-1 pe-4 text-start text-[16.5px] tracking-tight transition-colors duration-200 lg:block ${
-            active ? "font-semibold text-ink" : "font-medium text-ink-muted group-hover:text-ink"
-          }`}
-        >
-          {label}
-        </span>
-      )}
-    </button>
+        {!collapsed && (
+          <span
+            className={`hidden flex-1 pe-4 text-start text-[16.5px] tracking-tight transition-colors duration-200 lg:block ${
+              active ? "font-semibold text-ink" : "font-medium text-ink-muted group-hover:text-ink"
+            }`}
+          >
+            {label}
+          </span>
+        )}
+      </button>
+    </NavEditableItem>
   );
 }
 
@@ -263,7 +302,10 @@ function FrostLine({ className }: { className?: string }) {
     <div
       aria-hidden
       className={`h-px w-full ${className ?? ""}`}
-      style={{ background: "linear-gradient(90deg, transparent, #88c0d03d 20%, #88c0d03d 80%, transparent)" }}
+      style={{
+        background:
+          "linear-gradient(90deg, transparent, #88c0d03d 20%, #88c0d03d 80%, transparent)",
+      }}
     />
   );
 }

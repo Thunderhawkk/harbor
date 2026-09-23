@@ -6,12 +6,8 @@ import { useT } from "@/lib/i18n";
 import { useParental } from "@/lib/parental";
 import { useSettings } from "@/lib/settings";
 import { useView, type View } from "@/lib/view";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
-import {
-  NavHiddenTray,
-  NavHideBadge,
-  useNavDrag,
-} from "@/chrome/nav-edit";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { NavHiddenTray, NavHideBadge, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { DockButton } from "./minui-dock/dock-button";
 import { FloatingTop } from "./minui-dock/floating-top";
@@ -42,7 +38,10 @@ export function MinUIDock() {
     return () => window.cancelAnimationFrame(id);
   }, []);
 
-  const items = applyNavCustomization(NAV_ITEMS, usePreviewNavCustomization(settings.navCustomization));
+  const items = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  );
   const visible = items.filter((it) => {
     if (it.id === "kids") return false;
     if (it.view === "vod" && !settings.showPlaylistsTab) return false;
@@ -64,9 +63,10 @@ export function MinUIDock() {
 
   let firstPassScales = visible.map(() => 1);
   if (cursor != null) {
-    const centers = buttonCentersRef.current.length === visible.length
-      ? buttonCentersRef.current
-      : computeCenters(firstPassScales);
+    const centers =
+      buttonCentersRef.current.length === visible.length
+        ? buttonCentersRef.current
+        : computeCenters(firstPassScales);
     firstPassScales = centers.map((c) => magnify(Math.abs(cursor - c)));
   }
   buttonCentersRef.current = computeCenters(firstPassScales);
@@ -91,6 +91,7 @@ export function MinUIDock() {
       <FloatingTop />
       <div
         aria-hidden={chromeHidden}
+        data-tv-focus-scope={editing || undefined}
         className={`pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex items-end justify-center pb-6 transition-opacity duration-300 ${chromeHidden ? "opacity-0" : "opacity-100"}`}
       >
         <div
@@ -100,8 +101,7 @@ export function MinUIDock() {
               "linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 88%, transparent), color-mix(in srgb, var(--color-surface) 72%, transparent))",
             transform: `translateY(${mounted ? 0 : 28}px)`,
             opacity: mounted ? 1 : 0,
-            transition:
-              "transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease",
+            transition: "transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease",
           }}
         >
           <div
@@ -173,9 +173,16 @@ function MinUIDockItem({
       data-harbor-nav={item.id}
       data-tauri-drag-region={editing ? "false" : undefined}
       onContextMenu={(e) =>
-        openContextMenu(e, { kind: "nav", itemId: item.id, view: item.view, label })
+        openContextMenu(e, {
+          kind: "nav",
+          itemId: item.id,
+          view: item.view,
+          label,
+          onOpen: () => navigate(item),
+        })
       }
       onPointerDown={drag.onPointerDown}
+      onKeyDown={drag.onKeyDown}
       data-nav-drop-id={item.id}
     >
       {editing && <NavHideBadge itemId={item.id} />}

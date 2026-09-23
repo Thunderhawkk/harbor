@@ -783,6 +783,31 @@ main[data-kids="on"]::-webkit-scrollbar-thumb:hover {
   }
 }
 
+@keyframes harbor-marquee {
+  0%,
+  10% {
+    transform: translateX(0);
+  }
+  62%,
+  78% {
+    transform: translateX(var(--harbor-marquee, 0px));
+  }
+  96%,
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.harbor-marquee-line[data-marquee] {
+  animation: harbor-marquee 4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .harbor-marquee-line[data-marquee] {
+    animation: none;
+  }
+}
+
 @keyframes harbor-lift-in {
   0% {
     opacity: 0;
@@ -2547,6 +2572,12 @@ main[data-kids="on"]::-webkit-scrollbar-thumb:hover {
   animation: media-swap 280ms var(--ease-out) backwards;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-media-swap {
+    animation: none;
+  }
+}
+
 @keyframes xray-open {
   from {
     opacity: 0;
@@ -4158,7 +4189,11 @@ html[data-theme-layout="minui"] .anime-award-banner-logo {
 
 html:not([data-input-modality="pointer"])
   :is(button, a, select, summary, input, textarea, [tabindex]):focus-visible:not(
-    :where([data-profile-picker][role="dialog"][tabindex="-1"], .hset-title[tabindex="-1"])
+    :where(
+      [data-profile-picker][role="dialog"][tabindex="-1"],
+      .hset-title[tabindex="-1"],
+      [data-search-overlay] input
+    )
   ) {
   outline: 2px solid var(--color-accent) !important;
   outline-offset: 2px;
@@ -4685,7 +4720,7 @@ html[data-theme-card="crunch"][dir="rtl"] .harbor-profile-dropdown {
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--color-canvas);
-  padding-block: 8px 48px;
+  padding-block: 8px calc(48px + var(--harbor-music-dock, 0px));
   padding-inline: var(--hset-pad-inline);
   scroll-padding-block: 16px;
 }
@@ -4700,8 +4735,8 @@ html[data-theme-card="crunch"][dir="rtl"] .harbor-profile-dropdown {
 }
 
 .hset-main:has(.hset-footer) {
-  padding-block-end: 0;
-  scroll-padding-block-end: calc(var(--hset-footer-h) + 16px);
+  padding-block-end: var(--harbor-music-dock, 0px);
+  scroll-padding-block-end: calc(var(--hset-footer-h) + 16px + var(--harbor-music-dock, 0px));
 }
 
 .hset-main[data-hset-wide] {
@@ -5236,7 +5271,7 @@ html[data-theme-card="crunch"][dir="rtl"] .harbor-profile-dropdown {
 
 .hset-footer {
   position: sticky;
-  inset-block-end: 0;
+  inset-block-end: var(--harbor-music-dock, 0px);
   z-index: 5;
   display: flex;
   align-items: center;
@@ -6402,7 +6437,7 @@ textarea.hset-field {
   gap: 0;
   inline-size: 100%;
   min-block-size: 0;
-  padding: 0 0 16px;
+  padding: 0 0 calc(16px + var(--harbor-music-dock, 0px));
   background: var(--hset-sidebar-bg);
   overflow: hidden;
 }
@@ -7340,5 +7375,62 @@ button.hset-rail-me:hover,
   --poster-radius: var(--radius-md);
 }
 
-[data-nav-editing="true"] [data-harbor-nav]:hover { animation: none !important; }
-[data-nav-editing="true"] [data-harbor-nav] { transition: transform 160ms ease-out !important; margin: 1px 2px !important; }
+[data-nav-editing="true"] [data-harbor-nav]:hover {
+  animation: none !important;
+}
+[data-nav-editing="true"] [data-harbor-nav] {
+  margin: 1px 2px !important;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-nav-editing="true"] [data-harbor-nav] {
+    transition: transform 160ms ease-out !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-nav-editing="true"] [data-harbor-nav] {
+    transition: none !important;
+  }
+}
+/* Search overlay draws its own panel chrome; never outline its header container. */
+[data-search-overlay] [data-tv-search-editing-focused="true"],
+[data-search-overlay] [data-tv-search-nav-focused="true"] {
+  outline: none !important;
+}
+
+.music-eq-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+}
+.music-eq-bars i {
+  width: 3px;
+  height: 30%;
+  border-radius: 1px;
+  background: var(--color-accent);
+  animation: music-eq-bounce 900ms ease-in-out infinite;
+}
+.music-eq-bars i:nth-child(2) {
+  animation-delay: -600ms;
+}
+.music-eq-bars i:nth-child(3) {
+  animation-delay: -300ms;
+}
+.music-eq-bars i:nth-child(4) {
+  animation-delay: -800ms;
+}
+@keyframes music-eq-bounce {
+  0%,
+  100% {
+    height: 22%;
+  }
+  50% {
+    height: 92%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .music-eq-bars i {
+    animation: none;
+    height: 55%;
+  }
+}

@@ -2,7 +2,7 @@ import { Trash2 } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import type { Meta } from "@/lib/cinemeta";
 import { queueClear, queueIndexOf, queueItemAfter, queueRemove, useQueue } from "@/lib/queue";
-import { useView, type PlayEpisode } from "@/lib/view";
+import { usePlayerNavigation, type PlayEpisode } from "@/lib/view";
 import { parseKitsuId } from "@/lib/providers/kitsu";
 import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import { useT } from "@/lib/i18n";
@@ -20,7 +20,7 @@ export function QueueUpNext({
 }) {
   const t = useT();
   const queue = useQueue();
-  const { openPicker } = useView();
+  const { openPicker } = usePlayerNavigation();
   if (queue.length === 0) return null;
   const currentIdx = queueIndexOf(meta, currentEpisode);
   const currentId = currentIdx >= 0 ? (queue[currentIdx]?.id ?? null) : null;

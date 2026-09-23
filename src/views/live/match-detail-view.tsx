@@ -1,202 +1,286 @@
-import { useEffect, useState, useMemo } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ScoreMetric, ScoreBreakdown } from "@/views/sports/score-breakdown";
+import { TeamProfileLink, teamIdentity } from "@/views/sports/team-profile-link";
+import { useState, useMemo, useRef } from "react";
+import { ArrowLeft, ArrowUp } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
+import { openUrl } from "@/lib/window";
 import type { SportsGame, SportsMatchDetail } from "@/lib/sports/espn";
-import { fetchMatchSummary } from "@/lib/sports/espn";
-import { leagueByTag } from "@/lib/sports/espn-leagues";
+import { sportsLeagueByTag } from "@/lib/sports/provider";
+import { SportsReminderButton } from "@/views/sports/reminder-button";
+import { WhereToWatch } from "@/views/sports/where-to-watch";
+import { useMatchDetail } from "@/views/sports/use-match-detail";
+import { useAthletePortrait } from "@/views/sports/use-athlete-portrait";
+import { EventLogo, useEventDate } from "@/views/sports/hub-cards";
+import { hubLeague } from "@/lib/sports/hub-data";
+import { officialBoxingUrl } from "@/lib/sports/providers/boxing-schedule";
+import { useBoxingEvent } from "@/views/sports/use-boxing-event";
+import "@/views/sports/hub.css";
 import { MatchPanel } from "@/views/sports/match-panel";
+import { PlayerMatchStats } from "@/views/sports/player-match-stats";
 import { WatchSources } from "@/views/sports/watch-sources";
+import { BaseballDiamond } from "@/views/sports/baseball-diamond";
+import { SoccerPreview } from "@/views/sports/soccer-preview";
+import { getLeagueLabel } from "@/lib/sports/espn-leagues";
+import { PlayEventIcon } from "@/views/sports/play-event-icon";
+import { VenuePreview } from "@/views/sports/venue-preview";
+import { FieldPreview } from "@/views/sports/field-preview";
+import { EventOdds } from "@/views/sports/event-odds";
+import { AthleteProfileLink } from "@/views/sports/athlete-profile";
 import { TennisMatchPanel } from "./match-detail-view/tennis-match-panel";
 
-export function MatchDetailView({ game }: { game: SportsGame }) {
+export function MatchDetailView({
+  game,
+  shellBackAvailable = false,
+}: {
+  game: SportsGame;
+  shellBackAvailable?: boolean;
+}) {
   const t = useT();
+  const eventDate = useEventDate();
   const { goBack } = useView();
-  const [detail, setDetail] = useState<SportsMatchDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const isCombat = game.league === "UFC";
+  const officialBoxing = game.source === "official-boxing";
+  const boxingGame = useBoxingEvent(game);
+  const { detail, loading, failed, retry } = useMatchDetail(game, !officialBoxing);
+  const current = detail ?? boxingGame;
+  const league = sportsLeagueByTag(game.league) ?? hubLeague(game.league);
+  const individual = ["tennis", "combat", "golf", "motorsport"].includes(league?.group ?? "");
+  const homePortrait = useAthletePortrait(
+    { path: league?.path ?? "", ...current.home, image: current.home.logo },
+    individual,
+  );
+  const awayPortrait = useAthletePortrait(
+    { path: league?.path ?? "", ...current.away, image: current.away.logo },
+    individual,
+  );
+  const isCombat = sportsLeagueByTag(game.league)?.group === "combat";
   const isTennis = game.league === "ATP" || game.league === "WTA";
-  const isSoccer = leagueByTag(game.league)?.group === "soccer";
+  const isSoccer = sportsLeagueByTag(game.league)?.group === "soccer";
   const tabs = isCombat
-    ? (["summary", "profile", "stats"] as const)
+    ? ["profile", "stats"]
     : isTennis || isSoccer
-      ? (["match"] as const)
-      : (["summary", "lineups", "stats"] as const);
-  const [tab, setTab] = useState<"summary" | "lineups" | "stats" | "profile" | "match">(tabs[0]);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    fetchMatchSummary(game.league, game.id)
-      .then((res) => {
-        if (!active) return;
-        if (res) setDetail(res);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [game]);
-
-  const hYellow = parseInt(detail?.homeStats?.yellowCards || "0", 10);
-  const hRed = parseInt(detail?.homeStats?.redCards || "0", 10);
-  const aYellow = parseInt(detail?.awayStats?.yellowCards || "0", 10);
-  const aRed = parseInt(detail?.awayStats?.redCards || "0", 10);
-
+      ? ["match"]
+      : ["summary", "lineups", "stats"];
+  const [tab, setTab] = useState(tabs[0]);
+  const scrollRef = useRef<HTMLElement>(null);
+  const [showTop, setShowTop] = useState(false);
   return (
-    <div className="flex h-full flex-col bg-canvas pb-8">
-      <div className="relative shrink-0 pb-10 pt-24">
-        <div className="absolute inset-x-0 top-0 h-full bg-gradient-to-b from-brand/10 via-brand/5 to-transparent opacity-80" />
-        <button
-          aria-label={t("Back")}
-          onClick={goBack}
-          className="absolute start-6 top-24 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-elevated/80 text-ink shadow-lg ring-1 ring-edge-soft/50 transition-colors hover:bg-elevated hover:text-ink-muted md:top-20"
-        >
-          <ArrowLeft size={20} className="dir-icon" />
-        </button>
-        <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center gap-8 px-6 pt-4">
-          <div className="flex items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-4 py-1.5 text-[12px] font-bold uppercase tracking-widest text-brand">
-            {game.state === "in" && (
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75"></span>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-brand"></span>
-              </span>
-            )}
-            {game.league}
-          </div>
-          <div className="flex w-full items-center justify-center gap-4 md:gap-12">
-            <div className="flex flex-1 flex-col items-center gap-4 text-center">
-              <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-elevated/40 p-3 shadow-xl ring-1 ring-edge-soft/50 backdrop-blur-sm md:h-32 md:w-32 md:p-5">
-                {game.home.logo ? (
-                  <img
-                    src={game.home.logo}
-                    className="h-full w-full object-contain drop-shadow-md"
-                    alt=""
-                  />
-                ) : (
-                  <div className="h-full w-full rounded-full bg-canvas" />
-                )}
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-xl font-bold leading-tight md:text-2xl">
-                  {game.home.name}
-                </span>
-                {detail && (hYellow > 0 || hRed > 0) && (
-                  <div className="flex items-center gap-1">
-                    {hYellow > 0 &&
-                      Array.from({ length: hYellow }).map((_, i) => (
-                        <div
-                          key={`y-${i}`}
-                          className="h-3.5 w-2.5 rounded-[2px] bg-yellow-400 shadow-sm ring-1 ring-black/20"
-                        />
-                      ))}
-                    {hRed > 0 &&
-                      Array.from({ length: hRed }).map((_, i) => (
-                        <div
-                          key={`r-${i}`}
-                          className="h-3.5 w-2.5 rounded-[2px] bg-red-500 shadow-sm ring-1 ring-black/20"
-                        />
-                      ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex items-center justify-center gap-4 rounded-[2rem] border border-edge-soft/30 bg-elevated/50 px-6 py-4 shadow-2xl ring-1 ring-inset ring-white/5 backdrop-blur-xl md:px-8 md:py-5">
-                <span className="text-5xl font-black tabular-nums tracking-tighter text-ink drop-shadow-sm md:text-7xl">
-                  {game.home.score || "0"}
-                </span>
-                <span className="text-3xl font-black text-ink-subtle md:text-5xl">-</span>
-                <span className="text-5xl font-black tabular-nums tracking-tighter text-ink drop-shadow-sm md:text-7xl">
-                  {game.away.score || "0"}
-                </span>
-              </div>
-              <div className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-bold tracking-wide text-canvas shadow-md">
-                {game.detail ||
-                  (game.state === "in"
-                    ? t("Live")
-                    : game.state === "post"
-                      ? t("Final")
-                      : t("Upcoming"))}
-              </div>
-            </div>
-            <div className="flex flex-1 flex-col items-center gap-4 text-center">
-              <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-elevated/40 p-3 shadow-xl ring-1 ring-edge-soft/50 backdrop-blur-sm md:h-32 md:w-32 md:p-5">
-                {game.away.logo ? (
-                  <img
-                    src={game.away.logo}
-                    className="h-full w-full object-contain drop-shadow-md"
-                    alt=""
-                  />
-                ) : (
-                  <div className="h-full w-full rounded-full bg-canvas" />
-                )}
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-xl font-bold leading-tight md:text-2xl">
-                  {game.away.name}
-                </span>
-                {detail && (aYellow > 0 || aRed > 0) && (
-                  <div className="flex items-center gap-1">
-                    {aYellow > 0 &&
-                      Array.from({ length: aYellow }).map((_, i) => (
-                        <div
-                          key={`y-${i}`}
-                          className="h-3.5 w-2.5 rounded-[2px] bg-yellow-400 shadow-sm ring-1 ring-black/20"
-                        />
-                      ))}
-                    {aRed > 0 &&
-                      Array.from({ length: aRed }).map((_, i) => (
-                        <div
-                          key={`r-${i}`}
-                          className="h-3.5 w-2.5 rounded-[2px] bg-red-500 shadow-sm ring-1 ring-black/20"
-                        />
-                      ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <WatchSources game={game} />
-        </div>
-      </div>
-
-      <div
-        className={`mx-auto mt-8 flex w-full max-w-4xl shrink-0 gap-6 border-b border-edge-soft/50 px-6 ${
-          tabs.length > 1 ? "" : "hidden"
-        }`}
-      >
-        {tabs.map((tId) => (
-          <button
-            key={tId}
-            onClick={() => setTab(tId)}
-            className={`relative pb-3 text-sm font-semibold capitalize transition-colors ${tab === tId ? "text-ink" : "text-ink-subtle hover:text-ink-muted"}`}
-          >
-            {t(tId)}
-            {tab === tId && (
-              <div className="absolute inset-x-0 bottom-0 h-0.5 rounded-t-full bg-brand" />
-            )}
+    <main
+      ref={scrollRef}
+      className="sh-match-page"
+      onScroll={(event) => setShowTop(event.currentTarget.scrollTop > 700)}
+    >
+      <header className="sh-match-header">
+        {!shellBackAvailable && (
+          <button className="sh-button" aria-label={t("Back")} onClick={goBack}>
+            <ArrowLeft size={18} />
+            {t("Back")}
           </button>
-        ))}
+        )}
+        <span>{league ? getLeagueLabel(league) : game.league}</span>
+      </header>
+      <section className="sh-detail-scoreboard">
+        <div className="sh-detail-competitor">
+          <TeamProfileLink team={teamIdentity(current, "home")} className="sh-team-detail-link">
+            <EventLogo
+              side={{ ...current.home, logo: homePortrait.image || current.home.logo }}
+              fallback={current.home.logo || league?.logo}
+              sport={league?.group}
+              large
+            />
+            <h1>{current.home.name}</h1>
+          </TeamProfileLink>
+          {(isCombat || isTennis || officialBoxing) && (
+            <AthleteProfileLink
+              athlete={{ ...current.home, image: homePortrait.image || current.home.logo }}
+              league={game.league}
+              label={current.home.name}
+            />
+          )}
+        </div>
+        <div className="sh-detail-score">
+          <span className={current.state === "in" && !failed ? "sh-live" : "sh-eyebrow"}>
+            {t(
+              failed
+                ? current.state === "pre"
+                  ? "Saved"
+                  : "Saved scores"
+                : current.state === "in"
+                  ? "Live now"
+                  : current.state === "post"
+                    ? "Final"
+                    : "Upcoming",
+            )}
+          </span>
+          <ScoreMetric sport={league?.group || ""} game={current} />
+          <strong>
+            {current.state === "pre" ? (
+              t("vs")
+            ) : ["motorsport", "golf"].includes(league?.group || "") ? (
+              t("Results")
+            ) : (
+              <>
+                {current.home.score}
+                <em>:</em>
+                {current.away.score}
+              </>
+            )}
+          </strong>
+          {current.state !== "pre" && <small>{current.detail}</small>}
+          <time>{eventDate(current.startMs, false, current.dateOnly)}</time>
+        </div>
+        <div className="sh-detail-competitor">
+          <TeamProfileLink team={teamIdentity(current, "away")} className="sh-team-detail-link">
+            <EventLogo
+              side={{ ...current.away, logo: awayPortrait.image || current.away.logo }}
+              fallback={current.away.logo || league?.logo}
+              sport={league?.group}
+              large
+            />
+            <h1>{current.away.name}</h1>
+          </TeamProfileLink>
+          {(isCombat || isTennis || officialBoxing) && (
+            <AthleteProfileLink
+              athlete={{ ...current.away, image: awayPortrait.image || current.away.logo }}
+              league={game.league}
+              label={current.away.name}
+            />
+          )}
+        </div>
+      </section>
+      <ScoreBreakdown game={current} sport={league?.group || ""} />
+      <div className="sh-match-event-actions">
+        <SportsReminderButton game={current} />
       </div>
-
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto px-6 py-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {loading ? (
-          <div className="flex flex-1 items-center justify-center">
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-ink-subtle border-t-transparent" />
-          </div>
+      <div className="sh-match-photo-credit">
+        {[homePortrait, awayPortrait].some(
+          (portrait) => portrait.attribution?.source === "TheSportsDB",
+        ) && (
+          <button
+            className="sh-text-button min-h-9 text-xs text-ink-muted"
+            onClick={() => openUrl("https://www.thesportsdb.com/")}
+          >
+            {t("Photos")}: TheSportsDB
+          </button>
+        )}
+      </div>
+      <div className="sh-detail-watch">
+        <WatchSources
+          game={{
+            ...current,
+            broadcasts: current.broadcasts ?? game.broadcasts,
+          }}
+        />
+      </div>
+      <div className="sh-detail-content">
+        {(sportsLeagueByTag(game.league)?.group === "football" ||
+          sportsLeagueByTag(game.league)?.group === "basketball") && (
+          <FieldPreview
+            key={`${game.league}:${game.id}`}
+            game={current}
+            detail={detail}
+            basketball={sportsLeagueByTag(game.league)?.group === "basketball"}
+            failed={failed}
+          />
+        )}
+        {sportsLeagueByTag(game.league)?.group === "baseball" && (
+          <BaseballDiamond
+            key={`${game.league}:${game.id}`}
+            game={current}
+            detail={detail}
+            loading={loading}
+            failed={failed}
+            retry={retry}
+          />
+        )}
+        {isSoccer && (
+          <SoccerPreview
+            key={`${game.league}:${game.id}`}
+            game={current}
+            detail={detail}
+            loading={loading}
+            failed={failed}
+          />
+        )}
+        <VenuePreview
+          key={`venue:${game.league}:${game.id}`}
+          game={current}
+          detail={detail}
+          failed={failed}
+          sport={sportsLeagueByTag(game.league)?.group ?? ""}
+        />
+        <WhereToWatch game={{ ...current, broadcasts: current.broadcasts ?? game.broadcasts }} />
+        <EventOdds game={current} />
+      </div>
+      {!officialBoxing && (
+        <nav className="sh-detail-tabs" aria-label={t("Match details")}>
+          {tabs.map((id) => (
+            <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
+              {t(
+                (
+                  {
+                    match: "Match",
+                    summary: "Summary",
+                    profile: "Athlete profile",
+                    lineups: "Lineups",
+                    stats: "Stats",
+                  } as Record<string, string>
+                )[id],
+              )}
+            </button>
+          ))}
+        </nav>
+      )}
+      <div className="sh-detail-content">
+        {officialBoxing ? (
+          <section className="sh-where-watch">
+            <h3>{current.context?.name}</h3>
+            <p className="sh-muted">
+              {[current.context?.draw, current.context?.venue].filter(Boolean).join(" · ")}
+            </p>
+            {[current.home, current.away]
+              .filter((side) => side.record)
+              .map((side) => (
+                <p key={side.name}>
+                  {side.name} · {side.record}
+                </p>
+              ))}
+            <p className="sh-muted">
+              {t(
+                "Schedule published by the event promoter. Visit the official fight card for the latest lineup and broadcast details.",
+              )}
+            </p>
+            {officialBoxingUrl(current) && (
+              <button className="sh-button" onClick={() => openUrl(officialBoxingUrl(current)!)}>
+                {t("Official fight card")}
+              </button>
+            )}
+          </section>
+        ) : loading ? (
+          <p className="sh-lineups-pending" role="status">
+            {t("Loading match details…")}
+          </p>
         ) : !detail ? (
-          <div className="flex flex-1 items-center justify-center text-ink-subtle">
-            {t("Failed to load match details.")}
+          <div className="sh-empty">
+            <h2>{t("Match details are not available yet.")}</h2>
+            <p>{t("The schedule is still available. Try refreshing the match details.")}</p>
+            <button className="sh-button" onClick={retry}>
+              {t("Retry")}
+            </button>
           </div>
         ) : (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <>
+            {failed && (
+              <div className="sh-feed-note" role="status">
+                {t("Showing saved match details.")}
+                <button className="sh-text-button" onClick={retry}>
+                  {t("Retry")}
+                </button>
+              </div>
+            )}
             {tab === "match" &&
               (isSoccer ? (
-                <MatchPanel game={game} detail={detail} />
+                <MatchPanel game={game} detail={detail} hideScoreboard hidePitch />
               ) : (
                 <TennisMatchPanel detail={detail} />
               ))}
@@ -204,10 +288,30 @@ export function MatchDetailView({ game }: { game: SportsGame }) {
             {tab === "lineups" && <LineupsTab detail={detail} />}
             {tab === "stats" && <StatsTab detail={detail} />}
             {tab === "profile" && <MmaProfileTab detail={detail} />}
-          </div>
+          </>
         )}
       </div>
-    </div>
+      {showTop && (
+        <button
+          className="sh-back-top"
+          aria-label={t("Back to top")}
+          onClick={() => {
+            scrollRef.current?.scrollTo({
+              top: 0,
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                ? "instant"
+                : "smooth",
+            });
+            scrollRef.current
+              ?.querySelector<HTMLButtonElement>("button")
+              ?.focus({ preventScroll: true });
+          }}
+        >
+          <ArrowUp size={18} />
+          {t("Back to top")}
+        </button>
+      )}
+    </main>
   );
 }
 
@@ -264,11 +368,7 @@ function SummaryTab({ detail }: { detail: SportsMatchDetail }) {
               />
             ) : (
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-canvas ring-1 ring-edge-soft/50">
-                {e.type === "goal" && <span className="text-lg">⚽</span>}
-                {e.type === "yellow_card" && <div className="h-4 w-3 rounded-sm bg-yellow-400" />}
-                {e.type === "red_card" && <div className="h-4 w-3 rounded-sm bg-red-500" />}
-                {e.type === "substitution" && <span className="text-lg">🔄</span>}
-                {e.type === "other" && <span className="text-lg">ℹ️</span>}
+                <PlayEventIcon event={e} />
               </div>
             )}
             <div className="flex flex-1 flex-col justify-center gap-1">
@@ -279,14 +379,7 @@ function SummaryTab({ detail }: { detail: SportsMatchDetail }) {
             </div>
             {playerImage && (
               <div className="flex shrink-0 items-center justify-center px-2">
-                {e.type === "goal" && <span className="text-xl drop-shadow-md">⚽</span>}
-                {e.type === "yellow_card" && (
-                  <div className="h-5 w-3.5 rounded-[2px] bg-yellow-400 shadow-md ring-1 ring-black/20" />
-                )}
-                {e.type === "red_card" && (
-                  <div className="h-5 w-3.5 rounded-[2px] bg-red-500 shadow-md ring-1 ring-black/20" />
-                )}
-                {e.type === "substitution" && <span className="text-xl drop-shadow-md">🔄</span>}
+                <PlayEventIcon event={e} />
               </div>
             )}
           </div>
@@ -327,9 +420,13 @@ function LineupsTab({ detail }: { detail: SportsMatchDetail }) {
             <div className="flex items-center justify-between border-b border-edge-soft/50 pb-2 px-2">
               <div className="flex items-center gap-3">
                 {detail.home.logo && (
-                  <img src={detail.home.logo} className="h-8 w-8 object-contain" alt="" />
+                  <TeamProfileLink team={teamIdentity(detail, "home")}>
+                    <img src={detail.home.logo} className="h-8 w-8 object-contain" alt="" />
+                  </TeamProfileLink>
                 )}
-                <span className="font-bold text-lg">{detail.home.name}</span>
+                <TeamProfileLink team={teamIdentity(detail, "home")}>
+                  <span className="font-bold text-lg">{detail.home.name}</span>
+                </TeamProfileLink>
               </div>
               {detail.homeFormation && (
                 <span className="rounded-full bg-elevated px-3 py-1 text-xs font-bold text-ink-muted ring-1 ring-edge-soft/50">
@@ -348,9 +445,13 @@ function LineupsTab({ detail }: { detail: SportsMatchDetail }) {
             <div className="flex items-center justify-between border-b border-edge-soft/50 pb-2 px-2">
               <div className="flex items-center gap-3">
                 {detail.away.logo && (
-                  <img src={detail.away.logo} className="h-8 w-8 object-contain" alt="" />
+                  <TeamProfileLink team={teamIdentity(detail, "away")}>
+                    <img src={detail.away.logo} className="h-8 w-8 object-contain" alt="" />
+                  </TeamProfileLink>
                 )}
-                <span className="font-bold text-lg">{detail.away.name}</span>
+                <TeamProfileLink team={teamIdentity(detail, "away")}>
+                  <span className="font-bold text-lg">{detail.away.name}</span>
+                </TeamProfileLink>
               </div>
               {detail.awayFormation && (
                 <span className="rounded-full bg-elevated px-3 py-1 text-xs font-bold text-ink-muted ring-1 ring-edge-soft/50">
@@ -371,7 +472,10 @@ function LineupsTab({ detail }: { detail: SportsMatchDetail }) {
       <div className="flex flex-col gap-8 md:flex-row">
         <div className="flex flex-1 flex-col gap-4 rounded-2xl bg-elevated/30 p-4 ring-1 ring-edge-soft/50">
           <div className="text-sm font-bold uppercase tracking-wider text-ink-muted border-b border-edge-soft/50 pb-2">
-            {detail.home.name} - {t("Full Roster")}
+            <TeamProfileLink team={teamIdentity(detail, "home")}>
+              {detail.home.name}
+            </TeamProfileLink>{" "}
+            - {t("Full Roster")}
           </div>
           <div className="flex flex-col gap-2">
             {detail.homeRoster.map((p) => (
@@ -382,7 +486,7 @@ function LineupsTab({ detail }: { detail: SportsMatchDetail }) {
                 <span
                   className={`flex-1 ${p.starter ? "font-bold text-ink" : "font-medium text-ink-muted"}`}
                 >
-                  {p.name}
+                  <AthleteProfileLink athlete={p} league={detail.league} label={p.name} />
                 </span>
                 <span className="w-8 text-end text-[11px] font-semibold uppercase text-brand/80">
                   {p.position}
@@ -393,7 +497,10 @@ function LineupsTab({ detail }: { detail: SportsMatchDetail }) {
         </div>
         <div className="flex flex-1 flex-col gap-4 rounded-2xl bg-elevated/30 p-4 ring-1 ring-edge-soft/50">
           <div className="text-sm font-bold uppercase tracking-wider text-ink-muted border-b border-edge-soft/50 pb-2">
-            {detail.away.name} - {t("Full Roster")}
+            <TeamProfileLink team={teamIdentity(detail, "away")}>
+              {detail.away.name}
+            </TeamProfileLink>{" "}
+            - {t("Full Roster")}
           </div>
           <div className="flex flex-col gap-2">
             {detail.awayRoster.map((p) => (
@@ -404,7 +511,7 @@ function LineupsTab({ detail }: { detail: SportsMatchDetail }) {
                 <span
                   className={`flex-1 ${p.starter ? "font-bold text-ink" : "font-medium text-ink-muted"}`}
                 >
-                  {p.name}
+                  <AthleteProfileLink athlete={p} league={detail.league} label={p.name} />
                 </span>
                 <span className="w-8 text-end text-[11px] font-semibold uppercase text-brand/80">
                   {p.position}
@@ -629,7 +736,11 @@ function StatsTab({ detail }: { detail: SportsMatchDetail }) {
     );
   };
 
-  if (!detail.allStats || detail.allStats.length === 0) {
+  if (
+    (!detail.allStats || detail.allStats.length === 0) &&
+    !detail.playerStats?.length &&
+    !detail.partnerships?.length
+  ) {
     return (
       <div className="text-center text-sm text-ink-subtle">
         {t("Statistics not available yet.")}
@@ -638,10 +749,15 @@ function StatsTab({ detail }: { detail: SportsMatchDetail }) {
   }
 
   return (
-    <div className="flex flex-col gap-1 rounded-2xl bg-elevated/20 p-4 ring-1 ring-edge-soft/50 shadow-sm">
-      {detail.allStats.map((stat, i) => (
-        <StatsTabRow key={i} label={stat.label} hVal={stat.homeValue} aVal={stat.awayValue} />
-      ))}
+    <div className="flex min-w-0 flex-col gap-5">
+      {!!detail.allStats.length && (
+        <div className="flex flex-col gap-1 rounded-2xl bg-elevated/20 p-4 ring-1 ring-edge-soft/50 shadow-sm">
+          {detail.allStats.map((stat, i) => (
+            <StatsTabRow key={i} label={stat.label} hVal={stat.homeValue} aVal={stat.awayValue} />
+          ))}
+        </div>
+      )}
+      <PlayerMatchStats detail={detail} />
     </div>
   );
 }

@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { exitBigPicture } from "@/lib/big-picture";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { exitBigPicture, goBigPictureTab } from "@/lib/big-picture";
+import {
+  getSportsConsentServerSnapshot,
+  getSportsConsentSnapshot,
+  resetSportsConsent,
+  subscribeSportsConsent,
+} from "@/lib/sports/consent";
 import { SFX } from "@/lib/sfx";
 import { useBpT } from "./bp-i18n";
 import { pushBpBack } from "./bp-back";
@@ -48,10 +54,15 @@ export function BpSettings() {
   const activeRef = useRef(0);
   activeRef.current = active;
 
+  const consent = useSyncExternalStore(
+    subscribeSportsConsent,
+    getSportsConsentSnapshot,
+    getSportsConsentServerSnapshot,
+  );
   const connected = bpConnectedNames(facts);
   const categories = bpSettingsCategories(settings, t, overscan, connected);
   const cat: BpCatId = categories[active]?.id ?? "picture";
-  const controls = bpSettingsControls(cat, settings, t, overscan);
+  const controls = bpSettingsControls(cat, settings, t, overscan, consent.status !== "declined");
 
   useEffect(
     () =>
@@ -95,6 +106,11 @@ export function BpSettings() {
   const leave = useCallback(() => {
     SFX.close();
     exitBigPicture();
+  }, []);
+
+  const reviewSportsNotice = useCallback(() => {
+    resetSportsConsent();
+    goBigPictureTab("sports");
   }, []);
 
   if (pane !== "root") {
@@ -194,7 +210,8 @@ export function BpSettings() {
                   index={index}
                   label={control.label}
                   autofocus={i === 0}
-                  onPress={leave}
+                  flush={control.id === "sportsNotice"}
+                  onPress={control.id === "sportsNotice" ? reviewSportsNotice : leave}
                 />
               );
             })}

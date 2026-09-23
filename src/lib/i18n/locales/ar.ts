@@ -1,3 +1,11 @@
+import listenTogether from "./ar/listen-together";
+import music from "./ar/music";
+import sportsConsent from "./ar/sports-consent";
+import sportsStatistics from "./ar/sports-statistics";
+import sportsApi from "./ar/sports-api";
+import esportsArena from "./ar/esports-arena";
+import sportsHub from "./ar/sports-hub";
+import bpSports from "./ar/bp-sports";
 import ebookSources from "./ar/ebook-sources";
 import settingsRefinements from "./ar/settings-refinements";
 import uiFallback from "./ui-fallback";
@@ -40,6 +48,8 @@ import plugins from "./ar/plugins";
 import brands from "./ar/brands";
 
 const ar: Record<string, string> = {
+  ...videoCast,
+  ...music,
   ...ebookSources,
   ...uiFallback,
   ...coverage,
@@ -80,6 +90,14 @@ const ar: Record<string, string> = {
   ...settingsRefinements,
   ...plugins,
   ...brands,
+  ...sportsHub,
+  ...sportsConsent,
+  ...sportsStatistics,
+  ...sportsApi,
+  ...esportsArena,
+  ...bpSports,
+  ...listenTogether,
 };
 
 export default ar;
+import videoCast from "./ar/video-cast";

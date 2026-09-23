@@ -132,13 +132,35 @@ export function useCastPick(params: {
   const onPickDevice = useCallback(
     async (device: CastDeviceInfo) => {
       if (device.audio_only) {
-        setCastIncompatError(
-          t(
-            "{deviceName} is an audio-only device. Harbor can't transcode video to audio yet, so this device can only stream audio files. Pick a TV, Chromecast, or display-equipped device to stream video.",
-            { deviceName: device.name },
-          ),
-        );
+        const snap = snapRef.current;
         closeCastMenu();
+        const embedded = snap.audioTracks.filter((track) => !track.external);
+        const selected = snap.audioTracks.find((track) => track.selected);
+        if (selected?.external || (!selected && embedded.length > 1)) {
+          setCastIncompatError(t("video.cast.trackUnavailable"));
+          return;
+        }
+        if (src.isLive || src.meta.id?.startsWith("iptv:")) {
+          setCastIncompatError(t("video.cast.liveUnsupported"));
+          return;
+        }
+        if (device.kind !== "dlna") {
+          setCastIncompatError(
+            t(device.kind === "airplay" ? "music.cast.airplay" : "video.cast.protocol"),
+          );
+          return;
+        }
+        setCastTranscoding(true);
+        await pickCastDevice(device, {
+          url: src.url,
+          headers: src.headers,
+          title: src.title,
+          poster: src.meta.poster ?? undefined,
+          contentType: guessContentType(src.url, src.streamRef?.title ?? src.title),
+          startTimeSec: getPlaybackPosition(),
+          audioOnly: true,
+          audioTrackOrdinal: selected ? embedded.indexOf(selected) : undefined,
+        });
         return;
       }
       const snap = snapRef.current;

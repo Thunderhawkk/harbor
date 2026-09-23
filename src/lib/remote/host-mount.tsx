@@ -59,14 +59,26 @@ function broadcast(msg: RemoteServerMessage) {
   void invoke("remote_ws_broadcast", { payload: JSON.stringify(msg) }).catch(() => {});
 }
 
-function pushSnapshot() {
-  broadcast({
-    t: "snapshot",
-    snapshot: { ...buildRemoteSnapshot(getPlaybackPosition()), manga: buildRemoteMangaState() },
-  });
+function pushSnapshot(force = false) {
+  const snapshot = { ...buildRemoteSnapshot(getPlaybackPosition()), manga: buildRemoteMangaState() };
+  if (!force) {
+    const { updatedAt: _ignored, ...rest } = snapshot;
+    void _ignored;
+    const json = JSON.stringify(rest);
+    if (json === lastSnapshotJson && Date.now() - lastSnapshotAt < SNAPSHOT_HEARTBEAT_MS) return;
+    lastSnapshotJson = json;
+  } else {
+    lastSnapshotJson = "";
+  }
+  lastSnapshotAt = Date.now();
+  broadcast({ t: "snapshot", snapshot });
 }
 
 const SKIP_SNAPSHOT = new Set(["nav", "setText", "ping"]);
+
+let lastSnapshotJson = "";
+let lastSnapshotAt = 0;
+const SNAPSHOT_HEARTBEAT_MS = 5000;
 
 const LIBRARY_CAP = 60;
 
@@ -470,7 +482,7 @@ export function RemoteHostMount() {
       }
       if (msg.t === "hello") {
         broadcast({ t: "hello", proto: REMOTE_PROTO, server: "harbor-remote" });
-        pushSnapshot();
+        pushSnapshot(true);
         return;
       }
       if (msg.t === "cmd") {
@@ -514,7 +526,7 @@ export function RemoteHostMount() {
     void listen<{ action: string }>("remote://client", (e) => {
       if (e.payload?.action === "join") {
         broadcast({ t: "hello", proto: REMOTE_PROTO, server: "harbor-remote" });
-        pushSnapshot();
+        pushSnapshot(true);
       }
     }).then((u) => {
       if (cancelled) u();

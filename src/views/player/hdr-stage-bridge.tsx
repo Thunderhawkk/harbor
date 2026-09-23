@@ -9,7 +9,9 @@ import {
   type HdrStageAddSubtitleRequest,
   type HdrStageAddSubtitleResult,
   type HdrStageSubtitleTrackRequest,
+  type HdrNavigationRequest,
 } from "@/lib/hdr-overlay";
+import { usePlayerNavigation } from "@/lib/view";
 import type { PlayerBridge } from "@/lib/player/bridge";
 import { buildSubtitleTimingMediaKey } from "@/lib/player/subtitle-fps";
 import type { HdrStagePayload } from "../hdr-overlay-app";
@@ -42,19 +44,25 @@ export function HdrStageBridge({
   payload: HdrStagePayload;
   handlers: HdrStageHandlers;
 }) {
+  const navigation = usePlayerNavigation();
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
+  const listening = useRef(false);
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
   const payloadRef = useRef(payload);
   payloadRef.current = payload;
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !listening.current) return;
     void hdrOverlayEmitProps(payload);
   }, [active, payload]);
 
   useEffect(() => {
     if (!active) return;
-    const id = window.setInterval(() => void hdrOverlayEmitProps(payloadRef.current), 1000);
+    const id = window.setInterval(() => {
+      if (listening.current) void hdrOverlayEmitProps(payloadRef.current);
+    }, 1000);
     return () => window.clearInterval(id);
   }, [active]);
 
@@ -72,6 +80,25 @@ export function HdrStageBridge({
         else offs.push(off);
       };
       const h = () => handlersRef.current;
+      await bind("hdr-stage://navigate", (p) => {
+        const request = p as HdrNavigationRequest;
+        if (!request || !Array.isArray(request.args)) return;
+        const nav = navigationRef.current;
+        switch (request.action) {
+          case "openMeta":
+            nav.openMeta(...request.args);
+            break;
+          case "exitPlayer":
+            nav.exitPlayer(...request.args);
+            break;
+          case "openPicker":
+            nav.openPicker(...request.args);
+            break;
+          case "replacePlayerSrc":
+            nav.replacePlayerSrc(...request.args);
+            break;
+        }
+      });
       const isCurrentMediaRequest = (mediaKey: unknown) => {
         const current = payloadRef.current.src;
         return (
@@ -104,7 +131,9 @@ export function HdrStageBridge({
       await bind("hdr-stage://activity", () => h().activity());
       await bind("hdr-stage://lock", () => h().lock());
       await bind("hdr-stage://unlock", () => h().unlock());
-      await bind("hdr-stage://request", () => void hdrOverlayEmitProps(payloadRef.current));
+      await bind("hdr-stage://request", () => {
+        if (listening.current) void hdrOverlayEmitProps(payloadRef.current);
+      });
       await bind(HDR_STAGE_SET_SUBTITLE_TRACK, (p) => {
         const request = p as Partial<HdrStageSubtitleTrackRequest>;
         if (!isCurrentMediaRequest(request.mediaKey)) return;
@@ -150,9 +179,14 @@ export function HdrStageBridge({
           );
         })();
       });
-    })();
+      if (!cancelled) {
+        listening.current = true;
+        void hdrOverlayEmitProps(payloadRef.current);
+      }
+    })().catch(() => console.warn("[hdr-overlay] could not register player action listeners"));
     return () => {
       cancelled = true;
+      listening.current = false;
       for (const off of offs) off();
     };
   }, [active]);

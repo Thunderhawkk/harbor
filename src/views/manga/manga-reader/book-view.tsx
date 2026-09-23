@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   fitLevel,
+  guardPageLoaded,
   hasNativeZoom,
   nativePan,
   type FlipBookView,
@@ -97,6 +98,7 @@ function sampledAspect(srcs: string[]): Promise<number> {
 
 export type BookApi = {
   goToPage: (page: number) => void;
+  view: () => number;
   next: () => void;
   prev: () => void;
   pan: (dx: number, dy: number) => void;
@@ -112,6 +114,8 @@ export function BookFlip({
   soundEnabled,
   instanceName = NAME,
   zoom = 1,
+  pageHeaders,
+  instantTurns = false,
   onProgress,
   onReady,
 }: {
@@ -122,6 +126,8 @@ export function BookFlip({
   soundEnabled: boolean;
   instanceName?: string;
   zoom?: number;
+  pageHeaders?: Record<string, Record<string, string>>;
+  instantTurns?: boolean;
   onProgress: (page: number, spread: string) => void;
   onReady?: (api: BookApi) => void;
 }) {
@@ -132,6 +138,8 @@ export function BookFlip({
   ready.current = onReady;
   const soundOn = useRef(soundEnabled);
   soundOn.current = soundEnabled;
+  const headersRef = useRef(pageHeaders);
+  headersRef.current = pageHeaders;
   const instRef = useRef<FlipInstance | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const panRef = useRef({ x: 0, y: 0 });
@@ -206,15 +214,20 @@ export function BookFlip({
         if (h) hosts.add(h);
       }
     }
-    const httpMod = hosts.size ? import("@tauri-apps/plugin-http") : null;
+    const httpMod =
+      hosts.size || (headersRef.current && Object.keys(headersRef.current).length > 0)
+        ? import("@tauri-apps/plugin-http")
+        : null;
     if (httpMod) {
       window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
         const u =
           typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         const host = hostOf(u);
-        if (host && hosts.has(host)) {
+        const headers =
+          headersRef.current?.[u] ?? (host && hosts.has(host) ? IMAGE_FALLBACK_HEADERS : undefined);
+        if (headers) {
           return httpMod.then((m) =>
-            (m.fetch as unknown as typeof fetch)(u, { headers: IMAGE_FALLBACK_HEADERS }),
+            (m.fetch as unknown as typeof fetch)(u, { headers }),
           );
         }
         return origFetch(input, init);
@@ -234,6 +247,7 @@ export function BookFlip({
       const aspect = await sampledAspect(pages);
       await loadFlipbook();
       if (cancelled || !ref.current) return;
+      guardPageLoaded();
       const Ctor = (window as unknown as { FlipBook?: FlipCtor }).FlipBook;
       if (!Ctor) return;
       const FB = (window as unknown as { FLIPBOOK?: Record<string, unknown> }).FLIPBOOK;
@@ -247,6 +261,7 @@ export function BookFlip({
         pages: pages.map((src) => ({ src })),
         viewMode: "webgl",
         singlePageMode,
+        singlePageModeIfMobile: true,
         cover: false,
         rightToLeft: rtl,
         startPage: Math.min(pages.length, Math.max(1, resumePage + 1)),
@@ -254,6 +269,8 @@ export function BookFlip({
         backgroundColor: bg,
         backgroundTransparent: true,
         assets: { flipMp3: `${BASE}/assets/mp3/turnPage.mp3` },
+        mobile: { currentPage: { enabled: true } },
+        instantFlip: instantTurns,
         autoEnableOutline: false,
         autoEnableThumbnail: false,
         lightboxCloseOnBack: false,
@@ -301,9 +318,36 @@ export function BookFlip({
         requestAnimationFrame(stepBack);
       };
       ready.current?.({
-        goToPage: (n) => local?.goToPage?.(n),
-        next: () => local?.nextPage?.(),
-        prev: () => local?.prevPage?.(),
+        goToPage: (n) => {
+          try {
+            local?.goToPage?.(n);
+          } catch {
+            /* noop */
+          }
+        },
+        view: () => {
+          try {
+            if (local == null) return 1;
+            const v = (local as unknown as { view?: unknown }).view;
+            return typeof v === "number" ? v : 1;
+          } catch {
+            return 1;
+          }
+        },
+        next: () => {
+          try {
+            local?.nextPage?.();
+          } catch {
+            /* noop */
+          }
+        },
+        prev: () => {
+          try {
+            local?.prevPage?.();
+          } catch {
+            /* noop */
+          }
+        },
         pan: (dx, dy) => {
           if (hasNativeZoom(local)) {
             nativePan(local, dx, dy);
@@ -328,20 +372,24 @@ export function BookFlip({
           }
         },
         dragEnd: (commit, dir) => {
-          const view = local?.Book;
-          if (!view || typeof view.onSwipe !== "function") {
-            if (commit) {
+          const turn = () => {
+            try {
               if (dir === "next") local?.nextPage?.();
               else local?.prevPage?.();
+            } catch {
+              /* noop */
             }
+          };
+          const view = local?.Book;
+          if (!view || typeof view.onSwipe !== "function") {
+            if (commit) turn();
             return;
           }
           if (commit) {
             try {
               view.onSwipe(null, "end", dir === "next" ? -1 : 1, 0, 0, 1);
             } catch {
-              if (dir === "next") local?.nextPage?.();
-              else local?.prevPage?.();
+              turn();
             }
             return;
           }
