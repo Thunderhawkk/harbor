@@ -254,12 +254,25 @@ export function ContextMenu() {
 
   const [flipUp, setFlipUp] = useState(0);
   useLayoutEffect(() => {
-    setFlipUp(0);
     const el = ref.current;
-    if (!el || !state) return;
-    const r = el.getBoundingClientRect();
-    const overflow = r.bottom + flipUp - (window.innerHeight - 8);
-    if (overflow > 0) setFlipUp(Math.min(overflow, Math.max(0, r.top + flipUp - 8)));
+    if (!el || !state) {
+      setFlipUp(0);
+      return;
+    }
+    const measure = () => {
+      const estimatedHeight = state.target.kind === "subtitle" && state.target.details ? 460 : 120;
+      const anchorTop = Math.max(
+        8,
+        Math.min(state.pos.y, window.innerHeight - estimatedHeight - 8),
+      );
+      // Use layout height, not the opening animation's scaled rectangle.
+      const overflow = anchorTop + el.offsetHeight - (window.innerHeight - 8);
+      setFlipUp(Math.min(Math.max(0, overflow), anchorTop - 8));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [state]);
 
   useLayoutEffect(() => {
@@ -1012,7 +1025,7 @@ export function ContextMenu() {
         }}
         aria-label={subtitleDetails ? t("Subtitle details") : undefined}
         style={{ left, top: top - flipUp, width: menuWidth, maxHeight: "calc(100vh - 16px)" }}
-        className="fixed z-[145] flex flex-col overflow-y-auto rounded-xl border border-edge bg-elevated p-1 shadow-[0_18px_50px_-15px_rgba(0,0,0,0.7)] animate-popover-in motion-reduce:animate-none"
+        className={`fixed z-[145] flex flex-col overflow-y-auto rounded-xl border border-edge bg-elevated p-1 shadow-[0_18px_50px_-15px_rgba(0,0,0,0.7)] ${state.target.kind === "nav" ? "" : "animate-popover-in"}`}
       >
         {state.target.kind === "nav" && <TvModalClose onClose={close} label={t("Close")} />}
         {items}

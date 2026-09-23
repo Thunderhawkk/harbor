@@ -123,6 +123,8 @@ test("nav menu invokes the supplied checked action rather than navigating direct
   assert.match(source, /data-tv-focus-scope=\{state.target.kind === "nav"/);
   assert.match(source, /<TvModalClose onClose=\{close\}/);
   assert.match(source, /cancelAnimationFrame\(focusFrame\)/);
+  assert.match(source, /new ResizeObserver\(measure\)/);
+  assert.match(source, /anchorTop \+ el.offsetHeight/);
 });
 test("drag cleanup, reduced motion, and RTL handling are present", () => {
   const source = read("src/chrome/nav-edit.tsx");
