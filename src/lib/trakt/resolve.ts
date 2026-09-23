@@ -46,7 +46,7 @@ function airedEpisodes(videos: Meta["videos"]): Array<{ season: number; episode:
 // Trakt has no show-level mark call, so a show is expanded into its aired episodes;
 // per-episode writes are what let each season resolve onto its own entry.
 export async function markSeriesWatched(metaId: string): Promise<boolean> {
-  const series = await fetchMeta("series", metaId.split(":")[0]).catch(() => null);
+  const series = await fetchMeta("series", metaId.split(":")[0], true).catch(() => null);
   if (!series) return false;
   const episodes = airedEpisodes(series.videos);
   let any = false;

@@ -98,18 +98,6 @@ test("a conflicting episode id cannot fall through to the date window", () => {
   assert.equal(episodeMatches(dailyShow, wrongEpisode), false);
 });
 
-test("same-day releases without episode ids stay unresolved", () => {
-  const batch: EpisodeIdentity = { showTitle: "Batch Show", season: 1, number: 2, airDate: "2026-03-05" };
-  const seasons = [
-    season(1, [
-      { number: 1, title: "One", airDate: "2026-03-05" },
-      { number: 2, title: "Two", airDate: "2026-03-05" },
-      { number: 3, title: "Three", airDate: "2026-03-05" },
-    ]),
-  ];
-  assert.equal(findEpisodeInSeasons(batch, seasons), null);
-});
-
 test("an exact id on a later candidate beats a date guess on an earlier one", async () => {
   clearResolved();
   const deps: CatalogDeps = {

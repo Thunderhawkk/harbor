@@ -156,24 +156,13 @@ export function findEpisodeInSeasons(
     if (sameEpisodeId(identity, candidate)) return { season, number: candidate.number };
   }
 
-  // Without an id, only a strictly closest candidate is safe. A tie - same-day releases,
-  // or two episodes equidistant from the air date - cannot be told apart, and guessing
-  // would send progress to the wrong episode.
-  let best: { season: number; number: number } | null = null;
-  let bestDelta = Number.POSITIVE_INFINITY;
-  let tied = false;
+  // Same-day batches are normal here - a 2026 Grand Tour entry can hold several episodes
+  // all dated the same day - so a tie is not ambiguity to be refused. First match in
+  // season order stays the fallback, exactly as before ids were given priority.
   for (const { season, candidate } of ordered) {
-    if (!episodeMatches(identity, candidate)) continue;
-    const delta = daysBetween(identity.airDate, candidate.airDate) ?? 0;
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      best = { season, number: candidate.number };
-      tied = false;
-    } else if (delta === bestDelta) {
-      tied = true;
-    }
+    if (episodeMatches(identity, candidate)) return { season, number: candidate.number };
   }
-  return tied ? null : best;
+  return null;
 }
 
 export function hasAnyComparableSignal(

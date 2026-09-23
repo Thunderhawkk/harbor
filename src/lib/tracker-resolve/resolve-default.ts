@@ -39,7 +39,11 @@ export async function hydrateIdentity(
 ): Promise<EpisodeIdentity | null> {
   const seriesId = await cinemetaSeriesId(metaId);
   if (!seriesId) return null;
-  const series = await fetchMeta("series", seriesId).catch(() => null);
+  // Forced: the identity must come from Cinemeta even when the user disabled it in favour
+  // of a custom metadata addon, because Cinemeta is the source carrying the tracker's own
+  // episode ids. Without them no episode can be matched exactly, and hydration returning
+  // null silently disables the whole tracker path.
+  const series = await fetchMeta("series", seriesId, true).catch(() => null);
   if (!series) return null;
   const video = series.videos?.find(
     (entry) => (entry.season ?? 0) === season && (entry.episode ?? entry.number) === number,
