@@ -166,13 +166,21 @@ function withOrigin(meta: Meta, addon: Addon): Meta {
   };
 }
 
-export function hasCustomMetaAddon(): boolean {
-  return localAddons().some(
-    (a) =>
-      !isCinemeta(a) &&
-      (addonAccepts(a, "meta", "movie", "tt0000000") ||
-        addonAccepts(a, "meta", "series", "tt0000000")),
+function isMetaAddon(addon: Addon): boolean {
+  return (
+    !isCinemeta(addon) &&
+    (addonAccepts(addon, "meta", "movie", "tt0000000") ||
+      addonAccepts(addon, "meta", "series", "tt0000000"))
   );
+}
+
+export function hasCustomMetaAddon(): boolean {
+  return localAddons().some(isMetaAddon);
+}
+
+export async function hasCustomMetaAddonAsync(authKey: string | null): Promise<boolean> {
+  const user = authKey ? await userAddons(authKey).catch(() => [] as Addon[]) : [];
+  return [...user, ...localAddons()].some(isMetaAddon);
 }
 
 function isCinemeta(addon: Addon): boolean {
