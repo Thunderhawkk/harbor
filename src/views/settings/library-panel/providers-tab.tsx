@@ -19,12 +19,17 @@ import { useProviderKeys, type ProviderKeysArgs } from "./provider-keys";
 export function ProvidersTab(props: ProviderKeysArgs) {
   const { settings, update } = useSettings();
   const { authKey } = useAuth();
-  const [hasMetaAddon, setHasMetaAddon] = useState(() => hasCustomMetaAddon());
+  const [metaAddonResult, setMetaAddonResult] = useState<{
+    authKey: string | null;
+    found: boolean;
+  } | null>(null);
+  const hasMetaAddon =
+    metaAddonResult?.authKey === authKey ? metaAddonResult.found : hasCustomMetaAddon();
   useEffect(() => {
     let cancelled = false;
     void hasCustomMetaAddonAsync(authKey)
       .then((found) => {
-        if (!cancelled) setHasMetaAddon(found);
+        if (!cancelled) setMetaAddonResult({ authKey, found });
       })
       .catch(() => {});
     return () => {
