@@ -109,14 +109,14 @@ function ClearRow({
       setArmed(true);
       return;
     }
-    setArmed(false);
-    setFailed(false);
     try {
       onClear();
       setDone(true);
+      setFailed(false);
     } catch {
       setFailed(true);
     }
+    setArmed(false);
   };
 
   return (
@@ -124,7 +124,6 @@ function ClearRow({
       <button
         type="button"
         onClick={click}
-        onBlur={() => setArmed(false)}
         aria-label={done ? t("{name} cleared", { name: title }) : armed ? t("Confirm clearing {name}", { name: title }) : t("Clear {name}", { name: title })}
         className={done ? CLEAR_DONE : armed ? CLEAR_ARMED : CLEAR_IDLE}
       >

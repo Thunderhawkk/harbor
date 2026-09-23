@@ -7,7 +7,8 @@ import {
 import { useEffect, useState } from "react";
 import { Music, Check, RotateCw } from "../icons";
 import { useSettings } from "@/lib/settings";
-import { hasCustomMetaAddon } from "@/lib/meta-resource";
+import { useAuth } from "@/lib/auth";
+import { hasCustomMetaAddon, hasCustomMetaAddonAsync } from "@/lib/meta-resource";
 import { useT } from "@/lib/i18n";
 import { Section, Segmented, ToggleRow } from "../shared";
 import { ROW_ACTION, SettingGroup, SettingRow, Nested } from "../kit";
@@ -17,7 +18,24 @@ import { useProviderKeys, type ProviderKeysArgs } from "./provider-keys";
 
 export function ProvidersTab(props: ProviderKeysArgs) {
   const { settings, update } = useSettings();
-  const hasMetaAddon = hasCustomMetaAddon();
+  const { authKey } = useAuth();
+  const [metaAddonResult, setMetaAddonResult] = useState<{
+    authKey: string | null;
+    found: boolean;
+  } | null>(null);
+  const hasMetaAddon =
+    metaAddonResult?.authKey === authKey ? metaAddonResult.found : hasCustomMetaAddon();
+  useEffect(() => {
+    let cancelled = false;
+    void hasCustomMetaAddonAsync(authKey)
+      .then((found) => {
+        if (!cancelled) setMetaAddonResult({ authKey, found });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authKey]);
   const t = useT();
   const { keyRow, modals } = useProviderKeys(props);
 

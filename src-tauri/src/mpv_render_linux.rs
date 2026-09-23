@@ -340,6 +340,30 @@ pub fn install(gtk_window: &gtk::ApplicationWindow, vbox: &gtk::Box) -> Result<(
         glib::Propagation::Stop
     });
 
+    // Build the render context now rather than on the first paint. mpv_start
+    // issues loadfile as soon as install() returns, and when the file opens
+    // faster than GTK gets around to painting the GLArea (a cached file does it
+    // in milliseconds) mpv brings up the VO with no render context, logs
+    // "No render context set" and drops the video track for the whole
+    // playback. show_all() above has realized the area, so its GL context
+    // can be made current here. macOS already does this inside install().
+    // The lazy path in connect_render stays as the fallback.
+    if area.is_realized() {
+        area.make_current();
+        match build_render_context(mpv, backend, display_native) {
+            Ok(mut rc) => {
+                rc.set_update_callback(|| schedule_redraw());
+                *render_slot.borrow_mut() = Some(rc);
+            }
+            Err(e) => eprintln!(
+                "[harbor::mpv_linux] eager render ctx init failed, deferring to first paint: {}",
+                e
+            ),
+        }
+    } else {
+        eprintln!("[harbor::mpv_linux] GLArea not realized after show_all, deferring render ctx to first paint");
+    }
+
     EMBED.with(|slot| {
         *slot.borrow_mut() = Some(Embed {
             area: area.clone(),
