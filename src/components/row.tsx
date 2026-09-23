@@ -292,6 +292,10 @@ export function Row({
     const next = (Math.ceil(raw * 64) + 1) / 64;
     batchWrite(() => setCellWidth(next));
   };
+  const measureRef = useRef(measure);
+  useLayoutEffect(() => {
+    measureRef.current = measure;
+  });
 
   const readPos = (el: HTMLDivElement) => (rtl ? -el.scrollLeft : el.scrollLeft);
   const writePos = (el: HTMLDivElement, pos: number) => {
@@ -422,7 +426,7 @@ export function Row({
       if (roRaf != null) return;
       roRaf = requestAnimationFrame(() => {
         roRaf = null;
-        measure();
+        measureRef.current();
         measureScroll();
       });
     });

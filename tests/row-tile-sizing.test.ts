@@ -57,3 +57,16 @@ test("row tracks keep vertical room for the hover lift", () => {
 test("scroll padding no longer offsets snapping now that the track has no inline padding", () => {
   assert.doesNotMatch(row, /scroll-ps-5 scroll-pe-5/, "20px scroll padding would misalign snap targets");
 });
+
+test("row measurement never recomputes from a stale effMin after a style switch", () => {
+  assert.match(
+    row,
+    /const measureRef = useRef\(measure\)/,
+    "measure must be held in a ref so the ResizeObserver sees the latest effMin",
+  );
+  assert.match(
+    row,
+    /measureRef\.current\(\)/,
+    "the ResizeObserver must call the ref, not a captured measure closure",
+  );
+});
