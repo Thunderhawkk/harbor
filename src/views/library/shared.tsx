@@ -25,7 +25,13 @@ export type Tab =
 
 export type TypeKey = "all" | "movie" | "series";
 
-export type WatchlistMerged = { key: string; meta: Meta; date: number | null; stremioId?: string };
+export type WatchlistMerged = {
+  key: string;
+  meta: Meta;
+  date: number | null;
+  stremioId?: string;
+  localId?: string;
+};
 
 export function TabBtn({
   active,
@@ -239,14 +245,16 @@ export function RefreshButton({ onClick, spinning }: { onClick: () => void; spin
 }
 
 export function GroupedGrid<
-  T extends { meta: Meta; date: number | null; key: string; stremioId?: string },
+  T extends { meta: Meta; date: number | null; key: string; stremioId?: string; localId?: string },
 >({
   groups,
   onRemove,
+  onRemoveLocal,
   scrollRef,
 }: {
   groups: Array<{ label: string; items: T[] }>;
   onRemove?: (stremioId: string) => void;
+  onRemoveLocal?: (localId: string) => void;
   scrollRef?: RefObject<HTMLElement | null>;
 }) {
   const t = useT();
@@ -270,7 +278,11 @@ export function GroupedGrid<
                 <WatchlistCard
                   meta={it.meta}
                   onRemove={
-                    onRemove && it.stremioId ? () => onRemove(it.stremioId as string) : undefined
+                    onRemove && it.stremioId
+                      ? () => onRemove(it.stremioId as string)
+                      : onRemoveLocal && it.localId
+                        ? () => onRemoveLocal(it.localId as string)
+                        : undefined
                   }
                 />
               )}
@@ -282,7 +294,11 @@ export function GroupedGrid<
                   key={it.key}
                   meta={it.meta}
                   onRemove={
-                    onRemove && it.stremioId ? () => onRemove(it.stremioId as string) : undefined
+                    onRemove && it.stremioId
+                      ? () => onRemove(it.stremioId as string)
+                      : onRemoveLocal && it.localId
+                        ? () => onRemoveLocal(it.localId as string)
+                        : undefined
                   }
                 />
               ))}
