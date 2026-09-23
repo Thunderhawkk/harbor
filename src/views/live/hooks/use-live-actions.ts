@@ -3,6 +3,7 @@ import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { buildCatchupUrl } from "@/lib/iptv/catchup";
 import { headersFromChannel } from "@/lib/iptv/channel-headers";
+import { liveChannelSource } from "@/lib/iptv/playback-source";
 import { recordChannelPlay } from "@/lib/iptv/channel-stats";
 import { buildM3u, suggestExportFilename } from "@/lib/iptv/export";
 import { findCurrent } from "@/lib/iptv/xmltv";
@@ -38,16 +39,7 @@ export function useLiveActions(params: {
       recordChannelPlay(ch);
       const programs = ch.tvgId ? epg?.byChannel.get(ch.tvgId) : undefined;
       const liveProgram = findCurrent(programs, Date.now()).current?.title ?? undefined;
-      openPlayer({
-        meta: synthChannelMeta(ch),
-        url: ch.url,
-        title: ch.name,
-        subtitle: ch.group ?? "Live",
-        notWebReady: true,
-        isLive: true,
-        headers: headersFromChannel(ch),
-        liveProgram,
-      });
+      openPlayer(liveChannelSource(ch, ch.group ?? "Live", liveProgram));
     },
     [openPlayer, epg],
   );

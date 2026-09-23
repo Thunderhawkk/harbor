@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 const EXIT_MS = 190;
@@ -30,17 +30,27 @@ export function useModalExit(onClose: () => void, open = true) {
   return { closing, close };
 }
 
-export function useEscape(onDismiss: () => void, active = true) {
+export function useEscape(
+  onDismiss: () => void,
+  active = true,
+  scope?: RefObject<HTMLElement | null>,
+) {
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      e.stopPropagation();
+      if ((e.target as Element | null)?.closest?.("[data-dropdown-menu]")) return;
+      if (scope) {
+        // A nested career profile must not dismiss the event behind it as well.
+        const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+        if (dialogs[dialogs.length - 1] !== scope.current) return;
+      }
+      e.stopImmediatePropagation();
       onDismiss();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onDismiss, active]);
+  }, [onDismiss, active, scope]);
 }
 
 export function ModalShell({
@@ -49,6 +59,7 @@ export function ModalShell({
   width = 640,
   labelledBy,
   backdropClassName,
+  portalTarget,
   children,
 }: {
   closing: boolean;
@@ -56,9 +67,11 @@ export function ModalShell({
   width?: number;
   labelledBy?: string;
   backdropClassName?: string;
+  portalTarget?: Element;
   children: ReactNode;
 }) {
-  useEscape(onDismiss);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEscape(onDismiss, true, dialogRef);
 
   return createPortal(
     <div
@@ -70,6 +83,7 @@ export function ModalShell({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
@@ -82,6 +96,6 @@ export function ModalShell({
         {children}
       </div>
     </div>,
-    document.body,
+    portalTarget ?? document.body,
   );
 }

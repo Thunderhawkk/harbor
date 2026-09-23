@@ -4,10 +4,8 @@ import type { Meta } from "@/lib/cinemeta";
 import { useT } from "@/lib/i18n";
 import { useMediaFavorites, type MediaEntry } from "@/lib/media-favorites";
 import { useCharacterFavorites } from "@/lib/character-favorites";
-import { useMangaFavorites } from "@/lib/manga-favorites";
 import type { AnimeCharacter } from "@/lib/providers/anime-characters";
 import { CharacterCard } from "@/views/detail/character-card";
-import { MangaFavCard } from "./manga-fav-card";
 import { Grid, WatchlistCard } from "./shared";
 
 const ANIME_ID = /^(kitsu|mal|anilist|anidb|simkl):/;
@@ -27,7 +25,6 @@ export function FavoritesTab() {
   const t = useT();
   const { items: mediaItems } = useMediaFavorites();
   const { items: charItems } = useCharacterFavorites();
-  const { items: mangaItems } = useMangaFavorites();
 
   const { anime, movies, shows } = useMemo(() => {
     const all = [...mediaItems.values()].sort((a, b) => b.addedAt - a.addedAt);
@@ -46,15 +43,9 @@ export function FavoritesTab() {
     [charItems],
   );
 
-  const manga = useMemo(
-    () => [...mangaItems.values()].sort((a, b) => b.addedAt - a.addedAt),
-    [mangaItems],
-  );
-
   if (
     characters.length === 0 &&
     anime.length === 0 &&
-    manga.length === 0 &&
     movies.length === 0 &&
     shows.length === 0
   ) {
@@ -77,15 +68,6 @@ export function FavoritesTab() {
           <Grid>
             {anime.map((e) => (
               <WatchlistCard key={e.id} meta={toMeta(e)} />
-            ))}
-          </Grid>
-        </Section>
-      )}
-      {manga.length > 0 && (
-        <Section title={t("Favorite Manga")} count={manga.length}>
-          <Grid>
-            {manga.map((e) => (
-              <MangaFavCard key={e.id} entry={e} />
             ))}
           </Grid>
         </Section>
@@ -137,9 +119,9 @@ function EmptyFavorites() {
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-edge-soft bg-canvas/30 px-8 py-16 text-center">
       <Heart size={28} strokeWidth={1.6} className="text-ink-subtle" />
       <h2 className="text-[16px] font-semibold text-ink">{t("No favorites yet")}</h2>
-      <p className="max-w-md text-[13px] leading-relaxed text-ink-muted">
-        {t("Tap the heart on any movie, show, manga, or character to save it here.")}
-      </p>
+        <p className="max-w-md text-[13px] leading-relaxed text-ink-muted">
+          {t("Tap the heart on any movie, show, or character to save it here. Manga lives in the manga Library.")}
+        </p>
     </div>
   );
 }

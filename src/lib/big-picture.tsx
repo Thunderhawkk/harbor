@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { StreamingService } from "@/lib/settings/types";
+import type { SportsGame } from "@/lib/sports/espn-types";
 
 export type BigPictureRoute =
   | { kind: "home" }
@@ -7,6 +8,8 @@ export type BigPictureRoute =
   | { kind: "shows" }
   | { kind: "movies" }
   | { kind: "live" }
+  | { kind: "sports" }
+  | { kind: "sports-event"; game: SportsGame }
   | { kind: "discover" }
   | { kind: "search" }
   | { kind: "library" }
@@ -93,6 +96,7 @@ export type BigPictureTabKind =
   | "shows"
   | "movies"
   | "live"
+  | "sports"
   | "search"
   | "library"
   | "collections"
@@ -116,6 +120,7 @@ export function routeKey(route: BigPictureRoute): string {
   if (route.kind === "tmdb-collection") return `tmdb-collection:${route.collectionId}`;
   if (route.kind === "service") return `service:${route.service}`;
   if (route.kind === "addon") return `addon:${route.base}`;
+  if (route.kind === "sports-event") return `sports-event:${route.game.id}`;
   return route.kind;
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { usePreviewNavCustomization } from "@/lib/theme-preview";
 import { Monitor } from "lucide-react";
 import { Search } from "@/components/icons/search-icon";
 import { HarborMark } from "@/components/icons/harbor-mark";
@@ -20,7 +21,7 @@ import { useParental } from "@/lib/parental";
 import { useView, type View } from "@/lib/view";
 import { close, minimize, toggleMaximize, useMaximized } from "@/lib/window";
 import { OverflowNav, type NavEntry } from "@/chrome/nav-overflow";
-import { NAV_ITEMS, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
+import { useAvailableNavItems, applyNavCustomization, type NavItem } from "@/chrome/nav-items";
 import { useBigPictureEntry } from "@/chrome/use-big-picture-entry";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -39,7 +40,10 @@ export function RoyalTopbar() {
     settings.theme.preset !== "custom" ? getThemeById(settings.theme.preset) : null;
   const customMark = themePreset?.logo?.mark ?? null;
 
-  const items = applyNavCustomization(NAV_ITEMS, settings.navCustomization);
+  const items = applyNavCustomization(
+    useAvailableNavItems(),
+    usePreviewNavCustomization(settings.navCustomization),
+  );
 
   const isVisible = (item: NavItem) => {
     if (item.view === "vod" && !settings.showPlaylistsTab) return false;

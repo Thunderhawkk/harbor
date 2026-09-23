@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type RefObject } from "react";
+import {
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
+import { AthleteProfileLink, SportsAthleteLeagueContext } from "../athlete-profile";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import type { MatchPlayer } from "@/lib/sports/espn";
@@ -66,6 +75,7 @@ export function PitchPlayer({
   align,
 }: PitchPlayerProps) {
   const t = useT();
+  const league = useContext(SportsAthleteLeagueContext);
   const cardId = useId();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -77,17 +87,11 @@ export function PitchPlayer({
 
   const disc = compact ? "h-[30px] w-[30px] text-[11px]" : "h-[38px] w-[38px] text-[13px]";
   const skin =
-    side === "home"
-      ? "bg-ink text-canvas ring-canvas/40"
-      : "bg-canvas text-ink ring-edge";
+    side === "home" ? "bg-ink text-canvas ring-canvas/40" : "bg-canvas text-ink ring-edge";
 
   const tipSide = flip ? "top-full mt-2" : "bottom-full mb-2";
   const tipAlign =
-    align === "start"
-      ? "left-0"
-      : align === "end"
-        ? "right-0"
-        : "left-1/2 -translate-x-1/2";
+    align === "start" ? "left-0" : align === "end" ? "right-0" : "left-1/2 -translate-x-1/2";
   const tipShow = open
     ? "opacity-100"
     : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
@@ -100,7 +104,13 @@ export function PitchPlayer({
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
       }}
-      style={{ left: `${left}%`, top: `${top}%`, "--pitch-order": order } as CSSProperties}
+      style={
+        {
+          left: `${left}%`,
+          top: `${top}%`,
+          "--pitch-order": order,
+        } as CSSProperties
+      }
     >
       <div
         className={`group relative flex ${compact ? "w-[62px]" : "w-[74px]"} flex-col items-center gap-1`}
@@ -133,8 +143,12 @@ export function PitchPlayer({
 
           {(yellow > 0 || red > 0) && (
             <span className="absolute -bottom-1 -right-1 flex items-center gap-px">
-              {yellow > 0 && <span className="pitch-card h-[13px] w-[9px] bg-yellow-400 ring-1 ring-canvas" />}
-              {red > 0 && <span className="pitch-card h-[13px] w-[9px] bg-danger ring-1 ring-canvas" />}
+              {yellow > 0 && (
+                <span className="pitch-card h-[13px] w-[9px] bg-yellow-400 ring-1 ring-canvas" />
+              )}
+              {red > 0 && (
+                <span className="pitch-card h-[13px] w-[9px] bg-danger ring-1 ring-canvas" />
+              )}
             </span>
           )}
 
@@ -155,9 +169,10 @@ export function PitchPlayer({
 
         <div
           id={cardId}
-          className={`pointer-events-none absolute z-30 w-[172px] rounded-lg bg-elevated p-2.5 shadow-[0_10px_28px_-8px_rgba(0,0,0,0.55)] ring-1 ring-edge-soft transition-opacity duration-150 ${tipShow} ${tipSide} ${tipAlign}`}
+          className={`${open ? "pointer-events-auto" : "pointer-events-none"} absolute z-30 w-[172px] rounded-lg bg-elevated p-2.5 shadow-[0_10px_28px_-8px_rgba(0,0,0,0.55)] ring-1 ring-edge-soft transition-opacity duration-150 ${tipShow} ${tipSide} ${tipAlign}`}
         >
           <div className="truncate text-[12.5px] font-semibold text-ink">{player.name}</div>
+          {open && league && <AthleteProfileLink athlete={player} league={league} />}
           <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-subtle">
             {player.jersey ? (
               <span dir="ltr" className="tabular-nums">{`#${player.jersey}`}</span>

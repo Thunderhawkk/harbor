@@ -20,6 +20,7 @@ export function useKeyboardShortcuts(params: {
   drawMode: boolean;
   setDrawMode: (v: boolean) => void;
   closePlayer: () => void;
+  returnToPreview?: () => void;
   playPauseToggle: () => void;
   seekStep: (delta: number) => void;
   seekTo: (sec: number) => void;
@@ -60,6 +61,7 @@ export function useKeyboardShortcuts(params: {
     drawMode,
     setDrawMode,
     closePlayer,
+    returnToPreview,
     playPauseToggle,
     seekStep,
     seekTo,
@@ -150,6 +152,8 @@ export function useKeyboardShortcuts(params: {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const dock = document.querySelector('[data-harbor-player][data-docked="true"]');
+      if (dock && !dock.contains(e.target as Node) && !e.key.startsWith("Media")) return;
       if (isPlayerInteractionLocked()) {
         if (e.cancelable) e.preventDefault();
         return;
@@ -189,6 +193,11 @@ export function useKeyboardShortcuts(params: {
         if (getLeaveConfirm().open) return;
         if (drawMode) {
           setDrawMode(false);
+          return;
+        }
+        if (returnToPreview) {
+          e.preventDefault();
+          returnToPreview();
           return;
         }
         void (async () => {
@@ -537,6 +546,7 @@ export function useKeyboardShortcuts(params: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     closePlayer,
+    returnToPreview,
     togglePip,
     drawMode,
     snap.muted,

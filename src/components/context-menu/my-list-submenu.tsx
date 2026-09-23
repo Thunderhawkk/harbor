@@ -2,11 +2,9 @@ import { Check, ChevronRight, ListPlus, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  addToList,
-  toggleInList,
-  useCustomLists,
-  useListsContaining,
+  sharedLists,
   type ListItemInput,
+  type ListStore,
 } from "@/lib/custom-lists";
 import { useInLocalWatchlist, useLocalWatchlist } from "@/lib/local-watchlist";
 import { useT } from "@/lib/i18n";
@@ -16,10 +14,18 @@ import { CreateListModal } from "@/components/lists/create-list-modal";
 const FLYOUT_WIDTH = 244;
 const FLYOUT_HEIGHT_ESTIMATE = 320;
 
-export function MyListSubmenu({ item, onClose }: { item: ListItemInput; onClose: () => void }) {
+export function MyListSubmenu({
+  item,
+  onClose,
+  store = sharedLists,
+}: {
+  item: ListItemInput;
+  onClose: () => void;
+  store?: ListStore;
+}) {
   const t = useT();
-  const lists = useCustomLists();
-  const containing = useListsContaining(item.id);
+  const lists = store.useLists();
+  const containing = store.useListsContaining(item.id);
   const local = useLocalWatchlist();
   const inDefault = useInLocalWatchlist(item.id);
   const [open, setOpen] = useState(false);
@@ -60,7 +66,7 @@ export function MyListSubmenu({ item, onClose }: { item: ListItemInput; onClose:
     emitListToast(inDefault ? t("Removed from My List") : t("Added to My List"));
   };
   const toggleCustom = (listId: string, name: string) => {
-    const nowIn = toggleInList(listId, item);
+    const nowIn = store.toggleInList(listId, item);
     emitListToast(nowIn ? t('Added to "{name}"', { name }) : t('Removed from "{name}"', { name }));
   };
 
@@ -120,12 +126,13 @@ export function MyListSubmenu({ item, onClose }: { item: ListItemInput; onClose:
 
       {creating && (
         <CreateListModal
+          store={store}
           onClose={() => {
             setCreating(false);
             onClose();
           }}
           onCreated={(id) => {
-            addToList(id, item);
+            store.addToList(id, item);
             emitListToast(t("Added to new list"));
           }}
         />

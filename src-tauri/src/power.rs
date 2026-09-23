@@ -86,6 +86,9 @@ mod linux {
 
     use zbus::zvariant::{OwnedObjectPath, Value};
 
+    const GNOME_DESTINATION: &str = "org.gnome.SessionManager";
+    const GNOME_PATH: &str = "/org/gnome/SessionManager";
+    const GNOME_INTERFACE: &str = "org.gnome.SessionManager";
     const SCREENSAVER_DESTINATION: &str = "org.freedesktop.ScreenSaver";
     const SCREENSAVER_PATH: &str = "/org/freedesktop/ScreenSaver";
     const SCREENSAVER_INTERFACE: &str = "org.freedesktop.ScreenSaver";
@@ -96,6 +99,10 @@ mod linux {
     const INHIBIT_SUSPEND_AND_IDLE: u32 = 4 | 8;
 
     pub enum Token {
+        GnomeSession {
+            connection: zbus::Connection,
+            cookie: u32,
+        },
         ScreenSaver {
             connection: zbus::Connection,
             cookie: u32,
@@ -109,11 +116,37 @@ mod linux {
     pub async fn begin() -> Option<Token> {
         let connection = zbus::Connection::session().await.ok()?;
 
-        if let Some(token) = begin_portal(&connection).await {
+        if std::env::var_os("FLATPAK_ID").is_some() {
+            return begin_portal(&connection).await;
+        }
+
+        if let Some(token) = begin_gnome(&connection).await {
             return Some(token);
         }
 
-        begin_screensaver(&connection).await
+        if let Some(token) = begin_screensaver(&connection).await {
+            return Some(token);
+        }
+
+        begin_portal(&connection).await
+    }
+
+    async fn begin_gnome(connection: &zbus::Connection) -> Option<Token> {
+        let proxy = zbus::Proxy::new(connection, GNOME_DESTINATION, GNOME_PATH, GNOME_INTERFACE)
+            .await
+            .ok()?;
+        let cookie = proxy
+            .call(
+                "Inhibit",
+                &("Harbor", 0u32, "Harbor playback", INHIBIT_SUSPEND_AND_IDLE),
+            )
+            .await
+            .ok()?;
+
+        Some(Token::GnomeSession {
+            connection: connection.clone(),
+            cookie,
+        })
     }
 
     async fn begin_screensaver(connection: &zbus::Connection) -> Option<Token> {
@@ -159,6 +192,14 @@ mod linux {
 
     pub async fn end(token: Token) {
         match token {
+            Token::GnomeSession { connection, cookie } => {
+                if let Ok(proxy) =
+                    zbus::Proxy::new(&connection, GNOME_DESTINATION, GNOME_PATH, GNOME_INTERFACE)
+                        .await
+                {
+                    let _ = proxy.call::<_, _, ()>("Uninhibit", &(cookie,)).await;
+                }
+            }
             Token::ScreenSaver { connection, cookie } => {
                 if let Ok(proxy) = zbus::Proxy::new(
                     &connection,

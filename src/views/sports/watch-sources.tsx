@@ -1,33 +1,32 @@
-import { Check, Globe, Plus, X } from "lucide-react";
+import { hubLeague } from "@/lib/sports/hub-data";
+import { legacyEsportsMatch } from "@/lib/sports/legacy-esports-match";
+import { Check, Link2, X, Play, ChevronDown, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Search } from "@/components/icons/search-icon";
 import { useT } from "@/lib/i18n";
 import { usePlaylists } from "@/lib/iptv/playlists-store";
-import type { IptvChannel, IptvPlaylist } from "@/lib/iptv/types";
+import { getCachedEpg, subscribeEpg } from "@/lib/iptv/epg-store";
+import { computeTvgIdCounts, epgProgramsForChannel } from "@/lib/iptv/epg-resolver";
+import { epgOffsetHoursPref } from "@/lib/iptv/settings-bridge";
+import { prepareSportsChannels } from "@/lib/sports/channel-index";
+import type { IptvChannel, IptvPlaylist, EpgProgram } from "@/lib/iptv/types";
 import { getLeagueLabel, type SportsGame } from "@/lib/sports/espn";
 import {
-  buildSportsChannelIndex,
   leagueForTag,
-  matchChannelsForGame,
+  matchChannelsForGameAsync,
   searchSportsChannels,
-  type ChannelMatch,
   type PreparedChannel,
   type SportsChannelIndex,
+  type ChannelMatch,
 } from "@/lib/sports/iptv-match";
+import { hostOf } from "@/lib/sports/stream-resolver";
 import { useView } from "@/lib/view";
 import { useAllPlaylists } from "@/views/live/hooks/use-all-playlists";
-import {
-  setAttachedStream,
-  toggleAttachedChannel,
-  useAttachments,
-  type AttachedStream,
-} from "./source-store";
-import { fixtureLabelOf, hostOf, useChannelPlayer, useStreamPlayer } from "./watch-flow";
-
-const VISIBLE_CHIPS = 4;
-const CHIP =
-  "inline-flex h-[22px] items-center gap-1.5 rounded-sm px-1.5 text-[10.5px] uppercase tracking-[0.04em] ring-1 ring-inset transition-colors";
-const CHIP_QUIET = `${CHIP} bg-canvas font-medium text-ink-subtle ring-edge-soft hover:text-ink`;
+import { loadPlaylist } from "@/lib/iptv/store";
+import { AddStreamDialog, useStreamPlayer } from "./add-stream-dialog";
+import { setAttachedStream, toggleAttachedChannel, useAttachments } from "./source-store";
+import { fixtureLabelOf, useChannelPlayer } from "./watch-flow";
+import { SportsAddonSources } from "./addon-source-panel";
 
 let flatKey = "";
 let flatChannels: IptvChannel[] = [];
@@ -41,21 +40,105 @@ function flatten(playlists: Map<string, IptvPlaylist>): IptvChannel[] {
   return flatChannels;
 }
 
-export function useSportsChannelIndex(): SportsChannelIndex {
+const EMPTY_INDEX: SportsChannelIndex = { channels: [], scanned: 0 };
+
+export function useSportsChannelIndex(): SportsChannelIndex & {
+  loading: boolean;
+} {
   const sources = usePlaylists();
   const playlists = useAllPlaylists(sources, true);
-  return useMemo(() => buildSportsChannelIndex(flatten(playlists)), [playlists]);
+  const [fetching, setFetching] = useState(true);
+  useEffect(() => {
+    let active = true;
+    setFetching(true);
+    void Promise.allSettled(
+      sources.filter((source) => source.kind !== "epg").map((source) => loadPlaylist(source)),
+    ).then(() => {
+      if (active) setFetching(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [sources]);
+  const channels = useMemo(() => flatten(playlists), [playlists]);
+  const [base, setBase] = useState(EMPTY_INDEX);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setBase(EMPTY_INDEX);
+    void prepareSportsChannels(channels, controller.signal, setBase)
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [channels]);
+  const [epgVersion, setEpgVersion] = useState(0);
+  // Reuse Live TV's guide. Opening a match must not download entire XMLTV feeds.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = subscribeEpg(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setEpgVersion((version) => version + 1), 1500);
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
+  }, []);
+  const [programs, setPrograms] = useState(new Map<string, EpgProgram[]>());
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    const ids = new Set(base.channels.map((item) => item.channel.id));
+    const next = new Map<string, EpgProgram[]>();
+    const offsetHours = epgOffsetHoursPref();
+    void (async () => {
+      for (const playlist of playlists.values()) {
+        const guide = getCachedEpg(playlist.id);
+        if (!guide) continue;
+        const counts = computeTvgIdCounts(playlist.channels);
+        for (let i = 0; i < playlist.channels.length; i++) {
+          if (cancelled) return;
+          const channel = playlist.channels[i];
+          if (ids.has(channel.id)) {
+            const rows = epgProgramsForChannel(channel, guide, counts, offsetHours);
+            if (rows?.length) next.set(channel.id, rows);
+          }
+          if (i % 128 === 127) await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+      if (!cancelled) setPrograms(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [base, loading, playlists, epgVersion]);
+  return useMemo(
+    () => ({
+      ...base,
+      programs,
+      loading: loading || fetching || [...playlists.values()].some((playlist) => playlist.loading),
+    }),
+    [base, programs, loading, fetching, playlists],
+  );
 }
 
-export function WatchSources({
-  game,
-  index,
-  broadcastNames,
-}: {
+type WatchSourcesProps = {
   game: SportsGame;
   index?: SportsChannelIndex;
   broadcastNames?: readonly string[];
-}) {
+};
+
+export function WatchSources(props: WatchSourcesProps) {
+  if (props.game.state === "post") return null;
+  if (legacyEsportsMatch(props.game) || hubLeague(props.game.league)?.group === "esports")
+    return <SportsAddonSources game={props.game} />;
+  return <ActiveWatchSources {...props} />;
+}
+
+function ActiveWatchSources({ game, index, broadcastNames }: WatchSourcesProps) {
   const t = useT();
   const { setView } = useView();
   const playStream = useStreamPlayer();
@@ -70,62 +153,172 @@ export function WatchSources({
   );
   const stream = attachments.streams[game.id] ?? null;
   const [expanded, setExpanded] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [webStream, setWebStream] = useState(false);
   const anchor = useRef<HTMLDivElement>(null);
+  const addonAnchor = useRef<HTMLDivElement>(null);
+  const [hasAddonSources, setHasAddonSources] = useState(false);
   const fixtureLabel = fixtureLabelOf(game);
 
-  const matches = useMemo(
-    () => matchChannelsForGame(game, active, { attachedIds, broadcastNames, limit: 8 }),
-    [game, active, attachedIds, broadcastNames],
-  );
+  const [matches, setMatches] = useState<ChannelMatch[]>([]);
+  const [matching, setMatching] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    setMatching(true);
+    void matchChannelsForGameAsync(
+      game,
+      active,
+      {
+        attachedIds,
+        broadcastNames: broadcastNames ?? game.broadcasts,
+        limit: 8,
+      },
+      controller.signal,
+    )
+      .then((matches) => {
+        if (!controller.signal.aborted) setMatches(matches);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setMatching(false);
+      });
+    return () => controller.abort();
+  }, [game, active, attachedIds, broadcastNames]);
 
-  if (game.state === "post") return null;
-
-  const noSources = sources.length === 0;
-  const shown = noSources ? [] : expanded ? matches : matches.slice(0, VISIBLE_CHIPS);
-  const hidden = noSources ? 0 : matches.length - shown.length;
-
+  const selected =
+    matches.find((m) => m.channel.id === selectedId) ??
+    matches.find((m) => m.tier === "exact" || m.attached);
+  const play = () => {
+    if (stream) playStream(stream, fixtureLabel);
+    else if (selected) playChannel(selected.channel, fixtureLabel);
+    else if (matches.length) setExpanded(true);
+    else if (hasAddonSources) {
+      addonAnchor.current?.scrollIntoView({ block: "nearest" });
+      (
+        addonAnchor.current?.querySelector<HTMLButtonElement>(".sh-addon-choices button") ??
+        addonAnchor.current?.querySelector<HTMLButtonElement>(".sh-addon-tools button")
+      )?.focus({ preventScroll: true });
+    } else if (sources.length) setPicking(true);
+    else setView("live");
+  };
   return (
-    <div ref={anchor} className="relative flex flex-wrap items-center gap-1.5">
-      {stream && (
-        <StreamChip
-          stream={stream}
-          onPlay={() => playStream(stream, fixtureLabel)}
-          onDetach={() => setAttachedStream(game.id, null)}
-        />
-      )}
-      {shown.map((match, i) => (
-        <SourceChip
-          key={match.channel.id}
-          match={match}
-          lead={i === 0}
-          onPlay={() => playChannel(match.channel, fixtureLabel)}
-        />
-      ))}
-      {hidden > 0 && (
-        <button type="button" onClick={() => setExpanded(true)} className={CHIP_QUIET}>
-          {`+${hidden}`}
+    <section ref={anchor} className="sh-watch-panel">
+      <div className="sh-watch-heading">
+        <span>
+          <strong>{t("Watch with your sources")}</strong>
+          <small>{t("Your configured IPTV, M3U and Xtream channels, in one place.")}</small>
+        </span>
+        <button className="sh-watch-play" onClick={play}>
+          <Play size={20} fill="currentColor" />
+          {t(
+            stream || selected
+              ? game.state === "pre"
+                ? "Preview channel"
+                : "Play stream"
+              : matches.length
+                ? "Choose a channel"
+                : hasAddonSources
+                  ? "Addon sources"
+                  : "Set up sources",
+          )}
         </button>
+      </div>
+      {game.state === "pre" && (
+        <p className="sh-watch-preview-note">
+          {t("Event has not started. This opens the channel’s current broadcast.")}
+        </p>
       )}
-      {noSources ? (
-        <>
-          <button type="button" onClick={() => setView("live")} className={CHIP_QUIET}>
-            <Plus size={9} />
-            {t("Add an IPTV source")}
+      {(matching || own.loading) && <small role="status">{t("Checking your channels…")}</small>}
+      <div className="sh-watch-selected">
+        <span>
+          {stream
+            ? stream.title || hostOf(stream.page)
+            : selected?.channel.name ||
+              t(
+                matches.length
+                  ? "Possible channels found. Choose the correct broadcast."
+                  : hasAddonSources
+                    ? "Choose an addon source to see its streams."
+                    : "No matching channel is connected yet.",
+              )}
+        </span>
+        {(stream || selected) && (
+          <small>
+            {t(stream || selected?.attached ? "Your saved source" : "Matched from your channels")}
+          </small>
+        )}
+        {stream && (
+          <button
+            aria-label={t("Remove this stream")}
+            onClick={() => setAttachedStream(game.id, null)}
+          >
+            <X size={16} />
           </button>
-        </>
-      ) : (
+        )}
+      </div>
+      <div className="sh-watch-actions">
+        {matches.length > 0 && (
+          <button
+            className="sh-button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded(!expanded)}
+          >
+            <ChevronDown size={16} />
+            {t("Choose channel")} · {matches.length}
+          </button>
+        )}
         <button
-          type="button"
-          onClick={() => setPicking((v) => !v)}
-          className={`${CHIP} font-medium ${
-            picking ? "bg-raised text-ink ring-edge" : "bg-canvas text-ink-subtle ring-edge-soft hover:text-ink"
-          }`}
+          className="sh-button"
+          onClick={() => (sources.length ? setPicking(!picking) : setView("live"))}
         >
-          <Plus size={9} />
-          {matches.length === 0 ? t("Attach a channel") : t("Source")}
+          <Settings2 size={16} />
+          {t("Configure sources")}
         </button>
+        <button className="sh-button" onClick={() => setWebStream(true)}>
+          <Link2 size={16} />
+          {t("Paste a stream")}
+        </button>
+      </div>
+      {expanded && (
+        <div className="sh-watch-channels">
+          {matches.map((match) => (
+            <button
+              key={match.channel.id}
+              aria-pressed={selected?.channel.id === match.channel.id && !stream}
+              onClick={() => {
+                setSelectedId(match.channel.id);
+                setAttachedStream(game.id, null);
+              }}
+            >
+              <NetworkMark logo={match.channel.logo} label={match.label} />
+              <span>
+                <strong>{match.channel.name}</strong>
+                <small>
+                  {t(
+                    match.attached
+                      ? "Your pick for this competition"
+                      : match.reasons.some((r) => r.kind === "event")
+                        ? "Event matchup found"
+                        : match.tier === "exact"
+                          ? "Strong match"
+                          : match.tier === "likely"
+                            ? "Likely match · check the broadcast"
+                            : "Possible match · check the broadcast",
+                  )}
+                </small>
+              </span>
+              {selected?.channel.id === match.channel.id && !stream && <Check size={18} />}
+            </button>
+          ))}
+        </div>
       )}
+      <div ref={addonAnchor}>
+        <SportsAddonSources
+          game={broadcastNames ? { ...game, broadcasts: [...broadcastNames] } : game}
+          onAvailable={setHasAddonSources}
+        />
+      </div>
       {picking && (
         <AttachPopover
           game={game}
@@ -133,66 +326,20 @@ export function WatchSources({
           attachedIds={attachedIds}
           anchor={anchor}
           onClose={() => setPicking(false)}
+          onWebStream={() => {
+            setPicking(false);
+            setWebStream(true);
+          }}
         />
       )}
-    </div>
-  );
-}
-
-function SourceChip({ match, lead, onPlay }: { match: ChannelMatch; lead: boolean; onPlay: () => void }) {
-  const t = useT();
-  const why = match.attached
-    ? t("Your pick for this competition")
-    : match.reasons.map((r) => r.label).filter(Boolean).join(" · ");
-  const look = match.attached
-    ? "bg-elevated font-semibold text-ink ring-accent/40"
-    : lead && match.tier !== "possible"
-      ? "bg-elevated font-semibold text-ink ring-edge"
-      : "bg-canvas font-medium text-ink-muted ring-edge-soft hover:text-ink";
-  return (
-    <button
-      type="button"
-      onClick={onPlay}
-      title={why ? `${match.channel.name} · ${why}` : match.channel.name}
-      className={`animate-item-in ${CHIP} max-w-[190px] ${look}`}
-    >
-      <NetworkMark logo={match.channel.logo} label={match.label} />
-      <span className="truncate">{match.label}</span>
-    </button>
-  );
-}
-
-function StreamChip({
-  stream,
-  onPlay,
-  onDetach,
-}: {
-  stream: AttachedStream;
-  onPlay: () => void;
-  onDetach: () => void;
-}) {
-  const t = useT();
-  const host = hostOf(stream.page);
-  return (
-    <span className={`animate-item-in ${CHIP} max-w-[190px] bg-elevated font-semibold text-ink ring-accent/40`}>
-      <button
-        type="button"
-        onClick={onPlay}
-        title={stream.title ? `${stream.title} · ${host}` : host}
-        className="flex min-w-0 items-center gap-1.5"
-      >
-        <Globe size={10} className="shrink-0 text-ink-subtle" />
-        <span className="truncate">{host}</span>
-      </button>
-      <button
-        type="button"
-        onClick={onDetach}
-        aria-label={t("Remove this stream")}
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-raised hover:text-ink"
-      >
-        <X size={9} />
-      </button>
-    </span>
+      {webStream && (
+        <AddStreamDialog
+          fixtureLabel={fixtureLabel}
+          onAttach={(next) => setAttachedStream(game.id, next)}
+          onClose={() => setWebStream(false)}
+        />
+      )}
+    </section>
   );
 }
 
@@ -206,13 +353,16 @@ function NetworkMark({ logo, label }: { logo: string | null; label: string }) {
         draggable={false}
         loading="lazy"
         onError={() => setFailed(true)}
-        className="h-3 w-4 shrink-0 rounded-[3px] object-cover"
+        className="h-8 w-8 shrink-0 rounded-md object-contain"
       />
     );
   }
   return (
-    <span className="flex h-3 w-4 shrink-0 items-center justify-center rounded-[3px] bg-raised text-[7px] font-bold leading-none text-ink-muted">
-      {label.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2).toUpperCase()}
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[3px] bg-raised text-[10px] font-bold leading-none text-ink-muted">
+      {label
+        .replace(/[^\p{L}\p{N}]/gu, "")
+        .slice(0, 2)
+        .toUpperCase()}
     </span>
   );
 }
@@ -223,12 +373,14 @@ function AttachPopover({
   attachedIds,
   anchor,
   onClose,
+  onWebStream,
 }: {
   game: SportsGame;
   index: SportsChannelIndex;
   attachedIds: string[];
   anchor: RefObject<HTMLDivElement | null>;
   onClose: () => void;
+  onWebStream: () => void;
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
@@ -254,7 +406,7 @@ function AttachPopover({
   const attached = new Set(attachedIds);
 
   return (
-    <div className="animate-menu-pop absolute start-0 top-full z-40 mt-1 w-[280px] overflow-hidden rounded-lg border border-edge bg-elevated shadow-[0_18px_44px_-12px_rgba(0,0,0,0.6)]">
+    <div className="animate-menu-pop absolute start-0 top-full z-40 mt-1 w-[min(440px,100%)] overflow-hidden rounded-lg border border-edge bg-elevated shadow-[0_18px_44px_-12px_rgba(0,0,0,0.6)]">
       <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
         <span className="truncate text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
           {t("Always use for {league}", { league: leagueName })}
@@ -262,6 +414,7 @@ function AttachPopover({
         <button
           type="button"
           onClick={onClose}
+          aria-label={t("Close")}
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-raised hover:text-ink"
         >
           <X size={11} />
@@ -298,11 +451,27 @@ function AttachPopover({
           ))
         )}
       </div>
+      <button
+        type="button"
+        onClick={onWebStream}
+        className="flex w-full items-center gap-2 border-t border-edge-soft px-3 py-2.5 text-start text-[12.5px] text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+      >
+        <Link2 size={13} className="shrink-0 text-ink-subtle" />
+        {t("Find a stream on a web page")}
+      </button>
     </div>
   );
 }
 
-function ChannelRow({ row, on, onToggle }: { row: PreparedChannel; on: boolean; onToggle: () => void }) {
+function ChannelRow({
+  row,
+  on,
+  onToggle,
+}: {
+  row: PreparedChannel;
+  on: boolean;
+  onToggle: () => void;
+}) {
   return (
     <button
       type="button"

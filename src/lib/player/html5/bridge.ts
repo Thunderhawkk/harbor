@@ -53,6 +53,7 @@ export function createHtml5Bridge(): PlayerBridge {
   let lastSecondText = "";
   let activeTraceId: string | null = null;
   let mediaRevision = 0;
+  let autoplayUnmuteTimer: ReturnType<typeof setTimeout> | null = null;
   const mainSubtitleSelection = new SubtitleSelectionCoordinator();
   const secondarySubtitleSelection = new SubtitleSelectionCoordinator();
 
@@ -622,7 +623,7 @@ export function createHtml5Bridge(): PlayerBridge {
       startCueTicker();
       emit();
     },
-    async play() {
+    async play(options) {
       if (!video) return;
       const v = video;
       if (pendingStart != null && v.readyState < 1) {
@@ -643,6 +644,13 @@ export function createHtml5Bridge(): PlayerBridge {
         if (pendingStart > 5 && pendingStart < max) v.currentTime = pendingStart;
         pendingStart = null;
       }
+      // A video using a network speaker must never enter the autoplay unmute fallback.
+      if (options?.preserveMuted) {
+        if (autoplayUnmuteTimer != null) clearTimeout(autoplayUnmuteTimer);
+        autoplayUnmuteTimer = null;
+        await v.play();
+        return;
+      }
       v.muted = false;
       try {
         await v.play();
@@ -650,7 +658,9 @@ export function createHtml5Bridge(): PlayerBridge {
         v.muted = true;
         try {
           await v.play();
-          setTimeout(() => {
+          if (autoplayUnmuteTimer != null) clearTimeout(autoplayUnmuteTimer);
+          autoplayUnmuteTimer = setTimeout(() => {
+            autoplayUnmuteTimer = null;
             if (v && !v.paused) v.muted = false;
           }, 200);
         } catch {}
@@ -690,6 +700,10 @@ export function createHtml5Bridge(): PlayerBridge {
       emit();
     },
     setMuted(m) {
+      if (m && autoplayUnmuteTimer != null) {
+        clearTimeout(autoplayUnmuteTimer);
+        autoplayUnmuteTimer = null;
+      }
       if (video) video.muted = m;
     },
     setRate(r) {

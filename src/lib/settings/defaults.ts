@@ -407,6 +407,7 @@ export const DEFAULT: Settings = {
   profilePromptInterval: "launch",
   defaultProfileId: "",
   sportsLeagues: [],
+  sportsShowOdds: false,
   hideSpoilers: false,
   spoilerHideThumbnails: true,
   spoilerHideTitles: true,

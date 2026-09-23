@@ -70,6 +70,7 @@ export type PlayerOverlayLayersProps = {
   swappingEp: boolean;
   swapResolvingKey: string | null;
   closePlayer: () => void;
+  onBack: () => void;
   cancelToPicker: () => void;
   engineStats: Loader["engineStats"];
   isP2pEngine: boolean;
@@ -237,6 +238,7 @@ export const PlayerOverlayLayers = memo(function PlayerOverlayLayers(p: PlayerOv
         chromeVisible={p.showChrome}
       />
       <CastLayer
+        chromeVisible={p.showChrome}
         cast={p.cast}
         src={p.src}
         durationSec={p.snap.durationSec}
@@ -362,7 +364,7 @@ export const PlayerOverlayLayers = memo(function PlayerOverlayLayers(p: PlayerOv
           showDraw={p.showDraw}
           metaId={p.metaId}
           onMenuOpenChange={p.setAnyMenuOpen}
-          onBack={p.closePlayer}
+          onBack={p.onBack}
           onPlayPause={p.playPauseToggle}
           onSeek={p.seekTo}
           onSeekStep={p.onSeekStep}

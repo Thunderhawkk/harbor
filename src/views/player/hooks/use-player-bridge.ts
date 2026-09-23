@@ -26,6 +26,7 @@ import { pickBridge } from "../player-utils";
 function snapChangedIgnoringClock(a: PlayerSnapshot, b: PlayerSnapshot): boolean {
   return (
     a.status !== b.status ||
+    a.buffering !== b.buffering ||
     a.firstFrameReady !== b.firstFrameReady ||
     a.durationSec !== b.durationSec ||
     a.volume !== b.volume ||

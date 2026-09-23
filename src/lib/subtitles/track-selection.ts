@@ -42,13 +42,24 @@ export function isAutoSelectableSubtitleTrack(track: SelectableSubtitleTrack): b
   );
 }
 
-export function subtitleAutoSelectionSignature(
-  tracks: readonly Pick<SelectableSubtitleTrack, "id" | "prepared" | "autoSelectionEligible">[],
-): string {
+export function subtitleAutoSelectionSignature(tracks: readonly SelectableSubtitleTrack[]): string {
   return tracks
-    .map(
-      (track) =>
-        `${track.id}:${track.prepared === true ? 1 : 0}:${track.autoSelectionEligible === true ? 1 : 0}`,
+    .map((track) =>
+      JSON.stringify([
+        track.id,
+        track.lang,
+        track.external,
+        track.prepared,
+        track.autoSelectionEligible,
+        track.forced,
+        track.foreignOnly,
+        track.title,
+        track.label,
+        track.default,
+        track.matchScore,
+        track.matchConfidence,
+        track.timingStatus,
+      ]),
     )
     .join(",");
 }
@@ -71,6 +82,11 @@ export function pickDesiredSubtitleTrack<T extends SelectableSubtitleTrack>(
     const languageDelta =
       langScore(b.lang ?? "", preferredLanguages) - langScore(a.lang ?? "", preferredLanguages);
     if (languageDelta !== 0) return languageDelta;
+    // Timing confidence must not override an explicit embedded-source preference.
+    if (preferEmbedded) {
+      const embeddedDelta = Number(!b.external) - Number(!a.external);
+      if (embeddedDelta !== 0) return embeddedDelta;
+    }
     const timingDelta = Number(b.timingStatus === "aligned") - Number(a.timingStatus === "aligned");
     if (timingDelta !== 0) return timingDelta;
     const confidenceDelta = confidenceRank(b, preferEmbedded) - confidenceRank(a, preferEmbedded);
