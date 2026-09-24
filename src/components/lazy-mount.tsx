@@ -74,26 +74,37 @@ export function LazyMount({
       const vh = window.innerHeight || 800;
       return r.bottom > -vh * 0.5 && r.top < vh * 1.5;
     };
+    const reveal = () => {
+      stopIo();
+      stopNear();
+      setShown(true);
+    };
     const stopIo = observeWithin(el, rootMargin, (e) => {
       if (!e.isIntersecting) return;
-      stopIo();
-      if (inViewport(e.boundingClientRect)) setShown(true);
-      else startTransition(() => setShown(true));
+      if (inViewport(e.boundingClientRect)) {
+        reveal();
+        return;
+      }
+      startTransition(() => setShown(true));
+    });
+    const stopNear = observeWithin(el, "0px", (e) => {
+      if (e.isIntersecting) reveal();
     });
     let tries = 0;
     const stopProbe = addProbe(() => {
-      if (++tries > 60) return true;
       if (el.offsetParent === null) return false;
       if (typeof el.checkVisibility === "function" && !el.checkVisibility()) return false;
       const vh = window.innerHeight || 800;
       const r = el.getBoundingClientRect();
       if (r.top > vh * 3 || r.bottom < -vh * 3) return false;
-      if (inViewport(r)) setShown(true);
+      if (++tries > 60) return true;
+      if (inViewport(r)) reveal();
       else startTransition(() => setShown(true));
       return true;
     });
     return () => {
       stopIo();
+      stopNear();
       stopProbe();
     };
   }, [shown, rootMargin]);

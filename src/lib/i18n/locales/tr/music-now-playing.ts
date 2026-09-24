@@ -46,6 +46,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.now.next": "Sıradaki",
 
   "music.now.queueEmpty": "Bu kuyruğun sonuna ulaştınız.",
+  "music.now.queueBuilding": "Sıradakiler hazırlanıyor",
 
   "music.now.exploreArtist": "Sanatçıyı keşfet",
 

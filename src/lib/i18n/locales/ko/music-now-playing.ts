@@ -45,6 +45,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.now.next": "다음 곡",
 
   "music.now.queueEmpty": "재생 대기열의 끝에 도달했습니다.",
+  "music.now.queueBuilding": "다음 곡 준비 중",
 
   "music.now.exploreArtist": "아티스트 둘러보기",
 

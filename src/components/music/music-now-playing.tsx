@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { Poster } from "@/components/poster";
 import { useMusicTrackContextMenu } from "./music-track-menu";
+import { useUpNextSuggestions } from "@/lib/music/up-next";
 import { MusicVideoSurface } from "./music-video-surface";
 import { MusicVideoFullscreen } from "./music-video-fullscreen";
 import {
@@ -290,6 +291,9 @@ export function MusicNowPlaying({
     ? speaker.device?.name
     : outputs.find((device) => device.name === audio.settings.device)?.description;
   const next = musicUpcoming(player.queue, player.queueIndex, 40);
+  const suggested = useUpNextSuggestions(current, panel === "queue" && next.length === 0);
+  const upNext = next.length ? next : suggested.tracks;
+  const upNextQueue = next.length || !current ? player.queue : [current, ...suggested.tracks];
 
   return (
     <>
@@ -624,14 +628,14 @@ export function MusicNowPlaying({
                   />
                 ) : (
                   <>
-                    {next.length ? (
+                    {upNext.length ? (
                       <ol className="music-now-next-list">
-                        {next.map((track, index) => (
+                        {upNext.map((track, index) => (
                           <li key={`${track.connectorId}:${track.id}:${index}`}>
                             <button
                               type="button"
                               className="music-now-next-art"
-                              onClick={() => void playMusic(track, player.queue).catch(() => {})}
+                              onClick={() => void playMusic(track, upNextQueue).catch(() => {})}
                               aria-label={t("music.playTrack", {
                                 title: track.title,
                                 artist: track.artist,
@@ -648,7 +652,7 @@ export function MusicNowPlaying({
                             <span className="music-now-next-title">
                               <button
                                 type="button"
-                                onClick={() => void playMusic(track, player.queue).catch(() => {})}
+                                onClick={() => void playMusic(track, upNextQueue).catch(() => {})}
                               >
                                 <strong>{track.title}</strong>
                               </button>
@@ -671,7 +675,7 @@ export function MusicNowPlaying({
                     ) : (
                       <div className="music-now-empty">
                         <ListMusic size={23} aria-hidden="true" />
-                        <p>{t("music.now.queueEmpty")}</p>
+                        <p>{suggested.loading ? t("music.now.queueBuilding") : t("music.now.queueEmpty")}</p>
                         <button type="button" onClick={() => onExplore("artist")}>
                           {t("music.now.exploreArtist")}
                           <ArrowUpRight size={16} aria-hidden="true" />

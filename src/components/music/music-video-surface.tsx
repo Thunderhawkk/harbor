@@ -16,6 +16,7 @@ import { musicVideoStream, musicVideoStreamKey, type MusicVideoStream } from "@/
 import {
   adoptMusicVideoHost,
   musicVideoHost,
+  musicVideoHostLive,
   musicVideoHostSource,
   setMusicVideoHostSource,
 } from "@/lib/music/video-host";
@@ -161,7 +162,7 @@ export function MusicVideoSurface({
       setDecoded(false);
       return;
     }
-    const held = attempt === 0 ? musicVideoHostSource(key) : null;
+    const held = attempt === 0 ? musicVideoHostSource(key) ?? musicVideoHostLive() : null;
     if (held) {
       setStream(held);
       setDecoded((picture?.readyState ?? 0) >= 2);

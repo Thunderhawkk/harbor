@@ -44,6 +44,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.now.next": "التالي",
 
   "music.now.queueEmpty": "وصلت إلى نهاية قائمة الانتظار.",
+  "music.now.queueBuilding": "جارٍ إعداد التالي",
 
   "music.now.exploreArtist": "استكشف الفنان",
 

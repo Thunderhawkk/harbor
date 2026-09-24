@@ -45,6 +45,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.now.next": "Up next",
 
   "music.now.queueEmpty": "You’ve reached the end of this queue.",
+  "music.now.queueBuilding": "Building up next",
 
   "music.now.exploreArtist": "Explore artist",
 

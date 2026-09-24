@@ -8,6 +8,7 @@ import {
   MUSIC_VIDEO_KIND_LABELS,
   musicVideoQuery,
   musicVideoUsesYoutube,
+  MUSIC_VIDEO_MAX,
   searchMusicVideos,
   type MusicVideoKind,
 } from "@/lib/music/video-discovery";
@@ -66,7 +67,7 @@ export function MusicVideoDiscovery({
     if (!active || !visible || !search.trim()) return;
     let cancelled = false;
     setResult(null);
-    searchMusicVideos(search, retry > 0, regular)
+    searchMusicVideos(search, retry > 0, regular, MUSIC_VIDEO_MAX)
       .then((tracks) => {
         if (!cancelled) setResult({ key: search, tracks, error: false });
       })

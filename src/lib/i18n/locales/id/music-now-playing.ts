@@ -46,6 +46,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.now.next": "Berikutnya",
 
   "music.now.queueEmpty": "Anda telah mencapai akhir antrean ini.",
+  "music.now.queueBuilding": "Menyiapkan berikutnya",
 
   "music.now.exploreArtist": "Jelajahi artis",
 

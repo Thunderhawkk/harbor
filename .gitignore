@@ -103,3 +103,5 @@ crowdin.credentials
 crowdin_credentials.*
 *.token
 gemini.key
+/.firecrawl
+/work

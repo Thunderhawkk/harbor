@@ -129,6 +129,10 @@ export function musicVideoHostSource(key: string): MusicVideoStream | null {
   return sourceKey !== "" && sourceKey === key ? sourceStream : null;
 }
 
+export function musicVideoHostLive(): MusicVideoStream | null {
+  return sourceStream;
+}
+
 /** Assigning src reloads the decoder, so the same stream must never be assigned twice. */
 let pendingStart: { key: string; position: number } | null = null;
 

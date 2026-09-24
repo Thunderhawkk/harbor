@@ -515,7 +515,7 @@ export function MusicDock() {
         />
       </div>
 
-      <div className="grid h-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 px-3 pt-2 pb-2 @[700px]:grid-cols-[minmax(0,1fr)_auto_auto_auto] @[700px]:gap-2 @[700px]:px-5">
+      <div className="grid h-full grid-flow-col auto-cols-auto grid-cols-[minmax(0,1fr)] items-center gap-1 px-3 pt-2 pb-2 @[700px]:gap-2 @[700px]:px-5">
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"

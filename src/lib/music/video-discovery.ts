@@ -63,6 +63,8 @@ export function musicVideoUsesYoutube(kind: MusicVideoKind): boolean {
 
 const VIDEO_SEARCH_LIMIT = 40;
 
+export const MUSIC_VIDEO_MAX = VIDEO_SEARCH_LIMIT;
+
 export function searchMusicVideos(
   query: string,
   refresh = false,
