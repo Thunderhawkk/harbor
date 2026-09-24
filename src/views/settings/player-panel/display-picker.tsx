@@ -4,6 +4,7 @@ import { isWindowsDesktop } from "@/lib/platform";
 import {
   AUTO_DISPLAY,
   listMonitors,
+  monitorCardName,
   monitorResolution,
   type DisplaySelection,
   type MonitorInfo,
@@ -13,7 +14,6 @@ import { Check, Monitor, Tv } from "../icons";
 
 const CELL =
   "relative flex flex-col items-center gap-2.5 rounded-[10px] border bg-canvas p-4 text-center transition-colors";
-
 const BADGE =
   "inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[6px] px-2 text-[13px] font-bold uppercase leading-[17px] tracking-[0.72px]";
 
@@ -116,11 +116,11 @@ export function DisplayPickerRow({
           <MonitorCard
             key={m.id}
             icon={<Monitor size={26} strokeWidth={1.8} />}
-            name={m.name.trim() || m.deviceName || m.id}
+            name={monitorCardName(m)}
             detail={m.isPrimary ? `${monitorResolution(m)} · ${t("Primary")}` : monitorResolution(m)}
             selected={selectedId === m.id}
             onSelect={() => onChange({ mode: "explicit", monitor: m })}
-            ariaLabel={t("Open on {name}", { name: m.name.trim() || m.deviceName })}
+            ariaLabel={t("Open on {name}", { name: monitorCardName(m) })}
           />
         ))}
       </div>
