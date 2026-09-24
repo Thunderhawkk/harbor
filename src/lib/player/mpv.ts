@@ -147,6 +147,7 @@ export type MpvOptions = {
   extraOptions?: string;
   fullDownload?: boolean;
   separateDisplay?: MonitorInfo | null;
+  separateCoverTaskbar?: boolean;
   getEmbedRect?: () => Promise<MpvRect | null> | MpvRect | null;
 };
 
@@ -938,6 +939,7 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
             forceYuv420p: opts.forceYuv420p === true,
             extraOptions: opts.extraOptions || undefined,
             separateDisplay: opts.embed === true ? null : (opts.separateDisplay ?? null),
+            separateCoverTaskbar: opts.separateCoverTaskbar ?? true,
           },
         });
         preparedSubtitleCleanups.clearBefore(activeLoadId);

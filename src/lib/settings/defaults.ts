@@ -238,6 +238,7 @@ export const DEFAULT: Settings = {
   playerAnime4kIndicator: true,
   playerMpvEmbed: true,
   playerSeparateDisplay: AUTO_DISPLAY,
+  playerSeparateCoverTaskbar: true,
   playerP2pChip: true,
   showQualityInfo: false,
   stremioServerTranscode: false,

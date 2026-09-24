@@ -46,10 +46,16 @@ pub struct ResolvedMonitor {
     pub screen_index: i32,
     /// Monitor handle, for the DisplayConfig/HDR calls.
     pub hmon: windows::Win32::Graphics::Gdi::HMONITOR,
+    /// Full physical monitor rect (`rcMonitor`), covers the taskbar.
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
+    /// Usable work-area rect (`rcWork`), excludes the taskbar/docked bars.
+    pub work_x: i32,
+    pub work_y: i32,
+    pub work_width: u32,
+    pub work_height: u32,
 }
 
 /// The platform identity string stored as `MonitorInfo.id`.
@@ -228,6 +234,7 @@ mod imp {
                 && wide_to_string(&mi.szDevice) == state.device_name
             {
                 let r = mi.monitorInfo.rcMonitor;
+                let w = mi.monitorInfo.rcWork;
                 state.found = Some(ResolvedMonitor {
                     screen_index: state.index,
                     hmon,
@@ -235,6 +242,10 @@ mod imp {
                     y: r.top,
                     width: (r.right - r.left).max(0) as u32,
                     height: (r.bottom - r.top).max(0) as u32,
+                    work_x: w.left,
+                    work_y: w.top,
+                    work_width: (w.right - w.left).max(0) as u32,
+                    work_height: (w.bottom - w.top).max(0) as u32,
                 });
                 return BOOL(0);
             }

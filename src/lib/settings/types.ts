@@ -293,6 +293,8 @@ export type Settings = {
   playerMpvEmbed: boolean;
   /** Where the separate mpv window opens. Windows only; see src/lib/monitors.ts. */
   playerSeparateDisplay: DisplaySelection;
+  /** Fill the whole monitor (cover the taskbar) for the separate mpv window. */
+  playerSeparateCoverTaskbar: boolean;
   playerP2pChip: boolean;
   showQualityInfo: boolean;
   stremioServerTranscode: boolean;

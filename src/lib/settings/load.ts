@@ -391,6 +391,10 @@ function parseStoredSettings(raw: string | null): Settings {
       posterDockTransitionMs: sanitizePosterDockTransition(parsed.posterDockTransitionMs),
       bigPictureDisplay: sanitizeDisplaySelection(parsed.bigPictureDisplay),
       playerSeparateDisplay: sanitizeDisplaySelection(parsed.playerSeparateDisplay),
+      playerSeparateCoverTaskbar:
+        typeof parsed.playerSeparateCoverTaskbar === "boolean"
+          ? parsed.playerSeparateCoverTaskbar
+          : DEFAULT.playerSeparateCoverTaskbar,
       fullscreenClockEnabled:
         typeof parsed.fullscreenClockEnabled === "boolean"
           ? parsed.fullscreenClockEnabled

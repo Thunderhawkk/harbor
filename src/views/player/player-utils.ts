@@ -69,6 +69,7 @@ export async function pickBridge(
     extraOptions?: string;
     fullDownload?: boolean;
     separateDisplay?: MonitorInfo | null;
+    separateCoverTaskbar?: boolean;
     getEmbedRect?: () => Promise<MpvRect | null> | MpvRect | null;
   },
 ): Promise<{ bridge: PlayerBridge; engine: "html5" | "mpv" }> {

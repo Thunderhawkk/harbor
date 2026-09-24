@@ -146,6 +146,7 @@ export function usePlayerBridge(params: {
           settings.playerSeparateDisplay.mode === "explicit"
             ? settings.playerSeparateDisplay.monitor
             : null,
+        separateCoverTaskbar: settings.playerSeparateCoverTaskbar,
         extraOptions: [mergeMpvOptions(settings, svpOn), shaderCompanionOptions(settings)]
           .filter(Boolean)
           .join("\n"),

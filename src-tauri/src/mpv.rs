@@ -58,6 +58,8 @@ pub struct MpvStartArgs {
     pub renderer: Option<String>,
     pub force_yuv420p: Option<bool>,
     pub separate_display: Option<crate::monitors::MonitorInfo>,
+    /// Fill the whole monitor (cover the taskbar) instead of the work area.
+    pub separate_cover_taskbar: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -727,17 +729,33 @@ pub async fn mpv_start(
     } else {
         target_monitor.map(|m| m.screen_index)
     };
+    // Fill the whole monitor by default; the setting drops to the work area so
+    // the taskbar stays visible on that display.
+    #[cfg(windows)]
+    let separate_cover_taskbar = args.separate_cover_taskbar.unwrap_or(true);
     #[cfg(windows)]
     let separate_screen_size_for_init = if want_embed {
         None
     } else {
-        target_monitor.map(|m| (m.width, m.height))
+        target_monitor.map(|m| {
+            if separate_cover_taskbar {
+                (m.width, m.height)
+            } else {
+                (m.work_width, m.work_height)
+            }
+        })
     };
     #[cfg(windows)]
     let separate_screen_pos_for_init = if want_embed {
         None
     } else {
-        target_monitor.map(|m| (m.x, m.y))
+        target_monitor.map(|m| {
+            if separate_cover_taskbar {
+                (m.x, m.y)
+            } else {
+                (m.work_x, m.work_y)
+            }
+        })
     };
     #[cfg(not(windows))]
     let separate_screen_size_for_init = None;

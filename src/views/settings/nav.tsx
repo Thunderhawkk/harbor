@@ -5520,6 +5520,20 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
+    label: "Cover the taskbar",
+    section: "player",
+    tab: "engine",
+    anchorTitle: "Engine",
+    keywords: [
+      "taskbar",
+      "full screen",
+      "work area",
+      "separate window size",
+      "fill monitor",
+      "hide taskbar",
+    ],
+  },
+  {
     label: "Tonemap to SDR",
     section: "player",
     tab: "engine",
