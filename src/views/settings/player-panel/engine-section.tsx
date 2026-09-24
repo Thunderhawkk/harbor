@@ -11,6 +11,7 @@ import { ChoiceBlock, Tag } from "./choice";
 import { DesktopOnlyBlock, isTauri } from "./internals";
 import { HdrModePicker } from "./hdr-mode";
 import { DisplayPanelSelector } from "./display-panel-selector";
+import { DisplayPickerRow } from "./display-picker";
 
 export function PlayerEnginePanel() {
   const { settings, update } = useSettings();
@@ -72,6 +73,14 @@ export function PlayerEnginePanel() {
             value={settings.playerMpvEmbed}
             onChange={(v) => update({ playerMpvEmbed: v })}
           />
+          {(!settings.playerMpvEmbed || settings.playerHdrOpaqueWindow) && (
+            <DisplayPickerRow
+              label={t("Separate window display")}
+              desc={t("Which monitor the separate mpv window opens on. Harbor's own window stays where it is.")}
+              value={settings.playerSeparateDisplay}
+              onChange={(playerSeparateDisplay) => update({ playerSeparateDisplay })}
+            />
+          )}
           {mpvProbe && !mpvProbe.available && (
             <div className="flex items-start gap-2.5 rounded-[10px] bg-elevated px-4 py-3">
               <AlertTriangle size={18} strokeWidth={2.2} className="mt-[2px] shrink-0 text-danger" />

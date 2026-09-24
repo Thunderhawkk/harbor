@@ -142,6 +142,10 @@ export function usePlayerBridge(params: {
         ],
         macEdr: false,
         fullDownload: settings.torrentFullDownload,
+        separateDisplay:
+          settings.playerSeparateDisplay.mode === "explicit"
+            ? settings.playerSeparateDisplay.monitor
+            : null,
         extraOptions: [mergeMpvOptions(settings, svpOn), shaderCompanionOptions(settings)]
           .filter(Boolean)
           .join("\n"),
