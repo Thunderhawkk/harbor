@@ -40,8 +40,41 @@ const RETIRED_GEMINI = new Set([
 import { DEFAULT, STORAGE_KEY } from "./defaults";
 import type { Settings } from "./types";
 import { adoptLegacyPlaylists, readPlaylists } from "@/lib/iptv/playlists-store";
+import { AUTO_DISPLAY } from "@/lib/monitors";
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+function sanitizeDisplaySelection(value: unknown): Settings["bigPictureDisplay"] {
+  if (!value || typeof value !== "object") return AUTO_DISPLAY;
+  const v = value as { mode?: unknown; monitor?: unknown };
+  if (v.mode !== "explicit" || !v.monitor || typeof v.monitor !== "object") return AUTO_DISPLAY;
+  const m = v.monitor as Record<string, unknown>;
+  if (
+    typeof m.id !== "string" ||
+    typeof m.deviceName !== "string" ||
+    typeof m.x !== "number" ||
+    typeof m.y !== "number" ||
+    typeof m.width !== "number" ||
+    typeof m.height !== "number"
+  ) {
+    return AUTO_DISPLAY;
+  }
+  return {
+    mode: "explicit",
+    monitor: {
+      id: m.id,
+      deviceName: m.deviceName,
+      deviceId: typeof m.deviceId === "string" ? m.deviceId : "",
+      name: typeof m.name === "string" ? m.name : "",
+      isPrimary: m.isPrimary === true,
+      x: m.x,
+      y: m.y,
+      width: m.width,
+      height: m.height,
+      scaleFactor: typeof m.scaleFactor === "number" ? m.scaleFactor : 1,
+    },
+  };
+}
 
 function sanitizePosterDockTransition(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -356,6 +389,8 @@ function parseStoredSettings(raw: string | null): Settings {
         parsed.topbarGlassControls,
       ),
       posterDockTransitionMs: sanitizePosterDockTransition(parsed.posterDockTransitionMs),
+      bigPictureDisplay: sanitizeDisplaySelection(parsed.bigPictureDisplay),
+      playerSeparateDisplay: sanitizeDisplaySelection(parsed.playerSeparateDisplay),
       fullscreenClockEnabled:
         typeof parsed.fullscreenClockEnabled === "boolean"
           ? parsed.fullscreenClockEnabled

@@ -156,6 +156,7 @@ import {
   isVisible,
 } from "@/lib/keyboard-navigation";
 import { enterBigPicture, useBigPicture } from "@/lib/big-picture";
+import { moveMainToMonitor } from "@/lib/monitors";
 import { BpErrorBoundary } from "@/views/big-picture/bp-error-boundary";
 import { shouldAutoStartBigPicture, shouldOfferBigPicture } from "@/views/big-picture/bp-logic";
 import { BigPictureEntryButton } from "@/views/big-picture/bp-entry-button";
@@ -848,8 +849,18 @@ function Shell({ onReady }: { onReady?: () => void }) {
     });
     if (!go) return;
     bigPictureBooted.current = true;
+    // Move Harbor onto the chosen monitor before entering Big Picture, so the
+    // fullscreen that follows binds to that display. Automatic skips the move
+    // and leaves the window where the window-state plugin restored it.
+    const display = settings.bigPictureDisplay;
+    if (display.mode === "explicit") {
+      void moveMainToMonitor(display.monitor).then(() => {
+        if (bigPictureBooted.current) enterBigPicture();
+      });
+      return;
+    }
     enterBigPicture();
-  }, [settings.bigPictureAutoStart, kid]);
+  }, [settings.bigPictureAutoStart, settings.bigPictureDisplay, kid]);
 
   useKeyboardNavigation({
     enabled: settings.tvNavigation && !player && !picker && !bigPicture,
