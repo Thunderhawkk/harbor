@@ -203,6 +203,7 @@ export async function syncAnimeProgress(
   title: string,
   absoluteEpisode?: number,
   season?: number,
+  countRewatches = true,
 ): Promise<void> {
   if (!isAuthenticated()) return;
   const ep = episode ?? 1;
@@ -240,6 +241,9 @@ export async function syncAnimeProgress(
     // on REPEATING and only ever move the rewatch counter forward. That is what
     // renders the episodes as Rewatched rather than Watched.
     if (entryStatus === "COMPLETED" || entryStatus === "REPEATING") {
+      // Rewatch recording is off: leave the finished entry exactly as the user
+      // set it, the way the sync behaved before rewatches were supported.
+      if (!countRewatches) return;
       if (rewatch[harborId] !== true) {
         rewatch[harborId] = true;
         saveRewatch(rewatch);

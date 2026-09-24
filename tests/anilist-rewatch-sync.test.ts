@@ -63,3 +63,26 @@ test("rewatch syncs are flagged and the toast reads as a rewatch", () => {
   assert.match(toast, /t\("Rewatching on AniList"\)/);
   assert.match(toast, /t\("Rewatched on AniList"\)/);
 });
+
+test("rewatch counting is gated by the Count rewatches setting", () => {
+  assert.match(sync, /countRewatches = true,/);
+  assert.match(sync, /if \(!countRewatches\) return;/);
+  const defaults = readFileSync(new URL("../src/lib/settings/defaults.ts", import.meta.url), "utf8");
+  assert.match(defaults, /anilistCountRewatches: true,/, "on by default");
+  const panel = readFileSync(
+    new URL("../src/views/settings/anilist-panel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /settings\.anilistCountRewatches/);
+  assert.match(panel, /newId="anilist:count-rewatches"/, "the new setting carries the NEW badge");
+  assert.match(
+    panel,
+    /lockReason=\{\s*settings\.anilistAutoSync \? undefined : t\("Turn on Sync watch progress first\."\)/,
+    "rewatch counting stays locked while watch-progress sync is off",
+  );
+  const newSettings = readFileSync(
+    new URL("../src/views/settings/settings-new.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(newSettings, /"anilist:count-rewatches"/);
+});

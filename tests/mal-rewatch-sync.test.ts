@@ -56,3 +56,23 @@ test("the rewatch toast reads as a rewatch", () => {
   assert.match(toast, /t\("Rewatching on MyAnimeList"\)/);
   assert.match(toast, /t\("Rewatched on MyAnimeList"\)/);
 });
+
+test("rewatch counting is gated by the Count rewatches setting", () => {
+  assert.match(sync, /countRewatches = true,/);
+  assert.match(sync, /if \(!countRewatches\) return;/);
+  const defaults = readFileSync(new URL("../src/lib/settings/defaults.ts", import.meta.url), "utf8");
+  assert.match(defaults, /malCountRewatches: true,/, "on by default");
+  const panel = readFileSync(new URL("../src/views/settings/mal-panel.tsx", import.meta.url), "utf8");
+  assert.match(panel, /settings\.malCountRewatches/);
+  assert.match(panel, /newId="mal:count-rewatches"/, "the new setting carries the NEW badge");
+  assert.match(
+    panel,
+    /lockReason=\{settings\.malAutoSync \? undefined : t\("Turn on Sync watch progress first\."\)\}/,
+    "rewatch counting stays locked while watch-progress sync is off",
+  );
+  const newSettings = readFileSync(
+    new URL("../src/views/settings/settings-new.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(newSettings, /"mal:count-rewatches"/);
+});
