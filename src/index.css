@@ -3165,6 +3165,18 @@ html[data-theme-layout="minui"] main {
   padding-bottom: 7.5rem !important;
 }
 
+/* Big Picture is a <main> of its own, portaled to document.body, so the rule
+   above reached it too and reserved MinUI's 7.5rem dock clearance inside a
+   surface that is already fully dark and has no dock. That band sat under the
+   hint bar and shortened the page by 120px versus every other theme, which is
+   why the stray bottom band only ever appeared on minui and minui-dark. Big
+   Picture reserves its own bottom space through --bp-hint-h, so it takes none
+   of the page padding. Scoped to the direct child, not a bare main, so a
+   themed page's own main keeps the dock clearance. */
+html[data-theme-layout="minui"] [data-bp-root] > main {
+  padding-bottom: 0 !important;
+}
+
 html[data-theme-layout="minui"] main.pt-20:not([data-rail-flush]),
 html[data-theme-layout="minui"] main.pt-24:not([data-rail-flush]),
 html[data-theme-layout="minui"] main.pt-28:not([data-rail-flush]),
