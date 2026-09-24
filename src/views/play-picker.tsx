@@ -229,7 +229,8 @@ export function PlayPicker({
   const [resolving, setResolving] = useState<ResolvingSelection | null>(null);
   const [failedStreams, setFailedStreams] = useState<Set<ScoredStream>>(new Set());
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Condensed layout shows the full source list expanded by default; the user can collapse it.
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const [strictMode, setStrictMode] = useState(settings.streamFilterLevel === "strict");
   const [forceShowAll, setForceShowAll] = useState(false);
   const filterDisabled = settings.streamFilterLevel === "off" || forceShowAll || isDownload;
