@@ -2,6 +2,8 @@
 const uiFallback: Record<string, string> = {
   "Rewatching on AniList": "Rewatching on AniList",
   "Rewatched on AniList": "Rewatched on AniList",
+  "Rewatching on MyAnimeList": "Rewatching on MyAnimeList",
+  "Rewatched on MyAnimeList": "Rewatched on MyAnimeList",
   "Hide this tab": "Hide this tab",
   "Show this tab": "Show this tab",
   "Nothing hidden.": "Nothing hidden.",
