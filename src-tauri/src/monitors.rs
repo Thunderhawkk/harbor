@@ -88,32 +88,159 @@ mod imp {
         )
     }
 
-    /// Friendly model string and PnP id for the display behind a GDI device name
-    /// (e.g. `\\.\DISPLAY1`). The monitor device is `EnumDisplayDevicesW`'s second
-    /// entry for that adapter; the first is the adapter itself.
+    /// Friendly model name and stable id for the display behind a GDI device name
+    /// (`\\.\DISPLAY1`).
+    ///
+    /// The name comes from the DisplayConfig API (`monitorFriendlyDeviceName`),
+    /// which is the EDID-derived string Windows Settings shows (e.g. "KGS241Q").
+    /// `EnumDisplayDevicesW` is only the fallback: its monitor `DeviceString` is
+    /// frequently the generic "Generic PnP Monitor" even when DisplayConfig has
+    /// the real model, which is why every card originally read the same. The id
+    /// still prefers the `MONITOR\...` PnP id from `EnumDisplayDevicesW`, falling
+    /// back to the DisplayConfig device path when that is unavailable.
     fn friendly_name_for(device_name: &str) -> (String, String) {
+        let (enum_name, enum_id) = enum_display_device_for(device_name);
+        let (dc_name, dc_path) = display_config_for(device_name);
+
+        let name = [dc_name, enum_name]
+            .into_iter()
+            .map(|n| n.trim().to_string())
+            .find(|n| !is_generic_monitor_name(n))
+            .unwrap_or_default();
+        let id = if enum_id.is_empty() { dc_path } else { enum_id };
+        (name, id)
+    }
+
+    /// `EnumDisplayDevicesW` for the monitor on this adapter: its `DeviceString`
+    /// (often generic) and `MONITOR\...` PnP id. Index 0 is the adapter; monitors
+    /// start at index 1.
+    fn enum_display_device_for(device_name: &str) -> (String, String) {
         let dev_name: Vec<u16> = device_name.encode_utf16().chain(std::iter::once(0)).collect();
-        // EnumDisplayDevicesW with a non-null lpDevice enumerates the monitor(s)
-        // attached to that adapter, not the adapter itself.
-        for index in 0..4u32 {
-            let mut dd = DISPLAY_DEVICEW::default();
-            dd.cb = std::mem::size_of::<DISPLAY_DEVICEW>() as u32;
-            let ok = unsafe {
-                EnumDisplayDevicesW(PCWSTR(dev_name.as_ptr()), index, &mut dd, 0)
-            };
-            if !ok.as_bool() {
-                break;
+        let adapter = read_display_device(0, &dev_name);
+        let mut name = String::new();
+        let mut id = String::new();
+        for index in 1..8u32 {
+            match read_display_device(index, &dev_name) {
+                Some((monitor_name, monitor_id, true)) => {
+                    if id.is_empty() {
+                        id = monitor_id;
+                    }
+                    if name.is_empty() && !is_generic_monitor_name(&monitor_name) {
+                        name = monitor_name;
+                    }
+                    if !name.is_empty() && !id.is_empty() {
+                        break;
+                    }
+                }
+                Some(_) => continue,
+                None => break,
             }
-            if dd.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP
-                != DISPLAY_DEVICE_ATTACHED_TO_DESKTOP
-            {
+        }
+        if let Some((adapter_name, adapter_id, _)) = adapter {
+            if id.is_empty() {
+                id = adapter_id;
+            }
+            if name.is_empty() && !is_generic_monitor_name(&adapter_name) {
+                name = adapter_name;
+            }
+        }
+        (name, id)
+    }
+
+    fn read_display_device(index: u32, dev_name: &[u16]) -> Option<(String, String, bool)> {
+        let mut dd = DISPLAY_DEVICEW::default();
+        dd.cb = std::mem::size_of::<DISPLAY_DEVICEW>() as u32;
+        let ok = unsafe { EnumDisplayDevicesW(PCWSTR(dev_name.as_ptr()), index, &mut dd, 0) };
+        if !ok.as_bool() {
+            return None;
+        }
+        let attached = dd.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP
+            == DISPLAY_DEVICE_ATTACHED_TO_DESKTOP;
+        Some((
+            wide_to_string(&dd.DeviceString),
+            wide_to_string(&dd.DeviceID),
+            attached,
+        ))
+    }
+
+    /// DisplayConfig friendly name and device path for the monitor whose source
+    /// GDI name matches `device_name`. Empty strings when the query fails or no
+    /// path matches.
+    fn display_config_for(device_name: &str) -> (String, String) {
+        use windows::Win32::Devices::Display::{
+            DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QueryDisplayConfig,
+            DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
+            DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SOURCE_DEVICE_NAME,
+            DISPLAYCONFIG_TARGET_DEVICE_NAME, QDC_ONLY_ACTIVE_PATHS,
+        };
+        use windows::Win32::Foundation::WIN32_ERROR;
+
+        let mut path_count = 0u32;
+        let mut mode_count = 0u32;
+        if unsafe {
+            GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count)
+        } != WIN32_ERROR(0)
+            || path_count == 0
+            || path_count > 64
+        {
+            return (String::new(), String::new());
+        }
+        let mut paths: Vec<DISPLAYCONFIG_PATH_INFO> = Vec::new();
+        paths.resize_with(path_count as usize, DISPLAYCONFIG_PATH_INFO::default);
+        let mut modes: Vec<DISPLAYCONFIG_MODE_INFO> = Vec::new();
+        modes.resize_with(mode_count.max(1) as usize, DISPLAYCONFIG_MODE_INFO::default);
+        if unsafe {
+            QueryDisplayConfig(
+                QDC_ONLY_ACTIVE_PATHS,
+                &mut path_count,
+                paths.as_mut_ptr(),
+                &mut mode_count,
+                modes.as_mut_ptr(),
+                None,
+            )
+        } != WIN32_ERROR(0)
+        {
+            return (String::new(), String::new());
+        }
+        for path in paths.iter().take(path_count as usize) {
+            let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
+            source.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+            source.header.size = std::mem::size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32;
+            source.header.adapterId = path.sourceInfo.adapterId;
+            source.header.id = path.sourceInfo.id;
+            if unsafe { DisplayConfigGetDeviceInfo(&mut source.header) } != 0 {
                 continue;
             }
-            let name = wide_to_string(&dd.DeviceString);
-            let id = wide_to_string(&dd.DeviceID);
-            return (name, id);
+            if wide_to_string(&source.viewGdiDeviceName) != device_name {
+                continue;
+            }
+
+            let mut target = DISPLAYCONFIG_TARGET_DEVICE_NAME::default();
+            target.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+            target.header.size = std::mem::size_of::<DISPLAYCONFIG_TARGET_DEVICE_NAME>() as u32;
+            target.header.adapterId = path.targetInfo.adapterId;
+            target.header.id = path.targetInfo.id;
+            if unsafe { DisplayConfigGetDeviceInfo(&mut target.header) } != 0 {
+                continue;
+            }
+            return (
+                wide_to_string(&target.monitorFriendlyDeviceName),
+                wide_to_string(&target.monitorDevicePath),
+            );
         }
         (String::new(), String::new())
+    }
+
+    /// True when a monitor name carries no model information, so callers fall
+    /// back to the device name instead of showing the same string on every
+    /// display. Windows reports these when the EDID never reached the driver
+    /// (KVM, DisplayLink dock, virtual display).
+    fn is_generic_monitor_name(name: &str) -> bool {
+        let lower = name.trim().to_ascii_lowercase();
+        lower.is_empty()
+            || lower == "generic pnp monitor"
+            || lower == "generic monitor"
+            || lower == "generic non-pnp monitor"
     }
 
     fn scale_factor_for(hmon: HMONITOR) -> f64 {
