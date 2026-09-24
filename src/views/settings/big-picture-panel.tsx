@@ -32,6 +32,7 @@ export function BigPicturePanel() {
           <DisplayPickerRow
             label={t("Big Picture display")}
             desc={t("Which monitor Big Picture opens on at startup.")}
+            newId="bigPicture:display"
             value={settings.bigPictureDisplay}
             onChange={(bigPictureDisplay) => update({ bigPictureDisplay })}
           />

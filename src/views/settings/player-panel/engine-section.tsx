@@ -85,6 +85,7 @@ export function PlayerEnginePanel() {
               <DisplayPickerRow
                 label={t("Separate window display")}
                 desc={t("Which monitor the separate mpv window opens on. Harbor's own window stays where it is.")}
+                newId="player:separate-display"
                 value={settings.playerSeparateDisplay}
                 onChange={(playerSeparateDisplay) => update({ playerSeparateDisplay })}
               />
@@ -93,6 +94,7 @@ export function PlayerEnginePanel() {
                 sub={t("Span the whole screen including the taskbar. Turn off to keep the taskbar visible on that monitor.")}
                 value={settings.playerSeparateCoverTaskbar}
                 onChange={(v) => update({ playerSeparateCoverTaskbar: v })}
+                newId="player:cover-taskbar"
               />
             </>
           )}

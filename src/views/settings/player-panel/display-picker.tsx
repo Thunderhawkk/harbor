@@ -11,6 +11,7 @@ import {
 } from "@/lib/monitors";
 import { SettingRow } from "../kit";
 import { Check, Monitor, Tv } from "../icons";
+import { NewBadge } from "../new-badge";
 
 const CELL =
   "relative flex flex-col items-center gap-2.5 rounded-[10px] border bg-canvas p-4 text-center transition-colors";
@@ -75,11 +76,13 @@ function MonitorCard({
 export function DisplayPickerRow({
   label,
   desc,
+  newId,
   value,
   onChange,
 }: {
   label: string;
   desc: string;
+  newId?: string;
   value: DisplaySelection;
   onChange: (value: DisplaySelection) => void;
 }) {
@@ -102,7 +105,16 @@ export function DisplayPickerRow({
   const selectedId = value.mode === "explicit" ? value.monitor.id : "auto";
 
   return (
-    <SettingRow wide label={label} desc={desc}>
+    <SettingRow
+      wide
+      label={
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+          <span className="min-w-0">{label}</span>
+          {newId && <NewBadge id={newId} />}
+        </span>
+      }
+      desc={desc}
+    >
       <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
         <MonitorCard
           icon={<Tv size={26} strokeWidth={1.8} />}
