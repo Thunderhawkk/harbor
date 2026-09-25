@@ -15,6 +15,7 @@ const uiFallback: Record<string, string> = {
   "timed out": "timed out",
   "returned an error": "returned an error",
   "couldn't be reached": "couldn't be reached",
+  "{ok} updated · {failed} failed": "{ok} updated · {failed} failed",
   "Hide this tab": "Hide this tab",
   "Show this tab": "Show this tab",
   "Nothing hidden.": "Nothing hidden.",
