@@ -43,3 +43,41 @@ test("debrid cache verification is incremental and feeds the partials", () => {
     "newly verified streams must refresh the visible partial",
   );
 });
+
+test("self-hosted addons on loopback opt into local networking", () => {
+  const addons = readFileSync(new URL("../src/lib/streams/addons.ts", import.meta.url), "utf8");
+  assert.match(
+    addons,
+    /const doFetch = isLocalNetworkUrl\(base\) \? safeFetchLocal : fetch;/,
+    "only a local addon URL may skip the SSRF guard; public ones keep it",
+  );
+  const store = readFileSync(new URL("../src/lib/addon-store.ts", import.meta.url), "utf8");
+  assert.match(
+    store,
+    /const doFetch = isLocalNetworkUrl\(transportUrl\) \? safeFetchLocal : fetch;/,
+    "installing/refreshing a self-hosted manifest must reach loopback too",
+  );
+});
+
+test("a failed addon reports why instead of silently returning 0 streams", () => {
+  const addons = readFileSync(new URL("../src/lib/streams/addons.ts", import.meta.url), "utf8");
+  assert.match(addons, /export type AddonFailureCode = "blocked" \| "timeout" \| "http" \| "unreachable";/);
+  assert.match(addons, /failures\?: AddonFailure\[\];/);
+  assert.match(addons, /noteFailure\(addon\.manifest\.id, name, r\.failure\);/);
+  assert.match(addons, /failures: failures\.length > 0 \? \[\.\.\.failures\] : undefined,/);
+  assert.match(addons, /function failureCodeFor\(e: unknown\): AddonFailureCode \{/);
+  assert.match(addons, /if \(\/blocked internal target\/i\.test\(message\)\) return "blocked";/);
+
+  assert.match(pipeline, /addonErrors\?: AddonFailure\[\];/);
+  assert.match(pipeline, /addonErrors = progress\.failures \?\? \[\];/);
+  assert.match(pipeline, /addonErrors: addonErrors\.length > 0 \? addonErrors : undefined,/);
+  assert.match(
+    pipeline,
+    /onAddonBatch,\s+handleAddonProgress,/,
+    "failures ride along on the progress callback",
+  );
+
+  const picker = readFileSync(new URL("../src/views/play-picker.tsx", import.meta.url), "utf8");
+  assert.match(picker, /result\?\.addonErrors && result\.addonErrors\.length > 0 && \(/);
+  assert.match(picker, /addonFailureLabel\(t, e\.code\)/);
+});

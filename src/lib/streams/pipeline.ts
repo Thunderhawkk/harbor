@@ -1,7 +1,7 @@
 import type { Addon } from "@/lib/addons";
 import { dlog } from "@/lib/debug";
 import type { DebridStore } from "@/lib/debrid/types";
-import { fetchAddonStreams, type AddonProgress, type StreamRequest } from "./addons";
+import { fetchAddonStreams, type AddonFailure, type AddonProgress, type StreamRequest } from "./addons";
 import type { AddonRankFn } from "./addon-priority";
 import { applyStreamPriority } from "./priority-partition";
 import { enhanceAnimeStreams } from "./anitomy";
@@ -112,6 +112,7 @@ export type PipelineResult = {
   rejected: Rejection[];
   raw: { addon: Stream[]; library: Stream[] };
   debridErrors?: DebridError[];
+  addonErrors?: AddonFailure[];
 };
 
 // One debrid cacheCheck can fan out into many provider calls, so re-checking on
@@ -129,6 +130,7 @@ export async function runPipeline(
   let lastPartialAt = 0;
   let latestAddonStreams: Stream[] = [];
   const debridErrors: DebridError[] = [];
+  let addonErrors: AddonFailure[] = [];
   const priorityActive = input.addonRanks != null;
 
   // Debrid verification runs alongside the addon fetch instead of after it, so
@@ -216,6 +218,7 @@ export async function runPipeline(
       rejected: [...fin.rejected, ...extraRejected],
       raw: { addon: addonStreams, library },
       debridErrors: debridErrors.length > 0 ? debridErrors : undefined,
+      addonErrors: addonErrors.length > 0 ? addonErrors : undefined,
     };
   };
 
@@ -254,6 +257,14 @@ export async function runPipeline(
     emitPartialNow();
   };
 
+  // `fetchAddonStreams` reports which addons answered with nothing because the
+  // request failed; carry that into the result so the picker can explain "0
+  // streams" instead of staying silent.
+  const handleAddonProgress = (progress: AddonProgress): void => {
+    addonErrors = progress.failures ?? [];
+    onAddonProgress?.(progress);
+  };
+
   // Library listings do not depend on the addon responses, so start them with the
   // addons instead of after them.
   const libraryListsPromise: LibraryListings =
@@ -274,7 +285,7 @@ export async function runPipeline(
           input.request,
           signal,
           onAddonBatch,
-          onAddonProgress,
+          handleAddonProgress,
           input.addonTimeoutMs,
           input.addonRanks,
           input.forcedAddonBases,
@@ -409,6 +420,7 @@ export async function runPipeline(
       rejected: [...fin.rejected, ...animeRejected],
       raw: { addon: addonStreams, library },
       debridErrors: debridErrors.length > 0 ? debridErrors : undefined,
+      addonErrors: addonErrors.length > 0 ? addonErrors : undefined,
     };
   }
   const { keep, rejected } = applyTrust(parsed, input.trust ?? {});
@@ -440,6 +452,7 @@ export async function runPipeline(
     picker: applyStreamPriority(fin.picker, priorityActive, input.score.activeDebrids),
     rejected: [...fin.rejected, ...animeRejected],
     raw: { addon: addonStreams, library },
+    addonErrors: addonErrors.length > 0 ? addonErrors : undefined,
   };
 }
 

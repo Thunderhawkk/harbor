@@ -9,6 +9,12 @@ const uiFallback: Record<string, string> = {
   "Watching an anime you already finished marks it as Rewatching and counts the rewatch, instead of resetting your progress.":
     "Watching an anime you already finished marks it as Rewatching and counts the rewatch, instead of resetting your progress.",
   "Turn on Sync watch progress first.": "Turn on Sync watch progress first.",
+  "A source couldn't be reached": "A source couldn't be reached",
+  "{n} sources couldn't be reached": "{n} sources couldn't be reached",
+  "blocked by the network policy": "blocked by the network policy",
+  "timed out": "timed out",
+  "returned an error": "returned an error",
+  "couldn't be reached": "couldn't be reached",
   "Hide this tab": "Hide this tab",
   "Show this tab": "Show this tab",
   "Nothing hidden.": "Nothing hidden.",
