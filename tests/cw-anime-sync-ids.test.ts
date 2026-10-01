@@ -81,13 +81,17 @@ test("Trakt silently dropped the anime scrobble before enrichment and accepts it
   assert.deepEqual(after.target.episodeIds, { tvdb: 11872046 });
 });
 
-test("Simkl gets the imdb id as a second way to match a brand new season", () => {
+test("Simkl names an anime by its own id, never the row's IMDb id", () => {
+  // An IMDb id can resolve to a different Simkl entry than the anime the
+  // episode belongs to: JoJo's umbrella id (tt2359704) maps to Stone Ocean,
+  // while the episode aired in Steel Ball Run (kitsu 49847). Sending both ids
+  // in one node let Simkl record the watch on the wrong entry.
   const enriched = applyAniZipEpisode({ season: 1, episode: 6 }, MUSHOKU);
   const body = buildBody("kitsu:49002", enriched, 100) as {
     anime: { ids: Record<string, unknown> };
   };
   assert.equal(body.anime.ids.kitsu, 49002);
-  assert.equal(body.anime.ids.imdb, "tt13293588");
+  assert.equal(body.anime.ids.imdb, undefined);
 });
 
 test("non-anime scrobbles are byte for byte what they were", () => {

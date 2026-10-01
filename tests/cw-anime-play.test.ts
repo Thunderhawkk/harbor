@@ -150,6 +150,27 @@ test("a named anime entry owns the scrobble, not the row's IMDb show", () => {
   assert.deepEqual(body.episode, { season: 1, number: 2 });
 });
 
+test("an anime scrobble never carries the row's IMDb id", () => {
+  // tt2359704 resolves to Stone Ocean in Simkl's catalogue, while the episode
+  // belongs to Steel Ball Run (kitsu 49847). Merging the row's IMDb id into the
+  // anime node records the watch on the wrong entry.
+  const body = buildBody(
+    "tt2359704",
+    {
+      season: 6,
+      episode: 2,
+      imdbSeason: 6,
+      imdbEpisode: 2,
+      kitsuStreamId: "kitsu:49847:2",
+      sourceMetaId: "kitsu:49847",
+    },
+    100,
+    { imdb: "tt2359704", title: "JoJo's Bizarre Adventure" },
+  ) as { anime: { ids: Record<string, unknown> } };
+  assert.deepEqual(body.anime.ids, { kitsu: 49847 });
+  assert.equal(body.anime.ids.imdb, undefined);
+});
+
 test("a plain show still scrobbles by provider coordinates", () => {
   const body = buildBody("tt123", { season: 1, episode: 6, imdbSeason: 3, imdbEpisode: 6 }, 100, {
     imdb: "tt123",

@@ -38,11 +38,20 @@ export function animeIdentity(
   return { scheme, id, number };
 }
 
-function node(ids: Record<string, unknown>, info?: ScrobbleInfo): Record<string, unknown> {
+function node(
+  ids: Record<string, unknown>,
+  info?: ScrobbleInfo,
+  opts?: { anime?: boolean },
+): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...ids };
-  if (info?.imdb && /^tt\d+$/.test(info.imdb) && merged.imdb == null) merged.imdb = info.imdb;
-  if (info?.tmdb != null && Number.isFinite(info.tmdb) && merged.tmdb == null)
-    merged.tmdb = info.tmdb;
+  // An anime entry is named by its own ids only. The row's IMDb id can point at
+  // a different Simkl entry entirely (another cour, or another season), so it
+  // must never be merged into an anime node.
+  if (!opts?.anime) {
+    if (info?.imdb && /^tt\d+$/.test(info.imdb) && merged.imdb == null) merged.imdb = info.imdb;
+    if (info?.tmdb != null && Number.isFinite(info.tmdb) && merged.tmdb == null)
+      merged.tmdb = info.tmdb;
+  }
   const out: Record<string, unknown> = { ids: merged };
   if (info?.title) out.title = info.title;
   if (info?.year != null) out.year = info.year;
@@ -83,7 +92,7 @@ export function buildBody(
   // number is the one it can match — not the provider season.
   const anime = animeIdentity(episode);
   if (anime) {
-    const animeNode = node({ [anime.scheme]: anime.id }, ids);
+    const animeNode = node({ [anime.scheme]: anime.id }, ids, { anime: true });
     return anime.number != null
       ? { progress: p, anime: animeNode, episode: { season: 1, number: anime.number } }
       : { progress: p, movie: animeNode };
@@ -119,8 +128,8 @@ export function buildBody(
     // A Simkl anime entry is single-season, numbered from 1 within the entry.
     const animeEp = { season: episode?.season ?? 1, number: episode?.episode };
     return episode?.episode != null
-      ? { progress: p, anime: node({ [idKey]: num }, ids), episode: animeEp }
-      : { progress: p, movie: node({ [idKey]: num }, ids) };
+      ? { progress: p, anime: node({ [idKey]: num }, ids, { anime: true }), episode: animeEp }
+      : { progress: p, movie: node({ [idKey]: num }, ids, { anime: true }) };
   }
 
   return null;
