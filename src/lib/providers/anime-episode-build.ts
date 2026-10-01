@@ -171,8 +171,9 @@ export function mergeAniZipEpisodes(
       const localizedTitle = pickLocalizedTitle(az, opts?.lang);
       if (localizedTitle && !isGenericEpisodeName(localizedTitle) && isTextInLanguage(localizedTitle, opts?.lang)) {
         ep.title = localizedTitle;
-      } else if (az.titles?.en && !isGenericEpisodeName(az.titles.en)) {
-        ep.title = az.titles.en;
+      } else {
+        const enTitle = az.titles?.en ?? az.title?.en;
+        if (enTitle && !isGenericEpisodeName(enTitle)) ep.title = enTitle;
       }
     } else {
       const enrichedTitle = pickEpisodeTitle(az);

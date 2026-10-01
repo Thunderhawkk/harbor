@@ -38,6 +38,7 @@ import { resolvePreferredAnimeTitle } from "@/lib/anime-title";
 import { stripFranchiseSuffix } from "@/lib/providers/jikan";
 import { getAnimeCwId } from "@/lib/anime-cw-ids";
 import { aniZipLookupKey, applyAniZipEpisode, needsAniZipSyncIds } from "@/lib/cw-anime-episode";
+import { resolveCwAnimePlayEpisode } from "@/lib/cw-anime-play";
 import { isSplitFranchiseKitsu } from "@/lib/providers/anime-franchise-root";
 import { parseKitsuId } from "@/lib/providers/kitsu";
 import {
@@ -414,6 +415,16 @@ export const ContinueCard = memo(function ContinueCard({
   };
 
   const resolveEpisode = async (): Promise<PlayEpisode | undefined> => {
+    // Resolve the anime identity the same way the stream picker does, so a
+    // split series (Bleach TYBW, JoJo) lands on the cour that aired the season
+    // instead of the row's base entry.
+    const animePlay = await resolveCwAnimePlayEpisode({
+      metaId: item._id,
+      season: ep?.season,
+      episode: ep?.episode,
+      name: episodeTitle,
+    });
+    if (animePlay) return animePlay;
     let episode: PlayEpisode | undefined = item.type === "series" && ep ? ep : undefined;
     if (!episode && kitsuThreeSeg) {
       if (kitsuVideo) {
