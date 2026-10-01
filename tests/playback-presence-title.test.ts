@@ -63,7 +63,7 @@ function createHarness(settingsOverrides: Record<string, unknown> = {}) {
   const settings = {
     discordRichPresence: true,
     shareWatchPresence: false,
-    simklAnimeTitleLanguage: "english",
+    animeTitleLanguage: "english",
     ...settingsOverrides,
   };
 
@@ -167,4 +167,13 @@ test("an unresolved lookup falls back to the meta name", async () => {
   await settle();
   h.render(params("kitsu:49002", ROMAJI));
   assert.equal(h.published.at(-1)?.title, ROMAJI);
+});
+
+test("the CW card re-resolves when the title language changes", () => {
+  // Its own effect, keyed on the preference: changing the language must update
+  // the card live, not wait for a remount, and must not re-run the artwork
+  // hydration that shares the old effect.
+  const src = readFileSync("src/components/continue-card.tsx", "utf8");
+  assert.match(src, /resolvePreferredAnimeTitle\(item\._id, settings\.animeTitleLanguage\)/);
+  assert.match(src, /\}, \[item\._id, settings\.animeTitleLanguage\]\);/);
 });

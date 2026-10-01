@@ -547,7 +547,7 @@ export const DEFAULT: Settings = {
   simklUpNextRailEnabled: false,
   simklTrendingRailEnabled: false,
   simklScrobbleEnabled: true,
-  simklAnimeTitleLanguage: "english",
+  animeTitleLanguage: "english",
   weekStartsMonday: false,
   calendarPosterSize: "default",
   customCalendar: {

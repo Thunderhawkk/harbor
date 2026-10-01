@@ -32,7 +32,7 @@ export function usePlaybackPresence(params: {
       return;
     }
     let cancelled = false;
-    void resolvePreferredAnimeTitle(id, settings.simklAnimeTitleLanguage)
+    void resolvePreferredAnimeTitle(id, settings.animeTitleLanguage)
       .then((title) => {
         if (!cancelled) setPreferredTitle(title?.trim() || null);
       })
@@ -44,7 +44,7 @@ export function usePlaybackPresence(params: {
     };
   }, [
     src.meta.id,
-    settings.simklAnimeTitleLanguage,
+    settings.animeTitleLanguage,
     settings.discordRichPresence,
     settings.shareWatchPresence,
   ]);

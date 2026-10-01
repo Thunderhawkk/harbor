@@ -209,11 +209,6 @@ export const ContinueCard = memo(function ContinueCard({
       if (started) return;
       started = true;
       if (/^(kitsu|mal|anilist|anidb):/.test(item._id)) {
-        resolvePreferredAnimeTitle(item._id, settingsRef.current.simklAnimeTitleLanguage)
-          .then((tt) => {
-            if (!cancelled && tt) setTranslatedTitle(tt);
-          })
-          .catch(() => {});
         animeKitsuMeta(item._id)
           .then((m) => {
             if (cancelled || !m) return;
@@ -331,6 +326,22 @@ export const ContinueCard = memo(function ContinueCard({
       io.disconnect();
     };
   }, [item._id, item.type, item.state?.video_id, authKey]);
+
+  // The preferred title is a display preference the user can change at any time,
+  // so it resolves in its own effect: a language change must not tear down the
+  // card's artwork hydration above.
+  useEffect(() => {
+    if (!/^(kitsu|mal|anilist|anidb):/.test(item._id)) return;
+    let cancelled = false;
+    resolvePreferredAnimeTitle(item._id, settings.animeTitleLanguage)
+      .then((tt) => {
+        if (!cancelled) setTranslatedTitle(tt?.trim() || null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [item._id, settings.animeTitleLanguage]);
 
   useEffect(() => {
     setEpTitle(null);

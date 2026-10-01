@@ -429,7 +429,7 @@ const PosterCard = memo(function PosterCard({
       }
     }
 
-    const preferred = settings.simklAnimeTitleLanguage;
+    const preferred = settings.animeTitleLanguage;
 
     const fetchTitles = async () => {
       if (malId) {
@@ -491,7 +491,7 @@ const PosterCard = memo(function PosterCard({
       cancelled = true;
       off?.();
     };
-  }, [meta.id, isAnimeCardId, settings.simklAnimeTitleLanguage]);
+  }, [meta.id, isAnimeCardId, settings.animeTitleLanguage]);
 
   useEffect(() => {
     if (

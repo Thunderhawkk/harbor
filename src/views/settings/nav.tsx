@@ -8514,9 +8514,9 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   },
   {
     label: "Anime Title Language",
-    section: "trackers",
-    tab: "simkl",
-    anchorTitle: "Connected",
+    section: "language",
+    tab: "app",
+    anchorTitle: "Titles and descriptions",
     keywords: [
       "anime title",
       "title language",
