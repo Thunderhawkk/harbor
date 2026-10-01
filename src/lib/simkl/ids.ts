@@ -35,7 +35,13 @@ export async function resolveSimklEpisodeTarget(
 ): Promise<SimklTarget | null> {
   const direct = stremioIdToSimklTarget(harborId, episode);
   if (direct.ok && (direct.target.kind === "episode" || direct.target.kind === "anime-episode")) {
-    return direct.target;
+    // stremioIdToSimklTarget only numbers from the payload's own coordinates; a
+    // season remap means the provider pair is the one Simkl can match.
+    const season = episode.imdbSeason ?? direct.target.season;
+    const number = episode.imdbEpisode ?? direct.target.number;
+    return direct.target.kind === "episode"
+      ? { kind: "episode", show: direct.target.show, season, number }
+      : { kind: "anime-episode", anime: direct.target.anime, season, number };
   }
   const season = episode.imdbSeason ?? episode.season;
   const number = episode.imdbEpisode ?? episode.episode;

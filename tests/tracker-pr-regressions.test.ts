@@ -308,6 +308,7 @@ test("Simkl fallback returns actual outcomes and stops after its account changes
       stremioIdToSimklTarget: () => (known ? { ok: true, target: episode } : { ok: false }),
       resolveSimklEpisodeTarget: async () => null,
     },
+    "./scrobble-body": { animeIdentity: () => null },
     "./history": {
       markEpisodesWatched: async () => {
         if (switchDuring) session = { username: "b" };

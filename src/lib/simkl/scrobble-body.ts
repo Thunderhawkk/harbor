@@ -1,10 +1,42 @@
 export type ScrobbleAction = "start" | "pause" | "stop";
 
 export type EpisodeRef =
-  | { season?: number; episode?: number; imdbId?: string; imdbSeason?: number }
+  | {
+      season?: number;
+      episode?: number;
+      imdbId?: string;
+      imdbSeason?: number;
+      imdbEpisode?: number;
+      kitsuStreamId?: string;
+      sourceMetaId?: string;
+    }
   | undefined;
 
 export type ScrobbleInfo = { title?: string; year?: number | null; imdb?: string; tmdb?: number };
+
+const ANIME_ENTRY = /^(kitsu|mal|anilist|anidb):(\d+)$/;
+
+/**
+ * The anime entry an episode belongs to, when the player knows one. A scoped
+ * `kitsu:{entry}:{n}` stream or an explicit `sourceMetaId` names the cour that
+ * aired the episode, which is often a different entry than the row's own meta —
+ * Simkl keeps such cours as their own single-season anime entries.
+ */
+export function animeIdentity(
+  episode: EpisodeRef,
+): { scheme: string; id: number; number?: number } | null {
+  const stream = /^kitsu:(\d+):(\d+)$/.exec(episode?.kitsuStreamId ?? "");
+  const streamEntry = stream ? `kitsu:${stream[1]}` : null;
+  const entry = ANIME_ENTRY.exec(episode?.sourceMetaId ?? "")?.[0] ?? streamEntry;
+  if (!entry) return null;
+  const [scheme, raw] = entry.split(":");
+  const id = Number(raw);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  // A matching stream binds its number to this entry; otherwise the episode's
+  // own number is already entry-relative.
+  const number = stream && entry === streamEntry ? Number(stream[2]) : episode?.episode;
+  return { scheme, id, number };
+}
 
 function node(ids: Record<string, unknown>, info?: ScrobbleInfo): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...ids };
@@ -36,9 +68,26 @@ export function buildBody(
   info?: ScrobbleInfo,
 ): Record<string, unknown> | null {
   const p = Math.min(100, Math.max(0, progress));
-  const ep = { season: episode?.season ?? 1, number: episode?.episode };
+  // Provider (IMDb/TVDB) coordinates win when present: a season remap hands the
+  // player an entry-relative number, but Simkl numbers an imdb/tv entry by the
+  // season the provider aired.
+  const ep = {
+    season: episode?.imdbSeason ?? episode?.season ?? 1,
+    number: episode?.imdbEpisode ?? episode?.episode,
+  };
   const ids: ScrobbleInfo | undefined =
     episode?.imdbId && !info?.imdb ? { ...info, imdb: episode.imdbId } : info;
+
+  // A named anime entry outranks the row's own meta. Simkl keeps split cours as
+  // their own single-season entries numbered from 1, so the entry-relative
+  // number is the one it can match — not the provider season.
+  const anime = animeIdentity(episode);
+  if (anime) {
+    const animeNode = node({ [anime.scheme]: anime.id }, ids);
+    return anime.number != null
+      ? { progress: p, anime: animeNode, episode: { season: 1, number: anime.number } }
+      : { progress: p, movie: animeNode };
+  }
 
   if (metaId.startsWith("tt")) {
     const imdb = metaId.split(":")[0];
@@ -67,8 +116,10 @@ export function buildBody(
     const num = Number(metaId.split(":")[1]);
     if (!Number.isFinite(num)) return null;
     const idKey = animePrefix.slice(0, -1);
+    // A Simkl anime entry is single-season, numbered from 1 within the entry.
+    const animeEp = { season: episode?.season ?? 1, number: episode?.episode };
     return episode?.episode != null
-      ? { progress: p, anime: node({ [idKey]: num }, ids), episode: ep }
+      ? { progress: p, anime: node({ [idKey]: num }, ids), episode: animeEp }
       : { progress: p, movie: node({ [idKey]: num }, ids) };
   }
 

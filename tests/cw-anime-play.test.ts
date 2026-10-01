@@ -8,6 +8,7 @@ import test from "node:test";
 import ts from "typescript";
 import { pickEpisodeTitle } from "../src/lib/providers/anizip.ts";
 import { animeTrackerTarget } from "../src/lib/tracker-progress.ts";
+import { buildBody } from "../src/lib/simkl/scrobble-body.ts";
 
 function load(mocks: Record<string, unknown>) {
   const source = readFileSync("src/lib/cw-anime-play.ts", "utf8");
@@ -127,6 +128,33 @@ test("an ordinary series never pays for an identity lookup", async () => {
   );
   assert.equal(await resolveCwAnimePlayEpisode({ metaId: "tt100", season: 1, episode: 2 }), null);
   assert.equal(calls, 0);
+});
+
+test("a named anime entry owns the scrobble, not the row's IMDb show", () => {
+  // Simkl keeps split cours as their own single-season entries; the provider
+  // season is not the number that entry counts.
+  const body = buildBody(
+    "tt2359704",
+    {
+      season: 6,
+      episode: 2,
+      imdbSeason: 6,
+      imdbEpisode: 2,
+      kitsuStreamId: "kitsu:49847:2",
+      sourceMetaId: "kitsu:49847",
+    },
+    100,
+    { imdb: "tt2359704" },
+  ) as { anime: { ids: Record<string, unknown> }; episode: { season: number; number: number } };
+  assert.equal(body.anime.ids.kitsu, 49847);
+  assert.deepEqual(body.episode, { season: 1, number: 2 });
+});
+
+test("a plain show still scrobbles by provider coordinates", () => {
+  const body = buildBody("tt123", { season: 1, episode: 6, imdbSeason: 3, imdbEpisode: 6 }, 100, {
+    imdb: "tt123",
+  }) as { episode: { season: number; number: number } };
+  assert.deepEqual(body.episode, { season: 3, number: 6 });
 });
 
 test("the continue card resolves the anime identity before playing", () => {
