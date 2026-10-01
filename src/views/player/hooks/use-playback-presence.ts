@@ -1,10 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { setPlaybackPresence } from "@/lib/discord/presence";
 import { getPlaybackPosition } from "@/lib/player/playback-clock";
 import type { PlayerSnapshot } from "@/lib/player/bridge";
 import type { PlayerSrc } from "@/lib/view";
+import { resolvePreferredAnimeTitle } from "@/lib/anime-title";
+import { useSettings } from "@/lib/settings";
 
 const POSITION_REFRESH_MS = 30000;
+const ANIME_META_ID = /^(kitsu|mal|anilist):/;
 
 export function usePlaybackPresence(params: {
   src: PlayerSrc;
@@ -14,6 +17,37 @@ export function usePlaybackPresence(params: {
   liveGuideOpen: boolean;
 }) {
   const { src, snap, season, episode, liveGuideOpen } = params;
+  const { settings } = useSettings();
+  const [preferredTitle, setPreferredTitle] = useState<string | null>(null);
+
+  // Presence shows one title for the whole session, but the meta a launch
+  // carries depends on where it came from: a Kitsu addon meta is the Kitsu
+  // canonical title (often romaji), while the detail page resolves an English
+  // one. Resolve it the same way the cards do so both agree.
+  useEffect(() => {
+    const id = src.meta.id ?? "";
+    const wanted = settings.discordRichPresence || settings.shareWatchPresence;
+    if (!wanted || !ANIME_META_ID.test(id)) {
+      setPreferredTitle(null);
+      return;
+    }
+    let cancelled = false;
+    void resolvePreferredAnimeTitle(id, settings.simklAnimeTitleLanguage)
+      .then((title) => {
+        if (!cancelled) setPreferredTitle(title?.trim() || null);
+      })
+      .catch(() => {
+        if (!cancelled) setPreferredTitle(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    src.meta.id,
+    settings.simklAnimeTitleLanguage,
+    settings.discordRichPresence,
+    settings.shareWatchPresence,
+  ]);
 
   useEffect(() => {
     if (snap.status !== "playing" && snap.status !== "paused") {
@@ -29,9 +63,10 @@ export function usePlaybackPresence(params: {
         : undefined;
     const epTitle = src.episode?.name?.trim();
     const epLine = epLabel && epTitle ? `${epLabel} · ${epTitle}` : epLabel;
+    const title = preferredTitle ?? src.meta.name ?? "Untitled";
     const publish = () =>
       setPlaybackPresence({
-        title: src.meta.name ?? "Untitled",
+        title,
         subtitle: epLine || year,
         metaId: src.meta.id ?? undefined,
         metaType: src.meta.type ?? undefined,
@@ -58,6 +93,7 @@ export function usePlaybackPresence(params: {
     src.liveProgram,
     season,
     episode,
+    preferredTitle,
   ]);
 
   useEffect(() => {
@@ -85,14 +121,7 @@ export function usePlaybackPresence(params: {
       positionSec: 0,
       durationSec: 0,
     });
-  }, [
-    liveGuideOpen,
-    snap.status,
-    src.meta.id,
-    src.meta.name,
-    src.meta.poster,
-    src.liveProgram,
-  ]);
+  }, [liveGuideOpen, snap.status, src.meta.id, src.meta.name, src.meta.poster, src.liveProgram]);
 
   useEffect(() => () => setPlaybackPresence(null), []);
 }
