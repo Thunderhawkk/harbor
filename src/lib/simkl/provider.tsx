@@ -18,7 +18,7 @@ import {
 import { getSession, setSession, subscribeSession } from "./session";
 import { stremioIdToSimklTarget } from "./ids";
 import { addToHistory } from "./history";
-import { armOnlineFlush, flushPendingWatches } from "./pending-sync";
+import { armPendingFlush, flushPendingWatches } from "./pending-sync";
 import { recordWatchedFallback } from "./record-watched";
 import { simklScrobble } from "./scrobble";
 import type { SimklPin, SimklSession, SimklTarget } from "./types";
@@ -71,7 +71,7 @@ export function SimklProvider({ children }: { children: ReactNode }) {
 
   useEffect(
     () =>
-      armOnlineFlush({
+      armPendingFlush({
         hasSession: () => getSession() != null,
         stopScrobble: (metaId, episode) => simklScrobble("stop", metaId, episode, 100),
         recordWatched: (metaId, episode, imdb) =>

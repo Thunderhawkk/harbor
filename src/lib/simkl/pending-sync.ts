@@ -130,6 +130,7 @@ export function recordPendingWatch(
   };
   const rest = load().filter((p) => keyOf(p) !== keyOf(next));
   save([next, ...rest]);
+  scheduleSoon();
 }
 
 function clearPending(key: string): void {
@@ -138,9 +139,63 @@ function clearPending(key: string): void {
 
 let flushDeps: FlushDeps | null = null;
 
-export async function flushPendingWatches(
+// A queued watch must not wait for the next app launch. Retry shortly after a
+// failure (past Simkl's 20s per-user scrobble lock), then on a slow clock.
+const RETRY_INTERVAL_MS = 60_000;
+const RETRY_SOON_MS = 20_000;
+
+let retryTimer: number | null = null;
+let soonTimer: number | null = null;
+let flushing: Promise<{ flushed: number; remaining: number }> | null = null;
+
+function hasWork(): boolean {
+  if (!flushDeps || !flushDeps.hasSession()) return false;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  return load().length > 0;
+}
+
+function attemptFlush(): void {
+  if (!hasWork()) return;
+  void flushPendingWatches().catch(() => {});
+}
+
+/** Give a freshly queued watch a quick second chance before the slow clock. */
+function scheduleSoon(): void {
+  if (typeof window === "undefined") return;
+  if (soonTimer != null) window.clearTimeout(soonTimer);
+  soonTimer = window.setTimeout(() => {
+    soonTimer = null;
+    attemptFlush();
+  }, RETRY_SOON_MS);
+}
+
+function startRetryTimer(): void {
+  if (typeof window === "undefined" || retryTimer != null) return;
+  retryTimer = window.setInterval(attemptFlush, RETRY_INTERVAL_MS);
+}
+
+function stopRetryTimer(): void {
+  if (retryTimer != null) {
+    window.clearInterval(retryTimer);
+    retryTimer = null;
+  }
+  if (soonTimer != null) {
+    window.clearTimeout(soonTimer);
+    soonTimer = null;
+  }
+}
+
+export function flushPendingWatches(
   deps?: FlushDeps,
 ): Promise<{ flushed: number; remaining: number }> {
+  if (flushing) return flushing;
+  flushing = replayPending(deps).finally(() => {
+    flushing = null;
+  });
+  return flushing;
+}
+
+async function replayPending(deps?: FlushDeps): Promise<{ flushed: number; remaining: number }> {
   const d = deps ?? flushDeps;
   if (!d || !d.hasSession()) return { flushed: 0, remaining: load().length };
   const owner = storageKey();
@@ -173,22 +228,19 @@ export async function flushPendingWatches(
   return { flushed, remaining: load().length };
 }
 
-let onlineArmed = false;
-
-export function armOnlineFlush(deps: FlushDeps): () => void {
+/**
+ * Arms the pending-watch replay: a failed write is retried on a timer and when
+ * the browser regains its connection, instead of waiting for a relaunch.
+ */
+export function armPendingFlush(deps: FlushDeps): () => void {
   flushDeps = deps;
   if (typeof window === "undefined") return () => {};
-  const onOnline = () => {
-    void flushPendingWatches().catch(() => {});
-  };
-  if (!onlineArmed) {
-    onlineArmed = true;
-    window.addEventListener("online", onOnline);
-    return () => {
-      onlineArmed = false;
-      window.removeEventListener("online", onOnline);
-    };
-  }
+  const onOnline = () => attemptFlush();
   window.addEventListener("online", onOnline);
-  return () => window.removeEventListener("online", onOnline);
+  startRetryTimer();
+  attemptFlush();
+  return () => {
+    window.removeEventListener("online", onOnline);
+    stopRetryTimer();
+  };
 }

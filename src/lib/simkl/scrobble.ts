@@ -1,7 +1,7 @@
 import { activeProfileId } from "@/lib/active-profile-id";
 import { getSession } from "./session";
 import { resolveForMeta } from "@/lib/tracker-resolve";
-import { simklRequest } from "./client";
+import { simklRequest, SimklApiError } from "./client";
 import {
   buildBody,
   buildEpisodeBody,
@@ -19,8 +19,11 @@ async function post(action: ScrobbleAction, body: Record<string, unknown>): Prom
   try {
     await simklRequest(`/scrobble/${action}`, { method: "POST", body });
     return true;
-  } catch {
+  } catch (e) {
     // Background-safe: live scrobble failures must never break playback.
+    // A stop that was already finalized means the watch is recorded — Simkl
+    // reports that as 409 with watched_at, and it must not be retried.
+    if (action === "stop" && e instanceof SimklApiError && e.status === 409) return true;
     return false;
   }
 }

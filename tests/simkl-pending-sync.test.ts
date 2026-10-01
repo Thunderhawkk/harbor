@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import "./_localstorage-stub.ts";
 import {
-  armOnlineFlush,
+  armPendingFlush,
   flushPendingWatches,
   listPendingWatches,
   recordPendingWatch,
@@ -151,7 +151,7 @@ test("entry stays queued when the stop fails even if history succeeds", async ()
 });
 
 test("online arming is safe without a window", () => {
-  const off = armOnlineFlush({
+  const off = armPendingFlush({
     hasSession: () => false,
     stopScrobble: async () => false,
     recordWatched: async () => false,
@@ -165,8 +165,19 @@ test("hook queues failed stops and provider flushes on session", () => {
   assert.match(hook, /recordPendingWatch\(prev\.metaId, prev\.episode,/);
   assert.match(hook, /recordPendingWatch\(a\.metaId, a\.episode,/);
   const provider = readFileSync(new URL("../src/lib/simkl/provider.tsx", import.meta.url), "utf8");
-  assert.match(provider, /armOnlineFlush\(\{/);
+  assert.match(provider, /armPendingFlush\(\{/);
   assert.match(provider, /stopScrobble:/);
   assert.match(provider, /simklScrobble\("stop", metaId, episode, 100\)/);
   assert.match(provider, /flushPendingWatches\(\)/);
+});
+
+test("the armed replay retries on a clock, not only on the next launch", () => {
+  const src = readFileSync(new URL("../src/lib/simkl/pending-sync.ts", import.meta.url), "utf8");
+  assert.match(src, /window\.setInterval\(attemptFlush, RETRY_INTERVAL_MS\)/);
+  assert.match(src, /scheduleSoon\(\)/);
+  assert.match(src, /window\.setTimeout\(\(\) => \{/);
+  // A 409 means the watch is already recorded; treating it as failure would
+  // leave the entry queued forever.
+  const scrobble = readFileSync(new URL("../src/lib/simkl/scrobble.ts", import.meta.url), "utf8");
+  assert.match(scrobble, /action === "stop" && e instanceof SimklApiError && e\.status === 409/);
 });
