@@ -331,7 +331,9 @@ export const ContinueCard = memo(function ContinueCard({
   // so it resolves in its own effect: a language change must not tear down the
   // card's artwork hydration above.
   useEffect(() => {
-    if (!/^(kitsu|mal|anilist|anidb):/.test(item._id)) return;
+    // Any anime row qualifies: native anime ids, detected Cinemeta rows, and
+    // Cinemeta rows whose detail page recorded an anime mapping.
+    if (!isAnimeCwItem(item) && getAnimeCwId(item._id) == null) return;
     let cancelled = false;
     resolvePreferredAnimeTitle(item._id, settings.animeTitleLanguage)
       .then((tt) => {
