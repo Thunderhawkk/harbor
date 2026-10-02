@@ -67,6 +67,9 @@ function createHarness(settingsOverrides: Record<string, unknown> = {}) {
     ...settingsOverrides,
   };
 
+  const clockListeners = new Set<() => void>();
+  let clockPos = 0;
+
   const mocks: Record<string, unknown> = {
     react,
     "@/lib/discord/presence": {
@@ -81,7 +84,15 @@ function createHarness(settingsOverrides: Record<string, unknown> = {}) {
       },
     },
     "@/lib/settings": { useSettings: () => ({ settings }) },
-    "@/lib/player/playback-clock": { getPlaybackPosition: () => 42 },
+    "@/lib/player/playback-clock": {
+      getPlaybackPosition: () => clockPos,
+      subscribePlaybackClock: (fn: () => void) => {
+        clockListeners.add(fn);
+        return () => {
+          clockListeners.delete(fn);
+        };
+      },
+    },
   };
 
   const source = readFileSync("src/views/player/hooks/use-playback-presence.ts", "utf8");
@@ -98,6 +109,10 @@ function createHarness(settingsOverrides: Record<string, unknown> = {}) {
     published,
     lookups,
     resolve: (value: string | null) => release(value),
+    setClock(pos: number) {
+      clockPos = pos;
+      for (const fn of clockListeners) fn();
+    },
     render(params: Record<string, unknown>) {
       for (let pass = 0; pass < 8; pass++) {
         stateSlot = 0;
@@ -167,6 +182,30 @@ test("an unresolved lookup falls back to the meta name", async () => {
   await settle();
   h.render(params("kitsu:49002", ROMAJI));
   assert.equal(h.published.at(-1)?.title, ROMAJI);
+});
+
+test("a resume seek re-publishes the position at once", () => {
+  // The resume is applied as a seek after the file loads: the first publish
+  // lands at 0:00, so Discord must be corrected the moment the seek arrives
+  // instead of waiting for the 30s refresh.
+  const h = createHarness();
+  h.setClock(0);
+  h.render(params("tt1234567", "Some Live Action Show"));
+  assert.equal(h.published.at(-1)?.positionSec, 0);
+  const before = h.published.length;
+
+  h.setClock(320);
+  assert.ok(h.published.length > before, "a seek publishes immediately");
+  assert.equal(h.published.at(-1)?.positionSec, 320);
+});
+
+test("ordinary playback advance does not re-publish on every tick", () => {
+  const h = createHarness();
+  h.setClock(100);
+  h.render(params("tt1234567", "Some Live Action Show"));
+  const before = h.published.length;
+  h.setClock(101);
+  assert.equal(h.published.length, before, "a one-second advance is not a seek");
 });
 
 test("the CW card re-resolves when the title language changes", () => {

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { setPlaybackPresence } from "@/lib/discord/presence";
-import { getPlaybackPosition } from "@/lib/player/playback-clock";
+import { getPlaybackPosition, subscribePlaybackClock } from "@/lib/player/playback-clock";
 import type { PlayerSnapshot } from "@/lib/player/bridge";
 import type { PlayerSrc } from "@/lib/view";
 import { resolvePreferredAnimeTitle } from "@/lib/anime-title";
 import { useSettings } from "@/lib/settings";
 
 const POSITION_REFRESH_MS = 30000;
+const SEEK_DRIFT_SEC = 5;
 const ANIME_META_ID = /^(kitsu|mal|anilist):/;
 
 export function usePlaybackPresence(params: {
@@ -78,9 +79,26 @@ export function usePlaybackPresence(params: {
         durationSec: snap.durationSec,
       });
     publish();
-    if (snap.status !== "playing") return;
+    // A resume is applied as a seek after the file loads, so the first publish
+    // above can land while the position is still 0 — Discord would then show
+    // 0:00 until the slow refresh. Re-publish as soon as the position jumps away
+    // from where playback was heading.
+    let basePos = getPlaybackPosition();
+    let baseAt = Date.now();
+    const offClock = subscribePlaybackClock(() => {
+      const pos = getPlaybackPosition();
+      const at = Date.now();
+      if (Math.abs(pos - (basePos + (at - baseAt) / 1000)) <= SEEK_DRIFT_SEC) return;
+      basePos = pos;
+      baseAt = at;
+      publish();
+    });
+    if (snap.status !== "playing") return offClock;
     const tick = window.setInterval(publish, POSITION_REFRESH_MS);
-    return () => window.clearInterval(tick);
+    return () => {
+      window.clearInterval(tick);
+      offClock();
+    };
   }, [
     snap.status,
     snap.durationSec,
