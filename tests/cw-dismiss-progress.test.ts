@@ -228,6 +228,12 @@ test("external backfills preserve dismissals and save true remote progress only 
         readResumeEntry: () => existing,
         saveResumeMs: (...args: unknown[]) => writes.push(args),
       },
+      "@/lib/providers/anizip": {
+        aniZipByMal: async () => null,
+        aniZipByKitsu: async () => null,
+        aniZipByAnilist: async () => null,
+        aniZipByAnidb: async () => null,
+      },
     };
     const module = { exports: {} as Record<string, () => Promise<LibraryItem[]>> };
     const output = ts.transpileModule(source, {

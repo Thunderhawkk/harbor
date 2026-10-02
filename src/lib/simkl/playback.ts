@@ -2,6 +2,13 @@ import { simklRequest, SimklApiError } from "./client";
 import { getSession } from "./session";
 import { isCwDismissed } from "@/lib/cw-dismiss";
 import { readResumeEntry, saveResumeMs } from "@/lib/resume";
+import {
+  aniZipByAnidb,
+  aniZipByAnilist,
+  aniZipByKitsu,
+  aniZipByMal,
+  type AniZipMapping,
+} from "@/lib/providers/anizip";
 import type { LibraryItem } from "@/lib/stremio";
 
 type Ids = {
@@ -43,6 +50,29 @@ function seriesMetaId(ids?: Ids): string | null {
   return null;
 }
 
+/**
+ * Simkl keeps anime as per-cour entries numbered from 1 inside the entry while
+ * the entry's IMDb/TMDB ids name the umbrella series, so its episode coords are
+ * entry-relative, not provider seasons. Resolve the season the provider aired
+ * the episode in; without an anime-scheme id on the node the cour is unknown.
+ */
+async function resolveProviderEpisodeCoords(
+  ids: Ids | undefined,
+  entryNumber: number,
+): Promise<{ season: number; episode: number } | null> {
+  if (!Number.isInteger(entryNumber) || entryNumber <= 0) return null;
+  let az: AniZipMapping | null = null;
+  if (ids?.mal) az = await aniZipByMal(ids.mal);
+  if (!az && ids?.kitsu) az = await aniZipByKitsu(ids.kitsu);
+  if (!az && ids?.anilist) az = await aniZipByAnilist(ids.anilist);
+  if (!az && ids?.anidb) az = await aniZipByAnidb(ids.anidb);
+  const azEp = az?.episodes?.[String(entryNumber)];
+  const season = azEp?.seasonNumber;
+  const episode = azEp?.episodeNumber;
+  if (!season || season < 1 || !episode || episode < 1) return null;
+  return { season, episode };
+}
+
 function buildItem(
   id: string,
   type: "movie" | "series",
@@ -77,7 +107,7 @@ function buildItem(
   };
 }
 
-function toLibraryItem(raw: RawSession): LibraryItem | null {
+async function toLibraryItem(raw: RawSession): Promise<LibraryItem | null> {
   const pct = Math.min(100, Math.max(0, raw.progress ?? 0));
   if (pct < 1 || pct > 98) return null;
   const when = raw.paused_at ?? raw.watched_at ?? new Date(0).toISOString();
@@ -108,6 +138,18 @@ function toLibraryItem(raw: RawSession): LibraryItem | null {
   if (seriesNode) {
     const id = seriesMetaId(seriesNode.ids);
     if (!id) return null;
+    let season = raw.episode?.season;
+    let episode = raw.episode?.number ?? raw.episode?.episode;
+    // An anime row resolved to an umbrella IMDb/TMDB id pairs that id with the
+    // cour entry's own numbering, which reads as a wrong season-1 episode. The
+    // anime-native pipeline already handles entry-relative ids like mal:….
+    if (!raw.show && season === 1 && episode != null && (id.startsWith("tt") || id.startsWith("tmdb:tv:"))) {
+      const coords = await resolveProviderEpisodeCoords(seriesNode.ids, episode);
+      if (coords) {
+        season = coords.season;
+        episode = coords.episode;
+      }
+    }
     return buildItem(
       id,
       "series",
@@ -115,8 +157,8 @@ function toLibraryItem(raw: RawSession): LibraryItem | null {
       pct,
       DURATION_MS.series,
       when,
-      raw.episode?.season,
-      raw.episode?.number ?? raw.episode?.episode,
+      season,
+      episode,
       !raw.show,
     );
   }
@@ -137,7 +179,7 @@ export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
   const items: LibraryItem[] = [];
   const seen = new Set<string>();
   for (const r of raw) {
-    const item = toLibraryItem(r);
+    const item = await toLibraryItem(r);
     if (!item?.state) continue;
     const key = `${item._id}|${item.state.season ?? ""}|${item.state.episode ?? ""}`;
     if (seen.has(key)) continue;
