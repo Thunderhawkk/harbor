@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { PlayerBridge } from "@/lib/player/bridge";
 import { cloudWriteId } from "@/lib/stremio";
-import { isResumeStartReady, resolveStartMs } from "@/lib/player/resume-start";
+import { resolveStartMs } from "@/lib/player/resume-start";
 import type { PlayerSrc } from "@/lib/view";
 import { videoIdFor } from "./use-stremio-sync";
 import { useSettings } from "@/lib/settings";
@@ -99,32 +99,21 @@ export function useBridgeLoad(params: {
             episode,
             openingVid,
           });
-      const loadMedia = () =>
-        bridge.load({
-          url: playUrl,
-          traceId: src.playbackTraceId,
-          startupProfile: playbackStartupProfile(src.streamRef),
-          subtitles: src.subtitles,
-          notWebReady: src.notWebReady,
-          isLive,
-          headers: src.headers,
-        });
       let resolved: Awaited<typeof resumePromise>;
+      // The start position must be known before the media loads: both bridges
+      // honour `startAtSec` natively (mpv's `start`, the html5 element's initial
+      // seek), while a seek issued while the media is still loading can be
+      // dropped or land behind the request, losing the resume.
       try {
-        const waitBeforeLoad =
-          shouldResolveResume && !!authKey && !isResumeStartReady(resumeIdentity);
-        if (waitBeforeLoad) {
-          resolved = await resumePromise;
-          if (cancelled) return;
-          await loadMedia();
-        } else {
-          [resolved] = await Promise.all([resumePromise, loadMedia()]);
-        }
+        resolved = shouldResolveResume
+          ? await resumePromise
+          : { ms: 0, fromRemote: false, finished: false };
       } catch (e) {
         if (cancelled) return;
-        console.warn("[player] load failed", e);
-        return;
+        console.warn("[player] resume resolve failed", e);
+        resolved = { ms: 0, fromRemote: false, finished: false };
       }
+      if (cancelled) return;
       const startMs = src.startPositionMs ?? resolved.ms;
       const runtimeMin = src.episode?.runtime ?? null;
       const durationMs = runtimeMin && runtimeMin > 0 ? runtimeMin * 60_000 : 0;
@@ -146,6 +135,24 @@ export function useBridgeLoad(params: {
         resumePromptRef.current &&
         startSec > RESUME_PROMPT_MIN_SEC &&
         !guestInRoom;
+      // A pending prompt must start from the beginning and seek once answered.
+      const loadStartSec = eligibleForPrompt ? 0 : startSec;
+      try {
+        await bridge.load({
+          url: playUrl,
+          traceId: src.playbackTraceId,
+          startupProfile: playbackStartupProfile(src.streamRef),
+          subtitles: src.subtitles,
+          notWebReady: src.notWebReady,
+          isLive,
+          headers: src.headers,
+          startAtSec: loadStartSec > 5 ? loadStartSec : undefined,
+        });
+      } catch (e) {
+        if (cancelled) return;
+        console.warn("[player] load failed", e);
+        return;
+      }
       if (cancelled) return;
       if (eligibleForPrompt) {
         bridge.pause();
@@ -159,6 +166,15 @@ export function useBridgeLoad(params: {
             setPendingSeekSec(0);
           }
         };
+        return;
+      }
+      if (loadStartSec > 5) {
+        // The media already started at the saved position.
+        if (!inRoomRef.current && !src.startPaused) {
+          bridge.play().catch(() => {});
+        } else if (src.startPaused) {
+          bridge.pause();
+        }
         return;
       }
       if (!guestInRoom && startSec > 5) {
