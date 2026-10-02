@@ -106,7 +106,12 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
     if (!session.ready) return;
     // Keep the last usable duration through the bridge's teardown/reset event.
     if (snap.durationSec > 0 || !session.latest) session.latest = params;
-    if (snap.positionSec >= MIN_POSITION_SEC) session.position = snap.positionSec;
+    // The bridge snapshot's position only moves when another field changes, so it
+    // can trail the live clock by minutes. It may seed the session, but it must
+    // never overwrite a position the clock already reported.
+    if (snap.positionSec >= MIN_POSITION_SEC && session.position < MIN_POSITION_SEC) {
+      session.position = snap.positionSec;
+    }
   });
 
   useEffect(
@@ -341,7 +346,13 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
   }, [snap.status]);
 
   useEffect(() => {
-    return () => record(session);
+    return () => {
+      // The closing render can arrive after the last clock tick, and the snapshot
+      // it carries can be minutes stale, so refresh from the live clock first.
+      const live = getPlaybackPosition();
+      if (live >= MIN_POSITION_SEC) session.position = live;
+      record(session);
+    };
   }, [session]);
 
   useEffect(() => {
