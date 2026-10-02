@@ -426,6 +426,9 @@ export function useAutoRetry(params: {
   ]);
 
   const lastPosRef = useRef({ pos: 0, at: 0, started: false, urlAt: 0 });
+  // The interval closes over the snapshot, so read the live buffering flag from a ref.
+  const bufferingRef = useRef(false);
+  bufferingRef.current = snap.buffering;
   useEffect(() => {
     lastPosRef.current = { pos: 0, at: 0, started: false, urlAt: Date.now() };
   }, [src.url]);
@@ -440,6 +443,14 @@ export function useAutoRetry(params: {
       const now = Date.now();
       const ref = lastPosRef.current;
       const pos = getPlaybackPosition();
+      // A source buffering toward a seek target is not a dead one: restart the
+      // clock so the frozen-position check only measures playable stalls.
+      if (bufferingRef.current) {
+        ref.started = true;
+        ref.at = now;
+        ref.pos = pos;
+        return;
+      }
       if (!ref.started) {
         ref.started = true;
         ref.at = now;
@@ -481,6 +492,11 @@ export function useAutoRetry(params: {
       noVideoSinceRef.current = null;
       return;
     }
+    // Buffering toward a seek target has no frames yet; that is not a black screen.
+    if (snap.buffering) {
+      noVideoSinceRef.current = null;
+      return;
+    }
     if (videoSeenRef.current) return;
     if (noVideoSinceRef.current == null) {
       noVideoSinceRef.current = Date.now();
@@ -498,6 +514,7 @@ export function useAutoRetry(params: {
     snap.status,
     snap.videoWidth,
     snap.videoHeight,
+    snap.buffering,
     triggerAutoRetry,
     src.url,
     isP2pEngine,

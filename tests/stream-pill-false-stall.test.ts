@@ -52,6 +52,16 @@ test("a stream without a container duration is not treated as a stall", () => {
   assert.match(autoRetry, /\[src\.url, snap\.firstFrameReady, hasProgress, isLocal\]/);
 });
 
+test("a buffering source is not reported as dead or as a black screen", () => {
+  const autoRetry = read("src/views/player/hooks/use-auto-retry.ts");
+  // Resuming deep into a stream buffers without frames: both no-progress checks
+  // must treat that as progress rather than a dead source.
+  assert.match(autoRetry, /const bufferingRef = useRef\(false\);/);
+  assert.match(autoRetry, /bufferingRef\.current = snap\.buffering;/);
+  assert.match(autoRetry, /if \(bufferingRef\.current\) \{/);
+  assert.match(autoRetry, /if \(snap\.buffering\) \{\s*\n\s*noVideoSinceRef\.current = null;/);
+});
+
 test("every stream pill variant can be dismissed", () => {
   const pill = read("src/components/player/stream-check-pill.tsx");
   assert.match(pill, /onDismiss: \(\) => void;/);
