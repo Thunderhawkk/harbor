@@ -178,6 +178,21 @@ test("a plain show still scrobbles by provider coordinates", () => {
   assert.deepEqual(body.episode, { season: 3, number: 6 });
 });
 
+test("a non-anime card carries its episode title to the player", () => {
+  // Simkl/Trakt rows are Cinemeta-keyed, so the anime resolver declines them and
+  // the episode would reach the player nameless — the presence then shows only
+  // "S6 E2". The title the card already fetched must ride along.
+  const src = readFileSync("src/components/continue-card.tsx", "utf8");
+  assert.match(
+    src,
+    /if \(episode && !episode\.name && episodeTitle\) episode = \{ \.\.\.episode, name: episodeTitle \};/,
+  );
+  assert.match(
+    src,
+    /if \(episode && !episode\.still && epStill\) episode = \{ \.\.\.episode, still: epStill \};/,
+  );
+});
+
 test("the continue card resolves the anime identity before playing", () => {
   const src = readFileSync("src/components/continue-card.tsx", "utf8");
   assert.match(src, /import \{ resolveCwAnimePlayEpisode \} from "@\/lib\/cw-anime-play";/);

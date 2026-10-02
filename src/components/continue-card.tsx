@@ -475,6 +475,11 @@ export const ContinueCard = memo(function ContinueCard({
       const animeId = getAnimeCwId(item._id);
       if (animeId) episode = { ...episode, sourceMetaId: animeId };
     }
+    // The card already resolved this episode's title from the metadata addon.
+    // Carry it onto the episode so a row that is not anime (Simkl/Trakt and
+    // ordinary series) still gives the presence an episode name.
+    if (episode && !episode.name && episodeTitle) episode = { ...episode, name: episodeTitle };
+    if (episode && !episode.still && epStill) episode = { ...episode, still: epStill };
     return episode;
   };
 
