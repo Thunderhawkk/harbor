@@ -124,8 +124,17 @@ export async function resolveStartMs({
         ? localPct * remoteDuration
         : local;
     const flaggedWatched = (remote.state as { flaggedWatched?: number })?.flaggedWatched === 1;
+    // A watched flag can outlive the pass that set it (the tracker syncs rewrite
+    // the item's mtime), so it must not restart an episode the profile is still
+    // part-way through: the local entry is what the Continue Watching card shows.
+    const localMidEpisode =
+      localEntry != null &&
+      effectiveLocal > 0 &&
+      remoteDuration > 0 &&
+      effectiveLocal / remoteDuration < RESTART_THRESHOLD;
     const finished =
       isEpisode &&
+      !localMidEpisode &&
       (flaggedWatched || (remoteDuration > 0 && remoteMs / remoteDuration >= RESTART_THRESHOLD));
     const rawMtime = (remote as { _mtime?: unknown })._mtime;
     const remoteMtime =
