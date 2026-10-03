@@ -2,6 +2,9 @@ const KEY = "harbor.anime-cw-ids.v1";
 const MAX = 400;
 
 const ANIME_SCHEME = /^(kitsu|mal|anilist|anidb):/;
+// Catalog ids that can carry a recorded anime mapping: Cinemeta's IMDb ids and
+// TMDB's tv ids — both resolve to the same anime entries.
+const CATALOG_ID = /^(?:tt\d+|tmdb:tv:)/;
 
 function read(): Record<string, string> {
   try {
@@ -27,16 +30,16 @@ function write(map: Record<string, string>): void {
   }
 }
 
-export function recordAnimeCwId(ttId: string, animeId: string): void {
-  if (!ttId.startsWith("tt") || !ANIME_SCHEME.test(animeId)) return;
+export function recordAnimeCwId(catalogId: string, animeId: string): void {
+  if (!CATALOG_ID.test(catalogId) || !ANIME_SCHEME.test(animeId)) return;
   const map = read();
-  if (map[ttId] === animeId) return;
-  delete map[ttId];
-  map[ttId] = animeId;
+  if (map[catalogId] === animeId) return;
+  delete map[catalogId];
+  map[catalogId] = animeId;
   write(map);
 }
 
-export function getAnimeCwId(ttId: string): string | null {
-  if (!ttId.startsWith("tt")) return null;
-  return read()[ttId] ?? null;
+export function getAnimeCwId(catalogId: string): string | null {
+  if (!CATALOG_ID.test(catalogId)) return null;
+  return read()[catalogId] ?? null;
 }
