@@ -242,7 +242,7 @@ test("multi-season sync prefers the season-scoped identity over the base track i
     src,
     /const useIdentity =\s*\n\s*\(anilistAutoSyncRef\.current \|\| malAutoSyncRef\.current\)/,
   );
-  assert.match(src, /if \(trackId && !useIdentity\)/);
+  assert.match(src, /if \(track && !useIdentity\)/);
   assert.match(
     src,
     /else if \(useIdentity\)/,
