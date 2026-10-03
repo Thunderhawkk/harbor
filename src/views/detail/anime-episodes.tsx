@@ -43,11 +43,53 @@ import { useAnimeWatchedRouting } from "./anime-episodes/use-anime-watched-routi
 import { useAnimeFranchiseNav } from "./anime-episodes/use-anime-franchise-nav";
 import { useTvdbProxyImages } from "./anime-episodes/use-tvdb-proxy-images";
 import { pickTvdbImage } from "@/lib/providers/tvdb-proxy";
+import { fillAiredPlaceholderTitles, isPlaceholderEpisodeText } from "@/lib/providers/episode-placeholder";
+import {
+  episodeArtworkFor,
+  type EpisodeArtwork,
+} from "@/lib/providers/anime-episode-enrich";
 import { TvdbOrderPanel } from "./series-episodes/tvdb-order-panel";
 import { parseKitsuId } from "@/lib/providers/kitsu";
 import { aiIsGroq, aiKey, providerForModel } from "@/lib/ai-models";
 
 const WINDOW_STEP = 60;
+
+function parseTmdbTvId(id: string): number | null {
+  const m = /^tmdb:tv:(\d+)$/.exec(id);
+  return m ? Number(m[1]) : null;
+}
+
+// TVDB often lacks a still and description for an episode right after it airs;
+// the order rows then fall back to the series backdrop and show no synopsis.
+// TMDB (stills + overviews) and Cinemeta (stills) fill the gaps.
+function useEpisodeArtwork(
+  metaId: string,
+  imdbId: string | null,
+  tmdbKey: string,
+  seasons: number[],
+  enabled: boolean,
+): Map<string, EpisodeArtwork> {
+  const sig = seasons.join(",");
+  const [art, setArt] = useState<Map<string, EpisodeArtwork>>(() => new Map());
+  useEffect(() => {
+    if (!enabled) return;
+    const list = sig ? sig.split(",").map(Number) : [];
+    if (!imdbId?.startsWith("tt") && parseTmdbTvId(metaId) == null) return;
+    let cancelled = false;
+    void episodeArtworkFor({
+      imdbId,
+      tmdbId: parseTmdbTvId(metaId),
+      tmdbKey,
+      seasons: list,
+    }).then((map) => {
+      if (!cancelled) setArt(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, metaId, imdbId, tmdbKey, sig]);
+  return art;
+}
 
 export function AnimeEpisodes({
   meta,
@@ -299,13 +341,65 @@ export function AnimeEpisodes({
       : effectiveOrder
         ? effectiveOrder.visibleEpisodes
         : episodes;
+  const artworkSeasons = useMemo(
+    () => [
+      ...new Set(
+        baseDisplay
+          .map((e) => e.imdbSeason ?? e.seasonNumber)
+          .filter((s): s is number => s != null && s > 0),
+      ),
+    ],
+    [baseDisplay],
+  );
+  const artworkNeeded = useMemo(
+    () =>
+      baseDisplay.some(
+        (e) => !e.thumbnail || !e.synopsis?.trim() || isPlaceholderEpisodeText(e.synopsis),
+      ),
+    [baseDisplay],
+  );
+  const artwork = useEpisodeArtwork(
+    meta.id,
+    imdbId ?? null,
+    settings.tmdbKey,
+    artworkSeasons,
+    artworkNeeded,
+  );
   const displayEpisodes = useMemo(() => {
-    if (Object.keys(proxyImages).length === 0) return baseDisplay;
-    return baseDisplay.map((ep) => {
+    // The TVDB order can still say "TBA" for an episode that already aired while
+    // the entry's own episodes know the real title; fill those in, keep TBA for
+    // episodes that have not aired. Missing stills and descriptions come from
+    // the artwork map (TMDB first, then Cinemeta).
+    const filled = fillAiredPlaceholderTitles(baseDisplay, franchiseEpisodes);
+    let changed = false;
+    const out = filled.map((ep) => {
       const img = pickTvdbImage(proxyImages, ep);
-      return img ? { ...ep, thumbnail: img } : ep;
+      if (img) {
+        changed = true;
+        return { ...ep, thumbnail: img };
+      }
+      const pair =
+        ep.imdbSeason != null && ep.imdbEpisode != null
+          ? `${ep.imdbSeason}:${ep.imdbEpisode}`
+          : null;
+      const art = pair ? artwork.get(pair) : undefined;
+      let next = ep;
+      if (!next.thumbnail && art?.thumbnail) {
+        next = { ...next, thumbnail: art.thumbnail };
+        changed = true;
+      }
+      if ((!next.synopsis?.trim() || isPlaceholderEpisodeText(next.synopsis)) && art?.synopsis) {
+        next = { ...next, synopsis: art.synopsis };
+        changed = true;
+      }
+      if (!next.length && art?.runtime) {
+        next = { ...next, length: art.runtime };
+        changed = true;
+      }
+      return next;
     });
-  }, [baseDisplay, proxyImages]);
+    return changed ? out : filled;
+  }, [baseDisplay, proxyImages, franchiseEpisodes, artwork]);
   const displaySourceId = useMemo(() => {
     const ids = new Set<string>();
     for (const e of displayEpisodes) if (e.sourceMetaId != null) ids.add(e.sourceMetaId);

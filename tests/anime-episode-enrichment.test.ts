@@ -38,6 +38,8 @@ function enrichment({ videos = [], ratings = new Map(), thumbs = null }: {
     "@/lib/anime-fillers": { fillerEpisodes: async () => new Set() },
     "@/lib/providers/anime-tvdb-thumbs": { fetchTvdbThumbs: async () => thumbs },
     "@/lib/cinemeta": { meta: async () => ({ videos }) },
+    "@/lib/providers/tmdb/tmdb-details": { tmdbSeasonEpisodes: async () => [] },
+    "@/lib/providers/tmdb/tmdb-image-rungs": { STILL_HD_RUNG: "w780", tmdbStillUrl: () => undefined },
   }).enrichEpisodes;
 }
 
