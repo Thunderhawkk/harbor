@@ -67,7 +67,7 @@ test("the top-match warm resolves only anime-looking catalog metas", async () =>
 
 test("the detail page seeds detection from the recorded mapping", () => {
   const detail = readFileSync(new URL("../src/views/detail.tsx", import.meta.url), "utf8");
-  assert.ok(detail.includes("getAnimeCwId(meta.id)"));
+  assert.ok(detail.includes("getAnimeCanonicalId(meta.id)"));
   assert.ok(detail.includes("setDetectedKitsu(recordedKitsu)"));
   const overlay = readFileSync(
     new URL("../src/components/search/search-overlay.tsx", import.meta.url),
