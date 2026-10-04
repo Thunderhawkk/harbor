@@ -42,6 +42,7 @@ function load(overrides: Record<string, unknown> = {}): Api {
       pickEpisodeTitle: () => null,
     },
     "./providers/anime-mapping": { imdbToKitsu: async () => null, tmdbTvToKitsu: async () => null },
+    "./providers/anime-franchise-root": { franchiseRoot: async (id: string) => id },
     "./calendar-time": { localDateTimeFromIso },
     ...overrides,
   };
@@ -138,4 +139,50 @@ test("a merged parent-season episode does not duplicate the real sequel airing",
   const out = await api.fetchLibraryCalendar("key", 2026, 9, { tmdbKey: "k", includeTrakt: false });
   assert.equal(out.length, 1, "the merged S1 label must not survive");
   assert.match(out[0].name, /S02E03/);
+});
+
+test("a catalog row in the same franchise as an anime row is dropped", async () => {
+  const api = load({
+    "./local-cw": {
+      listLocalCw: () => [
+        { id: "kitsu:49444", type: "series", name: "Bleach: Thousand-Year Blood War - The Calamity", t: Date.now() },
+        { id: "tmdb:tv:30984", type: "series", name: "Bleach", t: Date.now() },
+      ],
+    },
+    "./providers/anime-franchise-root": { franchiseRoot: async () => "kitsu:244" },
+    "./providers/anime-mapping": {
+      imdbToKitsu: async () => null,
+      tmdbTvToKitsu: async (id: number) => (id === 30984 ? 244 : null),
+    },
+    "./providers/anizip": {
+      aniZipByAnilist: async () => null,
+      aniZipByKitsu: async (id: number) =>
+        id === 49444
+          ? {
+              titles: { en: "Bleach: Thousand-Year Blood War - The Calamity" },
+              mappings: {},
+              episodes: { "9": { episode: "9", seasonNumber: 17, episodeNumber: 49, airdate: "2026-10-19" } },
+            }
+          : null,
+      aniZipByMal: async () => null,
+      pickEpisodeTitle: () => null,
+    },
+    "./providers/tmdb/tmdb-calendar": {
+      tmdbFindByImdb: async () => ({ tvId: 30984, movieId: null }),
+      tmdbTvUpcoming: async () => ({
+        name: "Bleach",
+        poster: null,
+        isAnime: true,
+        episodes: [
+          { season: 2, number: 49, name: "THE BLADE", airDate: "2026-10-20", image: null, overview: "", voteAverage: 0 },
+        ],
+      }),
+      tmdbMovieRelease: async () => null,
+      tmdbTvPoster: async () => null,
+    },
+  });
+  const out = await api.fetchLibraryCalendar("key", 2026, 9, { tmdbKey: "k", includeTrakt: false });
+  assert.equal(out.length, 1, "the catalog duplicate must be dropped");
+  assert.equal(out[0].releaseDate, "2026-10-19");
+  assert.match(out[0].name, /S17E49/);
 });

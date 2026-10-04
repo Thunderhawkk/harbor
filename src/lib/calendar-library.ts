@@ -12,6 +12,8 @@ import {
   tmdbTvUpcoming,
 } from "./providers/tmdb/tmdb-calendar";
 import { aniZipByAnilist, aniZipByKitsu, aniZipByMal, pickEpisodeTitle } from "./providers/anizip";
+import { imdbToKitsu, tmdbTvToKitsu } from "./providers/anime-mapping";
+import { franchiseRoot } from "./providers/anime-franchise-root";
 import type { CalendarItem } from "./calendar";
 import { localDateTimeFromIso } from "./calendar-time";
 
@@ -355,6 +357,42 @@ function locallyWatchedCandidates(): Candidate[] {
 const curatedFirst = (a: Candidate, b: Candidate) =>
   (a.temp ? 1 : 0) - (b.temp ? 1 : 0) || b.mtime - a.mtime;
 
+/**
+ * The same anime is often in the library twice: once as a Kitsu/MAL/AniList row
+ * (started watching) and once as its IMDb/TMDB row (porvider metadata). They
+ * resolve to the same franchise but with different names and provider dates, so
+ * the per-episode dedup cannot see the overlap. When an anime-scheme candidate
+ * covers a franchise, drop the catalog candidate for that same franchise.
+ */
+async function candidateRoot(id: string): Promise<string> {
+  if (isAnimeId(id) || id.startsWith("anidb:")) return franchiseRoot(id).catch(() => id);
+  // franchiseRoot knows imdb and anime-scheme ids, but not tmdb:tv — bridge it.
+  let kitsu: number | null = null;
+  if (/^tt\d+/.test(id)) kitsu = await imdbToKitsu(id.split(":")[0]).catch(() => null);
+  else if (id.startsWith("tmdb:tv:")) {
+    const n = Number(id.split(":")[2]);
+    kitsu = Number.isFinite(n) ? await tmdbTvToKitsu(n).catch(() => null) : null;
+  }
+  if (kitsu == null) return id;
+  return franchiseRoot(`kitsu:${kitsu}`).catch(() => `kitsu:${kitsu}`);
+}
+
+async function dropCatalogDuplicates(candidates: Candidate[]): Promise<Candidate[]> {
+  const roots = new Map<string, string>();
+  const animeRoots = new Set<string>();
+  for (const c of candidates) {
+    const root = await candidateRoot(c.id);
+    roots.set(c.id, root);
+    if (isAnimeId(c.id)) animeRoots.add(root);
+  }
+  if (animeRoots.size === 0) return candidates;
+  return candidates.filter((c) => {
+    if (isAnimeId(c.id)) return true;
+    const root = roots.get(c.id);
+    return root == null || !animeRoots.has(root);
+  });
+}
+
 export async function fetchLibraryCalendar(
   authKey: string,
   year: number,
@@ -373,7 +411,8 @@ export async function fetchLibraryCalendar(
   }
   const trakt = opts.includeTrakt ? await fetchTraktWatchlist().catch(() => []) : [];
 
-  const candidates = gatherCandidates(stremio, local, trakt, locallyWatchedCandidates());
+  const gathered = gatherCandidates(stremio, local, trakt, locallyWatchedCandidates());
+  const candidates = await dropCatalogDuplicates(gathered);
   if (candidates.length === 0) {
     if (stremioFailed) throw new Error("Couldn't load your library");
     return [];
