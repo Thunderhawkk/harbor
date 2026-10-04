@@ -1,4 +1,4 @@
-import { isGenericEpisodeName } from "@/lib/providers/anime-episode-build";
+import { isForeignScriptTitle, isGenericEpisodeName } from "@/lib/providers/anime-episode-build";
 import type { KitsuEpisode } from "@/lib/providers/kitsu";
 
 // Providers publish placeholders such as "TBA" for episodes whose name has not
@@ -57,7 +57,13 @@ export function fillAiredPlaceholderTitles(
   rows: KitsuEpisode[],
   pool: KitsuEpisode[],
   now = Date.now(),
+  lang = "",
 ): KitsuEpisode[] {
+  const base = lang.trim().split("-")[0]?.toLowerCase() ?? "";
+  // An English target treats a foreign-script title as not-yet-known, so the
+  // pool's English name can replace it instead of the row sitting on Japanese.
+  const mismatched = (text: string | null | undefined) =>
+    (base === "" || base === "en") && isForeignScriptTitle(text);
   const byTvdbId = new Map<number, KitsuEpisode>();
   const byPair = new Map<string, KitsuEpisode>();
   const byAbs = new Map<number, KitsuEpisode>();
@@ -78,7 +84,10 @@ export function fillAiredPlaceholderTitles(
   let changed = false;
   const out = rows.map((ep) => {
     const titleMissing =
-      !ep.title?.trim() || isPlaceholderEpisodeText(ep.title) || isGenericEpisodeName(ep.title);
+      !ep.title?.trim() ||
+      isPlaceholderEpisodeText(ep.title) ||
+      isGenericEpisodeName(ep.title) ||
+      mismatched(ep.title);
     const synopsisMissing = !ep.synopsis?.trim() || isPlaceholderEpisodeText(ep.synopsis);
     if (!titleMissing && !synopsisMissing) return ep;
     const abs = ep.absoluteNumber;

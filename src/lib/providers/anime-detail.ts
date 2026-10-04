@@ -466,18 +466,22 @@ export async function animeDetails(
       tmdbEnRaw = en;
     }
   }
-  mergeAniZipEpisodes(episodes, aniZip, { lang: localized ? iso1 : undefined });
+  mergeAniZipEpisodes(episodes, aniZip, { lang: localized ? iso1 : undefined, targetLang: iso1 });
   // AniZip often carries a new season's ids before its episode records, and
   // the addon labels the cour "season 1" — the window must land before the
   // TVDB merge or the cour's identity-less rows match franchise season 1.
   await applyAnidbSeasonWindow(episodes, kitsuId);
-  mergeTvdbEpisodes(episodes, tvdbEpsRaw?.loc ?? null, { lang: localized ? iso1 : undefined });
-  mergeTmdbEpisodes(episodes, tmdbEpsRaw, { lang: localized ? iso1 : undefined });
+  mergeTvdbEpisodes(episodes, tvdbEpsRaw?.loc ?? null, {
+    lang: localized ? iso1 : undefined,
+    targetLang: iso1,
+  });
+  mergeTmdbEpisodes(episodes, tmdbEpsRaw, { lang: localized ? iso1 : undefined, targetLang: iso1 });
   // Fall back to English titles/overviews when the localized translation is missing (providers
-  // otherwise fall back to the original, e.g. Japanese for anime).
+  // otherwise fall back to the original, e.g. Japanese for anime). `targetLang` keeps this pass
+  // from overwriting a title the user already has in their own language.
   if (localized) {
-    if (tvdbEpsRaw?.en) mergeTvdbEpisodes(episodes, tvdbEpsRaw.en);
-    if (tmdbEnRaw) mergeTmdbEpisodes(episodes, tmdbEnRaw);
+    if (tvdbEpsRaw?.en) mergeTvdbEpisodes(episodes, tvdbEpsRaw.en, { targetLang: iso1 });
+    if (tmdbEnRaw) mergeTmdbEpisodes(episodes, tmdbEnRaw, { targetLang: iso1 });
   }
 
   // AniZip has no mapping for not-yet-indexed cours (e.g. Bleach TYBW cour 4).

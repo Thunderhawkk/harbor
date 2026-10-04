@@ -44,6 +44,7 @@ import { useAnimeFranchiseNav } from "./anime-episodes/use-anime-franchise-nav";
 import { useTvdbProxyImages } from "./anime-episodes/use-tvdb-proxy-images";
 import { pickTvdbImage } from "@/lib/providers/tvdb-proxy";
 import { fillAiredPlaceholderTitles, isPlaceholderEpisodeText } from "@/lib/providers/episode-placeholder";
+import { tmdbLanguageIso } from "@/lib/providers/tmdb/tmdb-client";
 import {
   episodeArtworkFor,
   unairedIndexes,
@@ -379,7 +380,7 @@ export function AnimeEpisodes({
     // the entry's own episodes know the real title; fill those in, keep TBA for
     // episodes that have not aired. Missing stills and descriptions come from
     // the artwork map (TMDB first, then Cinemeta).
-    const filled = fillAiredPlaceholderTitles(baseDisplay, franchiseEpisodes);
+    const filled = fillAiredPlaceholderTitles(baseDisplay, franchiseEpisodes, Date.now(), tmdbLanguageIso());
     let changed = false;
     const out = filled.map((ep) => {
       // An episode that has not aired has no real still or description

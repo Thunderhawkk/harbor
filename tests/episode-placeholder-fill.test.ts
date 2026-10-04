@@ -207,7 +207,7 @@ test("the TVDB order falls through placeholders instead of dropping the name", (
 
 test("the anime episode list fills aired placeholders from its pool", () => {
   const src = readFileSync(new URL("../src/views/detail/anime-episodes.tsx", import.meta.url), "utf8");
-  assert.ok(src.includes("fillAiredPlaceholderTitles(baseDisplay, franchiseEpisodes)"));
+  assert.ok(src.includes("fillAiredPlaceholderTitles(baseDisplay, franchiseEpisodes, Date.now(), tmdbLanguageIso())"));
   assert.ok(src.includes("episodeArtworkFor"));
   // Unaired rows must not receive artwork-map stills: providers number their
   // seasons differently, so any hit for an unaired episode is another

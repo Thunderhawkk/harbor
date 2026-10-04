@@ -3,6 +3,7 @@ import { useT } from "@/lib/i18n";
 import type { KitsuEpisode } from "@/lib/providers/kitsu";
 import { kitsuToTvdb } from "@/lib/providers/anime-mapping";
 import { isFranchiseExtra, type FranchiseEntry } from "@/lib/providers/anime-detail";
+import { isForeignScriptTitle, isGenericEpisodeName } from "@/lib/providers/anime-episode-build";
 import {
   tvdbLangFromIso1,
   tvdbOrderTypeHasEpisodes,
@@ -200,6 +201,7 @@ export function useAnimeTvdbPanel(
   const built = useMemo(() => {
     if (!ordering) return null;
     const lang = tmdbLanguageIso();
+    const englishTarget = lang === "" || lang === "en";
     const pool = franchiseEpisodes ?? episodes;
     const franchiseWide = franchiseEpisodes != null;
     const byPair = new Map<string, KitsuEpisode>();
@@ -312,6 +314,15 @@ export function useAnimeTvdbPanel(
             [{ text: match?.synopsis }, { text: currentMatch?.synopsis }],
             { lang },
           );
+        }
+        // A matched pool row can carry a Japanese-script title while TVDB has the
+        // English one for the same row. Only an English target may substitute it;
+        // a localized user keeps their own-language title.
+        if (title == null && match && englishTarget && isForeignScriptTitle(match.title)) {
+          const rowName = e.nameEn ?? e.name;
+          if (rowName && !isGenericEpisodeName(rowName) && !isForeignScriptTitle(rowName)) {
+            title = rowName;
+          }
         }
 
         let streamId: string | undefined;

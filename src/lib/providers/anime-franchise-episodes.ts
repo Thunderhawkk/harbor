@@ -85,18 +85,22 @@ export function fetchEntryEpisodes(kitsuId: number, settings: Settings): Promise
       }
     }
     const eps = buildKitsuEpisodes(addonMeta, raw);
-    mergeAniZipEpisodes(eps, aniZip, { lang: localized ? iso1 : undefined });
+    mergeAniZipEpisodes(eps, aniZip, { lang: localized ? iso1 : undefined, targetLang: iso1 });
     // AniZip often carries a new season's ids before its episode records, and
     // the addon labels the cour "season 1" — the window must land before the
     // TVDB merge or the cour's identity-less rows match franchise season 1.
     await applyAnidbSeasonWindow(eps, kitsuId);
-    mergeTvdbEpisodes(eps, tvdbRaw?.loc ?? null, { lang: localized ? iso1 : undefined });
-    mergeTmdbEpisodes(eps, tmdbEpsRaw, { lang: localized ? iso1 : undefined });
+    mergeTvdbEpisodes(eps, tvdbRaw?.loc ?? null, {
+      lang: localized ? iso1 : undefined,
+      targetLang: iso1,
+    });
+    mergeTmdbEpisodes(eps, tmdbEpsRaw, { lang: localized ? iso1 : undefined, targetLang: iso1 });
     // Fall back to English titles/overviews when the localized translation is missing (providers
-    // otherwise fall back to the original, e.g. Japanese for anime).
+    // otherwise fall back to the original, e.g. Japanese for anime). `targetLang` keeps this pass
+    // from overwriting a title the user already has in their own language.
     if (localized) {
-      if (tvdbRaw?.en) mergeTvdbEpisodes(eps, tvdbRaw.en);
-      if (tmdbEnRaw) mergeTmdbEpisodes(eps, tmdbEnRaw);
+      if (tvdbRaw?.en) mergeTvdbEpisodes(eps, tvdbRaw.en, { targetLang: iso1 });
+      if (tmdbEnRaw) mergeTmdbEpisodes(eps, tmdbEnRaw, { targetLang: iso1 });
     }
     const imdbId = aniZip?.mappings?.imdb_id ?? eps.find((ep) => ep.imdbId)?.imdbId ?? null;
     await enrichEpisodes(eps, settings, kitsuId, imdbId).catch(() => {});

@@ -104,6 +104,11 @@ const react = {
 const { useAnimeTvdbPanel } = load("src/views/detail/anime-episodes/use-anime-tvdb-panel.ts", {
   react,
   "@/lib/i18n": { useT: () => (s: string) => s },
+  "@/lib/providers/anime-episode-build": {
+    isForeignScriptTitle: (t?: string | null) =>
+      !!t && /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(t),
+    isGenericEpisodeName: (t?: string | null) => !!t && /^episode\s*\d+$/i.test(t.trim()),
+  },
   "@/lib/providers/kitsu": { parseKitsuId: (id: string) => Number(String(id).slice(6)) },
   "@/lib/providers/anime-mapping": { kitsuToTvdb: async () => 331753 },
   "@/lib/providers/anime-detail": { isFranchiseExtra: () => false },
