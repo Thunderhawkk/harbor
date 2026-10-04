@@ -5,7 +5,11 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error Node test types are outside the browser tsconfig.
 import test from "node:test";
 import ts from "typescript";
-import { mergeTmdbEpisodes, mergeTvdbEpisodes } from "../src/lib/providers/anime-episode-build.ts";
+import {
+  mergeAniZipEpisodes,
+  mergeTmdbEpisodes,
+  mergeTvdbEpisodes,
+} from "../src/lib/providers/anime-episode-build.ts";
 import type { KitsuEpisode } from "../src/lib/providers/kitsu.ts";
 
 function episode(overrides: Partial<KitsuEpisode> = {}): KitsuEpisode {
@@ -42,6 +46,20 @@ function enrichment({ videos = [], ratings = new Map(), thumbs = null }: {
     "@/lib/providers/tmdb/tmdb-image-rungs": { STILL_HD_RUNG: "w780", tmdbStillUrl: () => undefined },
   }).enrichEpisodes;
 }
+
+test("a newer AniZip entry's lowercase air date still reaches the episode", () => {
+  const ep = episode({ number: 2, airdate: null });
+  mergeAniZipEpisodes([ep], {
+    mappings: { kitsu_id: 50404 },
+    episodes: { "2": { episode: "2", airdate: "2026-10-03" } },
+  } as any);
+  assert.equal(ep.airdate, "2026-10-03");
+});
+
+test("newer AniZip lowercase air dates are read by the episode list builder", () => {
+  const src = readFileSync(new URL("../src/lib/series-episodes.ts", import.meta.url), "utf8");
+  assert.match(src, /m\.airDateUtc \?\? m\.airDate \?\? m\.airdate/);
+});
 
 test("TVDB does not replace a mapped later cour with season-one metadata", () => {
   const ep = episode({ thumbnail: "cour-three.jpg" });

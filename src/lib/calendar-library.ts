@@ -117,7 +117,7 @@ async function animeUpcoming(
   if (!mapping?.episodes) return null;
   const episodes: ResolvedEpisode[] = [];
   for (const [k, ep] of Object.entries(mapping.episodes)) {
-    const { date, time, atMs } = localDateTimeFromIso(ep.airDateUtc ?? ep.airDate);
+    const { date, time, atMs } = localDateTimeFromIso(ep.airDateUtc ?? ep.airDate ?? ep.airdate);
     if (!date || !inWindow(date)) continue;
     episodes.push({
       season: ep.seasonNumber ?? 1,

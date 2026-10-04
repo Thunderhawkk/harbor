@@ -197,7 +197,8 @@ export function mergeAniZipEpisodes(
       }
       ep.thumbnail = az.image;
     }
-    if (az.airDate) ep.airdate = az.airDate;
+    const azAir = az.airDate ?? az.airdate;
+    if (azAir) ep.airdate = azAir;
     if (az.runtime && !ep.length) ep.length = az.runtime;
     if (az.filler) ep.filler = true;
     // Same-season mismatch means this record's ids belong to another episode

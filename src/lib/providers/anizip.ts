@@ -35,6 +35,8 @@ export type AniZipEpisode = {
   tvdbId?: number;
   anidbEid?: number;
   airDate?: string;
+  /** Newer entries publish the same date under a lowercase key. */
+  airdate?: string;
   airDateUtc?: string;
   runtime?: number;
   overview?: string;
