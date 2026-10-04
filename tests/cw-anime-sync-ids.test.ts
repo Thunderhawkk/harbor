@@ -11,7 +11,7 @@ import {
   needsAniZipSyncIds,
 } from "../src/lib/cw-anime-episode.ts";
 import { stripFranchiseSuffix, franchiseDedupKey } from "../src/lib/providers/jikan.ts";
-import { buildBody } from "../src/lib/simkl/scrobble-body.ts";
+import { buildAnimeBody, buildBody } from "../src/lib/simkl/scrobble-body.ts";
 import {
   animeCoordPairs,
   findAnimeEntryNumber,
@@ -107,6 +107,18 @@ test("anime lookups are only attempted for anime id schemes", () => {
   assert.deepEqual(aniZipLookupKey("mal:59193"), { scheme: "mal", id: 59193 });
   assert.equal(aniZipLookupKey("tt13293588"), null);
   assert.equal(aniZipLookupKey("tmdb:tv:94664"), null);
+});
+
+test("a resolved sequel is scrobbled as a single-season anime entry, not the umbrella show", () => {
+  assert.deepEqual(buildAnimeBody({ kitsu: 50404 }, 2, 80), {
+    progress: 80,
+    anime: { ids: { kitsu: 50404 } },
+    episode: { season: 1, number: 2 },
+  });
+  const src = readFileSync(new URL("../src/lib/simkl/scrobble.ts", import.meta.url), "utf8");
+  assert.match(src, /animeBodyForEntry\(entry\.id, entry\.episode, progress\)/);
+  assert.match(src, /resolveTrackerAnimeEntry\(metaId, \{/);
+  assert.match(src, /if \(isAnimeNode\)/);
 });
 
 test("the season is not printed twice in the Continue Watching title", () => {

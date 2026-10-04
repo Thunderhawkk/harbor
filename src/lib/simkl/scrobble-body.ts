@@ -70,6 +70,20 @@ export function buildEpisodeBody(
   return { progress: p, show: { ids: { ...showIds } }, episode: { season, number } };
 }
 
+/**
+ * A resolved anime entry (its own single-season, entry-relative numbering) as a
+ * Simkl scrobble body. The row's umbrella ids are deliberately omitted: Simkl
+ * numbers anime by AniDB, so only the owning entry id can be matched.
+ */
+export function buildAnimeBody(
+  ids: Record<string, number>,
+  episode: number,
+  progress: number,
+): Record<string, unknown> {
+  const p = Math.min(100, Math.max(0, progress));
+  return { progress: p, anime: { ids }, episode: { season: 1, number: episode } };
+}
+
 export function buildBody(
   metaId: string,
   episode: EpisodeRef,
