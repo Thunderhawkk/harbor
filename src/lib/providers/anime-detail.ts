@@ -9,12 +9,11 @@ import {
 } from "@/lib/providers/anime-episode-build";
 import { animeKitsuMeta } from "@/lib/providers/anime-kitsu-addon";
 import {
+  applyAnidbSeasonWindow,
   kitsuToTvdb,
   kitsuToImdb,
   externalToKitsu,
   kitsuToAnilist,
-  kitsuToAnidb,
-  loadAnidbMaps,
 } from "@/lib/providers/anime-mapping";
 import { anilistFranchise, type AnilistFranchiseNode } from "@/lib/anilist/relations";
 import { anilistArtById, anilistRecommendations } from "@/lib/anilist/browse";
@@ -468,6 +467,10 @@ export async function animeDetails(
     }
   }
   mergeAniZipEpisodes(episodes, aniZip, { lang: localized ? iso1 : undefined });
+  // AniZip often carries a new season's ids before its episode records, and
+  // the addon labels the cour "season 1" — the window must land before the
+  // TVDB merge or the cour's identity-less rows match franchise season 1.
+  await applyAnidbSeasonWindow(episodes, kitsuId);
   mergeTvdbEpisodes(episodes, tvdbEpsRaw?.loc ?? null, { lang: localized ? iso1 : undefined });
   mergeTmdbEpisodes(episodes, tmdbEpsRaw, { lang: localized ? iso1 : undefined });
   // Fall back to English titles/overviews when the localized translation is missing (providers
@@ -478,28 +481,8 @@ export async function animeDetails(
   }
 
   // AniZip has no mapping for not-yet-indexed cours (e.g. Bleach TYBW cour 4).
-  // Fall back to the AniDB id (ARM) plus the anime-lists season window to
-  // attach provider season/episode coords, so stream queries carry the season.
-  if (!aniZip) {
-    const anidb = await kitsuToAnidb(kitsuId).catch(() => null);
-    if (anidb != null) {
-      const maps = await loadAnidbMaps().catch(() => null);
-      const tvdbId = maps?.tvdb[String(anidb)];
-      const win =
-        tvdbId != null
-          ? maps?.byTvdb?.[String(tvdbId)]?.find((w) => w.anidbId === anidb)
-          : undefined;
-      if (win && typeof win.season === "number") {
-        const imdbId = maps?.imdb[String(anidb)] ?? null;
-        for (const ep of episodes) {
-          if (ep.number == null) continue;
-          if (ep.imdbSeason == null) ep.imdbSeason = win.season;
-          if (ep.imdbEpisode == null) ep.imdbEpisode = ep.number + win.offset;
-          if (imdbId && !ep.imdbId) ep.imdbId = imdbId;
-        }
-      }
-    }
-  }
+  // applyAnidbSeasonWindow above already attached the AniDB id (ARM) plus the
+  // anime-lists season window to any episode AniZip left without coordinates.
 
   let seriesImdb = aniZip?.mappings?.imdb_id ?? episodes.find((e) => e.imdbId)?.imdbId ?? null;
   if (!seriesImdb) seriesImdb = await kitsuToImdb(kitsuId).catch(() => null);

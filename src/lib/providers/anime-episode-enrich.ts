@@ -8,6 +8,33 @@ import { STILL_HD_RUNG, tmdbStillUrl } from "@/lib/providers/tmdb/tmdb-image-run
 import type { KitsuEpisode } from "@/lib/providers/kitsu";
 import type { Settings } from "@/lib/settings";
 
+/**
+ * Indexes of episodes that have not aired: future-dated rows, plus undated
+ * rows positioned after the last dated-aired episode while the list proves it
+ * is an ongoing season (some episode is dated in the future). Anything in this
+ * set has no real artwork or rating anywhere yet — a fill would be another
+ * episode's data borrowed through a numbering fallback, e.g. a backend that
+ * splits seasons differently or a courier entry whose local numbers restart.
+ * Callers must pass the list in chronological episode order.
+ */
+export function unairedIndexes(episodes: KitsuEpisode[]): Set<number> {
+  const now = Date.now();
+  const times = episodes.map((ep) => {
+    const t = ep.airdate ? Date.parse(ep.airdate) : NaN;
+    return Number.isFinite(t) ? t : null;
+  });
+  let frontier = -1;
+  times.forEach((t, i) => {
+    if (t != null && t <= now) frontier = i;
+  });
+  const ongoing = times.some((t) => t != null && t > now);
+  const out = new Set<number>();
+  times.forEach((t, i) => {
+    if (t != null ? t > now : ongoing && frontier >= 0 && i > frontier) out.add(i);
+  });
+  return out;
+}
+
 async function enrichFiller(episodes: KitsuEpisode[], kitsuId: number): Promise<void> {
   if (episodes.some((ep) => ep.filler)) return;
   const malId = await kitsuToMal(kitsuId).catch(() => null);
@@ -98,8 +125,10 @@ async function enrichCinemetaThumbs(
     if (regular) byAbsolute.set(positions.get(key)!, v.thumbnail);
   }
 
-  for (const ep of episodes) {
+  const unaired = unairedIndexes(episodes);
+  for (const [i, ep] of episodes.entries()) {
     if (ep.thumbnail) continue;
+    if (unaired.has(i)) continue;
     const season = ep.imdbSeason ?? ep.seasonNumber ?? 1;
     const epNum = ep.imdbEpisode ?? ep.number;
     const hit =
@@ -121,8 +150,10 @@ async function enrichTvdbThumbs(
   const seasons = Array.from(new Set(episodes.map((ep) => ep.imdbSeason ?? ep.seasonNumber ?? 1)));
   const index = await fetchTvdbThumbs(settings.tvdbKey, tvdbId, seasons).catch(() => null);
   if (!index) return;
-  for (const ep of episodes) {
+  const unaired = unairedIndexes(episodes);
+  for (const [i, ep] of episodes.entries()) {
     if (ep.thumbnail) continue;
+    if (unaired.has(i)) continue;
     const season = ep.imdbSeason ?? ep.seasonNumber ?? 1;
     const epNum = ep.imdbEpisode ?? ep.number;
     const hit =
@@ -136,7 +167,11 @@ async function enrichHarborImdb(episodes: KitsuEpisode[], imdbId: string | null)
   if (!imdbId || !imdbId.startsWith("tt")) return;
   const map = await harborImdbEpisodes(imdbId).catch(() => null);
   if (!map || map.size === 0) return;
-  for (const ep of episodes) {
+  const unaired = unairedIndexes(episodes);
+  for (const [i, ep] of episodes.entries()) {
+    // Unaired episodes have no IMDb rating; a hit here is a mis-keyed rating
+    // from another episode.
+    if (unaired.has(i)) continue;
     const season = ep.imdbSeason ?? ep.seasonNumber ?? 1;
     const num = ep.imdbEpisode ?? ep.number;
     let real = map.get(`${season}:${num}`);

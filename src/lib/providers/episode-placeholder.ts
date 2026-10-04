@@ -47,11 +47,11 @@ function isRealTitle(text: string | null | undefined): text is string {
 /**
  * Replace a placeholder title/synopsis on an already-aired row with the real
  * text of the matching pool episode (same TVDB id, provider pair or absolute
- * number). Title and synopsis are handled independently — a row can have a real
- * name and a "TBA" description. Unaired rows keep the placeholder: "TBA" is
- * correct while nothing has been published, and a generic "Episode 4" from
- * another provider is not an improvement over it either. Rows that need no
- * change keep their identity.
+ * number). Title and synopsis are handled independently — a row can have a
+ * real name and a "TBA" description. Unaired rows keep the placeholder: "TBA"
+ * is correct while nothing has been published, so a generic "Episode 4" is
+ * displayed as "TBA" there too rather than masquerading as a title. Rows that
+ * need no change keep their identity.
  */
 export function fillAiredPlaceholderTitles(
   rows: KitsuEpisode[],
@@ -77,7 +77,8 @@ export function fillAiredPlaceholderTitles(
   }
   let changed = false;
   const out = rows.map((ep) => {
-    const titleMissing = !ep.title?.trim() || isPlaceholderEpisodeText(ep.title);
+    const titleMissing =
+      !ep.title?.trim() || isPlaceholderEpisodeText(ep.title) || isGenericEpisodeName(ep.title);
     const synopsisMissing = !ep.synopsis?.trim() || isPlaceholderEpisodeText(ep.synopsis);
     if (!titleMissing && !synopsisMissing) return ep;
     const abs = ep.absoluteNumber;
@@ -87,7 +88,16 @@ export function fillAiredPlaceholderTitles(
         ? byPair.get(`${ep.imdbSeason}:${ep.imdbEpisode}`)
         : undefined) ??
       (abs != null ? byAbs.get(abs) : undefined);
-    if (!base || !hasAired(ep.airdate ?? base.airdate, now)) return ep;
+    if (!hasAired(ep.airdate ?? base?.airdate, now)) {
+      // The episode has not aired (or carries no usable date): a generic
+      // "Episode 4" or blank title becomes the honest "TBA" placeholder.
+      if (titleMissing && (isGenericEpisodeName(ep.title) || !ep.title?.trim())) {
+        changed = true;
+        return { ...ep, title: "TBA" };
+      }
+      return ep;
+    }
+    if (!base) return ep;
     const patch: Partial<KitsuEpisode> = {};
     if (titleMissing && isRealTitle(base.title)) patch.title = base.title;
     if (synopsisMissing) {

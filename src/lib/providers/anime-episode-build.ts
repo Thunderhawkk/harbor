@@ -122,6 +122,13 @@ export function buildKitsuEpisodes(
   kitsuRawEpisodes: KitsuEpisode[],
 ): KitsuEpisode[] {
   if (!addonMeta?.videos || addonMeta.videos.length === 0) return kitsuRawEpisodes;
+  // The Kitsu addon stamps every video of a season with the season's start
+  // date. That single shared date marks episodes that have not aired as aired
+  // (breaking upcoming badges and air-date gates), so when every video carries
+  // the same released instant the per-episode Kitsu air date wins instead.
+  const released = addonMeta.videos.map((v) => v.released ?? null);
+  const sharedReleased =
+    released.length > 1 && released[0] != null && released.every((r) => r === released[0]);
   const kitsuById = new Map<number, KitsuEpisode>();
   for (const ep of kitsuRawEpisodes) kitsuById.set(ep.number, ep);
   return addonMeta.videos.map((v): KitsuEpisode => {
@@ -133,7 +140,7 @@ export function buildKitsuEpisodes(
       title: v.title || k?.title || `Episode ${v.episode}`,
       synopsis: v.overview ?? k?.synopsis ?? "",
       thumbnail: v.thumbnail ?? k?.thumbnail ?? null,
-      airdate: v.released ?? k?.airdate ?? null,
+      airdate: sharedReleased ? (k?.airdate ?? null) : (v.released ?? k?.airdate ?? null),
       length: k?.length ?? null,
       streamId: v.id,
       imdbId: v.imdb_id,

@@ -86,6 +86,38 @@ test("an aired placeholder takes the real title and synopsis from the pool", () 
   assert.notEqual(filled, row);
 });
 
+test("an unaired generic episode title becomes TBA", () => {
+  const row = episode({
+    title: "Episode 4",
+    tvdbEpisodeId: 11872175,
+    imdbSeason: 6,
+    imdbEpisode: 4,
+    airdate: "2026-10-09",
+  });
+  const out = fillAiredPlaceholderTitles([row], [], NOW);
+  assert.equal(out[0].title, "TBA");
+  assert.notEqual(out[0], row);
+});
+
+test("an aired generic title takes the pool's real name", () => {
+  const row = episode({
+    title: "Episode 3",
+    tvdbEpisodeId: 11872174,
+    imdbSeason: 6,
+    imdbEpisode: 3,
+    airdate: "2026-10-02",
+  });
+  const pool = [poolEpisode({ tvdbEpisodeId: 11872174, imdbSeason: 6, imdbEpisode: 3 })];
+  const [filled] = fillAiredPlaceholderTitles([row], pool, NOW);
+  assert.equal(filled.title, "The Desert-Born Outlaws");
+});
+
+test("an aired generic title stays when no source knows the real name", () => {
+  const row = episode({ title: "Episode 3", airdate: "2026-10-02" });
+  const out = fillAiredPlaceholderTitles([row], [], NOW);
+  assert.equal(out[0], row);
+});
+
 test("an unaired placeholder stays TBA even when the pool has a title", () => {
   const row = episode({
     tvdbEpisodeId: 11872175,
@@ -177,6 +209,10 @@ test("the anime episode list fills aired placeholders from its pool", () => {
   const src = readFileSync(new URL("../src/views/detail/anime-episodes.tsx", import.meta.url), "utf8");
   assert.ok(src.includes("fillAiredPlaceholderTitles(baseDisplay, franchiseEpisodes)"));
   assert.ok(src.includes("episodeArtworkFor"));
+  // Unaired rows must not receive artwork-map stills: providers number their
+  // seasons differently, so any hit for an unaired episode is another
+  // season's image.
+  assert.ok(src.includes("unairedIds.has(ep.id)"));
 });
 
 test("episode artwork prefers TMDB and falls back to Cinemeta", async () => {
@@ -185,6 +221,7 @@ test("episode artwork prefers TMDB and falls back to Cinemeta", async () => {
     "@/lib/providers/harbor-imdb": { harborImdbEpisodes: async () => new Map() },
     "@/lib/anime-fillers": { fillerEpisodes: async () => new Set() },
     "@/lib/providers/anime-tvdb-thumbs": { fetchTvdbThumbs: async () => null },
+    "@/lib/dates": load("src/lib/dates.ts", {}),
     "@/lib/cinemeta": {
       meta: async () => ({
         moviedb_id: 45790,
@@ -252,7 +289,7 @@ test("both order caches and the TVDB response cache reject stale data", () => {
     "utf8",
   );
   assert.ok(persisted.includes("isStaleTvdbOrder(s.bySeason)"));
-  assert.ok(persisted.includes('const PREFIX = "harbor.tvdbo.v6."'));
+  assert.ok(persisted.includes('const PREFIX = "harbor.tvdbo.v7."'));
   const order = readFileSync(new URL("../src/lib/providers/tvdb-order.ts", import.meta.url), "utf8");
   assert.ok(order.includes("isStaleTvdbOrder(cached.order.bySeason)"));
   assert.ok(order.includes("ORDER_CACHE_TTL_MS"));

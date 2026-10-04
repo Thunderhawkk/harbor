@@ -8,7 +8,7 @@ import {
 import { enrichEpisodes } from "@/lib/providers/anime-episode-enrich";
 import { animeKitsuMeta } from "@/lib/providers/anime-kitsu-addon";
 import { kitsuEpisodes, type KitsuEpisode } from "@/lib/providers/kitsu";
-import { kitsuToTvdb } from "@/lib/providers/anime-mapping";
+import { applyAnidbSeasonWindow, kitsuToTvdb } from "@/lib/providers/anime-mapping";
 import { tvdbEpisodesByType, tvdbEpisodesAbsolute, tvdbLangFromIso1 } from "@/lib/providers/tvdb";
 import { tmdbSeasonEpisodes } from "@/lib/providers/tmdb/tmdb-details";
 import type { Episode as TmdbEpisode } from "@/lib/providers/tmdb/tmdb-details";
@@ -86,6 +86,10 @@ export function fetchEntryEpisodes(kitsuId: number, settings: Settings): Promise
     }
     const eps = buildKitsuEpisodes(addonMeta, raw);
     mergeAniZipEpisodes(eps, aniZip, { lang: localized ? iso1 : undefined });
+    // AniZip often carries a new season's ids before its episode records, and
+    // the addon labels the cour "season 1" — the window must land before the
+    // TVDB merge or the cour's identity-less rows match franchise season 1.
+    await applyAnidbSeasonWindow(eps, kitsuId);
     mergeTvdbEpisodes(eps, tvdbRaw?.loc ?? null, { lang: localized ? iso1 : undefined });
     mergeTmdbEpisodes(eps, tmdbEpsRaw, { lang: localized ? iso1 : undefined });
     // Fall back to English titles/overviews when the localized translation is missing (providers

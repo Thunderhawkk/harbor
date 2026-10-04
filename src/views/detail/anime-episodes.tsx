@@ -46,6 +46,7 @@ import { pickTvdbImage } from "@/lib/providers/tvdb-proxy";
 import { fillAiredPlaceholderTitles, isPlaceholderEpisodeText } from "@/lib/providers/episode-placeholder";
 import {
   episodeArtworkFor,
+  unairedIndexes,
   type EpisodeArtwork,
 } from "@/lib/providers/anime-episode-enrich";
 import { TvdbOrderPanel } from "./series-episodes/tvdb-order-panel";
@@ -365,6 +366,14 @@ export function AnimeEpisodes({
     artworkSeasons,
     artworkNeeded,
   );
+  // Rows the air-date frontier marks as unaired — future-dated rows plus
+  // undated rows beyond the last aired episode of an ongoing season — badge
+  // and dim like dated upcoming rows even though no source knows their date.
+  const unairedIds = useMemo(() => {
+    const ids = new Set<number>();
+    unairedIndexes(baseDisplay).forEach((i) => ids.add(baseDisplay[i].id));
+    return ids;
+  }, [baseDisplay]);
   const displayEpisodes = useMemo(() => {
     // The TVDB order can still say "TBA" for an episode that already aired while
     // the entry's own episodes know the real title; fill those in, keep TBA for
@@ -373,6 +382,10 @@ export function AnimeEpisodes({
     const filled = fillAiredPlaceholderTitles(baseDisplay, franchiseEpisodes);
     let changed = false;
     const out = filled.map((ep) => {
+      // An episode that has not aired has no real still or description
+      // anywhere yet, so any artwork-map hit would be another season's data
+      // borrowed through a differently-numbered provider season.
+      if (unairedIds.has(ep.id)) return ep;
       const img = pickTvdbImage(proxyImages, ep);
       if (img) {
         changed = true;
@@ -399,7 +412,7 @@ export function AnimeEpisodes({
       return next;
     });
     return changed ? out : filled;
-  }, [baseDisplay, proxyImages, franchiseEpisodes, artwork]);
+  }, [baseDisplay, proxyImages, franchiseEpisodes, artwork, unairedIds]);
   const displaySourceId = useMemo(() => {
     const ids = new Set<string>();
     for (const e of displayEpisodes) if (e.sourceMetaId != null) ids.add(e.sourceMetaId);
@@ -704,6 +717,7 @@ export function AnimeEpisodes({
                   onContextMenu={openWatchedMenu}
                   metaForEp={routing.metaForEp}
                   showSeason={showSeason}
+                  forceUpcoming={unairedIds.has(ep.id)}
                 />
               ))}
               {hasMore && !filteredEpisodes && (
@@ -721,6 +735,7 @@ export function AnimeEpisodes({
               onReachEnd={settings.episodeLayout === "grid" ? undefined : grow}
               metaForEp={routing.metaForEp}
               showSeason={showSeason}
+              unairedIds={unairedIds}
             />
           )}
         </div>
