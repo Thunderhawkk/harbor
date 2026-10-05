@@ -19,8 +19,17 @@ const schedule = mpv.slice(
   mpv.indexOf("const handleEvent = (raw: MpvEvent) => {"),
 );
 
-test("audio-device-list property change is wired to schedule the reload", () => {
-  assert.match(mpv, /name === "audio-device-list"\) scheduleAudioDeviceReload\(\)/);
+test("audio-device-list property change only schedules a reload when the endpoint set changed", () => {
+  // Device state churn on unrelated endpoints (e.g. SteelSeries Sonar virtual
+  // devices) must not force a reload; only an actual list change may.
+  assert.match(mpv, /const sig = audioDeviceListSig\(data\);/);
+  assert.match(
+    mpv,
+    /lastAudioDeviceListSig != null && lastAudioDeviceListSig !== sig\s*\)\s*\{\s*scheduleAudioDeviceReload\(\);/,
+  );
+  assert.match(mpv, /lastAudioDeviceListSig = sig;/);
+  // An unusable payload falls back to the legacy always-reload behavior.
+  assert.match(mpv, /sig == null\)\s*\{\s*\/\/ No usable list payload[^]*?scheduleAudioDeviceReload\(\);/);
 });
 
 test("the reload re-init guard is Windows-only while actively playing", () => {
@@ -34,6 +43,15 @@ test("the reload re-asserts the device then forces ao-reload on the current defa
   assert.match(schedule, /cmd: \["ao-reload"\]/);
   // ao-reload must appear after the Windows gate so it only fires on desktop.
   assert.ok(schedule.indexOf("isWindowsDesktop()") < schedule.indexOf("ao-reload"));
+});
+
+test("forced reloads re-anchor A/V when dynaudnorm is active", () => {
+  // dynaudnorm keeps ~15s buffered; a reload re-anchors to that buffer head,
+  // leaving mpv silent until video catches up. The same-position exact seek
+  // restores audio immediately. Live streams must not be re-seeked.
+  assert.match(schedule, /snap\.audioNormalize\s*&&\s*!currentIsLive/);
+  assert.match(schedule, /name: "time-pos"/);
+  assert.match(schedule, /cmd: \["seek", pos, "absolute\+exact"\]/);
 });
 
 test("Rust observes audio-device-list so the event reaches the frontend", () => {

@@ -530,6 +530,19 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   // visible again we schedule the same device re-assertion + ao-reload and
   // re-select whichever audio track was active before the failure.
   let audioDeviceReloadTimer: number | null = null;
+  // mpv fires `audio-device-list` on every WASAPI notification, including state
+  // churn on devices we are not using (e.g. SteelSeries Sonar virtual endpoints
+  // reacting to app activation). Only a change in the endpoint set itself means
+  // the output may need re-binding; matching churn must not force a reload.
+  let lastAudioDeviceListSig: string | null = null;
+  const audioDeviceListSig = (data: unknown): string | null => {
+    if (!Array.isArray(data)) return null;
+    const names = data
+      .map((d) => String((d as Record<string, unknown>)?.name ?? ""))
+      .filter(Boolean)
+      .sort();
+    return names.length > 0 ? names.join("\n") : null;
+  };
   const scheduleAudioDeviceReload = () => {
     if (!isWindowsDesktop()) return;
     if (!mpvStarted) return;
@@ -545,6 +558,23 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
         await invoke("mpv_command", { cmd: ["ao-reload"] }).catch(() => {});
         if (prevAid) {
           await invoke("mpv_set_property", { name: "aid", value: prevAid }).catch(() => {});
+        }
+        // dynaudnorm keeps ~15s of audio buffered in its analysis window, and
+        // an output reload re-anchors playback to the head of that buffer —
+        // that far ahead of video — so mpv holds audio ("delaying audio start")
+        // while video plays on silently. A same-position exact seek restarts
+        // A/V in sync immediately.
+        if (
+          snap.audioNormalize &&
+          !currentIsLive &&
+          (snap.status === "playing" || snap.status === "paused")
+        ) {
+          const pos = await invoke<number | null>("mpv_get_property", {
+            name: "time-pos",
+          }).catch(() => null);
+          if (typeof pos === "number" && Number.isFinite(pos)) {
+            invoke("mpv_command", { cmd: ["seek", pos, "absolute+exact"] }).catch(() => {});
+          }
         }
       })();
     }, 300);
@@ -618,7 +648,16 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
       if (name === "eof-reached" && data === true) snap.status = "ended";
       if (name === "volume" && typeof data === "number") snap.volume = data / 100;
       if (name === "mute" && typeof data === "boolean") snap.muted = data;
-      if (name === "audio-device-list") scheduleAudioDeviceReload();
+      if (name === "audio-device-list") {
+        const sig = audioDeviceListSig(data);
+        if (sig == null) {
+          // No usable list payload; keep the legacy always-reload behavior.
+          scheduleAudioDeviceReload();
+        } else if (lastAudioDeviceListSig != null && lastAudioDeviceListSig !== sig) {
+          scheduleAudioDeviceReload();
+        }
+        lastAudioDeviceListSig = sig;
+      }
       if (name === "track-list" && Array.isArray(data)) {
         const list = data as Array<Record<string, unknown>>;
         pendingTracks["track-list"] = list;
