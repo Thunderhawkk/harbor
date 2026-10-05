@@ -1,4 +1,4 @@
-import { pickEpisodeTitle, pickLocalizedTitle, type AniZipMapping } from "@/lib/providers/anizip";
+import { pickLocalizedTitle, type AniZipMapping } from "@/lib/providers/anizip";
 import type { AnimeKitsuMeta } from "@/lib/providers/anime-kitsu-addon";
 import type { KitsuEpisode } from "@/lib/providers/kitsu";
 import type { TvdbEpisode } from "@/lib/providers/tvdb";
@@ -212,16 +212,16 @@ export function mergeAniZipEpisodes(
         if (enTitle && !isGenericEpisodeName(enTitle)) ep.title = enTitle;
       }
     } else {
-      const enrichedTitle = pickEpisodeTitle(az);
-      // An English target must not take a Japanese-script title: leaving the
-      // row generic lets TVDB/TMDB supply the English name.
+      // English target: only an English name is acceptable. A romaji (`x-jat`)
+      // or Japanese original must not fill the row — leaving it generic lets
+      // TVDB/TMDB/MAL supply the English name.
+      const enTitle = az.titles?.en ?? az.title?.en;
       if (
-        enrichedTitle &&
-        !isGenericEpisodeName(enrichedTitle) &&
-        !isForeignScriptTitle(enrichedTitle) &&
+        enTitle &&
+        !isGenericEpisodeName(enTitle) &&
         (!ep.title || ep.title === `Episode ${ep.number}`)
       ) {
-        ep.title = enrichedTitle;
+        ep.title = enTitle;
       }
     }
     if (az.overview && !ep.synopsis && (!localized || isTextInLanguage(az.overview, opts?.lang))) {

@@ -34,6 +34,17 @@ test("an English target never takes a Japanese AniZip title", () => {
   assert.equal(ep.title, "Episode 1", "a Japanese title must not become the English name");
 });
 
+test("an English target ignores a romaji AniZip title (x-jat)", () => {
+  const ep = episode();
+  mergeAniZipEpisodes([ep], {
+    mappings: { kitsu_id: 1 },
+    episodes: {
+      "1": { episode: "1", title: { en: null, "x-jat": "Bousou Suru Scorpius ga Arawareta!" } },
+    },
+  } as any);
+  assert.equal(ep.title, "Episode 1", "romaji must not stand in for an English title");
+});
+
 test("an English AniZip title still applies", () => {
   const ep = episode();
   mergeAniZipEpisodes([ep], {
