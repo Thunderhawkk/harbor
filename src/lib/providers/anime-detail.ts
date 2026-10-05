@@ -12,9 +12,15 @@ import {
   applyAnidbSeasonWindow,
   kitsuToTvdb,
   kitsuToImdb,
+  kitsuToMal,
   externalToKitsu,
   kitsuToAnilist,
 } from "@/lib/providers/anime-mapping";
+import {
+  applyMalEpisodeTitles,
+  episodesMissingTitle,
+} from "@/lib/providers/episode-placeholder";
+import { malEpisodeTitles } from "@/lib/providers/mal-episodes";
 import { anilistFranchise, type AnilistFranchiseNode } from "@/lib/anilist/relations";
 import { anilistArtById, anilistRecommendations } from "@/lib/anilist/browse";
 import { enrichEpisodes } from "@/lib/providers/anime-episode-enrich";
@@ -482,6 +488,15 @@ export async function animeDetails(
   if (localized) {
     if (tvdbEpsRaw?.en) mergeTvdbEpisodes(episodes, tvdbEpsRaw.en, { targetLang: iso1 });
     if (tmdbEnRaw) mergeTmdbEpisodes(episodes, tmdbEnRaw, { targetLang: iso1 });
+  }
+  // Last resort: MAL names episodes the other providers leave unnamed (it
+  // carries English and romaji early). Only rows with no real title are filled.
+  if (episodesMissingTitle(episodes)) {
+    const malId = aniZip?.mappings?.mal_id ?? (await kitsuToMal(kitsuId).catch(() => null));
+    if (malId != null) {
+      const malEps = await malEpisodeTitles(malId).catch(() => null);
+      applyMalEpisodeTitles(episodes, malEps);
+    }
   }
 
   // AniZip has no mapping for not-yet-indexed cours (e.g. Bleach TYBW cour 4).

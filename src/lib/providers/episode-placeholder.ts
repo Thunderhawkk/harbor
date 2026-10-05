@@ -119,3 +119,42 @@ export function fillAiredPlaceholderTitles(
   });
   return changed ? out : rows;
 }
+
+export type MalEpisodeTitle = {
+  number: number;
+  title?: string;
+  romaji?: string;
+  japanese?: string;
+};
+
+function isTitleMissing(title: string | null | undefined): boolean {
+  return !title?.trim() || isPlaceholderEpisodeText(title) || isGenericEpisodeName(title);
+}
+
+/** True when at least one row still lacks a real title and could use MAL's. */
+export function episodesMissingTitle(episodes: KitsuEpisode[]): boolean {
+  return episodes.some((ep) => isTitleMissing(ep.title));
+}
+
+/**
+ * Fill rows the other providers left unnamed with MAL's English episode name.
+ * Runs last: a row that already has a real title is untouched.
+ */
+export function applyMalEpisodeTitles(
+  episodes: KitsuEpisode[],
+  malEpisodes: MalEpisodeTitle[] | null | undefined,
+): void {
+  if (!malEpisodes || malEpisodes.length === 0) return;
+  const byNumber = new Map<number, MalEpisodeTitle>();
+  for (const e of malEpisodes) if (!byNumber.has(e.number)) byNumber.set(e.number, e);
+  for (const ep of episodes) {
+    if (ep.number == null || !isTitleMissing(ep.title)) continue;
+    const m = byNumber.get(ep.number);
+    if (!m) continue;
+    // English only: a romaji name is not a substitute for an English one.
+    const title = m.title;
+    if (title && !isGenericEpisodeName(title) && !isPlaceholderEpisodeText(title)) {
+      ep.title = title;
+    }
+  }
+}

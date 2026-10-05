@@ -8,7 +8,12 @@ import {
 import { enrichEpisodes } from "@/lib/providers/anime-episode-enrich";
 import { animeKitsuMeta } from "@/lib/providers/anime-kitsu-addon";
 import { kitsuEpisodes, type KitsuEpisode } from "@/lib/providers/kitsu";
-import { applyAnidbSeasonWindow, kitsuToTvdb } from "@/lib/providers/anime-mapping";
+import { applyAnidbSeasonWindow, kitsuToTvdb, kitsuToMal } from "@/lib/providers/anime-mapping";
+import {
+  applyMalEpisodeTitles,
+  episodesMissingTitle,
+} from "@/lib/providers/episode-placeholder";
+import { malEpisodeTitles } from "@/lib/providers/mal-episodes";
 import { tvdbEpisodesByType, tvdbEpisodesAbsolute, tvdbLangFromIso1 } from "@/lib/providers/tvdb";
 import { tmdbSeasonEpisodes } from "@/lib/providers/tmdb/tmdb-details";
 import type { Episode as TmdbEpisode } from "@/lib/providers/tmdb/tmdb-details";
@@ -101,6 +106,15 @@ export function fetchEntryEpisodes(kitsuId: number, settings: Settings): Promise
     if (localized) {
       if (tvdbRaw?.en) mergeTvdbEpisodes(eps, tvdbRaw.en, { targetLang: iso1 });
       if (tmdbEnRaw) mergeTmdbEpisodes(eps, tmdbEnRaw, { targetLang: iso1 });
+    }
+    // Last resort: MAL names episodes the other providers leave unnamed (it
+    // carries English and romaji early). Only rows with no real title are filled.
+    if (episodesMissingTitle(eps)) {
+      const malId = aniZip?.mappings?.mal_id ?? (await kitsuToMal(kitsuId).catch(() => null));
+      if (malId != null) {
+        const malEps = await malEpisodeTitles(malId).catch(() => null);
+        applyMalEpisodeTitles(eps, malEps);
+      }
     }
     const imdbId = aniZip?.mappings?.imdb_id ?? eps.find((ep) => ep.imdbId)?.imdbId ?? null;
     await enrichEpisodes(eps, settings, kitsuId, imdbId).catch(() => {});
