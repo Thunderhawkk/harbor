@@ -79,12 +79,12 @@ test("the retry clock replays a queued watch and clears it once accepted", async
   off();
 });
 
-test("a watch that keeps failing stays queued for the next tick", async () => {
+test("a watch that no write confirms stays queued for the next tick", async () => {
   localStorage.removeItem(PENDING_KEY);
   const off = armPendingFlush({
     hasSession: () => true,
     stopScrobble: async () => false,
-    recordWatched: async () => true,
+    recordWatched: async () => false,
   });
   recordPendingWatch("kitsu:2", { season: 1, episode: 3 });
 

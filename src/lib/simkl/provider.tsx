@@ -16,6 +16,8 @@ import {
   type PollResult,
 } from "./device-auth";
 import { getSession, setSession, subscribeSession } from "./session";
+import { isSimklEpisodeWatched } from "./list-status";
+import { hasActiveSimklPlayback } from "./playback";
 import { stremioIdToSimklTarget } from "./ids";
 import { addToHistory } from "./history";
 import { armPendingFlush, flushPendingWatches } from "./pending-sync";
@@ -73,6 +75,11 @@ export function SimklProvider({ children }: { children: ReactNode }) {
     () =>
       armPendingFlush({
         hasSession: () => getSession() != null,
+        // An entry Simkl already holds needs no write, and replaying it would
+        // re-mark an item the user may have removed from their history.
+        isWatched: (metaId, episode, imdb) => isSimklEpisodeWatched(metaId, episode, imdb),
+        hasActivePlayback: (metaId, episode, imdb) =>
+          hasActiveSimklPlayback(metaId, episode, imdb),
         stopScrobble: (metaId, episode) => simklScrobble("stop", metaId, episode, 100),
         recordWatched: (metaId, episode, imdb) =>
           recordWatchedFallback(metaId, episode, imdb ? { imdb } : undefined),

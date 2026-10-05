@@ -136,13 +136,75 @@ test("flush replays the terminal stop before the history write", async () => {
   clearPending();
 });
 
-test("entry stays queued when the stop fails even if history succeeds", async () => {
+test("an entry Simkl already lists as watched clears without any write", async () => {
+  clearPending();
+  recordPendingWatch("kitsu:1", { season: 1, episode: 2 });
+  const stops: string[] = [];
+  const watched: string[] = [];
+  const r = await flushPendingWatches({
+    hasSession: () => true,
+    isWatched: async () => true,
+    stopScrobble: async (metaId) => {
+      stops.push(metaId);
+      return true;
+    },
+    recordWatched: async (metaId) => {
+      watched.push(metaId);
+      return true;
+    },
+  });
+  assert.equal(r.flushed, 1);
+  assert.equal(r.remaining, 0);
+  assert.deepEqual(stops, [], "a watched entry must not be stop-scrobbled again");
+  assert.deepEqual(watched, [], "a watched entry must not be written to history again");
+  assert.equal(listPendingWatches().length, 0);
+  clearPending();
+});
+
+test("without an active playback session the replay records without a stop scrobble", async () => {
+  clearPending();
+  recordPendingWatch("kitsu:1", { season: 1, episode: 2 });
+  const stops: string[] = [];
+  const r = await flushPendingWatches({
+    hasSession: () => true,
+    isWatched: async () => false,
+    hasActivePlayback: async () => false,
+    stopScrobble: async (metaId) => {
+      stops.push(metaId);
+      return true;
+    },
+    recordWatched: async () => true,
+  });
+  assert.equal(r.flushed, 1);
+  assert.deepEqual(stops, [], "a stop without a live session would re-mark an unmarked item");
+  assert.equal(listPendingWatches().length, 0);
+  clearPending();
+});
+
+test("an active playback session still replays the terminal stop and either write clears", async () => {
   clearPending();
   recordPendingWatch("kitsu:1", { season: 1, episode: 2 });
   const r = await flushPendingWatches({
     hasSession: () => true,
+    isWatched: async () => false,
+    hasActivePlayback: async () => true,
+    stopScrobble: async () => true,
+    recordWatched: async () => false,
+  });
+  assert.equal(r.flushed, 1, "a full-progress stop means Simkl holds the watch");
+  assert.equal(listPendingWatches().length, 0);
+  clearPending();
+});
+
+test("a watch that no write confirms stays queued for the next attempt", async () => {
+  clearPending();
+  recordPendingWatch("kitsu:1", { season: 1, episode: 2 });
+  const r = await flushPendingWatches({
+    hasSession: () => true,
+    isWatched: async () => false,
+    hasActivePlayback: async () => false,
     stopScrobble: async () => false,
-    recordWatched: async () => true,
+    recordWatched: async () => false,
   });
   assert.equal(r.flushed, 0);
   assert.equal(r.remaining, 1);

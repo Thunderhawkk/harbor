@@ -34,6 +34,18 @@ export type PendingWatch = {
 
 export type FlushDeps = {
   hasSession: () => boolean;
+  /** True when Simkl already lists the item as watched — the entry needs no write. */
+  isWatched?: (
+    metaId: string,
+    episode: PendingEpisode | undefined,
+    imdb?: string,
+  ) => Promise<boolean>;
+  /** True when Simkl still holds an active playback session for the item. */
+  hasActivePlayback?: (
+    metaId: string,
+    episode: PendingEpisode | undefined,
+    imdb?: string,
+  ) => Promise<boolean>;
   stopScrobble: (metaId: string, episode: PendingEpisode | undefined) => Promise<boolean>;
   recordWatched: (
     metaId: string,
@@ -205,12 +217,28 @@ async function replayPending(deps?: FlushDeps): Promise<{ flushed: number; remai
   for (const p of load()) {
     if (!stillOwned()) break;
     const key = keyOf(p);
+    // An item Simkl already lists as watched needs no write; replaying one
+    // would only re-mark an entry the user may have removed from their history.
+    try {
+      if (d.isWatched && (await d.isWatched(p.metaId, p.episode, p.imdb))) {
+        if (!stillOwned()) break;
+        flushed += 1;
+        clearPending(key);
+        continue;
+      }
+    } catch {
+      /* An unavailable lookup falls through to the write path. */
+    }
     let stopOk = false;
     let histOk = false;
     try {
-      // Replays the terminal stop first: this is what clears Simkl's
-      // "actively playing" state. The history write alone does not.
-      stopOk = await d.stopScrobble(p.metaId, p.episode);
+      // The terminal stop clears Simkl's "actively playing" state, which the
+      // history write alone does not. Gated on a live session when the caller
+      // can tell: without one it would only re-mark an unmarked item.
+      if (!d.hasActivePlayback || (await d.hasActivePlayback(p.metaId, p.episode, p.imdb))) {
+        if (!stillOwned()) break;
+        stopOk = await d.stopScrobble(p.metaId, p.episode);
+      }
     } catch {
       stopOk = false;
     }
@@ -220,7 +248,11 @@ async function replayPending(deps?: FlushDeps): Promise<{ flushed: number; remai
     } catch {
       histOk = false;
     }
-    if (stopOk && histOk && stillOwned()) {
+    // Either confirmed write means Simkl holds the watch: the stop is posted at
+    // full progress, and the history write accepts the already-watched no-op.
+    // Requiring both would loop forever whenever one lands and the other
+    // reports the item as already present.
+    if ((stopOk || histOk) && stillOwned()) {
       flushed += 1;
       clearPending(key);
     }
