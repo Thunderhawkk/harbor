@@ -173,6 +173,11 @@ export function usePlayerBridge(params: {
         macEdr:
           isMacDesktop() && embedActive && settings.playerMacEdr && !settings.playerHdrToSdr,
         fullDownload: settings.torrentFullDownload,
+        separateDisplay:
+          settings.playerSeparateDisplay.mode === "explicit"
+            ? settings.playerSeparateDisplay.monitor
+            : null,
+        separateCoverTaskbar: settings.playerSeparateCoverTaskbar,
         cacheDir: settings.playbackCacheDir,
         extraOptions: [mergeMpvOptions(settings, svpOn, { anime4k: anime4kOn }), shaderCompanionOptions(settings)]
           .filter(Boolean)

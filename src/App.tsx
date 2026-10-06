@@ -159,16 +159,14 @@ import {
   isVisible,
 } from "@/lib/keyboard-navigation";
 import { enterBigPicture, useBigPicture } from "@/lib/big-picture";
+import { moveMainToMonitor } from "@/lib/monitors";
 import { BpErrorBoundary } from "@/views/big-picture/bp-error-boundary";
 import { shouldAutoStartBigPicture, shouldOfferBigPicture } from "@/views/big-picture/bp-logic";
 import { BigPictureEntryButton } from "@/views/big-picture/bp-entry-button";
 import { releaseBigPictureFullscreen } from "@/views/big-picture/use-bp-fullscreen";
 import { getNavFocusTarget } from "@/lib/keyboard-navigation/geometry";
 import { SFX } from "@/lib/sfx";
-import {
-  startMusicTaskbarButtons,
-  syncMusicTaskbarArtwork,
-} from "@/lib/music/taskbar-buttons";
+import { startMusicTaskbarButtons, syncMusicTaskbarArtwork } from "@/lib/music/taskbar-buttons";
 import { resetMusicForProfile } from "@/lib/music/player";
 import { startMediaSessionWindowTracking } from "@/lib/media-session";
 
@@ -796,7 +794,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const { settings, update } = useSettings();
   const { open: searchOpen, setOpen: setSearchOpen } = useSearch();
   const bigPicture = useBigPicture().active;
-  const bigPictureBooted = useRef(false);
+  const bigPictureBootChecked = useRef(false);
   const uiScaleRef = useRef(settings.uiScale);
   const { activeProfile } = useProfiles();
   const activeProfileForMusic = activeProfile?.id ?? null;
@@ -859,15 +857,27 @@ function Shell({ onReady }: { onReady?: () => void }) {
   }, []);
 
   useEffect(() => {
+    // Autostart is a launch-only decision. Consume the check on the first run
+    // whatever the outcome, so turning the setting on later does not drop the
+    // user straight into Big Picture.
+    const alreadyBooted = bigPictureBootChecked.current;
+    bigPictureBootChecked.current = true;
     const go = shouldAutoStartBigPicture({
       autoStart: settings.bigPictureAutoStart,
-      alreadyBooted: bigPictureBooted.current,
+      alreadyBooted,
       kidProfileActive: kid !== null,
     });
     if (!go) return;
-    bigPictureBooted.current = true;
+    // Move Harbor onto the chosen monitor before entering Big Picture, so the
+    // fullscreen that follows binds to that display. Automatic skips the move
+    // and leaves the window where the window-state plugin restored it.
+    const display = settings.bigPictureDisplay;
+    if (display.mode === "explicit") {
+      void moveMainToMonitor(display.monitor).then(() => enterBigPicture());
+      return;
+    }
     enterBigPicture();
-  }, [settings.bigPictureAutoStart, kid]);
+  }, [settings.bigPictureAutoStart, settings.bigPictureDisplay, kid]);
 
   useKeyboardNavigation({
     enabled: settings.tvNavigation && !player && !picker && !bigPicture,

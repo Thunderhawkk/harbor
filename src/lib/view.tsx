@@ -19,6 +19,7 @@ import {
 } from "react";
 import { subscribeOpenProfile } from "@/lib/social/open-profile";
 import { subscribeOpenGroup } from "@/lib/social/open-group";
+import { useBigPicture } from "@/lib/big-picture";
 import type { Meta } from "./cinemeta";
 import type { PeopleDept, RankSource } from "./harbor-rank";
 import { profileFromMeta, trackEvent } from "./discover";
@@ -200,7 +201,14 @@ export type Frame =
       seasonEntryId?: string;
     }
   | { kind: "addon-collection"; meta: Meta }
-  | { kind: "episode-detail"; seriesId: string; season: number; episode: number; seriesMeta?: Meta; playback?: EpisodeDetailPlayback }
+  | {
+      kind: "episode-detail";
+      seriesId: string;
+      season: number;
+      episode: number;
+      seriesMeta?: Meta;
+      playback?: EpisodeDetailPlayback;
+    }
   | { kind: "person"; id: number }
   | { kind: "profile"; handle: string }
   | { kind: "feed" }
@@ -268,8 +276,20 @@ type ViewValue = {
       exact?: boolean;
     },
   ) => void;
-  episodeDetail: { seriesId: string; season: number; episode: number; seriesMeta?: Meta; playback?: EpisodeDetailPlayback } | null;
-  openEpisodeDetail: (seriesId: string, season: number, episode: number, seriesMeta?: Meta, playback?: EpisodeDetailPlayback) => void;
+  episodeDetail: {
+    seriesId: string;
+    season: number;
+    episode: number;
+    seriesMeta?: Meta;
+    playback?: EpisodeDetailPlayback;
+  } | null;
+  openEpisodeDetail: (
+    seriesId: string,
+    season: number,
+    episode: number,
+    seriesMeta?: Meta,
+    playback?: EpisodeDetailPlayback,
+  ) => void;
   promoteMetaToRoot: () => void;
   personId: number | null;
   openPerson: (id: number | null) => void;
@@ -503,6 +523,12 @@ export function ViewProvider({ children }: { children: ReactNode }) {
   stackRef.current = stack;
   forwardStackRef.current = forwardStack;
   const [chromeHidden, setChromeHidden] = useState(false);
+  // Big Picture is its own full-screen shell, so every layout's nav stands down
+  // for it. That is exactly what chromeHidden means to the chrome components,
+  // and routing it through here is what finally hides them: the MinUI dock read
+  // chromeHidden but nothing ever set it for Big Picture, so it kept painting
+  // over the shell as a bordered box.
+  const bigPictureActive = useBigPicture().active;
   const sectionBackActive = useSectionBackActive();
   const [homeResetTick, setHomeResetTick] = useState(0);
   const scrollMem = useRef<Map<string, ScrollSnapshot>>(new Map());
@@ -958,8 +984,8 @@ export function ViewProvider({ children }: { children: ReactNode }) {
         setNavStack((cur) => {
           const t = cur[cur.length - 1];
           if (t.kind === "meta" && t.meta.id === target.id) return cur;
-          const returningToSeries = t.kind === "episode-detail" &&
-            (t.seriesMeta?.id ?? t.seriesId) === target.id;
+          const returningToSeries =
+            t.kind === "episode-detail" && (t.seriesMeta?.id ?? t.seriesId) === target.id;
           if (returningToSeries) {
             // The episode's series link returns to its parent, not another history entry.
             for (let i = cur.length - 2; i >= 0; i--) {
@@ -1128,7 +1154,13 @@ export function ViewProvider({ children }: { children: ReactNode }) {
   );
 
   const openEpisodeDetail = useCallback(
-    (seriesId: string, season: number, episode: number, seriesMeta?: Meta, playback?: EpisodeDetailPlayback) => {
+    (
+      seriesId: string,
+      season: number,
+      episode: number,
+      seriesMeta?: Meta,
+      playback?: EpisodeDetailPlayback,
+    ) => {
       setNavStack((cur) => {
         const t = cur[cur.length - 1];
         if (
@@ -1143,7 +1175,14 @@ export function ViewProvider({ children }: { children: ReactNode }) {
         ) {
           return cur;
         }
-        return pushFrame(cur, { kind: "episode-detail", seriesId, season, episode, seriesMeta, playback });
+        return pushFrame(cur, {
+          kind: "episode-detail",
+          seriesId,
+          season,
+          episode,
+          seriesMeta,
+          playback,
+        });
       });
     },
     [setNavStack],
@@ -1426,7 +1465,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       recallScroll,
       rememberRowScroll,
       recallRowScroll,
-      chromeHidden,
+      chromeHidden: chromeHidden || bigPictureActive,
       setChromeHidden,
       setNavStack,
     }),
@@ -1505,6 +1544,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       rememberScroll,
       recallScroll,
       chromeHidden,
+      bigPictureActive,
       setNavStack,
     ],
   );
