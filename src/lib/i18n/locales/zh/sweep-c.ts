@@ -240,7 +240,7 @@ const sweepC: Record<string, string> = {
   "For the manual path: {code} 20+ and {code} CLI.": "手动部署方式需要 {code} 20+ 和 {code} CLI。",
   "For users who want to deploy themselves or already have a wrangler workflow.":
     "适合希望自行部署或已有 wrangler 工作流的用户。",
-  "For watching things": "用于观看内容",
+  "Built for Adventure!": "为冒险而生！",
   "Force of Nature": "自然之力",
   "Force on": "强制开启",
   "Force your look onto subtitles that carry their own styling.":

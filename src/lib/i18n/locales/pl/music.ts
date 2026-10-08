@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "Nowszy rocznik",
+  "music.xxl.older": "Starszy rocznik",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -377,6 +379,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "Dodaj zapisany lub ostatnio odtwarzany utwór z poniższych list.",
   "music.library.savedTracks": "Zapisane utwory",
   "music.library.readyForPlaylist": "Gotowe do dodania do {name}",
+  "music.library.addTracks": "Dodaj utwory",
+  "music.library.addTracksCount": "{count} gotowych do dodania",
   "music.library.permanent": "Twoja stała kolekcja",
   "music.library.recent": "Ostatnio odtwarzane",
   "music.library.newestFirst": "Najnowsze odtworzenia najpierw",
@@ -558,6 +562,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "Treść",
   "music.playlistTools.explicit": "Niecenzurowane",
   "music.playlistTools.clean": "Bez treści niecenzurowanych",
+  "music.surprise.rate.title": "Jak ta składanka?",
+  "music.surprise.rate.note": "{count} utworów do tej pory",
+  "music.surprise.rate.yes": "Super",
+  "music.surprise.rate.no": "Nie dla mnie",
+  "music.surprise.redirect.title": "Czego wolisz posłuchać?",
+  "music.surprise.redirect.note": "Wybierz kierunek, a składanka zacznie się od nowa.",
+  "music.surprise.redirect.more": "Więcej gatunków",
+  "music.surprise.back": "Wstecz",
   "music.surprise.title": "Zaskocz mnie",
   "music.surprise.stop": "Zakończ Zaskocz mnie",
   "music.surprise.body": "Nieznane ci utwory dobrane na podstawie twoich odsłuchów i playlist.",

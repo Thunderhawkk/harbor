@@ -232,22 +232,17 @@ def write_config(
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
 
-def release_binary(root: Path) -> Path:
+def release_binary(root: Path, triple: str) -> Path:
     target_root = Path(os.environ.get("CARGO_TARGET_DIR", root / "src-tauri" / "target"))
-    arch = os.environ.get("TAURI_ENV_ARCH", "")
-    triples = {
-        "aarch64": "aarch64-apple-darwin",
-        "x86_64": "x86_64-apple-darwin",
-    }
-    candidates: list[Path] = []
-    if arch in triples:
-        candidates.append(target_root / triples[arch] / "release" / "harbor")
-    candidates.append(target_root / "release" / "harbor")
-    candidates.extend(target_root.glob("*-apple-darwin/release/harbor"))
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate.resolve()
-    raise RuntimeError(f"Could not locate the compiled Harbor binary below {target_root}")
+    candidate = target_root / triple / "release" / "harbor"
+    if candidate.is_file():
+        return candidate.resolve()
+    # Local native builds deliberately omit --target to reuse the warm cache.
+    # Never fall back to a different target directory; finalize verifies lipo.
+    native = target_root / "release" / "harbor"
+    if native.is_file():
+        return native.resolve()
+    raise RuntimeError(f"Could not locate {candidate}; build with --target {triple}")
 
 
 def rewrite_executable(binary: Path, frameworks_dir: Path) -> None:
@@ -284,10 +279,13 @@ def verify_closure(
     advertised: tuple[int, int, int],
     shipped: Iterable[Path] = (),
 ) -> list[Path]:
+    shipped = list(shipped)
     verify_macho(executable, frameworks_dir)
     libraries = sorted(frameworks_dir.glob("*.dylib"))
     for library in libraries:
-        verify_macho(library, frameworks_dir)
+        verify_macho(library, frameworks_dir, executable)
+    for binary in shipped:
+        verify_macho(binary, frameworks_dir)
     verify_minimum_os([executable, *libraries, *shipped], advertised)
     return libraries
 
@@ -323,7 +321,9 @@ def finalize(args: argparse.Namespace) -> None:
         return
     root = Path(__file__).resolve().parents[1]
     frameworks_dir = Path(os.environ["HARBOR_MACOS_FRAMEWORKS_DIR"]).resolve()
-    binary = release_binary(root)
+    binary = release_binary(root, args.target)
+    architecture = {"aarch64-apple-darwin": "arm64", "x86_64-apple-darwin": "x86_64"}[args.target]
+    run("lipo", str(binary), "-verify_arch", architecture)
     mpv = root / "src-tauri" / "binaries" / f"mpv-{args.target}"
     if not mpv.is_file():
         raise RuntimeError(f"The staged thumbnail mpv executable is missing: {mpv}")
@@ -353,6 +353,9 @@ def verify_app(args: argparse.Namespace) -> None:
     advertised = advertised_minimum(app)
     verify_supported_minimum(advertised, f"the {app.name} Info.plist")
     libraries = verify_closure(executable, frameworks_dir, advertised, shipped)
+    architecture = {"aarch64-apple-darwin": "arm64", "x86_64-apple-darwin": "x86_64"}[args.target]
+    for binary in [executable, *libraries, *shipped]:
+        run("lipo", str(binary), "-verify_arch", architecture)
     verify_macho(mpv, frameworks_dir)
     for binary in [executable, mpv]:
         searched = [
@@ -383,6 +386,7 @@ def parser() -> argparse.ArgumentParser:
     finalize_parser.set_defaults(handler=finalize)
     verify_parser = commands.add_parser("verify-app")
     verify_parser.add_argument("--app", type=Path, required=True)
+    verify_parser.add_argument("--target", choices=targets, required=True)
     verify_parser.set_defaults(handler=verify_app)
     return result
 

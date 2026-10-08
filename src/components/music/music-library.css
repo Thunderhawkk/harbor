@@ -732,6 +732,8 @@
 
 .music-library-track-art {
   position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
 }
 .music-library-track-state {
   position: absolute;
@@ -749,10 +751,19 @@
 .music-like-this-ask {
   display: flex;
   flex-direction: column;
-  padding: 10px 8px 8px;
+  gap: 3px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 7px 7px;
+  border: 1px solid var(--color-edge-soft);
+  border-radius: 9px;
+  background: var(--color-elevated);
+  color: var(--color-ink);
+  box-shadow: 0 12px 28px -16px rgb(0 0 0 / .65);
 }
 .music-like-this-ask > p {
-  padding: 0 8px 8px;
+  margin: 0;
+  padding: 2px 10px 8px;
   font-size: 11.5px;
   color: var(--color-ink-subtle);
 }
@@ -768,9 +779,12 @@
 }
 .music-like-this-ask > button:hover,
 .music-like-this-ask > button:focus-visible {
-  background: var(--color-elevated);
+  background: var(--color-raised);
   outline: none;
 }
+.music-like-this-ask > button:focus-visible { outline: 1px solid var(--color-ink-muted); outline-offset: -2px; }
+.music-library-playlist-heading > .music-playlist-build-status { margin: -6px 0 0; font-size: 13px; line-height: 1.5; color: var(--color-ink-muted); }
+.music-library-playlist-heading .music-playlist-commands button[aria-busy="true"] { opacity: 1; color: var(--color-ink); }
 
 .music-library-bar {
   display: flex;

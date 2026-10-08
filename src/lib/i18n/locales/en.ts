@@ -1,6 +1,77 @@
+import playOrders from "./en/play-orders";
+import gameRomLibrary from "./en/game-rom-library";
+import gameNotes from "./en/game-notes";
+import gameLibraryRefinements from "./en/game-library-refinements";
+import gamePokemonUi from "./en/game-pokemon-ui";
+import customArtwork from "./en/custom-artwork";
+import gameAtlasDiscovery from "./en/game-atlas-discovery";
+import gameDiscoveryPicker from "./en/game-discovery-picker";
+import gameLibraryManagement from "./en/game-library-management";
+import gameHydraImport from "./en/game-hydra-import";
+import gameStudioCatalog from "./en/game-studio-catalog";
+import gameArtwork from "./en/game-artwork";
+import gameMetadataMatching from "./en/game-metadata-matching";
+import gameAgeRatings from "./en/game-age-ratings";
+import gameLibraryLinks from "./en/game-library-links";
+import gameModHub from "./en/game-mod-hub";
+import gameLibraryTitles from "./en/game-library-titles";
+import gameStoreSearch from "./en/game-store-search";
+import gameSteamShortcuts from "./en/game-steam-shortcuts";
+import gameGallery from "./en/game-gallery";
+import gameStardew from "./en/game-stardew";
+import gameSourceAlerts from "./en/game-source-alerts";
+import gamePokemon from "./en/game-pokemon";
+import gameSims from "./en/game-sims";
+import gameTarkov from "./en/game-tarkov";
+import gameTft from "./en/game-tft";
+import gameEve from "./en/game-eve";
+import gameOsrs from "./en/game-osrs";
+import gameFfxiv from "./en/game-ffxiv";
+import gameFortnite from "./en/game-fortnite";
+import gameSetup from "./en/game-setup";
+import torrentDialog from "./en/torrent-dialog";
+import gameDownloadNotifications from "./en/game-download-notifications";
+import gameDownloadCenter from "./en/game-download-center";
+import warhammerUniverse from "./en/warhammer-universe";
+import gameValorant from "./en/game-valorant";
+import gameAudience from "./en/game-audience";
+import gameDetailFlow from "./en/game-detail-flow";
+import gameWowTalents from "./en/game-wow-talents";
+import gameWowProgress from "./en/game-wow-progress";
+import gameWowRuns from "./en/game-wow-runs";
+import gamePlaytime from "./en/game-playtime";
+import gameLaunchHealth from "./en/game-launch-health";
+import gameUnifiedLibrary from "./en/game-unified-library";
+import gameDota from "./en/game-dota";
+import gameLeague from "./en/game-league";
+import gameOverwatch from "./en/game-overwatch";
+import gameWowEquipment from "./en/game-wow-equipment";
+import gameRecommendations from "./en/game-recommendations";
+import gameOwnedDiscovery from "./en/game-owned-discovery";
+import gameBackups from "./en/game-backups";
+import gameArchives from "./en/game-archives";
+import gameSourceDiscovery from "./en/game-source-discovery";
+import gameGuides from "./en/game-guides";
+import gameModUpdates from "./en/game-mod-updates";
+import gameMinecraft from "./en/game-minecraft";
+import gameRoms from "./en/game-roms";
+import gameExploreRows from "./en/game-explore-rows";
+import gameHackDiscovery from "./en/game-hack-discovery";
+import gameHub from "./en/game-hub";
+import floatingPlayer from "./en/floating-player";
+import gameAntiCheat from "./en/game-anti-cheat";
+import gameDock from "./en/game-dock";
+import gameCompanion from "./en/game-companion";
+import gameWow from "./en/game-wow";
+import gameSearch from "./en/game-search";
 import mediaStart from "./en/media-start";
 import spooktober from "./en/spooktober";
 import music from "./en/music";
+import games from "./en/games";
+import gamePlayer from "./en/game-player";
+import gameDiscovery from "./en/game-discovery";
+import gameDetails from "./en/game-details";
+import gameAchievements from "./en/game-achievements";
 import settingsRefinements from "./en/settings-refinements";
 
 import nytTv from "./en/nyt-tv";
@@ -14,6 +85,18 @@ import criticism from "./en/criticism";
 import soundtrack from "./en/soundtrack";
 
 const en: Record<string, string> = {
+  "collections.feed.more": "Load more collections",
+  "collections.feed.error": "Couldn't load collections. Try again.",
+  ...gamePokemon,
+  ...torrentDialog,
+  ...gameAudience,
+  ...gameUnifiedLibrary,
+  ...gameStoreSearch,
+  ...gameLibraryTitles,
+  ...gameLibraryLinks,
+  ...gameHub,
+  ...floatingPlayer,
+  ...gameAntiCheat,
   "sports.guide.athletes": "Athletes",
   "sports.guide.athlete": "Athlete",
   "sports.guide.athleteCount": "{n} athletes",
@@ -31,10 +114,34 @@ const en: Record<string, string> = {
   "Translating…": "Translating…",
   "Showing {lang}": "Showing {lang}",
   "Show all": "Show all",
+  "games.download.queueOrder": "Queue order {position}",
+  "games.download.earlier": "Move {name} earlier",
+  "games.download.later": "Move {name} later",
   ...mediaStart,
   ...spooktober,
   ...videoCast,
   ...music,
+  ...games,
+  ...gamePlaytime,
+  ...gameLaunchHealth,
+  ...gamePlayer,
+  ...gameDiscovery,
+  ...gameDetails,
+  ...gameAchievements,
+  ...gameSearch,
+  ...gameDock,
+  ...gameCompanion,
+  ...gameFortnite,
+  ...gameFfxiv,
+  ...gameOsrs,
+  ...gameTarkov,
+  ...gameModHub,
+  ...gameSims,
+  ...gameStardew,
+  ...gameTft,
+  ...gameEve,
+  ...warhammerUniverse,
+  ...gameWow,
   Soccer: "Football",
   "Build identity. Useful when filing a bug report.":
     "Build identity. Useful when filing a bug report.",
@@ -339,6 +446,46 @@ const en: Record<string, string> = {
   ...soundtrack,
   ...country,
   ...personCraft,
+  ...gameHackDiscovery,
+  ...gameStudioCatalog,
+  ...gameDiscoveryPicker,
+  ...gameLibraryManagement,
+  ...gameAtlasDiscovery,
+  ...gameRoms,
+  ...gameDetailFlow,
+  ...gameExploreRows,
+  ...gameSourceDiscovery,
+  ...gameDownloadCenter,
+  ...gameDownloadNotifications,
+  ...gameSourceAlerts,
+  ...gameModUpdates,
+  ...gameMinecraft,
+  ...gameGuides,
+  ...gameRecommendations,
+  ...gameOverwatch,
+  ...gameValorant,
+  ...gameDota,
+  ...gameLeague,
+  ...gameWowEquipment,
+  ...gameWowTalents,
+  ...gameWowProgress,
+  ...gameWowRuns,
+  ...gameOwnedDiscovery,
+  ...gameBackups,
+  ...gameArchives,
+  ...gameSetup,
+  ...gameHydraImport,
+  ...gameSteamShortcuts,
+  ...gameGallery,
+  ...gameAgeRatings,
+  ...gameMetadataMatching,
+  ...gameArtwork,
+  ...gamePokemonUi,
+  ...customArtwork,
+  ...gameLibraryRefinements,
+  ...gameRomLibrary,
+  ...gameNotes,
+  ...playOrders,
 };
 
 export default en;

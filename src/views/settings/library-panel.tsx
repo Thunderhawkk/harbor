@@ -46,7 +46,7 @@ export function LibraryPanel({
     { id: "cards" as const, label: t("Cards") },
     { id: "detail" as const, label: t("Detail pages") },
     { id: "providers" as const, label: t("Metadata") },
-    { id: "ai" as const, label: t("AI search") },
+    { id: "ai" as const, label: t("Search") },
     { id: "library" as const, label: t("Library") },
   ];
   useSubTabs(tabs, tab, (id) => setTab(id as Tab));

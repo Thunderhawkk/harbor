@@ -495,6 +495,11 @@
 .imdb-rating { display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;color:#cfcbd0;vertical-align:middle; }
 .imdb-rating>img { display:block;width:28px;height:14px;object-fit:contain;border-radius:2px; }
 .media-rating.imdb-rating>span { color:inherit;background:none;padding:0;font-size:inherit;font-weight:500; }
+.media-ratings { display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:7px; }
+.media-ratings>.media-rating { margin-top:0; }
+.mal-rating { display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;color:#cfcbd0; }
+.mal-rating>img { display:block;width:30px;height:12px;object-fit:contain; }
+.media-rating.mal-rating>span { color:inherit;background:none;padding:0;font-size:inherit;font-weight:500; }
 .feature-selector .queue-facts>span:last-child { display:flex;align-items:center;gap:3px; }
 .queue-facts .imdb-rating { gap:3px;font-size:10px; }.queue-facts .imdb-rating>img { width:25px;height:12px; }
 .rating-meta { color:#cfcbd0; }

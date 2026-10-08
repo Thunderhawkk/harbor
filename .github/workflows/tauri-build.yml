@@ -95,6 +95,14 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Set up Pokémon engine SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.401'
+
+      - name: Build Pokémon engine and corresponding source bundle
+        run: node tools/pokemon-engine/build.mjs --fetch-source "${{ runner.temp }}/harbor-pokemon-source" --output src-tauri/resources/pokemon-engine --artifacts "${{ runner.temp }}/harbor-pokemon-build"
+
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
@@ -212,6 +220,9 @@ jobs:
           FRAMEWORKS_DIR="$RUNNER_TEMP/harbor-macos-frameworks-${{ matrix.platform.target }}"
           CONFIG_PATH="$RUNNER_TEMP/tauri-macos-libmpv-${{ matrix.platform.target }}.json"
           python3 tests/test_macos_mpv_bundle.py
+          python3 tests/test_macos_signature.py
+          python3 tests/test_macos_resign.py
+          python3 tests/test_macos_startup.py
           python3 scripts/macos-bundle-libmpv.py prepare \
             --frameworks "$FRAMEWORKS_DIR" \
             --config "$CONFIG_PATH" \
@@ -270,8 +281,17 @@ jobs:
             echo "Harbor.app was not produced" >&2
             exit 1
           fi
-          python3 scripts/macos-bundle-libmpv.py verify-app --app "$APP_PATH"
+          python3 scripts/macos-bundle-libmpv.py verify-app --app "$APP_PATH" --target "${{ matrix.platform.target }}"
           python3 scripts/macos-verify-signature.py --app "$APP_PATH"
+          python3 scripts/macos-startup-check.py --app "$APP_PATH" --output "$RUNNER_TEMP/harbor-macos-startup" --seconds 20
+
+      - name: Preserve macOS startup diagnostics
+        if: always() && contains(matrix.platform.runner, 'macos')
+        uses: actions/upload-artifact@v4
+        with:
+          name: startup-${{ matrix.platform.target }}
+          path: ${{ runner.temp }}/harbor-macos-startup/*.log
+          if-no-files-found: ignore
 
       - name: Archive verified macOS app for local updater signing
         if: contains(matrix.platform.runner, 'macos')

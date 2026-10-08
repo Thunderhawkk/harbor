@@ -16,6 +16,7 @@ import {
   X,
 } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 import { MusicServiceLogo } from "./music-service-logo";
 import "./music-queue.css";
 import { useT } from "@/lib/i18n";
@@ -145,7 +146,7 @@ function QueueTrack({
               seed={`track:${track.connectorId ?? ""}:${track.sourceId ?? track.id}`}
               ratio="square"
               className="w-full [--poster-radius:4px]"
-            />
+            ><MusicTrackPlaybackMark track={track}/></Poster>
             <span className="music-queue-cover-play" aria-hidden>
               {playing ? (
                 <Pause size={18} fill="currentColor" />

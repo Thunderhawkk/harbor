@@ -7,7 +7,11 @@ import { loadSurpriseLibrary } from "./surprise-library";
 import { recordMusicSimilarPlayback } from "./playback-origin";
 import { heldMusicContextTracks, hydrateMusicContextTracks, musicContextArtwork, recordMusicRecentContext, rememberMusicContextTracks } from "./recent-context";
 import { musicQueueAutomationStarted, ownMusicQueueAutomation, ownsMusicQueueAutomation, releaseMusicQueueAutomation } from "./queue-automation";
+import { artistIdentityKey } from "./artist-popularity";
+import { dailyArtistKey } from "./daily-discovery-selection";
 import { createSurpriseCatalog } from "./surprise-catalog";
+import { noteSurpriseTrack, resetSurpriseFeedback } from "./surprise-feedback";
+import { getSurpriseBlend, hydrateSurpriseBlend } from "./surprise-preferences";
 import { selectSurpriseTracks } from "./surprise-selection";
 import { musicTrackIdentity } from "./track-identity";
 import { getMusicTransport, musicUpcoming } from "./transport";
@@ -30,7 +34,17 @@ export function stopMusicSurprise(): void {
   setMusicQueue(current.queue.slice(0, current.queueIndex + 1));
 }
 
+let lastStart: { name: string; homeRows: readonly MusicCatalogRow[]; spotifyConnected: boolean } | null = null;
+export function restartMusicSurprise(genres: readonly number[]): Promise<void> {
+  const held = lastStart;
+  if (!held) return Promise.resolve();
+  stopMusicSurprise();
+  return startMusicSurprise(genres, held.name, held.homeRows, held.spotifyConnected);
+}
+
 export async function startMusicSurprise(genres: readonly number[], name: string, homeRows: readonly MusicCatalogRow[] = [], spotifyConnected = false): Promise<void> {
+  lastStart = { name, homeRows, spotifyConnected };
+  resetSurpriseFeedback();
   const profile = activeProfileId(), abort = new AbortController();
   const contextId = `mix:surprise:${profile}`;
   let unsubscribe = () => {}, timer: ReturnType<typeof setTimeout> | undefined;
@@ -52,6 +66,7 @@ export async function startMusicSurprise(genres: readonly number[], name: string
       hydrateMusicContextTracks(),
       hydrateListeningAffinity(profile),
       loadSurpriseLibrary(primary, spotifyConnected, abort.signal),
+      hydrateSurpriseBlend(),
     ]);
     if (!live()) return;
     const state = getMusicState();
@@ -61,6 +76,10 @@ export async function startMusicSurprise(genres: readonly number[], name: string
     const taste = { recents: [...state.recents, ...spotifyRecent], liked: state.likedTracks, followed: getLikedArtists(), library, affinity: readListeningAffinity(profile) };
     if (!taste.recents.length && !taste.liked.length && !taste.followed.length && !library.length && !genres.length) { finish("empty"); return; }
     const familiar = new Set([...Object.keys(taste.affinity), ...taste.recents.map(musicTrackIdentity), ...taste.liked.map(musicTrackIdentity), ...library.map(musicTrackIdentity)]);
+    const knownArtists = new Set(
+      [...taste.recents, ...taste.liked, ...library].map(dailyArtistKey),
+    );
+    for (const artist of taste.followed) knownArtists.add(artistIdentityKey(artist.name));
     const seen = new Set((heldMusicContextTracks("similar", contextId) ?? []).slice(-2048).map(musicTrackIdentity));
     if (state.current) seen.add(musicTrackIdentity(state.current));
     const catalog = createSurpriseCatalog(taste, genres, profile, abort.signal);
@@ -75,13 +94,16 @@ export async function startMusicSurprise(genres: readonly number[], name: string
         // A song heard or saved outside this mix during the session is no longer a discovery.
         [...current.recents, ...current.likedTracks].forEach(track => familiar.add(musicTrackIdentity(track)));
         const previous = started ? [...played.slice(-3), ...(current.current ? [current.current] : [])] : [];
-        let picks = selectSurpriseTracks(catalog.candidates(), familiar, seen, previous);
-        for (let pass = 0; picks.length < 8 && pass < 4 && live(); pass++) {
+        const choose = (strict: boolean) => selectSurpriseTracks(catalog.candidates(), familiar, seen, previous, 12, Math.random, { knownArtists, blend: getSurpriseBlend(), strict });
+        let picks = choose(true);
+        for (let pass = 0; picks.length < 8 && pass < 6 && live(); pass++) {
           await catalog.expand();
           if (!live()) return;
-          picks = selectSurpriseTracks(catalog.candidates(), familiar, seen, previous);
+          picks = choose(true);
         }
         if (!live()) return;
+        // Only after the catalogue has genuinely run dry does familiar listening fill the gap.
+        if (picks.length < 4) picks = choose(false);
         if (!picks.length) {
           if (!started) { finish("error"); return; }
           publish("waiting");
@@ -127,6 +149,7 @@ export async function startMusicSurprise(genres: readonly number[], name: string
       if (!started || !live() || !current.current) return;
       const key = musicTrackIdentity(current.current);
       if (key !== lastTrack) {
+        noteSurpriseTrack(current.current);
         if (lastTrack) {
           const previous = current.queue.find(track => musicTrackIdentity(track) === lastTrack);
           if (previous) played.push(previous);

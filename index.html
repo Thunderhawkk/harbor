@@ -77,7 +77,7 @@
       #harbor-boot.gone {
         opacity: 0;
       }
-      #harbor-boot svg {
+      #harbor-boot > svg {
         width: 96px;
         height: auto;
         color: #f5f5f5;
@@ -170,6 +170,23 @@
       </svg>
     </div>
     <div id="root" inert data-startup-hidden></div>
+    <script>
+      // Paint the saved poster before React or the animation player loads.
+      try {
+        var art = JSON.parse(localStorage.getItem('harbor.custom-artwork.v1') || '{}').launch;
+        if (art && /^[\w-]{1,80}$/.test(art.id) && typeof art.poster === 'string' && art.poster.length < 200000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(art.poster)) {
+          var mark = document.querySelector('#harbor-boot > svg');
+          var custom = document.createElement('div');
+          custom.id = 'harbor-custom-boot-art';
+          custom.style.cssText = 'position:relative;width:128px;height:128px';
+          custom.setAttribute('aria-hidden', 'true');
+          var poster = document.createElement('img');
+          poster.src = art.poster; poster.alt = ''; poster.style.cssText = 'width:100%;height:100%;object-fit:contain';
+          custom.appendChild(poster); mark.after(custom); mark.style.display = 'none';
+        }
+      } catch (e) {}
+    </script>
+    <script type="module" src="/src/boot-artwork.ts"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

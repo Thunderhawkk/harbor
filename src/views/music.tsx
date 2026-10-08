@@ -6,6 +6,7 @@ import "./music/music-page-system.css";
 import { reopenMusicMix } from "@/lib/music/recent-context";
 import { MusicBillboardPage } from "@/components/music/music-billboard-page";
 import { MusicGenres, type MusicGenreEntry } from "./music/music-genres";
+import { MusicExploreBands } from "./music/music-explore-bands";
 import { MusicBillboardCharts } from "@/components/music/music-discovery-charts";
 import { MusicAudioSettings } from "@/components/music/music-audio-settings";
 import { MusicSpeakers } from "@/components/music/music-speakers";
@@ -42,12 +43,16 @@ import {
   MUSIC_GENRE_EVENT,
   MUSIC_LABEL_EVENT,
   MUSIC_PANEL_EVENT,
+  MUSIC_LIBRARY_EVENT,
+  MUSIC_PLAY_EVENT,
   MUSIC_PLAYLIST_EVENT,
   MUSIC_SEARCH_EVENT,
   takeMusicExploreRequest,
   takeMusicGenreRequest,
   takeMusicLabelRequest,
   takeMusicPanelRequest,
+  takeMusicLibraryRequest,
+  takeMusicPlayRequest,
   takeMusicPlaylistRequest,
   takeMusicSearchRequest,
 } from "@/lib/music/navigation";
@@ -844,6 +849,24 @@ function MusicViewContent({ active }: { active: boolean }) {
     receive();
     return () => window.removeEventListener(MUSIC_PLAYLIST_EVENT, receive);
   }, [openLibrary]);
+  useEffect(() => {
+    const receive = () => {
+      const request = takeMusicLibraryRequest();
+      if (request) openLibrary(request);
+    };
+    window.addEventListener(MUSIC_LIBRARY_EVENT, receive);
+    receive();
+    return () => window.removeEventListener(MUSIC_LIBRARY_EVENT, receive);
+  }, [openLibrary]);
+  useEffect(() => {
+    const receive = () => {
+      const request = takeMusicPlayRequest();
+      if (request) playTrack(request.track, request.queue);
+    };
+    window.addEventListener(MUSIC_PLAY_EVENT, receive);
+    receive();
+    return () => window.removeEventListener(MUSIC_PLAY_EVENT, receive);
+  }, [playTrack]);
 
   useEffect(() => {
     const receive = () => {
@@ -948,19 +971,27 @@ function MusicViewContent({ active }: { active: boolean }) {
   useEffect(() => {
     const receive = () => {
       const query = takeMusicSearchRequest();
-      if (!query) return;
+      if (query === null) return;
       closeConnections();
       setDiscoveryPage(null);
       setWatch(null);
       setYtm(false);
       setNotice(null);
       setTab("forYou");
-      runSearch(query, null);
+      // An empty request is the quick dock asking for the search page itself, not for a search.
+      if (query.trim()) {
+        runSearch(query, null);
+        return;
+      }
+      showSearch("", null);
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLInputElement>("[data-music-mast-search]")?.focus({ preventScroll: true }),
+      );
     };
     window.addEventListener(MUSIC_SEARCH_EVENT, receive);
     receive();
     return () => window.removeEventListener(MUSIC_SEARCH_EVENT, receive);
-  }, [runSearch, closeConnections]);
+  }, [runSearch, showSearch, closeConnections]);
 
   useEffect(() => {
     const receive = () => {
@@ -1376,7 +1407,16 @@ function MusicViewContent({ active }: { active: boolean }) {
                         onBillboard={openBillboard}
                         onTastes={() => openDiscovery("tastes")}
                         onWatch={openVideo}
+                        onPlay={playTrack}
                         active={active}
+                      />
+                      <MusicExploreBands
+                        recents={player.recents}
+                        liked={player.likedTracks}
+                        active={active}
+                        genre={genre}
+                        onPlay={playTrack}
+                        onOpen={openItem}
                       />
                     </>
                   )}

@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ChevronLeft, Search } from "@/components/icons/music-icons";
+import { ChevronLeft } from "@/components/icons/music-icons";
 import {
   errorText,
   MusicConnectionRow,
@@ -149,7 +149,6 @@ export function useMusicConnections(): MusicConnectionsContextValue {
 export function MusicConnections({ focusId, onClose }: { focusId?: string; onClose: () => void }) {
   const t = useT();
   const { connections, status, error, connected, reload, apply } = useMusicConnections();
-  const [query, setQuery] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -157,11 +156,7 @@ export function MusicConnections({ focusId, onClose }: { focusId?: string; onClo
 
   const groups = GROUPS.map((group) => ({
     ...group,
-    items: connections.filter(
-      (item) =>
-        item.kind === group.kind &&
-        `${item.name} ${item.detail ?? ""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-    ),
+    items: connections.filter((item) => item.kind === group.kind),
   })).filter((group) => group.items.length > 0);
 
   return (
@@ -193,17 +188,6 @@ export function MusicConnections({ focusId, onClose }: { focusId?: string; onClo
             </p>
           )}
         </div>
-        <label className="flex w-full max-w-sm items-center gap-3 rounded-md bg-elevated px-4 py-3">
-          <Search size={17} className="text-ink-muted" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            aria-label={t("music.connections.capability.search")}
-            placeholder={t("music.connections.capability.search")}
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-          />
-        </label>
       </header>
 
       <div className="flex min-h-40 flex-col gap-7 pb-5">

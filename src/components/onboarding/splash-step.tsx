@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
+import { CustomArtwork } from "@/components/custom-artwork";
 import { Poster } from "@/components/poster";
 import { topMovies, topSeries, type Meta } from "@/lib/cinemeta";
 import { useT } from "@/lib/i18n";
@@ -59,7 +60,7 @@ export function SplashStep({ onAdvance }: { onAdvance: () => void }) {
         }}
       />
       <div className="relative flex h-full flex-col items-center justify-center gap-3 text-center">
-        <h1 className="animate-splash-title flex items-center gap-3 font-display text-[88px] font-medium leading-none tracking-tight text-ink">
+        <CustomArtwork role="launch" className="h-44 w-64" fallback={<h1 className="animate-splash-title flex items-center gap-3 font-display text-[88px] font-medium leading-none tracking-tight text-ink">
           <HarborMark className="h-[1em] w-[1em] shrink-0" />
           <span style={{ transform: "translateY(0.04em)" }}>
             Harb
@@ -71,12 +72,12 @@ export function SplashStep({ onAdvance }: { onAdvance: () => void }) {
             </span>
             r
           </span>
-        </h1>
+        </h1>} />
         <p
           className="animate-splash-title text-[14px] uppercase tracking-[0.42em] text-ink-muted"
           style={{ animationDelay: "260ms" }}
         >
-          {t("For watching things")}
+          {t("Built for Adventure!")}
         </p>
       </div>
     </div>

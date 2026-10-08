@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "Более новый состав",
+  "music.xxl.older": "Более ранний состав",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -377,6 +379,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "Добавьте сохранённый или недавний трек из списков ниже.",
   "music.library.savedTracks": "Сохранённые треки",
   "music.library.readyForPlaylist": "Готово к добавлению в {name}",
+  "music.library.addTracks": "Добавить треки",
+  "music.library.addTracksCount": "{count} готово к добавлению",
   "music.library.permanent": "Ваша постоянная коллекция",
   "music.library.recent": "Недавно прослушано",
   "music.library.newestFirst": "Сначала последние прослушивания",
@@ -558,6 +562,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "Содержание",
   "music.playlistTools.explicit": "Ненормативная лексика",
   "music.playlistTools.clean": "Без ненормативной лексики",
+  "music.surprise.rate.title": "Как вам этот микс?",
+  "music.surprise.rate.note": "Прослушано треков: {count}",
+  "music.surprise.rate.yes": "Нравится",
+  "music.surprise.rate.no": "Не моё",
+  "music.surprise.redirect.title": "Что хотите послушать вместо этого?",
+  "music.surprise.redirect.note": "Выберите направление, и микс начнётся заново.",
+  "music.surprise.redirect.more": "Другие жанры",
+  "music.surprise.back": "Назад",
   "music.surprise.title": "Удиви меня",
   "music.surprise.stop": "Остановить «Удиви меня»",
   "music.surprise.body": "Новые для вас песни на основе прослушиваний и плейлистов.",

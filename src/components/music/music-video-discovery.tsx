@@ -25,6 +25,7 @@ export function MusicVideoDiscovery({
   filterSubject = subject,
   queryForKind,
   headerContent,
+  titleKey,
   controlsInHeader = false,
   onWatch,
 }: {
@@ -36,6 +37,8 @@ export function MusicVideoDiscovery({
   filterSubject?: string;
   queryForKind?: (kind: MusicVideoKind) => string;
   headerContent?: ReactNode;
+  /** Overrides the heading so sibling rows read as distinct sections. */
+  titleKey?: string;
   controlsInHeader?: boolean;
   onWatch: (track: MusicTrack, queue: MusicTrack[]) => void;
 }) {
@@ -157,11 +160,13 @@ export function MusicVideoDiscovery({
       behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
     });
   };
-  const heading = tabs
-    ? MUSIC_VIDEO_KIND_LABELS[kind]
-    : interviews
-      ? "music.videos.interviews"
-      : "music.videos.title";
+  const heading = titleKey
+    ? titleKey
+    : tabs
+      ? MUSIC_VIDEO_KIND_LABELS[kind]
+      : interviews
+        ? "music.videos.interviews"
+        : "music.videos.title";
   const glyph = (tabs ? kind === "interviews" : interviews) ? (
     <Mic2 size={21} aria-hidden />
   ) : tabs && kind === "concerts" ? (

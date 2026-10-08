@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Play } from "@/components/icons/music-icons";
 import { MUSIC_SHELF_MIN } from "@/components/music/music-catalog-row";
 import { MusicMixCover } from "@/components/music/music-mix-cover";
+import { MusicNowPlayingMark } from "@/components/music/music-now-playing-mark";
 import { MusicSectionHead } from "@/components/music/music-track-grid";
 import { Row } from "@/components/row";
 import { activeProfileId } from "@/lib/active-profile-id";
@@ -12,7 +13,9 @@ import { loadTastePool } from "@/lib/music/taste-pool";
 import { filterBlockedTracks } from "@/lib/music/artist-blocks";
 import { dailyDayKey } from "@/lib/music/daily-discovery-selection";
 import { playMusic } from "@/lib/music/player";
-import { recordMusicSimilarPlayback } from "@/lib/music/playback-origin";
+import { recordMusicSimilarPlayback, useMusicPlaybackOrigin } from "@/lib/music/playback-origin";
+import { musicRecentContextIdentity } from "@/lib/music/recent-identity";
+import { useMusicNowPlaying } from "@/lib/music/use-now-playing";
 import "@/components/music/music-cover-card.css";
 import "./music-made-for-you-band.css";
 import type { MusicBand, MusicBandContext } from "./music-band-types";
@@ -26,12 +29,16 @@ function mixName(mix: Mix, t: Translate): string {
 
 function MadeForYouRow({ player, t, title, openMix }: { player: MusicBandContext["player"]; t: Translate; title: string; openMix: MusicBandContext["openMix"] }) {
   const followed = useLikedArtists();
+  const origin = useMusicPlaybackOrigin();
+  const now = useMusicNowPlaying();
+  const playing = origin?.kind === "similar" && (now.phase === "playing" || now.phase === "resolving") ? musicRecentContextIdentity(origin) : null;
   const inputs = useRef({ player, followed });
   inputs.current = { player, followed };
   const [loadingPersonal, setLoadingPersonal] = useState(true);
   const [mixes, setMixes] = useState<Mix[]>([]);
   const [day, setDay] = useState(dailyDayKey);
   const [retry, setRetry] = useState(0);
+  const [errored, setErrored] = useState(false);
   const hasTaste = !!(player.likedTracks.length || player.recents.length || followed.length);
   const profile = activeProfileId();
   useEffect(() => {
@@ -55,6 +62,7 @@ function MadeForYouRow({ player, t, title, openMix }: { player: MusicBandContext
   useEffect(() => {
     let live = true;
     setMixes([]);
+    setErrored(false);
     setLoadingPersonal(true);
     void readMadeForYouShelf(day, profile, hasTaste).then(async held => {
       if (held.length) return held;
@@ -65,7 +73,7 @@ function MadeForYouRow({ player, t, title, openMix }: { player: MusicBandContext
         day, profile, value => { if (live) setMixes(value); });
     })
       .then(value => { if (live) setMixes(value); })
-      .catch(() => { if (live) setMixes([]); })
+      .catch(() => { if (live) { setMixes([]); setErrored(true); } })
       .finally(() => { if (live) setLoadingPersonal(false); });
     return () => { live = false; };
   }, [hasTaste, day, profile, retry]);
@@ -103,16 +111,20 @@ function MadeForYouRow({ player, t, title, openMix }: { player: MusicBandContext
     }
   };
 
+  // Nothing to personalise from yet, so the band stays out of the way entirely rather
+  // than showing an empty shelf. It appears once there are plays, likes or follows.
+  if (!hasTaste && !mixes.length && !errored) return null;
+
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-busy={loadingPersonal}>
       <MusicSectionHead title={title} subtitle={t("music.madeForYou.subtitle")} />
-      {!loadingPersonal && !mixes.length && <div className="flex items-center gap-3 py-4 text-sm text-ink-muted" role="status">
-        <span>{t("music.action.error")}</span>
+      {!loadingPersonal && !mixes.length && errored && <div className="flex items-center gap-3 py-4 text-sm text-ink-muted" role="status">
+        <span>{t("music.madeForYou.retry")}</span>
         <button type="button" className="rounded-md bg-elevated px-3 py-2 text-ink" onClick={() => setRetry(value => value + 1)}>{t("common.retry")}</button>
       </div>}
       <Row shape="square" min={MUSIC_SHELF_MIN} scrollKey="music:madeForYou" alwaysActive>
         {loadingPersonal && !mixes.length ? Array.from({ length: 6 }, (_, index) => <div key={index} aria-hidden="true" className="aspect-square rounded-md bg-elevated animate-pulse motion-reduce:animate-none" />) : mixes.map((mix) => (
-          <div key={mix.id} className="music-mix-card music-cover-card group">
+          <div key={mix.id} data-mix-id={mix.id} className="music-mix-card music-cover-card group">
             <div className="relative">
               <button
                 type="button"
@@ -133,6 +145,7 @@ function MadeForYouRow({ player, t, title, openMix }: { player: MusicBandContext
                 </span>
               </button>
               <div className="pointer-events-none absolute inset-x-0 top-0 aspect-square">
+                {playing === musicRecentContextIdentity({ kind: "similar", id: mix.id, seed: mix.seeds[0] }) && <MusicNowPlayingMark loading={now.phase === "resolving"} />}
                 <button
                   type="button"
                   className="music-cover-play no-press bg-ink text-canvas"

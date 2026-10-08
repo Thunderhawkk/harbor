@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "Lớp mới hơn",
+  "music.xxl.older": "Lớp trước",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -378,6 +380,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "Thêm bài hát đã lưu hoặc mới nghe từ các danh sách bên dưới.",
   "music.library.savedTracks": "Bài hát đã lưu",
   "music.library.readyForPlaylist": "Sẵn sàng thêm vào {name}",
+  "music.library.addTracks": "Thêm bài hát",
+  "music.library.addTracksCount": "{count} sẵn sàng để thêm",
   "music.library.permanent": "Bộ sưu tập lâu dài của bạn",
   "music.library.recent": "Đã phát gần đây",
   "music.library.newestFirst": "Lần phát mới nhất trước",
@@ -557,6 +561,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "Nội dung",
   "music.playlistTools.explicit": "Nhạy cảm",
   "music.playlistTools.clean": "Không nhạy cảm",
+  "music.surprise.rate.title": "Bản phối này thế nào?",
+  "music.surprise.rate.note": "Đã nghe {count} bài",
+  "music.surprise.rate.yes": "Rất thích",
+  "music.surprise.rate.no": "Không hợp tôi",
+  "music.surprise.redirect.title": "Bạn muốn nghe gì hơn?",
+  "music.surprise.redirect.note": "Chọn một hướng và bản phối sẽ bắt đầu lại.",
+  "music.surprise.redirect.more": "Thêm thể loại",
+  "music.surprise.back": "Quay lại",
   "music.surprise.title": "Gây bất ngờ",
   "music.surprise.stop": "Dừng Gây bất ngờ",
   "music.surprise.body": "Những bài bạn chưa nghe, dựa trên lịch sử nghe và danh sách phát của bạn.",

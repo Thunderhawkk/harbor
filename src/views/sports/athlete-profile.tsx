@@ -8,7 +8,7 @@ import { safeFetch } from "@/lib/safe-fetch";
 import { openUrl } from "@/lib/window";
 import { hubLeague } from "@/lib/sports/hub-data";
 import { fetchSoccerCareer } from "@/lib/sports/athlete-soccer";
-import { fetchAthleteCareer } from "@/lib/sports/athlete-career";
+import { fetchAthleteCareer, type AthleteCareerCategory } from "@/lib/sports/athlete-career";
 import {
   athleteImageUrl,
   fetchSportsDbAthleteBio,
@@ -27,22 +27,13 @@ export type AthleteIdentity = {
   source?: AthleteSource;
 };
 export const SportsAthleteLeagueContext = createContext("");
-type Category = {
-  name: string;
-  rowLabel?: string;
-  teamLabel?: string;
-  labels: string[];
-  descriptions: string[];
-  totals: string[];
-  rows: { season: string; team: string; teamLogo?: string; values: string[] }[];
-};
 type Profile = {
   name: string;
   image: string;
   bio: string[];
   summaryTitle: string;
   summary: { name: string; value: string }[];
-  categories: Category[];
+  categories: AthleteCareerCategory[];
   statsFailed: boolean;
   team?: { name: string; logo: string };
   recordUrl?: string;
@@ -188,9 +179,25 @@ export function AthleteProfile({
         setLoading(false);
         return;
       }
-      const categories: Category[] = (data || []).filter(
-        (category) => category.totals.length || category.rows.length,
-      );
+      const summary = (person?.statsSummary?.statistics ?? []).slice(0, 12).map((stat: any) => ({
+        name: String(stat.displayName || stat.name),
+        value: String(stat.displayValue ?? "—"),
+      }));
+      const summarySeason = bio.status === "fulfilled" ? String(bio.value?.season?.year) : "";
+      const categories: AthleteCareerCategory[] = (data || [])
+        .map((category: AthleteCareerCategory) => {
+          if (!category.season || category.season !== summarySeason) return category;
+          const included = category.descriptions
+            .map((name, index) => ({ name, index }))
+            .filter(({ name }) => !summary.some((stat: { name: string }) => stat.name === name));
+          return {
+            ...category,
+            labels: included.map(({ index }) => category.labels[index]),
+            descriptions: included.map(({ name }) => name),
+            totals: included.map(({ index }) => category.totals[index]),
+          };
+        })
+        .filter((category) => category.totals.length || category.rows.length);
       const identity = parseEspnAthleteBio({ athlete: person }, athlete.id);
       const result: Profile = {
         name: identity?.name || athlete.name,
@@ -199,10 +206,7 @@ export function AthleteProfile({
         summaryTitle:
           def?.group === "combat" ? "Career record" : person?.statsSummary?.displayName || "Stats",
         team: identity?.team,
-        summary: (person?.statsSummary?.statistics ?? []).slice(0, 12).map((stat: any) => ({
-          name: String(stat.displayName || stat.name),
-          value: String(stat.displayValue ?? "—"),
-        })),
+        summary,
         categories,
         statsFailed:
           stats.status === "rejected" || (bio.status === "rejected" && !categories.length),
@@ -225,7 +229,7 @@ export function AthleteProfile({
 
   return (
     <ModalShell closing={false} onDismiss={onClose} width={1120} labelledBy="sh-athlete-title">
-      <article className="sh-athlete-profile">
+      <article className="sh-athlete-profile" data-sport={def?.group}>
         <header>
           <button ref={backButton} className="sh-button" onClick={onClose}>
             <ArrowLeft size={16} />
@@ -303,13 +307,15 @@ export function AthleteProfile({
                   {!category.rows.length && category.totals.length ? (
                     <>
                       <p className="sh-athlete-stat-scope">
-                        {t(
-                          def?.group === "soccer"
-                            ? "Career totals for this competition"
-                            : "Career totals",
-                        )}
+                        {category.season
+                          ? `${t("Season")} ${category.season}`
+                          : t(
+                              def?.group === "soccer"
+                                ? "Career totals for this competition"
+                                : "Career totals",
+                            )}
                       </p>
-                      <div className="sh-athlete-summary">
+                      <div className="sh-athlete-summary" data-season={category.season}>
                         {category.totals.map((value, i) => (
                           <div key={i}>
                             <strong>{formatStatValue(value, locale)}</strong>

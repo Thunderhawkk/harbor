@@ -22,7 +22,7 @@ export type SocialNotif = {
 
 export type CenterNotif = {
   id: string;
-  source: "theme" | "social";
+  source: "theme" | "social" | "game";
   kind: string;
   title: string;
   body?: string;

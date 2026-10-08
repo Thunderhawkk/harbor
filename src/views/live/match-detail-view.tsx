@@ -1,6 +1,6 @@
 import { ScoreMetric, ScoreBreakdown } from "@/views/sports/score-breakdown";
 import { TeamProfileLink, teamIdentity } from "@/views/sports/team-profile-link";
-import { useState, useMemo, useRef } from "react";
+import { lazy, useState, useMemo, useRef } from "react";
 import { ArrowLeft, ArrowUp } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
@@ -12,6 +12,7 @@ import { WhereToWatch } from "@/views/sports/where-to-watch";
 import { useMatchDetail } from "@/views/sports/use-match-detail";
 import { SportsMatchDetailsSkeleton } from "@/views/sports/sports-skeletons";
 import { useAthletePortrait } from "@/views/sports/use-athlete-portrait";
+import { useAthleteRecord } from "@/views/sports/use-athlete-record";
 import { isIndividualCompetition } from "@/lib/sports/competition-metadata";
 import { EventLogo, useEventDate } from "@/views/sports/hub-cards";
 import { hubLeague } from "@/lib/sports/hub-data";
@@ -30,8 +31,26 @@ import { FieldPreview } from "@/views/sports/field-preview";
 import { EventOdds } from "@/views/sports/event-odds";
 import { AthleteProfileLink } from "@/views/sports/athlete-profile";
 import { TennisMatchPanel } from "./match-detail-view/tennis-match-panel";
+import { MatchDetailsPanel } from "./match-detail-view/match-details-panel";
+
+const HubEventPage = lazy(() => import("@/views/sports/hub-event-page").then((module) => ({ default: module.HubEventPage })));
 
 export function MatchDetailView({
+  eventGames,
+  ...props
+}: {
+  game: SportsGame;
+  shellBackAvailable?: boolean;
+  eventGames?: SportsGame[];
+}) {
+  return eventGames ? (
+    <HubEventPage {...props} games={eventGames} />
+  ) : (
+    <HeadToHeadMatchDetail {...props} />
+  );
+}
+
+function HeadToHeadMatchDetail({
   game,
   shellBackAvailable = false,
 }: {
@@ -70,6 +89,9 @@ export function MatchDetailView({
   const isCombat = sportsLeagueByTag(game.league)?.group === "combat";
   const isTennis = game.league === "ATP" || game.league === "WTA";
   const isSoccer = sportsLeagueByTag(game.league)?.group === "soccer";
+  const showRecords = isCombat || officialBoxing;
+  const homeRecord = useAthleteRecord(current?.home.id, showRecords);
+  const awayRecord = useAthleteRecord(current?.away.id, showRecords);
   const tabs = isCombat
     ? ["profile", "stats"]
     : isTennis || isSoccer
@@ -104,6 +126,7 @@ export function MatchDetailView({
             />
             <h1>{current.home.name}</h1>
           </TeamProfileLink>
+          {homeRecord && <small className="sh-detail-record">{homeRecord}</small>}
           {(isCombat || isTennis || officialBoxing) && (
             <AthleteProfileLink
               athlete={{ ...current.home, image: homePortrait.image || current.home.logo }}
@@ -153,6 +176,7 @@ export function MatchDetailView({
             />
             <h1>{current.away.name}</h1>
           </TeamProfileLink>
+          {awayRecord && <small className="sh-detail-record">{awayRecord}</small>}
           {(isCombat || isTennis || officialBoxing) && (
             <AthleteProfileLink
               athlete={{ ...current.away, image: awayPortrait.image || current.away.logo }}
@@ -238,29 +262,11 @@ export function MatchDetailView({
         />
         <EventOdds game={current} />
       </div>
-      {!officialBoxing && (
-        <nav className="sh-detail-tabs" aria-label={t("Match details")}>
-          {tabs.map((id) => (
-            <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
-              {t(
-                (
-                  {
-                    match: "Match",
-                    summary: "Summary",
-                    profile: "Athlete profile",
-                    lineups: "Lineups",
-                    stats: "Stats",
-                  } as Record<string, string>
-                )[id],
-              )}
-            </button>
-          ))}
-        </nav>
-      )}
       <div className="sh-detail-content">
         {officialBoxing ? (
           <BoxingEventDetails game={current} />
-        ) : loading ? (
+        ) : <MatchDetailsPanel tabs={tabs} selected={tab} onChange={setTab}>
+          {loading ? (
           <SportsMatchDetailsSkeleton />
         ) : !detail ? (
           <div className="sh-empty">
@@ -292,6 +298,7 @@ export function MatchDetailView({
             {tab === "profile" && <MmaProfileTab detail={detail} />}
           </>
         )}
+        </MatchDetailsPanel>}
       </div>
       {showTop && (
         <button

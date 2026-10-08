@@ -1,4 +1,4 @@
-import { useMusicSourceRequest, musicSourceRequestMatches } from "@/lib/music/source-request";
+import { useTrackPlaybackState } from "@/lib/music/use-track-playback-state";
 import { useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { GripVertical, Heart, LoaderCircle, MoreHorizontal, Pause, Play } from "@/components/icons/music-icons";
 import { MusicTrackMenu, useMusicTrackMenuItems } from "./music-track-menu";
@@ -70,8 +70,10 @@ export function MusicTrackRow({
   className?: string;
 }) {
   const t = useT();
-  const request = useMusicSourceRequest();
-  loading = loading || musicSourceRequestMatches(request, track);
+  const status = useTrackPlaybackState(track);
+  loading = loading || status.loading;
+  nowPlaying = nowPlaying || status.current;
+  paused = paused || status.paused;
   const tracked = useMusicTrackLiked(track);
   const saved = liked ?? tracked;
   const rowBadge = badge?.kind === "connector" ? { ...badge, itemId: track.id } : badge;
@@ -146,6 +148,7 @@ export function MusicTrackRow({
           {nowPlaying && !loading && (
             <span
               aria-hidden="true"
+              data-paused={paused || undefined}
               className="music-eq absolute inset-0 grid place-items-center bg-black/45 group-hover:opacity-0"
             >
               <span className="music-eq-bars">

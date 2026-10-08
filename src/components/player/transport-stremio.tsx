@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PlayerCapabilities, PlayerSnapshot } from "@/lib/player/bridge";
 import type { SubtitleAddHandler } from "@/lib/player/subtitle-load";
 import type { Meta } from "@/lib/cinemeta";
+import { isLivePlaybackSrc } from "@/lib/player/live-src";
 import {
   controlsInSlot,
   PLAYER_CHROME_CHANGED_EVENT,
@@ -25,6 +26,7 @@ import { useCastModalPlay } from "./use-cast-modal-play";
 
 export type TransportStremioProps = {
   snap: PlayerSnapshot;
+  isLive?: boolean;
   capabilities: PlayerCapabilities;
   visible: boolean;
   fullscreen: boolean;
@@ -160,7 +162,7 @@ export function TransportStremio(p: TransportStremioProps) {
   const [castModalOpen, setCastModalOpen] = useState(false);
   const [showRemaining, setShowRemaining] = useState(false);
   const [config, setConfig] = useState<PlayerChromeConfig>(() => readPlayerChromeConfig("stremio"));
-  const isLiveChannel = !!meta?.id?.startsWith("iptv:");
+  const isLiveChannel = isLivePlaybackSrc({ meta: meta ?? {}, isLive: p.isLive });
   const titleClickable = !!meta && !isLiveChannel;
   const { openMeta, exitPlayer } = usePlayerNavigation();
   const castModalPlay = useCastModalPlay();

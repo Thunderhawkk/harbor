@@ -1,3 +1,4 @@
+import { musicGenreName } from "@/lib/music/genre-catalog";
 import { useEffect, useMemo, useState } from "react";
 import { Dropdown } from "@/components/dropdown";
 import { Check, Search, X } from "@/components/icons/music-icons";
@@ -32,7 +33,7 @@ export function MusicGenreBrowser({ mode = "explore", selected, onSelect }: {
   const countryName = (code: string) => regions.of(code) ?? code;
   const countries = [...MUSIC_GENRE_COUNTRIES].sort((a, b) => countryName(a).localeCompare(countryName(b), language));
   useEffect(() => writeMusicPreference(`harbor.music.genres.${mode}.v1`, JSON.stringify(filters)), [filters, mode]);
-  const filtered = filterMusicGenres(MUSIC_GENRES, filters.query, filters.countries, filters.family, countryName)
+  const filtered = filterMusicGenres(MUSIC_GENRES, filters.query, filters.countries, filters.family, countryName, genre => musicGenreName(genre, t))
     .filter(genre => !selectedOnly || selected?.includes(genre.id));
   const change = (patch: Partial<Filters>) => setFilters(previous => ({ ...previous, ...patch }));
   const isFiltered = filters.query || filters.countries.length || filters.family || selectedOnly;
@@ -65,7 +66,7 @@ export function MusicGenreBrowser({ mode = "explore", selected, onSelect }: {
           aria-pressed={selected ? selected.includes(genre.id) : undefined} onClick={() => onSelect(genre)}>
           <img src={MUSIC_GENRE_ARTWORK[genre.id]} alt="" loading="lazy" decoding="async"/>
           <MusicDiscoveryIcon genreId={genre.id} />
-          <span className="music-genre-copy"><strong>{genre.name}</strong><small>{genre.countries.length ? genre.countries.slice(0, 2).map(countryName).join(" · ") : t("music.explore.global")}</small></span>
+          <span className="music-genre-copy"><strong>{musicGenreName(genre, t)}</strong><small>{genre.countries.length ? genre.countries.slice(0, 2).map(countryName).join(" · ") : t("music.explore.global")}</small></span>
           {selected && <span className="music-genre-check">{selected.includes(genre.id) && <Check size={15} aria-hidden />}</span>}
         </button>)}
       </div>

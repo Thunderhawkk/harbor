@@ -290,6 +290,18 @@ pub async fn pip_window_exit(
     Ok(())
 }
 
+/// Restore floating playback to Harbor and reveal its existing main window.
+#[tauri::command]
+pub async fn pip_window_restore(app: AppHandle, state: tauri::State<'_, PipWindowState>) -> Result<(), String> {
+    pip_window_exit(app.clone(), state).await?;
+    if let Some(main) = app.get_webview_window("main") {
+        main.show().map_err(|e| format!("show: {e}"))?;
+        main.unminimize().map_err(|e| format!("unminimize: {e}"))?;
+        main.set_focus().map_err(|e| format!("focus: {e}"))?;
+    }
+    Ok(())
+}
+
 /// Keeps the surface filling the frame while the viewer drags or resizes it.
 #[tauri::command]
 pub async fn pip_window_fit(

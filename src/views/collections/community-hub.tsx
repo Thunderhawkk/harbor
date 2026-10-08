@@ -1,5 +1,5 @@
 import { ArrowLeft, BookmarkPlus, Check, GalleryVerticalEnd, Plus, RefreshCw, Users } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useScrollMemory, useView } from "@/lib/view";
 import { BackToTop } from "@/components/back-to-top";
@@ -20,8 +20,6 @@ import {
 } from "@/lib/collections";
 import { useCurrentHandle } from "./community-share-button";
 import {
-  COMMUNITY_COLLECTIONS_EVENT,
-  fetchCommunityCollections,
   notifyCommunityChanged,
   publishCollections,
   type CommunityCollection,
@@ -30,6 +28,7 @@ import { purgeCollectionFromPages } from "@/lib/page-collection-rows";
 import { CommunityCollectionCard } from "./community-collection-card";
 import { CommunityCollectionEditor } from "./community-editor";
 import { CommunityCollectionPage } from "./community-collection-page";
+import { useCommunityCollections } from "./use-community-collections";
 
 type Screen =
   | { kind: "grid" }
@@ -39,43 +38,50 @@ type Screen =
 
 export function CommunityCollectionsView({ active }: { active: boolean }) {
   const [screen, setScreen] = useState<Screen>({ kind: "grid" });
-
-  if (screen.kind === "editor") {
-    return (
-      <CommunityCollectionEditor
-        id={screen.id}
-        onBack={() => setScreen({ kind: "grid" })}
-        onViewPage={(id) => setScreen({ kind: "page", id })}
-      />
-    );
-  }
-
-  if (screen.kind === "page") {
-    return (
-      <CommunityCollectionPage
-        id={screen.id}
-        onBack={() => setScreen({ kind: "grid" })}
-        onEdit={(id) => setScreen({ kind: "editor", id })}
-      />
-    );
-  }
-
-  if (screen.kind === "community") {
-    return (
-      <CommunityDetail
-        collection={screen.collection}
-        onBack={() => setScreen({ kind: "grid" })}
-      />
-    );
-  }
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const open = (next: Screen) => {
+    if (screen.kind === "grid") returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setScreen(next);
+  };
+  const back = () => setScreen({ kind: "grid" });
+  useEffect(() => {
+    if (!active || screen.kind !== "grid" || !returnFocus.current) return;
+    const frame = requestAnimationFrame(() => {
+      returnFocus.current?.focus({ preventScroll: true });
+      returnFocus.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [active, screen.kind]);
 
   return (
-    <HubGrid
-      active={active}
-      onOpen={(id) => setScreen({ kind: "page", id })}
-      onEdit={(id) => setScreen({ kind: "editor", id })}
-      onOpenCommunity={(collection) => setScreen({ kind: "community", collection })}
-    />
+    <>
+      <HubGrid
+        active={active && screen.kind === "grid"}
+        onOpen={(id) => open({ kind: "page", id })}
+        onEdit={(id) => open({ kind: "editor", id })}
+        onOpenCommunity={(collection) => open({ kind: "community", collection })}
+      />
+      {screen.kind === "editor" && (
+        <CommunityCollectionEditor
+          id={screen.id}
+          onBack={back}
+          onViewPage={(id) => setScreen({ kind: "page", id })}
+        />
+      )}
+      {screen.kind === "page" && (
+        <CommunityCollectionPage
+          id={screen.id}
+          onBack={back}
+          onEdit={(id) => setScreen({ kind: "editor", id })}
+        />
+      )}
+      {screen.kind === "community" && (
+        <CommunityDetail
+          collection={screen.collection}
+          onBack={back}
+        />
+      )}
+    </>
   );
 }
 
@@ -94,35 +100,16 @@ function HubGrid({
   const collections = useCollections();
   const scrollRef = useRef<HTMLElement>(null);
   useScrollMemory("collections-hub", scrollRef, active);
-  const [community, setCommunity] = useState<CommunityCollection[] | null>(null);
-  const [communityFailed, setCommunityFailed] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadCommunity = useCallback((signal?: AbortSignal) => {
-    setRefreshing(true);
-    return fetchCommunityCollections(signal)
-      .then((list) => {
-        setCommunity(list);
-        setCommunityFailed(false);
-      })
-      .catch(() => {
-        if (signal?.aborted) return;
-        setCommunityFailed(true);
-        setCommunity((prev) => prev ?? []);
-      })
-      .finally(() => setRefreshing(false));
-  }, []);
-
+  const { collections: community, loading, failed, loaded, hasMore, loadMore, refresh, retry } = useCommunityCollections(active);
+  const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const ctrl = new AbortController();
-    void loadCommunity(ctrl.signal);
-    const onChanged = () => void loadCommunity();
-    window.addEventListener(COMMUNITY_COLLECTIONS_EVENT, onChanged);
-    return () => {
-      ctrl.abort();
-      window.removeEventListener(COMMUNITY_COLLECTIONS_EVENT, onChanged);
-    };
-  }, [loadCommunity]);
+    if (!active || !hasMore || loading || failed || !sentinel.current) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMore();
+    }, { root: scrollRef.current, rootMargin: "0px 0px 600px 0px" });
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [active, hasMore, loading, failed, loadMore, community.length]);
 
   const atMax = collections.length >= MAX_COLLECTIONS;
 
@@ -143,6 +130,7 @@ function HubGrid({
   return (
     <main
       ref={scrollRef}
+      style={active ? undefined : { display: "none" }}
       className="flex-1 overflow-y-auto px-5 pt-24 pb-20 sm:px-8 lg:px-12 lg:pt-28"
     >
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-10">
@@ -164,7 +152,7 @@ function HubGrid({
             type="button"
             onClick={create}
             disabled={atMax}
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-accent px-5 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-semibold text-canvas transition-opacity duration-200 ease-out hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={17} strokeWidth={2.4} />
             {t("New collection")}
@@ -206,36 +194,24 @@ function HubGrid({
             <h2 className="text-[16px] font-semibold text-ink">{t("From the community")}</h2>
             <button
               type="button"
-              onClick={() => void loadCommunity()}
-              disabled={refreshing}
+              onClick={() => void refresh()}
+              disabled={loading}
               aria-label={t("Refresh")}
               className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
             >
               <RefreshCw
                 size={14}
                 strokeWidth={2.2}
-                className={refreshing ? "animate-spin" : ""}
+                className={loading ? "animate-spin motion-reduce:animate-none" : ""}
               />
               {t("Refresh")}
             </button>
           </div>
-          {community === null ? (
+          {!loaded && !failed ? (
             <CommunityLoading />
-          ) : communityFailed ? (
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-edge-soft bg-canvas/40 px-8 py-14 text-center">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-elevated/60 text-ink-subtle ring-1 ring-edge-soft/60">
-                <Users size={24} strokeWidth={1.6} />
-              </span>
-              <p className="font-display text-[19px] font-medium text-ink">
-                {t("Community collections are coming soon")}
-              </p>
-              <p className="max-w-md text-[13.5px] leading-relaxed text-ink-muted">
-                {t("Shared collections from across Harbor will show up here soon.")}
-              </p>
-            </div>
-          ) : community.length === 0 ? (
+          ) : loaded && community.length === 0 && !failed ? (
             <CommunityEmpty />
-          ) : (
+          ) : community.length > 0 ? (
             <div
               className="grid gap-5"
               style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}
@@ -247,6 +223,27 @@ function HubGrid({
                   onOpen={onOpenCommunity}
                 />
               ))}
+            </div>
+          ) : null}
+          {failed && (
+            <div role="status" className="flex flex-wrap items-center justify-center gap-3 py-5 text-[14px] text-ink-muted">
+              <p>{t("collections.feed.error")}</p>
+              <button type="button" onClick={() => void retry()} className="min-h-11 rounded-lg bg-elevated px-5 font-semibold text-ink hover:bg-elevated-hover focus-visible:outline-2 focus-visible:outline-ink">
+                {t("Retry")}
+              </button>
+            </div>
+          )}
+          {loaded && (hasMore || loading) && !failed && (
+            <div ref={sentinel} className="flex min-h-14 items-center justify-center" aria-live="polite">
+              {loading ? (
+                <span role="status" className="inline-flex items-center gap-2 text-[13px] text-ink-muted">
+                  <RefreshCw size={14} className="animate-spin motion-reduce:animate-none" />{t("Loading...")}
+                </span>
+              ) : (
+                <button type="button" onClick={() => void loadMore()} className="min-h-11 rounded-lg px-5 text-[13px] text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
+                  {t("collections.feed.more")}
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -272,7 +269,7 @@ function EmptyCollections({ onCreate }: { onCreate: () => void }) {
       <button
         type="button"
         onClick={onCreate}
-        className="mt-1 inline-flex h-11 items-center gap-2 rounded-full bg-accent px-6 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
+        className="mt-1 inline-flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-[13px] font-semibold text-canvas transition-opacity duration-200 ease-out hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Plus size={17} strokeWidth={2.2} />
         {t("New collection")}
@@ -377,10 +374,10 @@ function SaveCollectionButton({ collection }: { collection: CommunityCollection 
         if (!saved) saveCommunityCollection(collection);
       }}
       disabled={saved}
-      className={`inline-flex h-11 items-center gap-2 rounded-full px-5 text-[14px] font-semibold transition-transform duration-200 ${
+      className={`inline-flex h-11 items-center gap-2 rounded-full px-5 text-[13px] font-semibold transition-opacity duration-200 ease-out ${
         saved
           ? "cursor-default border border-edge-soft bg-elevated/60 text-ink-muted"
-          : "bg-accent text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:scale-[1.03] active:scale-[0.98]"
+          : "bg-ink text-canvas hover:opacity-90"
       }`}
     >
       {saved ? (

@@ -35,6 +35,7 @@ import { PlaylistVodIcon } from "@/components/icons/playlist-vod-icon";
 import { SettingsIcon } from "@/components/icons/settings-icon";
 import { TvIcon } from "@/components/icons/tv-icon";
 import { DownloadsNavIcon } from "@/chrome/downloads-nav-icon";
+import { GamesNavIcon } from "@/components/icons/games-nav-icon";
 import type { LockableTab } from "@/lib/parental";
 import type { View } from "@/lib/view";
 
@@ -60,6 +61,7 @@ export type NavItemId =
   | "movies"
   | "shows"
   | "music"
+  | "games"
   | "kids"
   | "anime"
   | "manga"
@@ -197,6 +199,12 @@ const NAV_ITEMS_ALL: NavItem[] = [
     view: "music",
   },
   {
+    id: "games",
+    label: "nav.games",
+    render: (_active, hovered) => <GamesNavIcon hovered={hovered} />,
+    view: "games",
+  },
+  {
     id: "live",
     label: "nav.live",
     render: (active, hovered) => (
@@ -297,12 +305,16 @@ const NAV_ITEMS_ALL: NavItem[] = [
 ];
 
 export const NAV_ITEMS: NavItem[] = NAV_ITEMS_ALL;
+export const GAMES_IN_NAV = true;
+
 export function useAvailableNavItems(): NavItem[] {
   const sportsEnabled = useSportsEnabled();
   const pluginCatalogs = usePluginCataloguesAvailable();
   return NAV_ITEMS.filter(
     (item) =>
-      (item.id !== "sports" || sportsEnabled) && (item.id !== "plugins" || pluginCatalogs),
+      (item.id !== "sports" || sportsEnabled) &&
+      (item.id !== "plugins" || pluginCatalogs) &&
+      (item.id !== "games" || GAMES_IN_NAV),
   );
 }
 

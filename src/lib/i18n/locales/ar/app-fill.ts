@@ -1342,6 +1342,7 @@ const appFill: Record<string, string> = {
     "يجري إغلاق Harbor. سيُنهي Harbor Setup التثبيت ثم يعيد فتحه.",
   "Harbor Setup did not finish updating Harbor. Nothing was changed.":
     "لم يُكمل Harbor Setup تحديث Harbor. لم يتغيّر شيء.",
+  "Dismiss": "تجاهل",
 };
 
 export default appFill;

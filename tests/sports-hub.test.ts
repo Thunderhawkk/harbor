@@ -8,6 +8,18 @@ import {
   type SportsSnapshot,
 } from "../src/lib/sports/hub-cache.ts";
 import { diverseEvents, featuredEvents } from "../src/lib/sports/hub-discovery.ts";
+import { fetchHubSlice, HUB_LEAGUES } from "../src/lib/sports/hub-data.ts";
+import {
+  esportsOffseasonGames,
+  esportsRailGames,
+  esportsRailMatches,
+  selectedEsportsFeeds,
+} from "../src/lib/sports/esports-match-rail.ts";
+import type {
+  EsportsFeed,
+  EsportsGameId,
+  EsportsMatch,
+} from "../src/lib/sports/esports-feeds.ts";
 import { parseEvents } from "../src/lib/sports/espn-parse.ts";
 import { parseDotaMatches } from "../src/lib/sports/opendota.ts";
 import { twitchEmbedUrl } from "../src/lib/sports/broadcasts.ts";
@@ -22,6 +34,30 @@ const game = (id: string, league = "EPL"): SportsGame => ({
   detail: "",
   home: { id: "1", name: "Home", abbr: "HOM", logo: "", score: "", winner: false },
   away: { id: "2", name: "Away", abbr: "AWY", logo: "", score: "", winner: false },
+});
+const ESPORTS_NOW = Date.UTC(2026, 8, 30, 12);
+const ESPORTS_TITLES: EsportsGameId[] = ["cs2", "dota2", "lol", "rocketleague", "valorant"];
+const esportsKeys = () =>
+  HUB_LEAGUES.filter((league) => league.group === "esports").map((league) => league.key);
+const esMatch = (id: string, game: EsportsGameId, event = "Tournament"): EsportsMatch => ({
+  id,
+  game,
+  state: "upcoming",
+  startMs: ESPORTS_NOW + 3_600_000,
+  event: { id, name: event },
+  teams: [
+    { id: "a", name: "Alpha" },
+    { id: "b", name: "Bravo" },
+  ],
+  streams: [],
+  sourceUrl: "https://example.com/match",
+});
+const esFeed = (game: EsportsGameId, matches: EsportsMatch[]): EsportsFeed => ({
+  game,
+  matches,
+  status: "ready",
+  fetchedAt: ESPORTS_NOW,
+  source: { name: "Fixture", url: "https://example.com" },
 });
 const def = (key: string, group: string): LeagueDef => ({
   key,
@@ -218,4 +254,49 @@ test("official-service suggestions are not misrepresented as this event's listed
   const listed = watchProviders({ ...game("nba", "NBA"), broadcasts: ["ESPN"] });
   assert(listed.find((provider) => provider.id === "espn")?.listed);
   assert.equal(listed.find((provider) => provider.id === "nba")?.listed, false);
+});
+
+test("every esports title the hub offers can reach the rail", () => {
+  // A hub key with no game mapping is exactly how CS2 and VALORANT stayed invisible.
+  for (const key of esportsKeys()) assert.equal(esportsRailGames([key])?.length, 1, key);
+  assert.deepEqual([...new Set(esportsRailGames(esportsKeys()))].sort(), ESPORTS_TITLES);
+});
+test("a full esports selection keeps every title on the rail", () => {
+  const feeds = [
+    esFeed("dota2", [esMatch("d1", "dota2")]),
+    esFeed("cs2", [esMatch("c1", "cs2")]),
+    esFeed("valorant", [esMatch("v1", "valorant")]),
+    esFeed("lol", [esMatch("l1", "lol", "EMEA MASTERS · Playoffs")]),
+    esFeed("rocketleague", [esMatch("r1", "rocketleague")]),
+  ];
+  const rail = esportsRailMatches(selectedEsportsFeeds(feeds, esportsKeys()), ESPORTS_NOW);
+  assert.deepEqual([...new Set(rail.map((match) => match.game))].sort(), ESPORTS_TITLES);
+});
+test("a chosen LoL split narrows the feed, and a week without it keeps the game", () => {
+  const names = (feeds: EsportsFeed[]) => feeds[0].matches.map((match) => match.event.name);
+  const lol = (leagues: string[]) =>
+    esFeed(
+      "lol",
+      leagues.map((league, i) => esMatch(`l${i}`, "lol", `${league} · Playoffs`)),
+    );
+  assert.deepEqual(names(selectedEsportsFeeds([lol(["EMEA MASTERS", "CBLOL"])], ["LCK"])), [
+    "EMEA MASTERS · Playoffs",
+    "CBLOL · Playoffs",
+  ]);
+  assert.deepEqual(names(selectedEsportsFeeds([lol(["LCK", "LEC", "LCK Challengers"])], ["LCK"])), [
+    "LCK · Playoffs",
+  ]);
+});
+test("a healthy empty esports feed reads as a season break, not an outage", () => {
+  const empty = esFeed("rocketleague", []);
+  const live = esFeed("cs2", [esMatch("c1", "cs2")]);
+  assert.deepEqual(esportsOffseasonGames([empty, live]), ["rocketleague"]);
+  assert.deepEqual(esportsOffseasonGames([{ ...empty, status: "unavailable" }]), []);
+  assert.deepEqual(esportsOffseasonGames([{ ...empty, partial: true }]), []);
+});
+test("a rail-only esports title requests no day schedule", async () => {
+  for (const key of ["CS2", "VALORANT"]) {
+    const slice = await fetchHubSlice(`${key}@20260930@day`, new AbortController().signal);
+    assert.deepEqual(slice, [], key);
+  }
 });

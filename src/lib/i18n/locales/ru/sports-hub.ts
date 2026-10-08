@@ -1,4 +1,5 @@
 export default {
+  "No videos found.": "Видео не найдены.",
   "sports.guide.athletes": "Спортсмены",
   "sports.guide.athlete": "Спортсмен",
   "sports.guide.athleteCount": "Спортсменов: {n}",

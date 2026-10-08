@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Poster } from "@/components/poster";
+import { CustomArtwork } from "@/components/custom-artwork";
 import type { Meta } from "@/lib/cinemeta";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { bpBoxPx, bpCardArt, bpViewportWidth, type BpArtBox } from "./bp-art";
@@ -111,7 +112,7 @@ export function BpIntro({ pool, leaving }: { pool: Meta[]; leaving: boolean }) {
       />
 
       <div className="relative flex h-full flex-col items-center justify-center gap-[clamp(28px,4.5vh,64px)]">
-        <BpIntroMark settled={handoff.current} />
+        <CustomArtwork role="launch" className="h-[min(22vh,200px)] w-[min(24vw,200px)]" fallback={<BpIntroMark settled={handoff.current} />} />
         <BpIntroSpinner settled={handoff.current} />
       </div>
     </div>

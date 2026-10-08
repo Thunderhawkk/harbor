@@ -1,5 +1,5 @@
 import {createSpooktoberEnvironment} from './native-environment.js';
-import {startSpooktoberRuntime} from './native-runtime.js?v=8dce91cf1cac';
+import {startSpooktoberRuntime} from './native-runtime.js?v=1f87a4b3cd8a';
 const fonts=new Map();
 const mounts=new WeakMap();
 async function loadFonts(records){await Promise.all(records.map(async record=>{const key=JSON.stringify(record);if(!fonts.has(key)){const font=new FontFace(record.family,record.source,record.descriptors);fonts.set(key,font.load().then(value=>document.fonts.add(value)).catch(()=>null))}await fonts.get(key)}))}

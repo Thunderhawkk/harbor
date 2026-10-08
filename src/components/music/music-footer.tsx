@@ -5,6 +5,14 @@ import { APP_VERSION, BUILD_LABEL } from "@/lib/build-info";
 import { useT } from "@/lib/i18n";
 import type { MusicConnection, MusicConnectionStatus } from "@/lib/music/types";
 import { useView } from "@/lib/view";
+import { openUrl } from "@/lib/window";
+
+const LEGAL_TERMS = [
+  { name: "Spotify", href: "https://www.spotify.com/legal/end-user-agreement/" },
+  { name: "YouTube", href: "https://www.youtube.com/t/terms" },
+  { name: "Deezer", href: "https://www.deezer.com/legal/cgu" },
+  { name: "Apple", href: "https://www.apple.com/legal/internet-services/itunes/" },
+];
 
 const PANEL = "border-t border-edge-soft pt-5 pb-6";
 
@@ -174,38 +182,21 @@ export function MusicFooter({ className = "" }: { className?: string }) {
           <button type="button" onClick={() => openSettings("licenses")} className="underline">
             {t("music.legal.readFull")}
           </button>
-          <a
-            href="https://www.spotify.com/legal/end-user-agreement/"
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            Spotify
-          </a>
-          <a
-            href="https://www.youtube.com/t/terms"
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            YouTube
-          </a>
-          <a
-            href="https://www.deezer.com/legal/cgu"
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            Deezer
-          </a>
-          <a
-            href="https://www.apple.com/legal/internet-services/itunes/"
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            Apple
-          </a>
+          {LEGAL_TERMS.map((term) => (
+            <a
+              key={term.href}
+              href={term.href}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+              onClick={(event) => {
+                event.preventDefault();
+                openUrl(term.href);
+              }}
+            >
+              {term.name}
+            </a>
+          ))}
         </div>
       </details>
       <details>

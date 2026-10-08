@@ -390,14 +390,16 @@ export function createBoxingScheduleLoader(read: TextLoader, now = Date.now) {
   };
 }
 const load = createBoxingScheduleLoader(async (url, signal) => {
-  const { safeFetch } = await import("@/lib/safe-fetch");
+  const { safeFetchBytes } = await import("@/lib/safe-fetch");
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal.addEventListener("abort", abort, { once: true });
   if (signal.aborted) abort();
   const timer = setTimeout(abort, 9000);
   try {
-    const response = await safeFetch(url, { signal: controller.signal });
+    // Background schedule reads must stay bounded and never open a source-check window.
+    // Capped native requests return blocked responses without invoking the visible solver.
+    const response = await safeFetchBytes(url, { signal: controller.signal }, 9000, 1_000_000);
     if (!response.ok) throw new Error(`Boxing schedule ${response.status}`);
     const html = await response.text();
     if (html.length > 1_000_000) throw new Error("Boxing schedule too large");

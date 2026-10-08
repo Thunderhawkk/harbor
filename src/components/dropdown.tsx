@@ -2,9 +2,10 @@ import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { advanceFocus } from "@/lib/keyboard-navigation";
+import { pushBackHandler } from "@/lib/back-intercept";
 import { getDirection, isBackKey } from "@/lib/keyboard-navigation/geometry";
 
-export type DropdownOption = { value: string; label: string; left?: ReactNode };
+export type DropdownOption = { value: string; label: string; left?: ReactNode; dir?: "ltr" | "rtl" | "auto" };
 
 const MENU_MAX = 320;
 const GAP = 6;
@@ -56,6 +57,9 @@ export function Dropdown({
 
   useEffect(() => {
     if (!open) return;
+    // The shell handles Back before window key listeners. Give this open menu
+    // priority so keyboard/controller Back cannot also leave the current page.
+    const removeBack = pushBackHandler(() => { close(true); return true; });
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
       if (ref.current?.contains(t) || listRef.current?.contains(t)) return;
@@ -70,6 +74,7 @@ export function Dropdown({
     document.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKey, true);
     return () => {
+      removeBack();
       document.removeEventListener("mousedown", onDown);
       window.removeEventListener("keydown", onKey, true);
     };
@@ -191,7 +196,7 @@ export function Dropdown({
           className={`flex min-w-0 items-center gap-2 ${selected ? "text-ink" : "text-ink-subtle"}`}
         >
           {selected?.left}
-          <span className="truncate">{selected?.label ?? placeholder ?? ""}</span>
+          <span className="truncate" dir={selected?.dir} title={selected?.dir ? selected.label : undefined}>{selected?.label ?? placeholder ?? ""}</span>
         </span>
         <span
           ref={chevRef}
@@ -251,7 +256,7 @@ export function Dropdown({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     {o.left}
-                    <span className="truncate">{o.label}</span>
+                    <span className="truncate" dir={o.dir} title={o.dir ? o.label : undefined}>{o.label}</span>
                   </span>
                   {active && (
                     <Check size={15} strokeWidth={2.4} className="animate-badge-pop shrink-0" />

@@ -138,10 +138,11 @@ async function fetchAnilistBrowse(sort: string, count: number): Promise<Meta[]> 
         BROWSE_QUERY,
         { page: i + 1, perPage, sort: [sort], isAdult: false },
         undefined,
-        false,
+        true,
       ).catch(() => null),
     ),
   );
+  if (responses.every(data => !data?.Page)) throw new Error("AniList discovery unavailable");
   const all: AnilistMedia[] = [];
   const seenId = new Set<number>();
   for (const data of responses) {

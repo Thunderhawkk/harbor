@@ -404,7 +404,7 @@ const catalog05: Record<string, string> = {
     "Metoda ręczna wymaga {code} 20+ oraz interfejsu CLI {code}.",
   "For users who want to deploy themselves or already have a wrangler workflow.":
     "Dla użytkowników, którzy chcą przeprowadzić wdrożenie samodzielnie lub już korzystają z procesu opartego na wrangler.",
-  "For watching things": "Do oglądania",
+  "Built for Adventure!": "Stworzony do przygody!",
   "Force of Nature": "Siła natury",
   "Force on": "Wymuś włączenie",
   "Force player menus and panels to pure black, ignoring your theme tint.":

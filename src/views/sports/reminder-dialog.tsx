@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { ModalShell } from "@/components/modal-shell";
 import { useT } from "@/lib/i18n";
+import { useSectionBack } from "@/lib/section-back";
 import "./reminder-modal.css";
 
 /** The reminder editor is a separate overlay, even when opened from an event dialog. */
@@ -13,6 +14,7 @@ export function ReminderDialog({
   children: ReactNode;
 }) {
   const t = useT();
+  useSectionBack(onClose, true, true);
   const titleId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {

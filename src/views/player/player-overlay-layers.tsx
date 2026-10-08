@@ -12,6 +12,7 @@ import type { ParentalCategory } from "@/lib/providers/harbor-imdb";
 import type { PlayerBridge, PlayerSnapshot } from "@/lib/player/bridge";
 import { writePlayerPrefs } from "@/lib/player-prefs";
 import type { PlayerSrc, PlayEpisode } from "@/lib/view";
+import { isLivePlaybackSrc } from "@/lib/player/live-src";
 import { BpTenFootLayer } from "./bp-ten-foot";
 import { CastLayer } from "./cast-layer";
 import { DragClickStage } from "./drag-click-stage";
@@ -353,6 +354,7 @@ export const PlayerOverlayLayers = memo(function PlayerOverlayLayers(p: PlayerOv
         <ShellLayer
           shellId={p.playerShellId}
           shellSnap={p.shellSnap}
+          isLive={isLivePlaybackSrc(p.src)}
           snapRef={p.snapRef}
           bridgeRef={p.bridgeRef}
           engine={p.engine}

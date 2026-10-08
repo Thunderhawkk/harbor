@@ -431,7 +431,7 @@ const misc: Record<string, string> = {
     "Thư viện Stremio và tiện ích bổ sung của bạn được đồng bộ nguyên vẹn.",
   "No telemetry, no servers, no bundled keys.":
     "Không thu thập dữ liệu từ xa, không máy chủ, không khóa đi kèm.",
-  "For watching things": "Để xem phim",
+  "Built for Adventure!": "Được tạo ra cho cuộc phiêu lưu!",
   "Hero, Top 10, Trending, In Theaters, per-service rails. Your addons append underneath.":
     "Nổi bật, Top 10, Thịnh hành, Đang chiếu rạp và các hàng theo từng dịch vụ. Tiện ích bổ sung của bạn sẽ được thêm bên dưới.",
   "Continue Watching, then your addon catalogs in install order. No hero, no Harbor rails.":

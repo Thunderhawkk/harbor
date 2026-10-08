@@ -60,12 +60,23 @@ const sectionDefinitions = [
     ['international', '08', '', 'Horror from around the world', 'International films.'],
     ['music', '09', '', 'Halloween songs', 'Listen to song previews.'],
     ['true-crime', '10', '', 'Reality is scarier than fiction', 'True-crime documentaries.'],
+    ['anime', '11', '', 'Anime after dark', 'Anime series & films.'],
 ];
 const POSTER_LABELS = { halloween: 'Slasher', shining: 'Psychological', thing: 'Sci-fi horror', psycho: 'Suspense', alien: 'Sci-fi horror', exorcist: 'Possession', dracula: 'Gothic novel', frankenstein: 'Gothic novel', uzumaki: 'Junji Ito', tomie: 'Junji Ito', gyo: 'Junji Ito', coraline: 'Stop-motion', 'hallow-eve': 'Anthology', backrooms: 'Horror', obsession: 'Horror', 'other-mommy': 'Oct 9', tt39143902: 'Horror' };
+function malScore(item) { return Number.isInteger(item.malId) && item.malId > 0 && Number.isFinite(item.malRating) && item.malRating > 0 && item.malRating <= 10 ? item.malRating.toFixed(2) : null; }
+function cardRatings(item) {
+    const imdb = item.imdbRating ? `<span class="media-rating imdb-rating"><img src="/spooktober/assets/services/imdb.svg" alt="IMDb" width="28" height="14"><span>${escape(item.imdbRating)}</span></span>` : '';
+    const mal = malScore(item);
+    if (!mal)
+        return imdb;
+    const entry = [item.malTitle || item.title, item.malYear].filter(Boolean).join(' · ');
+    const label = `MyAnimeList: ${mal} / 10 — ${entry}`;
+    return `<span class="media-ratings">${imdb}<span class="media-rating mal-rating" title="${escape(label + (item.malCheckedAt ? ' · Checked ' + item.malCheckedAt : ''))}"><img src="/spooktober/assets/services/myanimelist.svg" alt="MAL" width="30" height="12"><span>${mal}</span></span></span>`;
+}
 function card(item, decorated = false) {
     const label = decorated ? (item.shelfLabel || POSTER_LABELS[item.id] || (item.type === 'Music' ? Math.floor(item.duration / 60) + ':' + String(item.duration % 60).padStart(2, '0') : item.type === 'Manga' ? 'Manga' : item.type === 'Book' ? 'Book' : item.release?.includes('In theaters') ? 'In theaters' : item.genres?.[1] || item.genres?.[0] || item.type)) : '';
     const metadata = item.type === 'Music' ? item.creator : ([item.seasonLabel || displayYear(item), (item.runtime && !item.seasonLabel ? item.runtime + (item.type === 'Series' ? ' / ep.' : '') : '') || (item.type === 'Book' || item.type === 'Manga' ? item.creator : item.seasonLabel ? item.seasonYear : item.type)].filter(Boolean).join(' · '));
-    return `<button class="media-card ${item.type === 'Music' ? 'music-card' : ''}" data-item="${item.id}" aria-label="View ${escape(item.title)}, ${item.type}, ${item.year}"><span class="poster-mat"><span class="poster-wrap"><img src="${item.poster}" alt="" loading="lazy" width="320" height="480"></span>${label ? `<span class="poster-label ${item.type === 'Music' ? 'label-music' : ''}">${escape(label)}</span>` : ''}</span><span class="media-title">${escape(item.title)}</span><span class="media-meta" title="${escape(metadata)}">${escape(metadata)}</span>${decorated && item.imdbRating ? `<span class="media-rating imdb-rating"><img src="/spooktober/assets/services/imdb.svg" alt="IMDb" width="28" height="14"><span>${escape(item.imdbRating)}</span></span>` : ''}</button>`;
+    return `<button class="media-card ${item.type === 'Music' ? 'music-card' : ''}" data-item="${item.id}" aria-label="View ${escape(item.title)}, ${item.type}, ${item.year}${decorated && malScore(item) ? ', MyAnimeList ' + malScore(item) + ' out of 10 for ' + escape(item.malTitle || item.title) + (item.malYear ? ' ' + escape(item.malYear) : '') : ''}"><span class="poster-mat"><span class="poster-wrap"><img src="${item.poster}" alt="" loading="lazy" width="320" height="480"></span>${label ? `<span class="poster-label ${item.type === 'Music' ? 'label-music' : ''}">${escape(label)}</span>` : ''}</span><span class="media-title">${escape(item.title)}</span><span class="media-meta" title="${escape(metadata)}">${escape(metadata)}</span>${decorated ? cardRatings(item) : ''}</button>`;
 }
 function shelf(def) {
     const [id, n, kicker, title, description] = def;
@@ -77,7 +88,7 @@ function shelf(def) {
     const scenery = id === 'new' ? `<div class="shelf-garden" aria-hidden="true"><img class="garden-tree" src="${art('foreground-tree')}" alt=""><img class="garden-ghost" src="${art('ghost-float')}" alt=""><img class="garden-stone-front" src="${art('headstone-ornate')}" alt=""><img class="garden-grass" src="${art('grass-clump')}" alt=""></div>` : id === 'books' ? `<div class="reading-stone" aria-hidden="true"><img src="${art('headstone-cross')}" alt=""><img src="${art('grass-clump')}" alt=""></div>` : '';
     return `<section id="section-${id}" class="shelf scene ${id === 'cozy' ? 'cozy-shelf' : ''}" data-section="${id}" tabindex="-1" aria-labelledby="heading-${id}">
    
-   <div class="section-top"><div class="section-heading"><img class="collection-icon" src="/spooktober/assets/icons/${({ classics: 'midnight-film', new: 'candle', series: 'ghost-tv', books: 'haunted-book', manga: 'ink-eye', cozy: 'candy', modern: 'moon', international: 'ink-eye', music: 'haunted-record', 'true-crime': 'case-file', gotham: 'moon' })[id]}.svg" alt=""><div><h2 id="heading-${id}">${title}</h2><p>${id === 'music' ? selected.length + (isHarborEmbedded ? ' songs. Play in Harbor.' : ' songs. Listen to previews.') : id === 'manga' ? selected.length + ' titles to discover.' : id === 'true-crime' ? selected.length + ' documentaries and docuseries.' : description}</p></div></div>${sectionAction(id)}</div></div>
+   <div class="section-top"><div class="section-heading"><img class="collection-icon" src="/spooktober/assets/icons/${({ classics: 'midnight-film', new: 'candle', series: 'ghost-tv', books: 'haunted-book', manga: 'ink-eye', cozy: 'candy', modern: 'moon', anime: 'anime-spirit', international: 'ink-eye', music: 'haunted-record', 'true-crime': 'case-file', gotham: 'moon' })[id]}.svg" alt=""><div><h2 id="heading-${id}">${title}</h2><p>${id === 'music' ? selected.length + (isHarborEmbedded ? ' songs. Play in Harbor.' : ' songs. Listen to previews.') : id === 'manga' ? selected.length + ' titles to discover.' : id === 'true-crime' ? selected.length + ' documentaries and docuseries.' : id === 'anime' ? selected.length + ' anime series &amp; films.' : description}</p></div></div>${sectionAction(id)}</div></div>
    ${id === 'new' ? '<div class="new-release-layout">' : ''}${railMarkup(selected.map(i => card(i, true)).join(''), title, 'media-row', id === 'new' ? 'garden-rail' : '')}
    ${scenery}${id === 'new' ? '</div>' : ''}
  </section>`;
@@ -85,7 +96,7 @@ function shelf(def) {
 let observer;
 function render() {
     observer?.disconnect();
-    $('#collections').innerHTML = formatDoorways() + shelf(sectionDefinitions[0]) + shudderShelf(screening, railMarkup) + shelf(sectionDefinitions[1]) + mastersMarkup(railMarkup) + '<div id="editorial-mount"></div>' + shelf(sectionDefinitions[6]) + '<div id="spotlight-mount"></div>' + shelf(sectionDefinitions[7]) + '<div id="horror-paths-mount"></div><div id="encounter-mount"></div>' + shelf(sectionDefinitions[5]) + '<div id="twilight-mount"></div>' + shelf(sectionDefinitions[2]) + shelf(sectionDefinitions[9]) + `<div class="reading-pair">${shelf(sectionDefinitions[3])}${shelf(sectionDefinitions[4])}</div>` + musicWorld(screening, railMarkup) + playlistMarkup(items, railMarkup) + shelf(sectionDefinitions[8]) + (isHalloweenNight() ? shelf(HALLOWEEN_NIGHT_SECTION) : '');
+    $('#collections').innerHTML = formatDoorways() + shelf(sectionDefinitions[0]) + shudderShelf(screening, railMarkup) + shelf(sectionDefinitions[1]) + mastersMarkup(railMarkup) + '<div id="editorial-mount"></div>' + shelf(sectionDefinitions[6]) + shelf(sectionDefinitions[10]) + '<div id="spotlight-mount"></div>' + shelf(sectionDefinitions[7]) + '<div id="horror-paths-mount"></div><div id="encounter-mount"></div>' + shelf(sectionDefinitions[5]) + '<div id="twilight-mount"></div>' + shelf(sectionDefinitions[2]) + shelf(sectionDefinitions[9]) + `<div class="reading-pair">${shelf(sectionDefinitions[3])}${shelf(sectionDefinitions[4])}</div>` + musicWorld(screening, railMarkup) + playlistMarkup(items, railMarkup) + shelf(sectionDefinitions[8]) + (isHalloweenNight() ? shelf(HALLOWEEN_NIGHT_SECTION) : '');
     initWatchers();
     initRails();
     initShudderArt();
@@ -370,7 +381,7 @@ async function init() {
 }
 init();
 async function loadExpandedShelves() {
-    const results = await Promise.allSettled(['halloween-song-shelf.json?v=d497a9c2d0', 'manga-expanded.json?v=ce72547fad', 'horror-paths.json?v=2cb40c0307', 'series-features.json?v=7b424912e4', 'new-releases-expanded.json?v=63a5ce1cac', 'international-expanded.json?v=289531393b', 'reading-cozy-expanded.json?v=977871a4ca', 'screen-shelves-expanded.json?v=99cceb7688', 'true-crime-expanded.json?v=6ccc45d52c'].map(async (file) => { const r = await fetch(file); if (!r.ok)
+    const results = await Promise.allSettled(['halloween-song-shelf.json?v=d497a9c2d0', 'manga-expanded.json?v=ce72547fad', 'horror-paths.json?v=2cb40c0307', 'series-features.json?v=7b424912e4', 'new-releases-expanded.json?v=63a5ce1cac', 'international-expanded.json?v=289531393b', 'reading-cozy-expanded.json?v=977871a4ca', 'screen-shelves-expanded.json?v=99cceb7688', 'true-crime-expanded.json?v=6ccc45d52c', 'anime-expanded.json?v=465221f3ac'].map(async (file) => { const r = await fetch(file); if (!r.ok)
         throw Error(file); return r.json(); }));
     results.forEach((result, index) => {
         if (result.status !== 'fulfilled')
@@ -547,6 +558,7 @@ const JUMP_SECTIONS = [
     ['New & coming soon', '#section-new', 'candle'],
     ['Shudder picks', '#section-shudder', 'midnight-film'],
     ['Masters of horror', '#masters-world', 'moon'],
+    ['Anime', '#section-anime', 'anime-spirit'],
     ['Playlists', '.playlist-world', 'haunted-record', 'playlist-heading'],
     ['True crime', '#section-true-crime', 'case-file'],
     ['Go deeper', '.horror-paths', 'path-folk-horror', 'horror-paths-heading'],

@@ -464,6 +464,8 @@ const player: Record<string, string> = {
   "Couldn't restart the streaming server.": "ストリーミングサーバーを再起動できませんでした。",
   "The streaming server didn't come back up.": "ストリーミングサーバーが復帰しませんでした。",
   "Streaming server restarted.": "ストリーミングサーバーを再起動しました。",
+  "Search audio language": "音声の言語を検索",
+  "No audio track in that language.": "その言語の音声トラックはありません。",
 };
 
 export default player;

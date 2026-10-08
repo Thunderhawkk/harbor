@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source not "../tests";
 
 @font-face {
   font-family: "WonderfulFontyCure";
@@ -475,6 +476,11 @@ main[data-kids="on"]::-webkit-scrollbar-thumb:hover {
     background: none;
     border: 0;
     outline: none;
+  }
+
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
   }
 
   img {
@@ -4164,6 +4170,7 @@ html:not([data-input-modality="pointer"])
       .hset-title[tabindex="-1"],
       .music-library-playlist-hero[tabindex="-1"],
       [data-search-overlay] input,
+      .music-genre-search input,
       [data-plugins-search] input
     )
   ) {
@@ -4184,7 +4191,11 @@ html:not([data-input-modality="pointer"])
    Derived from each theme's own --color-canvas via color-mix so they adapt per theme.
    Canvas/bokeh page background is intentionally left untouched. Opaque themes
    (flat/crunch/noir/velvet) and the already-handled stremio/minui are not affected. */
-html[data-theme-card="glass"] {
+/* These must match ELEMENTS, not html: applyTheme writes the theme tokens as inline
+   styles on the root, and a style attribute outranks any author rule on that element.
+   Scoped to popover roots so ordinary page cards keep the glass look. */
+html[data-theme-card="glass"]
+  :is(.harbor-profile-dropdown, .animate-popover-in, .animate-menu-pop, [role="menu"]) {
   --color-surface: color-mix(in srgb, var(--color-canvas) 91%, white);
   --color-elevated: color-mix(in srgb, var(--color-canvas) 85%, white);
   --color-raised: color-mix(in srgb, var(--color-canvas) 79%, white);
@@ -4380,6 +4391,8 @@ html[data-theme-card="crunch"][dir="rtl"] .harbor-profile-dropdown {
 .harbor-row-shell {
   content-visibility: auto;
   contain-intrinsic-size: auto 280px;
+  /* Paint containment must leave room for the outset arrows and card hovers. */
+  overflow-clip-margin: 64px;
 }
 .harbor-preview-img {
   background-color: var(--color-raised);

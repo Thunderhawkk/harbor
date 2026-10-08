@@ -6,6 +6,7 @@ import { loadGenreArtistRoster } from "./genre-artist-roster";
 import { readMadeForYouShelf } from "./made-for-you";
 import { rankMixArtists, type MixTaste } from "./made-for-you-selection";
 import { mixRecordings } from "./mix-quality";
+import { playlistNeighbours } from "./playlist-neighbours";
 import { filterBlockedTracks } from "./artist-blocks";
 import { shuffleSurprise } from "./surprise-selection";
 import { musicTrackIdentity } from "./track-identity";
@@ -25,20 +26,44 @@ export function createSurpriseCatalog(taste: MixTaste, genres: readonly number[]
   const currentKeys = new Set(current.map(artist => artist.key));
   const starters = [...current, ...shuffleSurprise(anchors.filter(artist => !currentKeys.has(artist.key))).slice(0, 8)];
   const pending: Artist[] = shuffleSurprise(starters).map(artist => ({ name: artist.name, ref: artist.ref, seed: artist.seeds[0], neighbours: true }));
+  // Anchors seed the mix; they must never monopolise it, so artists one hop away queue
+  // separately and are drawn first once any are known.
+  const discovered: Artist[] = [];
+  const heard = new Set([...clean.recents, ...clean.liked, ...clean.library].map(dailyArtistKey));
+  for (const ref of taste.followed) heard.add(artistIdentityKey(ref.name));
   const queued = new Set(pending.map(artist => artistIdentityKey(artist.name)));
   const pool = new Map<string, MusicTrack>();
   const tasteGenres = shuffleSurprise([...new Set(genres)]);
   const offsets = new Map<number, number | null>();
-  let genreCursor = 0, warmed = false;
-  const add = (tracks: readonly MusicTrack[]) => {
-    for (const track of allowedSurpriseTracks(tracks)) pool.set(musicTrackIdentity(track), track);
-    while (pool.size > 800) pool.delete(pool.keys().next().value!);
+  let genreCursor = 0, warmed = false, rounds = 0;
+  // Breadth beats depth: one catalogue cannot take more than its share of the pool, or a
+  // single prolific anchor evicts every neighbour before it can be picked.
+  const depth = new Map<string, number>();
+  const drop = (id: string) => {
+    const track = pool.get(id);
+    if (!track) return;
+    pool.delete(id);
+    const key = dailyArtistKey(track), left = (depth.get(key) ?? 1) - 1;
+    if (left > 0) depth.set(key, left); else depth.delete(key);
   };
-  const enqueue = (artists: Artist[]) => {
+  const add = (tracks: readonly MusicTrack[]) => {
+    for (const track of allowedSurpriseTracks(tracks)) {
+      const id = musicTrackIdentity(track);
+      if (pool.has(id)) continue;
+      const key = dailyArtistKey(track);
+      if ((depth.get(key) ?? 0) >= 5) continue;
+      pool.set(id, track);
+      depth.set(key, (depth.get(key) ?? 0) + 1);
+    }
+    while (pool.size > 800) drop(pool.keys().next().value!);
+  };
+  const enqueue = (artists: Artist[], lane: Artist[]) => {
     for (const artist of artists) {
       const key = artistIdentityKey(artist.name);
-      if (!key || queued.has(key) || pending.length >= 72) continue;
-      queued.add(key); pending.push(artist);
+      if (!key || queued.has(key) || lane.length >= 72) continue;
+      // A neighbour already on repeat is not a discovery, and the anchors already cover it.
+      if (lane === discovered && heard.has(key)) continue;
+      queued.add(key); lane.push(artist);
     }
   };
   const fetchArtist = async (artist: Artist) => {
@@ -55,7 +80,13 @@ export function createSurpriseCatalog(taste: MixTaste, genres: readonly number[]
     if (signal.aborted) return;
     const related = rows.flatMap(row => row.id === "artist:related" || row.title === "music.detail.relatedArtists"
       ? row.items.filter((item): item is MusicArtistRef & { kind: "artist" } => item.kind === "artist") : []);
-    enqueue(shuffleSurprise(related).slice(0, 8).map(ref => ({ name: ref.name, ref, neighbours: false })));
+    enqueue(shuffleSurprise(related).slice(0, 8).map(ref => ({ name: ref.name, ref, neighbours: false })), discovered);
+    // Who the wider public files alongside this artist, asked for whenever the mix is
+    // running low on somewhere new to go.
+    if (discovered.length >= 12) return;
+    const shared = await playlistNeighbours(ref.name, signal).catch(() => []);
+    if (signal.aborted) return;
+    enqueue(shared.slice(0, 8).map(ref => ({ name: ref.name, ref, neighbours: false })), discovered);
   };
   return {
     async warm() {
@@ -67,7 +98,7 @@ export function createSurpriseCatalog(taste: MixTaste, genres: readonly number[]
     async expand() {
       if (signal.aborted) return;
       // Selected genres can broaden the taste, but never substitute an unrelated generic chart.
-      if (tasteGenres.length && pending.length < 4 && (genreCursor < tasteGenres.length || !pending.length)) {
+      if (tasteGenres.length && !discovered.length && !pending.length) {
         const genre = tasteGenres[genreCursor++ % tasteGenres.length];
         const offset = offsets.get(genre) ?? 0;
         if (offsets.get(genre) !== null) {
@@ -75,19 +106,27 @@ export function createSurpriseCatalog(taste: MixTaste, genres: readonly number[]
           if (signal.aborted) return;
           if (page) {
             offsets.set(genre, page.next);
-            enqueue(shuffleSurprise(page.artists).slice(0, 6).map(ref => ({ name: ref.name, ref, neighbours: false })));
+            enqueue(shuffleSurprise(page.artists).slice(0, 6).map(ref => ({ name: ref.name, ref, neighbours: false })), discovered);
           }
         }
       }
-      if (!pending.length && anchors.length) {
+      if (!pending.length && !discovered.length && anchors.length) {
         // Revisit trusted artists after catalog exhaustion; the session's recent-history window
         // still excludes repeats and allows a long-running session to discover later releases.
         queued.clear();
-        enqueue(shuffleSurprise(anchors).map(artist => ({ name: artist.name, ref: artist.ref, seed: artist.seeds[0], neighbours: true })));
+        enqueue(shuffleSurprise(anchors).map(artist => ({ name: artist.name, ref: artist.ref, seed: artist.seeds[0], neighbours: true })), pending);
       }
-      await Promise.all(pending.splice(0, 2).map(fetchArtist));
+      // Mostly neighbours, with a fresh anchor every third round so the mix keeps opening
+      // new neighbourhoods instead of draining the first one it found. Two artists at a time.
+      const next = shuffleSurprise(discovered.splice(0, discovered.length));
+      const batch = !next.length || rounds % 3 === 0 ? pending.splice(0, 1) : [];
+      batch.push(...next.splice(0, 2 - batch.length));
+      if (batch.length < 2) batch.push(...pending.splice(0, 2 - batch.length));
+      discovered.push(...next);
+      rounds += 1;
+      await Promise.all(batch.map(fetchArtist));
     },
     candidates() { return allowedSurpriseTracks([...pool.values()]); },
-    consume(tracks: readonly MusicTrack[]) { for (const track of tracks) pool.delete(musicTrackIdentity(track)); },
+    consume(tracks: readonly MusicTrack[]) { for (const track of tracks) drop(musicTrackIdentity(track)); },
   };
 }

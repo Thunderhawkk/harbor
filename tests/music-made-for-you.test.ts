@@ -35,6 +35,7 @@ function api(options: { outage?: boolean; sparse?: boolean; metadataOnly?: boole
     "./made-for-you-selection": ranking,
     "./mix-quality": quality,
     "./track-identity": { musicTrackIdentity },
+    "./made-for-you-genres": { loadMadeForYouGenres: async () => [] },
   };
   const module = { exports: {} };
   new Function("require", "module", "exports", code)((id: string) => { assert.ok(id in mocks, id); return mocks[id]; }, module, module.exports);
@@ -87,6 +88,18 @@ test("same-day cache, duplicate requests and reopening preserve queues without p
   assert.deepEqual(await music.readMadeForYouMix(a[0].id, "me"), a[0]);
   assert.equal(queries(), before);
   assert.equal(await music.readMadeForYouMix(a[0].id, "other-profile"), null);
+});
+
+test("adding genre shelves to an older daily snapshot preserves its existing queues and IDs", async () => {
+  const { music, saved, queries } = api();
+  const previous = await music.loadMadeForYou(taste(), day, "me");
+  const snapshot = Object.values(saved)[0][0];
+  delete snapshot.genres;
+  assert.deepEqual(await music.readMadeForYouShelf(day, "me", true), []);
+  const before = queries();
+  assert.deepEqual(await music.loadMadeForYou(taste(), day, "me"), previous);
+  assert.equal(queries(), before);
+  assert.deepEqual(await music.readMadeForYouShelf(day, "me", true), previous);
 });
 
 test("daily refresh rotates actual recordings and profile caches are separate", async () => {

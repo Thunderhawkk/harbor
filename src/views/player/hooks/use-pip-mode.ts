@@ -20,6 +20,7 @@ export function usePipMode(params: {
   // Detached moves the live surface into its own window; resize shrinks Harbor itself.
   const detached = settings.pipBehavior === "native";
   const [pipMode, setPipMode] = useState(false);
+  const nativeDetached = useRef(false);
   const setChromeHiddenRef = useRef(setChromeHidden);
   setChromeHiddenRef.current = setChromeHidden;
 
@@ -66,12 +67,14 @@ export function usePipMode(params: {
       // player closes back to whatever the viewer was on.
       const onDetachedEntered = makeSafeTauriUnlisten(
         await listen("pip://detached-entered", () => {
+          nativeDetached.current = true;
           setPipMode(true);
           onDetachRef.current?.();
         }),
       );
       const onDetachedExited = makeSafeTauriUnlisten(
         await listen("pip://detached-exited", () => {
+          nativeDetached.current = false;
           setPipMode(false);
           onReattachRef.current?.();
           kickLayout();
@@ -105,6 +108,10 @@ export function usePipMode(params: {
       unlistenDetached = [];
       unlistenEntered = null;
       unlistenExited = null;
+      if (nativeDetached.current) {
+        nativeDetached.current = false;
+        void import("@tauri-apps/api/core").then(({ invoke }) => invoke("pip_window_exit")).catch(() => {});
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -120,7 +127,7 @@ export function usePipMode(params: {
       if (pipMode) {
         setPipMode(false);
         setChromeHidden(false);
-        await invoke(detached ? "pip_window_exit" : "window_pip_exit");
+        await invoke(nativeDetached.current ? "pip_window_exit" : "window_pip_exit");
       } else {
         if (document.fullscreenElement) {
           await document.exitFullscreen().catch(() => {});
@@ -141,7 +148,7 @@ export function usePipMode(params: {
     setChromeHidden(false);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke(detached ? "pip_window_exit" : "window_pip_exit");
+      await invoke(nativeDetached.current ? "pip_window_exit" : "window_pip_exit");
     } catch {}
   }, [pipMode, setChromeHidden, detached]);
 

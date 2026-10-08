@@ -160,30 +160,30 @@ html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-c
   background: transparent !important;
 }
 
-html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) {
+html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) {
   margin: 0 !important;
   padding: 70px 12px 40px !important;
   background-color: #fdefe0 !important;
   background-image: none !important;
 }
 
-html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])) ~ *:not([class~="fixed"]), html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])) {
+html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])) ~ *:not([class~="fixed"]), html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])) {
   padding-inline: 20px;
 }
 
-html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])) {
+html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])) {
   padding-top: 0;
 }
 
-html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])):has(> :first-child:not([class*="-mx-"]):not([class*="absolute"])) {
+html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])):has(> :first-child:not([class*="-mx-"]):not([class*="absolute"])) {
   padding-top: 30px;
 }
 
-html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-last-child(1 of :not([class~="fixed"])) {
+html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-last-child(1 of :not([class~="fixed"])) {
   padding-bottom: 44px;
 }
 
-html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])):nth-last-child(1 of :not([class~="fixed"])) {
+html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])):nth-last-child(1 of :not([class~="fixed"])) {
   min-height: 100%;
 }
 
@@ -209,7 +209,7 @@ html::before {
 }
 
 @media (min-width: 1024px) {
-  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) {
+  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) {
     padding-inline: 36px !important;
     scrollbar-gutter: stable !important;
     background-color: transparent !important;
@@ -226,23 +226,23 @@ html::before {
     background-repeat: no-repeat, no-repeat !important;
   }
 
-  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])) ~ *:not([class~="fixed"]), html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])) {
+  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])) ~ *:not([class~="fixed"]), html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])) {
     padding-inline: 48px;
   }
 
-  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-child(1 of :not([class~="fixed"])) {
+  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-child(1 of :not([class~="fixed"])) {
     overflow: clip;
   }
 
-  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page])::-webkit-scrollbar {
+  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main)::-webkit-scrollbar {
     width: 8px !important;
   }
 
-  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) {
+  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) {
     padding-bottom: 0 !important;
   }
 
-  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]) > :nth-last-child(1 of :not([class~="fixed"])) {
+  html:not([data-mpv-embed="1"]):not([data-big-picture="true"]):not([data-player-chrome-mounted]) main:not(.fixed):not([data-live-page]):not(.hset-main) > :nth-last-child(1 of :not([class~="fixed"])) {
     padding-bottom: 56px;
     border-bottom: 2px solid #e3c9ae;
     border-end-start-radius: 14px;
@@ -271,17 +271,14 @@ html[data-chrome-hidden] body::after {
   display: none !important;
 }
 
-[data-harbor-sidebar] {
+aside[data-harbor-sidebar] {
   background-color: var(--kw-stripe-a) !important;
   background-image: repeating-linear-gradient(90deg, var(--kw-stripe-a) 0 24px, var(--kw-stripe-b) 24px 48px) !important;
   border-inline-end: 2px solid #e3c9ae !important;
 }
 
-nav[data-harbor-sidebar][data-tv-scroll-focus]::after {
-  display: none !important;
-}
 
-[data-harbor-sidebar]::after {
+aside[data-harbor-sidebar]::after {
   content: "";
   position: absolute;
   top: 0;
@@ -710,11 +707,11 @@ input[type="radio"] {
 }
 
 .harbor-settings-shell .hset-tools,
-.harbor-settings-shell .hset-sidebar {
+.harbor-settings-shell .hset-rail {
   background-color: #fbe6d3 !important;
 }
 
-.harbor-settings-shell .hset-sidebar {
+.harbor-settings-shell .hset-rail {
   border-inline-end: 2px solid #e6d2bd !important;
 }
 

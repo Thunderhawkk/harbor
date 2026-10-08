@@ -52,11 +52,18 @@ export function GamepadRunner() {
   capturedRef.current = captured;
   axes.current = live.axes;
 
+  // Mirroring every :hover rule means walking every rule in every stylesheet. These styles
+  // only do anything once a pad is driving hover, and re-running the walk per inserted
+  // <style> made it quadratic while the app was still loading its sheets.
+  const padConnected = pads.length > 0;
   useEffect(() => {
+    if (!padConnected) return;
     const style = document.createElement("style");
     style.setAttribute("data-gamepad-hover-styles", "");
     document.head.appendChild(style);
+    let frame = 0;
     const apply = () => {
+      frame = 0;
       style.textContent = Array.from(document.styleSheets)
         .filter((sheet) => sheet.ownerNode !== style)
         .map((sheet) => {
@@ -68,14 +75,18 @@ export function GamepadRunner() {
         })
         .join("");
     };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(apply);
+    };
     apply();
-    const observer = new MutationObserver(apply);
+    const observer = new MutationObserver(schedule);
     observer.observe(document.head, { childList: true });
     return () => {
+      cancelAnimationFrame(frame);
       observer.disconnect();
       style.remove();
     };
-  }, []);
+  }, [padConnected]);
 
   useEffect(() => {
     if (pads.length === 0) {

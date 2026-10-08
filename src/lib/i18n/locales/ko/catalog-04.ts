@@ -296,7 +296,7 @@ const catalog04: Record<string, string> = {
   "For the manual path: {code} 20+ and {code} CLI.": "수동 방식: {code} 20 이상 및 {code} CLI.",
   "For users who want to deploy themselves or already have a wrangler workflow.":
     "직접 배포하거나 이미 wrangler 워크플로를 사용하는 사용자를 위한 방법입니다.",
-  "For watching things": "감상 중심",
+  "Built for Adventure!": "모험을 위해 만들어졌습니다!",
   "Force of Nature": "자연의 힘",
   "Force on": "강제로 켜기",
   "Force player menus and panels to pure black, ignoring your theme tint.":

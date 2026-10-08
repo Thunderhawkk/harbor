@@ -319,29 +319,46 @@ async function localPackage(path: string): Promise<EpubBook> {
   return pending;
 }
 
+// Libraries are filed Author/Book/Book.epub as often as they are flat, and a single
+// pass over the chosen folder found neither. Walk down instead, with a cap so a
+// symlink loop or a whole drive cannot turn a scan into an endless one.
+const LOCAL_SCAN_MAX_DEPTH = 6;
+const LOCAL_SCAN_MAX_DIRS = 4000;
+
+const byName = (a: { name: string }, b: { name: string }) =>
+  a.name.localeCompare(b.name, undefined, { numeric: true });
+
 async function scanLocalBooks(
   source: EBookSource,
 ): Promise<Map<string, { title: string; paths: string[] }>> {
   const { readDir } = await import("@tauri-apps/plugin-fs");
-  const entries = await readDir(source.location);
   const books = new Map<string, { title: string; paths: string[] }>();
-  for (const item of entries.sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true }),
-  )) {
-    const path = await localJoin(source.location, item.name);
-    if (item.isFile && /\.epub$/i.test(item.name))
-      books.set(path, { title: localTitle(item.name), paths: [path] });
-    if (!item.isDirectory) continue;
-    const files = await readDir(path).catch(() => []);
-    const epubs = files
-      .filter((file) => file.isFile && /\.epub$/i.test(file.name))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    if (epubs.length)
-      books.set(path, {
-        title: localTitle(item.name),
-        paths: await Promise.all(epubs.map((file) => localJoin(path, file.name))),
+  let visited = 0;
+
+  const walk = async (dir: string, name: string, depth: number) => {
+    if (depth > LOCAL_SCAN_MAX_DEPTH || visited >= LOCAL_SCAN_MAX_DIRS) return;
+    visited += 1;
+    const entries = (await readDir(dir).catch(() => [])).sort(byName);
+    const epubs = entries.filter((item) => item.isFile && /\.epub$/i.test(item.name));
+    if (!name)
+      // A book folder is one entry however many volumes it holds, but loose files at the
+      // top of the library are each their own book.
+      for (const file of epubs) {
+        const path = await localJoin(dir, file.name);
+        books.set(path, { title: localTitle(file.name), paths: [path] });
+      }
+    else if (epubs.length)
+      books.set(dir, {
+        title: localTitle(name),
+        paths: await Promise.all(epubs.map((file) => localJoin(dir, file.name))),
       });
-  }
+    for (const item of entries) {
+      if (!item.isDirectory) continue;
+      await walk(await localJoin(dir, item.name), item.name, depth + 1);
+    }
+  };
+
+  await walk(source.location, "", 0);
   localBooks.set(source.id, books);
   return books;
 }

@@ -189,6 +189,7 @@ export function MusicMast({
         </button>
         <input
           ref={inputRef}
+          data-music-mast-search
           value={query}
           onChange={(event) => {
             setQuery(event.currentTarget.value);

@@ -16,6 +16,7 @@ import {
   type PollResult,
 } from "./device-auth";
 import { getSession, setSession, subscribeSession } from "./session";
+import { subscribeSecretsReady } from "@/lib/secret-store";
 import { stremioIdToTraktTarget, type TraktEpisodeRef } from "./ids";
 import { commitPlaybackState, commitWatchedEpisode } from "./resolve";
 import { armOnlineFlush, flushPendingStops, recordPendingStop } from "./pending-sync";
@@ -63,6 +64,10 @@ export function TraktProvider({ children }: { children: ReactNode }) {
       }),
     [],
   );
+
+  // The persisted store loads after this mounts, so the first read can miss a
+  // connected account. Re-read once it is in memory.
+  useEffect(() => subscribeSecretsReady(() => setLocalSession(getSession())), []);
 
   useEffect(() => {
     return () => {

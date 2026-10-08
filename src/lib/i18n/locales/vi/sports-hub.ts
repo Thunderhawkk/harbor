@@ -1,4 +1,5 @@
 export default {
+  "No videos found.": "Không tìm thấy video.",
   "sports.guide.athletes": "Vận động viên",
   "sports.guide.athlete": "Vận động viên",
   "sports.guide.athleteCount": "{n} vận động viên",

@@ -13,7 +13,7 @@ import { useKnobAnim } from "@/lib/knob-anim";
 import { advanceFocus } from "@/lib/keyboard-navigation";
 import { getDirection, isRtl } from "@/lib/keyboard-navigation/geometry";
 import { openUrl } from "@/lib/window";
-import { sourceTranslationKey, useT } from "@/lib/i18n";
+import { sourceTranslationKey, useT, useUiLanguage } from "@/lib/i18n";
 import { HoverPreviewCard } from "./setting-preview";
 import { NewBadge } from "./new-badge";
 
@@ -653,6 +653,7 @@ export function Segmented<T extends string>({
   sub?: string;
 }) {
   const t = useT();
+  const language = useUiLanguage();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const thumbRef = useRef<HTMLSpanElement | null>(null);
@@ -699,7 +700,7 @@ export function Segmented<T extends string>({
         { duration: 320, easing: "ease-in-out" },
       );
     }
-  }, [activeIndex, options.length]);
+  }, [activeIndex, options.length, language]);
 
   useEffect(() => {
     const wrap = wrapRef.current;

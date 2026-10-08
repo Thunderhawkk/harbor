@@ -174,7 +174,7 @@ const misc: Record<string, string> = {
   Font: "Fuente",
   "For now, please open this site on a desktop, or build Harbor from source.":
     "Por ahora, abre este sitio en una computadora o compila Harbor desde el código fuente.",
-  "For watching things": "Para ver contenido",
+  "Built for Adventure!": "¡Hecho para la aventura!",
   "found by": "encontrado por",
   France: "Francia",
   "Free key unlocks Trending, In Theaters, and per-service catalogs. 60 seconds.":

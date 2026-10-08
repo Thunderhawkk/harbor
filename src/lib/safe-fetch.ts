@@ -62,6 +62,8 @@ function countCrossing(kind: BridgeKind, url: string): void {
 const DIRECT_HOSTS = new Set(["torrentio.strem.fun", "stremio.torbox.app"]);
 
 const PROXY_HOSTS = new Set([
+  "jikanfortheweebs.midnightignite.me",
+  "mcp-api.op.gg",
   "v3-cinemeta.strem.io",
   "opensubtitles-v3.strem.io",
   "opensubtitles.strem.io",
@@ -79,11 +81,35 @@ const PROXY_HOSTS = new Set([
   "api.deepseek.com",
   "api.deezer.com",
   "api.igdb.com",
+  "api.steampowered.com",
   "images.igdb.com",
   "store.steampowered.com",
+  "steamcommunity.com",
+  "www.speedrun.com",
+  "partner.steamgames.com",
+  "help.steampowered.com",
+  "worldofwarcraft.blizzard.com",
+  "api.warframe.com",
+  "www.youtube.com",
+  "www.pcgamingwiki.com",
+  "kick.com",
+  "prosettings.net",
   "cdn.cloudflare.steamstatic.com",
 ]);
 const DEV_PROXY_HOSTS = new Set([
+  "mcp-api.op.gg",
+  "worldofwarcraft.blizzard.com",
+  "api.warframe.com",
+  "www.youtube.com",
+  "www.pcgamingwiki.com",
+  "kick.com",
+  "prosettings.net",
+  "api.steampowered.com",
+  "store.steampowered.com",
+  "steamcommunity.com",
+  "www.speedrun.com",
+  "partner.steamgames.com",
+  "help.steampowered.com",
   "graphql.anilist.co",
   "openlibrary.org",
   "covers.openlibrary.org",
@@ -176,7 +202,14 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 function base64ToBytes(value: string): Uint8Array {
   const binary = atob(value);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  // Every image crosses the native bridge through here, so this runs while rows are
+  // scrolling into view. Uint8Array.from with a callback pays an iterator step and a JS
+  // call per byte; writing straight into the buffer does the same work far cheaper.
+  const size = binary.length;
+  // Backed by a concrete ArrayBuffer so the result stays usable as a Response body.
+  const bytes = new Uint8Array(new ArrayBuffer(size));
+  for (let i = 0; i < size; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 async function invokeHarborFetch(
@@ -270,7 +303,9 @@ async function tauriHarborFetch(
     resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
   );
   if (resp.url) responseHeaders.set(FINAL_URL_HEADER, resp.url);
-  return new Response(responseType === "base64" ? base64ToBytes(resp.body) : resp.body, {
+  const bodyless = init?.method?.toUpperCase() === "HEAD" || [204, 205, 304].includes(resp.status);
+  const body = bodyless ? null : responseType === "base64" ? base64ToBytes(resp.body) : resp.body;
+  return new Response(body, {
     status: resp.status,
     headers: responseHeaders,
   });

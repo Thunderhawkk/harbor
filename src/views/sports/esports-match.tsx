@@ -1,13 +1,13 @@
 import { fetchDotaBroadcasts } from "@/lib/sports/esports-dota-broadcasts";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
-import { ArrowRight, ExternalLink, Play, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, Play, X } from "lucide-react";
 import { ModalShell } from "@/components/modal-shell";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 import type { EsportsMatch } from "@/lib/sports/esports-feeds";
 import { ESPORTS_GAMES } from "@/lib/sports/esports-catalog";
 import { esportsExternalUrl, type EsportsStream } from "@/lib/sports/esports-streams";
-import type { SportsGame } from "@/lib/sports/espn";
+import { esportsSportsGame } from "@/lib/sports/esports-sports-game";
 import { EsportsImage } from "./esports-image";
 import { EsportsMap } from "./esports-map";
 import { SportsAddonSources } from "./addon-source-panel";
@@ -21,58 +21,33 @@ const TeamDialog = lazy(() =>
 );
 import { EsportsCsRoster } from "./esports-cs-roster";
 import { fetchCsMatchDetail } from "@/lib/sports/esports-cs-detail";
+import { useScrollMemory } from "@/lib/view";
+import { BackToTop } from "@/components/back-to-top";
 
-export function esportsSportsGame(match: EsportsMatch): SportsGame {
-  const side = (index: number) => ({
-    id: match.teams[index].id,
-    name: match.teams[index].name,
-    abbr: match.teams[index].code || match.teams[index].name,
-    logo: match.teams[index].logo || "",
-    score: match.teams[index].score?.toString() || "",
-    winner: match.teams[index].winner || false,
-  });
-  return {
-    id: match.id,
-    league: {
-      dota2: "DOTA2",
-      lol: "LOL",
-      valorant: "VALORANT",
-      cs2: "CS2",
-      rocketleague: "RLCS",
-    }[match.game],
-    source: match.game === "dota2" ? "opendota" : "esports-arena",
-    state: match.state === "live" ? "in" : match.state === "recent" ? "post" : "pre",
-    startMs: match.startMs,
-    detail: match.event.stage || "",
-    home: side(0),
-    away: side(1),
-    context: {
-      id: match.event.id,
-      name: match.event.name,
-      round: match.event.stage || "",
-      venue: "",
-      draw: "",
-      major: false,
-    },
-  };
-}
 
 export function EsportsMatchView({
   match,
   onClose,
   onWatch,
   portalTarget,
+  page = false,
+  shellBackAvailable = false,
 }: {
   match: EsportsMatch;
   onClose: () => void;
   onWatch: (stream: EsportsStream) => void;
   onTeam?: (id: number) => void;
   portalTarget?: Element;
+  page?: boolean;
+  shellBackAvailable?: boolean;
 }) {
   const t = useT();
   const locale = useUiLanguage();
   const id = useId();
   const close = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const scroll = useRef<HTMLElement>(null);
+  useScrollMemory(`sports-event:${match.game}:${match.id}`, scroll, page);
   const trigger = useRef(document.activeElement as HTMLElement | null);
   const def = ESPORTS_GAMES.find((game) => game.id === match.game)!;
   const game = esportsSportsGame(match);
@@ -127,34 +102,31 @@ export function EsportsMatchView({
     match.teams[1].name,
   ]);
   useEffect(() => {
-    close.current?.focus();
+    if (page) heading.current?.focus({ preventScroll: true });
+    else close.current?.focus();
     return () => {
-      if (trigger.current?.isConnected) trigger.current.focus({ preventScroll: true });
+      if (!page && trigger.current?.isConnected) trigger.current.focus({ preventScroll: true });
     };
   }, []);
   useEffect(() => {
-    if (accountId === null) close.current?.focus();
+    if (accountId === null) {
+      if (page) heading.current?.focus({ preventScroll: true });
+      else close.current?.focus();
+    }
   }, [accountId]);
   if (accountId !== null)
     return <EsportsPlayerProfile accountId={accountId} onClose={() => setAccountId(null)} />;
-  return (
-    <ModalShell
-      closing={false}
-      onDismiss={onClose}
-      labelledBy={id}
-      width={1050}
-      portalTarget={portalTarget}
-      backdropClassName={portalTarget ? "broadcast-match-details" : undefined}
-    >
-      <div className="ea-dialog-head">
+  const Heading = page ? "h1" : "h2";
+  const content = <>
+      <div className={page ? "sh-event-page-heading" : "ea-dialog-head"}>
         <div>
           <span className="ea-kicker">{def.name}</span>
-          <h2 id={id}>{match.event.name}</h2>
+          <Heading ref={heading} tabIndex={page ? -1 : undefined} id={id}>{match.event.name}</Heading>
           <p>{match.event.stage}</p>
         </div>
-        <button ref={close} className="sh-icon" aria-label={t("Close")} onClick={onClose}>
+        {!page && <button ref={close} className="sh-icon" aria-label={t("Close")} onClick={onClose}>
           <X size={20} />
-        </button>
+        </button>}
       </div>
       <div className="ea-match-detail">
         <div className="ea-detail-versus">
@@ -286,6 +258,13 @@ export function EsportsMatchView({
           />
         )}
       </Suspense>
-    </ModalShell>
-  );
+    </>;
+  return page ? <main ref={scroll} className="sh-match-page sh-event-page" aria-labelledby={id}>
+    <header className="sh-match-header">
+      {!shellBackAvailable && <button ref={close} className="sh-button" onClick={onClose}><ArrowLeft size={18} />{t("Back")}</button>}
+      <span>{def.name}</span>
+    </header>
+    <div className="sh-event-page-body">{content}</div>
+    <BackToTop scrollRef={scroll} onReturnToTop={() => heading.current?.focus({ preventScroll: true })} />
+  </main> : <ModalShell closing={false} onDismiss={onClose} labelledBy={id} width={1050} portalTarget={portalTarget} backdropClassName={portalTarget ? "broadcast-match-details" : undefined}>{content}</ModalShell>;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { PlayerBridge } from "@/lib/player/bridge";
 import { cloudWriteId } from "@/lib/stremio";
-import { isResumeStartReady, resolveStartMs } from "@/lib/player/resume-start";
+import { resolveStartMs } from "@/lib/player/resume-start";
 import type { PlayerSrc } from "@/lib/view";
 import { videoIdFor } from "./use-stremio-sync";
 import { useSettings } from "@/lib/settings";
@@ -29,6 +29,8 @@ export function useBridgeLoad(params: {
   acknowledgeResume: (action: "resume" | "start-over") => void;
   pendingSeekSec: number | null;
   clearPendingSeek: () => void;
+  sourceKey: string;
+  resumeReady: boolean;
 } {
   const {
     bridgeRef,
@@ -53,8 +55,10 @@ export function useBridgeLoad(params: {
   const firstLoadRef = useRef(true);
   const [pendingResumeSec, setPendingResumeSec] = useState<number | null>(null);
   const [pendingSeekSec, setPendingSeekSec] = useState<number | null>(null);
+  const [readyLoadKey, setReadyLoadKey] = useState<string | null>(null);
   const ackRef = useRef<((action: "resume" | "start-over") => void) | null>(null);
   const sourceIdentity = playerLoadIdentity(src, transcodedUrl ?? src.url, season, episode);
+  const sourceKey = `${bridgeKey}|${sourceIdentity}`;
 
   useEffect(() => {
     const sessionId = src.proxySessionId;
@@ -70,11 +74,12 @@ export function useBridgeLoad(params: {
     const bridge = bridgeRef.current;
     if (!bridge) return;
     const playUrl = transcodedUrl ?? src.url;
-    const loadKey = `${bridgeKey}|${sourceIdentity}`;
+    const loadKey = sourceKey;
     if (lastLoadedUrlRef.current === loadKey) return;
-    lastLoadedUrlRef.current = loadKey;
+    setPendingResumeSec(null);
+    setPendingSeekSec(null);
+    ackRef.current = null;
     const isFirstLoad = firstLoadRef.current;
-    firstLoadRef.current = false;
     const isAutoRetry = (src.attempt ?? 0) > 0;
     const isLive = isLivePlaybackSrc(src);
     let cancelled = false;
@@ -99,32 +104,14 @@ export function useBridgeLoad(params: {
             episode,
             openingVid,
           });
-      const loadMedia = () =>
-        bridge.load({
-          url: playUrl,
-          traceId: src.playbackTraceId,
-          startupProfile: playbackStartupProfile(src.streamRef),
-          subtitles: src.subtitles,
-          notWebReady: src.notWebReady,
-          isLive,
-          headers: src.headers,
-        });
       let resolved: Awaited<typeof resumePromise>;
       try {
-        const waitBeforeLoad =
-          shouldResolveResume && !!authKey && !isResumeStartReady(resumeIdentity);
-        if (waitBeforeLoad) {
-          resolved = await resumePromise;
-          if (cancelled) return;
-          await loadMedia();
-        } else {
-          [resolved] = await Promise.all([resumePromise, loadMedia()]);
-        }
+        resolved = await resumePromise;
       } catch (e) {
-        if (cancelled) return;
-        console.warn("[player] load failed", e);
+        if (!cancelled) console.warn("[player] resume lookup failed", e);
         return;
       }
+      if (cancelled) return;
       const startMs = src.startPositionMs ?? resolved.ms;
       const runtimeMin = src.episode?.runtime ?? null;
       const durationMs = runtimeMin && runtimeMin > 0 ? runtimeMin * 60_000 : 0;
@@ -136,8 +123,10 @@ export function useBridgeLoad(params: {
       // progress when opening an item normally.
       const hasExplicitStart = src.startPositionMs != null;
       const startSec =
-        (hasExplicitStart ? startMs : !resumePlaybackRef.current || finishedNearEnd ? 0 : startMs) /
-        1000;
+        isLive || src.startFromZero
+          ? 0
+          : (hasExplicitStart ? startMs : !resumePlaybackRef.current || finishedNearEnd ? 0 : startMs) /
+            1000;
       const guestInRoom = inRoomRef.current && !isHostRef.current;
       const eligibleForPrompt =
         isFirstLoad &&
@@ -146,7 +135,27 @@ export function useBridgeLoad(params: {
         resumePromptRef.current &&
         startSec > RESUME_PROMPT_MIN_SEC &&
         !guestInRoom;
+      try {
+        await bridge.load({
+          url: playUrl,
+          traceId: src.playbackTraceId,
+          startupProfile: playbackStartupProfile(src.streamRef),
+          subtitles: src.subtitles,
+          notWebReady: src.notWebReady,
+          isLive,
+          headers: src.headers,
+          // Supply resume to the initial load so mpv/HTML5 never start at zero
+          // while a later seek races automatic intro skipping.
+          startAtSec: !guestInRoom && !eligibleForPrompt && startSec > 5 ? startSec : undefined,
+        });
+      } catch (e) {
+        if (!cancelled) console.warn("[player] load failed", e);
+        return;
+      }
       if (cancelled) return;
+      lastLoadedUrlRef.current = loadKey;
+      firstLoadRef.current = false;
+      setReadyLoadKey(loadKey);
       if (eligibleForPrompt) {
         bridge.pause();
         setPendingResumeSec(startSec);
@@ -192,15 +201,22 @@ export function useBridgeLoad(params: {
     authKey,
   ]);
 
-  useEffect(() => {
-    lastLoadedUrlRef.current = null;
-  }, [bridgeKey]);
-
   const acknowledgeResume = (action: "resume" | "start-over") => {
     ackRef.current?.(action);
   };
 
   const clearPendingSeek = () => setPendingSeekSec(null);
 
-  return { pendingResumeSec, acknowledgeResume, pendingSeekSec, clearPendingSeek };
+  return {
+    pendingResumeSec: readyLoadKey === sourceKey ? pendingResumeSec : null,
+    acknowledgeResume,
+    pendingSeekSec: readyLoadKey === sourceKey ? pendingSeekSec : null,
+    clearPendingSeek,
+    sourceKey,
+    resumeReady:
+      bridgeReady &&
+      readyLoadKey === sourceKey &&
+      pendingResumeSec == null &&
+      pendingSeekSec == null,
+  };
 }

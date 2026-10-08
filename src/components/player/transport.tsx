@@ -1,4 +1,5 @@
 import { Settings2 } from "lucide-react";
+import { isLivePlaybackSrc } from "@/lib/player/live-src";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { PlayerCapabilities, PlayerSnapshot } from "@/lib/player/bridge";
 import type { SubtitleAddHandler } from "@/lib/player/subtitle-load";
@@ -33,6 +34,7 @@ import { useCastModalPlay } from "./use-cast-modal-play";
 // renders views/big-picture/player instead, so nothing here scales for ten feet.
 export function Transport({
   snap,
+  isLive,
   capabilities,
   visible,
   fullscreen,
@@ -97,6 +99,7 @@ export function Transport({
   homeServerQualityControl,
 }: {
   snap: PlayerSnapshot;
+  isLive?: boolean;
   capabilities: PlayerCapabilities;
   visible: boolean;
   fullscreen: boolean;
@@ -176,7 +179,7 @@ export function Transport({
   const [chromeConfig, setChromeConfig] = useState<PlayerChromeConfig>(() =>
     readPlayerChromeConfig("default"),
   );
-  const isLiveChannel = !!meta?.id?.startsWith("iptv:");
+  const isLiveChannel = isLivePlaybackSrc({ meta: meta ?? {}, isLive });
   const titleClickable = !!meta && !isLiveChannel;
   const { openMeta, exitPlayer } = usePlayerNavigation();
   const castModalPlay = useCastModalPlay();
@@ -227,6 +230,7 @@ export function Transport({
     return (
       <TransportStremio
         snap={snap}
+        isLive={isLiveChannel}
         capabilities={capabilities}
         visible={visible}
         fullscreen={fullscreen}

@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "Neuerer Jahrgang",
+  "music.xxl.older": "Älterer Jahrgang",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -379,6 +381,8 @@ const music: Record<string, string> = {
     "Füge unten aus den Listen einen gespeicherten oder kürzlich gespielten Titel hinzu.",
   "music.library.savedTracks": "Gespeicherte Titel",
   "music.library.readyForPlaylist": "Bereit zum Hinzufügen zu {name}",
+  "music.library.addTracks": "Titel hinzufügen",
+  "music.library.addTracksCount": "{count} bereit zum Hinzufügen",
   "music.library.permanent": "Deine dauerhafte Sammlung",
   "music.library.recent": "Zuletzt gespielt",
   "music.library.newestFirst": "Neueste Wiedergaben zuerst",
@@ -561,6 +565,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "Inhalt",
   "music.playlistTools.explicit": "Explizit",
   "music.playlistTools.clean": "Ohne explizite Inhalte",
+  "music.surprise.rate.title": "Wie ist dieser Mix?",
+  "music.surprise.rate.note": "{count} Songs bisher",
+  "music.surprise.rate.yes": "Gefällt mir",
+  "music.surprise.rate.no": "Nichts für mich",
+  "music.surprise.redirect.title": "Was möchtest du lieber hören?",
+  "music.surprise.redirect.note": "Wähle eine Richtung, dann startet der Mix neu.",
+  "music.surprise.redirect.more": "Weitere Genres",
+  "music.surprise.back": "Zurück",
   "music.surprise.title": "Überrasch mich",
   "music.surprise.stop": "Überrasch mich beenden",
   "music.surprise.body": "Neue Songs für dich, passend zu deinem Hörverhalten und deinen Playlists.",

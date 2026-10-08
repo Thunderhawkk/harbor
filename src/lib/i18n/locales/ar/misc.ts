@@ -893,7 +893,7 @@ const misc: Record<string, string> = {
     "تتزامن مكتبة Stremio وإضافاتك كما هي دون تغيير.",
   "No telemetry, no servers, no bundled keys.": "لا قياس عن بُعد، ولا خوادم، ولا مفاتيح مُضمَّنة.",
 
-  "For watching things": "لمشاهدة الأشياء",
+  "Built for Adventure!": "صُنع للمغامرة!",
 
   "Harbor curated": "اختيار Harbor",
   "Hero, Top 10, Trending, In Theaters, per-service rails. Your addons append underneath.":

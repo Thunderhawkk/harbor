@@ -114,3 +114,15 @@ crowdin_credentials.*
 gemini.key
 /.firecrawl
 /work
+!docs/games/*.md
+/docs/games
+
+# Games artwork: 8.6MB of static files referenced by URL, not imported, so ignoring
+# them cannot break a build. Source under src/assets/games stays tracked because it is imported.
+/public/games/
+
+# Built separately from pinned GPL sources; see tools/pokemon-engine/README.md.
+/src-tauri/resources/pokemon-engine/
+
+# Rotated dev-server logs: *.log covers dev.log but not its .prev rotation.
+dev.log*

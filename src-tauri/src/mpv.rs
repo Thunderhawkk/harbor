@@ -1129,7 +1129,8 @@ pub async fn mpv_start(
         }
     }
     let _ = mpv.set_property("sub-font-provider", "auto");
-    let _ = mpv.set_property("sub-font", "Noto Sans JP");
+    let _ = mpv.set_property("sub-font", "sans-serif");
+    let _ = mpv.set_property("sub-ass-shaper", "complex");
     let _ = mpv.set_property("embeddedfonts", "yes");
 
     if let Some(extra) = args.extra_options.as_deref() {
@@ -1708,6 +1709,11 @@ pub async fn mpv_set_geometry(
     _state: State<'_, MpvState>,
     geom: MpvGeometry,
 ) -> Result<(), String> {
+    // The detached window owns the live surface and resizes it through its own
+    // fit command. Late geometry updates from Harbor must not move that surface.
+    if app.state::<crate::pip_window::PipWindowState>().active.load(std::sync::atomic::Ordering::SeqCst) {
+        return Ok(());
+    }
     #[cfg(windows)]
     {
         let embedded = {
@@ -3267,7 +3273,7 @@ fn position_embedded_mpv_child(app: &AppHandle, css: MpvGeometry) -> Result<(), 
     use windows::Win32::UI::WindowsAndMessaging::{
         EnumChildWindows, GetClassNameW, GetWindowLongW, GetWindowTextW, SetWindowLongW,
         SetWindowPos, GWL_EXSTYLE, HWND_BOTTOM, HWND_TOP, SWP_HIDEWINDOW, SWP_NOACTIVATE,
-        SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WS_EX_TRANSPARENT,
+        SWP_SHOWWINDOW, WS_EX_TRANSPARENT,
     };
     let hdr_stage = MPV_HDR_STAGE.load(std::sync::atomic::Ordering::Relaxed)
         && app
@@ -3387,7 +3393,6 @@ fn position_embedded_mpv_child(app: &AppHandle, css: MpvGeometry) -> Result<(), 
             Err(_) => None,
         };
         let first_position = prev_rect.map(|r| r.0) != Some(first);
-        let rect_unchanged = prev_rect == Some(new_rect);
         let target = HWND(first as *mut _);
         let z = if hdr_stage { HWND_TOP } else { HWND_BOTTOM };
         unsafe {
@@ -3424,17 +3429,9 @@ fn position_embedded_mpv_child(app: &AppHandle, css: MpvGeometry) -> Result<(), 
                     h as i32,
                     SWP_NOACTIVATE | SWP_SHOWWINDOW,
                 );
-            } else if rect_unchanged {
-                let _ = SetWindowPos(
-                    target,
-                    Some(z),
-                    0,
-                    0,
-                    0,
-                    0,
-                    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
-                );
             } else {
+                // mpv can resize its child to the parent during a window resize.
+                // Reapply the requested viewport even if our last request was identical.
                 let _ = SetWindowPos(
                     target,
                     Some(z),

@@ -20,8 +20,16 @@ import { MoreLikeThisIcon } from "@/components/icons/more-like-this-icon";
 import { AnchoredMenu } from "@/components/anchored-menu";
 import { useT } from "@/lib/i18n";
 import { saveArtwork } from "@/lib/music/artwork-save";
-import { requestMusicExplore, requestMusicPlaylist } from "@/lib/music/navigation";
-import { getMusicPlaybackOrigin, musicTitleTarget } from "@/lib/music/playback-origin";
+import {
+  requestMusicExplore,
+  requestMusicLibrary,
+  requestMusicPlaylist,
+} from "@/lib/music/navigation";
+import {
+  getMusicPlaybackOrigin,
+  musicOriginName,
+  musicTitleTarget,
+} from "@/lib/music/playback-origin";
 import { getMusicState } from "@/lib/music/player";
 import { useArtistCredits } from "./use-artist-credits";
 import { useMusicNavigate } from "./music-navigate";
@@ -126,15 +134,35 @@ export function useMusicTrackMenuItems(
       }
     },
   });
-  const playingFrom = musicTitleTarget(getMusicPlaybackOrigin());
+  const origin = getMusicPlaybackOrigin();
+  const playingFrom = musicTitleTarget(origin);
+  const originName = musicOriginName(origin);
   if (playingFrom.kind !== "album") {
     items.push({
       id: "playing-from",
-      label: t("music.card.goToPlaying"),
+      label: originName
+        ? t("music.card.openPlaying", { name: originName })
+        : t("music.card.goToPlaying"),
       icon: <ListMusic size={14} />,
       run: () => {
         if (playingFrom.kind === "playlist") {
           requestMusicPlaylist(playingFrom.playlistId);
+          return;
+        }
+        if (playingFrom.kind === "library") {
+          requestMusicLibrary({ view: playingFrom.view });
+          return;
+        }
+        if (playingFrom.kind === "spotify") {
+          requestMusicLibrary({
+            view: "spotify",
+            spotifyKind: playingFrom.collection === "liked" ? "liked" : "playlists",
+          });
+          return;
+        }
+        if (playingFrom.kind === "catalog") {
+          if (playingFrom.item.kind === "playlist") requestMusicPlaylist(playingFrom.item.id);
+          else requestMusicExplore({ kind: "album", track });
           return;
         }
         const seed = getMusicState().current;

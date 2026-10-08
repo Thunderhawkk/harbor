@@ -134,17 +134,21 @@ export function FieldPreview({
       {open && (
         <div className="sh-field-body">
           <div className="sh-field-tools">
-            <span>
-              <TeamProfileLink team={teamIdentity(game, "home")}>{game.home.name}</TeamProfileLink>{" "}
-              ·{" "}
-              <TeamProfileLink team={teamIdentity(game, "away")}>{game.away.name}</TeamProfileLink>
-            </span>
+            {basketball && (
+              <span>
+                <TeamProfileLink team={teamIdentity(game, "home")}>{game.home.name}</TeamProfileLink>{" "}
+                ·{" "}
+                <TeamProfileLink team={teamIdentity(game, "away")}>{game.away.name}</TeamProfileLink>
+              </span>
+            )}
             {!basketball && (
               <>
                 <div role="group" aria-label={t("Team")}>
                   {(["home", "away"] as const).map((value) => (
                     <button
                       key={value}
+                      aria-label={game[value].name}
+                      title={game[value].name}
                       aria-pressed={team === value}
                       onClick={() => {
                         setTeam(value);

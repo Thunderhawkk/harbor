@@ -1,5 +1,5 @@
 import { AppWindow, Frame, Move, PanelTop, PanelTopDashed } from "./icons";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode, useRef } from "react";
 import { getCustomThemes, subscribeCustomThemes } from "@/lib/custom-themes";
 import { useSettings } from "@/lib/settings";
 import { FEATURED_CUSTOM_THEMES, getThemeById, THEME_PRESETS, type ThemeSettings } from "@/lib/theme";
@@ -22,11 +22,20 @@ import type { IconThumb } from "./theme-panel/custom-themes-section/community-st
 import { AmbienceSection, DisplaySection } from "./theme-panel/display-section";
 import { FontGrid } from "./theme-panel/font-grid";
 import { LogoPicker } from "./theme-panel/logo-picker";
+import { StartupArtworkSettings } from "./theme-panel/startup-artwork";
 import { HybridBarArt, TitleBarArt, WindowControlArt } from "./theme-panel/window-control-art";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-type Tab = "theme" | "library" | "logo" | "type" | "interface" | "ambience" | "window";
+type Tab =
+  | "theme"
+  | "library"
+  | "mylibrary"
+  | "logo"
+  | "type"
+  | "interface"
+  | "ambience"
+  | "window";
 
 export function ThemePanel() {
   const t = useT();
@@ -44,12 +53,15 @@ export function ThemePanel() {
       setTab("library");
       requestThemeLibrary(req);
     }
-    return subscribeThemeLibraryRequest(() => setTab("library"));
+    return subscribeThemeLibraryRequest(() =>
+      setTab((current) => (current === "mylibrary" ? current : "library")),
+    );
   }, []);
 
   const tabs = [
     { id: "theme" as const, label: t("Theme") },
     { id: "library" as const, label: t("Your themes"), count: themeCount },
+    { id: "mylibrary" as const, label: t("My library") },
     { id: "logo" as const, label: t("Logo & icon") },
     { id: "type" as const, label: t("Typography") },
     { id: "interface" as const, label: t("Interface") },
@@ -57,15 +69,22 @@ export function ThemePanel() {
     ...(isTauri ? [{ id: "window" as const, label: t("Window") }] : []),
   ];
 
-  const active: Tab = libraryOpen ? "library" : tab;
+  const active: Tab = libraryOpen && tab !== "mylibrary" ? "library" : tab;
 
-  useSubTabs(libraryOpen ? [] : tabs, tab, (id) => setTab(id as Tab));
+  const wasLibraryOpen = useRef(false);
+  useEffect(() => {
+    if (wasLibraryOpen.current && !libraryOpen && tab === "mylibrary") setTab("library");
+    wasLibraryOpen.current = libraryOpen;
+  }, [libraryOpen, tab]);
+
+  useSubTabs(libraryOpen && tab !== "mylibrary" ? [] : tabs, tab, (id) => setTab(id as Tab));
 
   return (
     <>
       <div key={active} className="harbor-cascade flex flex-col gap-10">
         {active === "theme" && <ThemeTab />}
         {active === "library" && <LibraryTab />}
+        {active === "mylibrary" && <LibraryTab startOpenTab="library" />}
         {active === "logo" && <LogoTab />}
         {active === "type" && <TypographyTab />}
         {active === "interface" && <DisplaySection />}
@@ -136,13 +155,14 @@ function ThemeTab() {
 function LogoTab() {
   const t = useT();
   return (
-    <Section title={t("Logo & app icon")} bare>
+    <><Section title={t("Logo & app icon")} bare>
       <LogoPicker />
     </Section>
+    <StartupArtworkSettings /></>
   );
 }
 
-function LibraryTab() {
+function LibraryTab({ startOpenTab }: { startOpenTab?: "library" } = {}) {
   const t = useT();
   const libraryOpen = useThemeLibraryOpen();
   return (
@@ -152,7 +172,7 @@ function LibraryTab() {
           {t("Make your own in the Theme Studio, or import one a friend shared.")}
         </p>
       )}
-      <CustomThemesSection />
+      <CustomThemesSection startOpenTab={startOpenTab} />
     </Section>
   );
 }

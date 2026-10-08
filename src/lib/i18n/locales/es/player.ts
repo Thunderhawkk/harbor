@@ -369,6 +369,9 @@ const player: Record<string, string> = {
   "Your style is overriding the embedded subtitle's own styling":
     "Tu estilo está reemplazando el formato propio de los subtítulos integrados",
   "Zoom {pct}%": "Zoom {pct}%",
+  "Search audio language": "Buscar idioma de audio",
+  "No audio track in that language.": "No hay pista de audio en ese idioma.",
+  "Clear": "Borrar",
 };
 
 export default player;

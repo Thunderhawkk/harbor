@@ -1,4 +1,8 @@
 export default {
+  "Match stats": "Statistik pertandingan",
+  "Timeline": "Linimasa",
+  "Head to head": "Riwayat pertemuan",
+  "Standings": "Klasemen",
   "Loading team results…": "Memuat hasil tim…",
   "No completed matches were returned for this team.":
     "Tidak ada pertandingan selesai yang dikembalikan untuk tim ini.",

@@ -1,6 +1,8 @@
 import { TeamProfileLink } from "./team-profile-link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
+import { ListOrdered } from "lucide-react";
+import { MatchDisclosure } from "./match-disclosure";
 import {
   fetchStandings,
   findStandingsRow,
@@ -147,9 +149,12 @@ function Table({
   return (
     <div
       ref={box}
-      className="relative max-h-[420px] overflow-y-auto rounded-lg bg-canvas/50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="relative max-h-[min(420px,60vh)] overflow-auto rounded-lg bg-canvas/50 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2"
+      tabIndex={0}
+      role="region"
+      aria-label={t("Standings")}
     >
-      <div className="flex items-center gap-2 border-b border-edge-soft px-3 py-2">
+      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-edge-soft bg-surface px-3 py-2">
         <span className="w-6 shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-subtle">
           {t("#")}
         </span>
@@ -255,14 +260,7 @@ export function StandingsPanel({
   if (!table || !group) return null;
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <span className="h-px flex-1 bg-edge-soft" />
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
-          {title ?? t("Standings")}
-        </span>
-        <span className="h-px flex-1 bg-edge-soft" />
-      </div>
+    <MatchDisclosure title={title ?? t("Standings")} icon={ListOrdered} scroll={false}>
       {table.groups.length > 1 && (
         <GroupTabs groups={table.groups} selected={group.id} onSelect={setGroupId} />
       )}
@@ -272,6 +270,6 @@ export function StandingsPanel({
         columns={headerSet(t, table.sport)}
         highlight={marks}
       />
-    </section>
+    </MatchDisclosure>
   );
 }

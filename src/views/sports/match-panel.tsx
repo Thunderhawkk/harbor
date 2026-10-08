@@ -18,6 +18,8 @@ import { matchPlayerByName } from "./pitch/pitch-formation";
 import { PitchView } from "./pitch/pitch-view";
 import { StandingsPanel } from "./standings-panel";
 import { PlayerMatchStats } from "./player-match-stats";
+import { BarChart3, Clock3, History } from "lucide-react";
+import { MatchDisclosure } from "./match-disclosure";
 
 function toNumber(value: string): number {
   const parsed = parseFloat((value || "").replace(/[^0-9.-]/g, ""));
@@ -146,12 +148,12 @@ function StatBar({ row }: { row: MatchTeamStatRow }) {
   return (
     <div className="grid grid-cols-[3rem_1fr_3rem] items-center gap-3">
       <span
-        className={`text-end text-[13px] font-semibold tabular-nums ${homeLeads ? "text-ink" : "text-ink-subtle"}`}
+        className={`text-end text-[13px] font-semibold tabular-nums ${homeLeads ? "text-ink" : "text-ink-muted"}`}
       >
         {row.homeValue || "0"}
       </span>
       <div className="flex flex-col gap-1">
-        <span className="text-center text-[10.5px] uppercase tracking-[0.1em] text-ink-subtle">
+        <span className="text-center text-[12px] text-ink-muted">
           {statLabel(t, row.label)}
         </span>
         <div className="flex h-1.5 gap-px overflow-hidden rounded-full bg-canvas">
@@ -176,7 +178,7 @@ function StatBar({ row }: { row: MatchTeamStatRow }) {
         </div>
       </div>
       <span
-        className={`text-[13px] font-semibold tabular-nums ${awayLeads ? "text-ink" : "text-ink-subtle"}`}
+        className={`text-[13px] font-semibold tabular-nums ${awayLeads ? "text-ink" : "text-ink-muted"}`}
       >
         {row.awayValue || "0"}
       </span>
@@ -195,7 +197,7 @@ function EventCard({ event, mirrored }: { event: MatchEvent; mirrored: boolean }
           {event.participantName || event.text}
         </div>
         {event.participantName && event.text && (
-          <div className="truncate text-[11px] text-ink-subtle">{event.text}</div>
+          <div className="truncate text-[11px] text-ink-muted">{event.text}</div>
         )}
       </div>
     </div>
@@ -228,7 +230,7 @@ function Timeline({ detail }: { detail: SportsMatchDetail }) {
           return (
             <div key={`${event.id}-${index}`} className="flex flex-col items-center gap-1">
               {minute}
-              <span className="text-center text-[11.5px] text-ink-subtle">{event.text}</span>
+              <span className="text-center text-[11.5px] text-ink-muted">{event.text}</span>
             </div>
           );
         }
@@ -375,7 +377,7 @@ export function MatchPanel({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="sh-match-sections" key={`${loaded.league}:${loaded.id}`}>
       {!hideScoreboard && <Scoreboard detail={loaded} />}
 
       {!hidePitch && (
@@ -385,27 +387,35 @@ export function MatchPanel({
       )}
 
       {loaded.allStats.length > 0 && (
-        <Section title={t("Match stats")}>
-          <div className="flex flex-col gap-3 rounded-lg bg-canvas/50 p-3.5">
+        <MatchDisclosure
+          title={t("Match stats")}
+          icon={BarChart3}
+          count={loaded.allStats.length.toLocaleString(locale)}
+        >
+          <div className="sh-match-stat-grid">
             {loaded.allStats.map((row, index) => (
               <StatBar key={`${row.label}-${index}`} row={row} />
             ))}
           </div>
-        </Section>
+        </MatchDisclosure>
       )}
 
       <PlayerMatchStats detail={loaded} />
 
       {loaded.events.length > 0 && (
-        <Section title={t("Timeline")}>
+        <MatchDisclosure
+          title={t("Timeline")}
+          icon={Clock3}
+          count={loaded.events.length.toLocaleString(locale)}
+        >
           <Timeline detail={loaded} />
-        </Section>
+        </MatchDisclosure>
       )}
 
       {h2h && (
-        <Section title={t("Head to head")}>
+        <MatchDisclosure title={t("Head to head")} icon={History}>
           <HeadToHead result={h2h} locale={locale} />
-        </Section>
+        </MatchDisclosure>
       )}
 
       <StandingsPanel

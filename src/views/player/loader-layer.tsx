@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import type { PlayerSnapshot } from "@/lib/player/bridge";
 import { mapErrorSourceKey } from "@/lib/player/html5/error-map";
 import type { PlayerSrc } from "@/lib/view";
+import { isLivePlaybackSrc } from "@/lib/player/live-src";
 import { CinematicPlayerLoader } from "./cinematic-player-loader";
 import { LiveChannelError } from "./live-channel-error";
 import { LocalFileError } from "./local-file-error";
@@ -30,7 +31,7 @@ export const LoaderLayer = memo(function LoaderLayer({
   onRetry: () => void;
   onBrowseChannels?: () => void;
 }) {
-  const isLiveSrc = src.meta.id.startsWith("iptv:");
+  const isLiveSrc = isLivePlaybackSrc(src);
   return (
     <>
       {(isLocalSrc || isLiveSrc) && snap.errorCode != null ? null : (

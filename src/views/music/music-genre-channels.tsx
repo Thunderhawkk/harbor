@@ -27,6 +27,7 @@ export function MusicGenreChannels({
   return (
     <MusicVideoDiscovery
       key={`channels:${genre.id}`}
+      titleKey="music.videos.studios"
       query={chosen.query}
       active={active}
       onWatch={onWatch}
@@ -39,6 +40,13 @@ export function MusicGenreChannels({
               aria-pressed={index === at}
               onClick={() => setAt(index)}
             >
+              {channel.logo ? (
+                <img className="music-genre-channel-logo" src={channel.logo} alt="" loading="lazy" />
+              ) : (
+                <span className="music-genre-channel-logo" data-monogram aria-hidden>
+                  {channel.name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase()}
+                </span>
+              )}
               {channel.name}
             </button>
           ))}

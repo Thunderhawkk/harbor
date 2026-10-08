@@ -123,16 +123,17 @@ export async function resolveStartMs({
       typeof localPct === "number" && Number.isFinite(localPct) && remoteDuration > 0
         ? localPct * remoteDuration
         : local;
-    const flaggedWatched = (remote.state as { flaggedWatched?: number })?.flaggedWatched === 1;
-    const finished =
-      isEpisode &&
-      (flaggedWatched || (remoteDuration > 0 && remoteMs / remoteDuration >= RESTART_THRESHOLD));
-    const rawMtime = (remote as { _mtime?: unknown })._mtime;
+    // Trackers can leave flaggedWatched set during a rewatch. Completion must
+    // describe the selected progress, not an unrelated historical watched flag.
+    const finishedAt = (ms: number) =>
+      isEpisode && remoteDuration > 0 && ms / remoteDuration >= RESTART_THRESHOLD;
+    const rawMtime = remote.state?.lastWatched ?? (remote as { _mtime?: unknown })._mtime;
     const remoteMtime =
       typeof rawMtime === "number" ? rawMtime : Date.parse(String(rawMtime ?? ""));
-    const remoteIsNewer =
-      Number.isFinite(remoteMtime) && (!localEntry || remoteMtime > localEntry.t);
-    if (remoteIsNewer || remoteMs >= effectiveLocal) {
+    const useRemote =
+      !localEntry ||
+      (Number.isFinite(remoteMtime) ? remoteMtime > localEntry.t : remoteMs >= effectiveLocal);
+    if (useRemote) {
       saveResumeBatch([
         {
           id: metaId,
@@ -142,9 +143,9 @@ export async function resolveStartMs({
           t: Number.isFinite(remoteMtime) ? remoteMtime : undefined,
         },
       ]);
-      return { ms: remoteMs, fromRemote: true, finished };
+      return { ms: remoteMs, fromRemote: true, finished: finishedAt(remoteMs) };
     }
-    return { ms: effectiveLocal, fromRemote: false, finished };
+    return { ms: effectiveLocal, fromRemote: false, finished: finishedAt(effectiveLocal) };
   }
   return { ms: local, fromRemote: false, finished: false };
 }

@@ -809,6 +809,7 @@ const appFill: Record<string, string> = {
     "O Harbor está fechando. O Harbor Setup vai terminar e abri-lo novamente.",
   "Harbor Setup did not finish updating Harbor. Nothing was changed.":
     "O Harbor Setup não terminou de atualizar o Harbor. Nada foi alterado.",
+  "Dismiss": "Dispensar",
 };
 
 export default appFill;

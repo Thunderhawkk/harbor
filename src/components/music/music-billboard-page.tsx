@@ -15,6 +15,7 @@ import { MusicServiceLogo } from "./music-service-logo";
 import { useMusicItemMenu } from "./music-item-menu";
 import { MusicArtistLink } from "./music-artist-link";
 import "./music-billboard-page.css";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 export type MusicBillboardPageProps = {
   onBack: () => void;
   onOpen: (item: MusicCatalogItem, siblings: MusicCatalogItem[]) => void;
@@ -215,6 +216,7 @@ export function MusicBillboardPage({
                     loading="lazy"
                   />
                 )}
+                {item.kind === "track" && <MusicTrackPlaybackMark track={item} loading={busy === item.id}/>}
               </button>
               <div className="music-billboard-copy">
                 <button type="button" disabled={busy === item.id} onClick={() => void open(item)}>

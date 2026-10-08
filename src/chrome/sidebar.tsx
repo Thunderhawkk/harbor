@@ -442,6 +442,7 @@ function NavItem({
         }}
         data-harbor-nav={view}
         data-active={active ? "" : undefined}
+        aria-current={active ? "page" : undefined}
         data-tauri-drag-region={editing ? "false" : undefined}
         onPointerDown={drag.onPointerDown}
         onKeyDown={drag.onKeyDown}

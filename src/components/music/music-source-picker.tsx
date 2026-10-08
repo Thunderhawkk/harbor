@@ -18,10 +18,10 @@ import { MusicSourceRow } from "@/components/music/music-source-row";
 import { useT } from "@/lib/i18n";
 import { adoptRequestedIdentity } from "@/lib/music/queue-source";
 import { playMusic } from "@/lib/music/player";
+import { MUSIC_SOURCE_REQUIRED, resolveAndPlayMusicTrack } from "@/lib/music/play-track";
 import {
   getMusicSourceCandidates,
   getSpotifyStatus,
-  musicSourcePriority,
 } from "@/lib/music/sources";
 import { musicProviderSearch, musicRecoveryKey, musicSourceName } from "@/lib/music/recovery";
 import { openUrl } from "@/lib/window";
@@ -85,6 +85,12 @@ function MusicSourcePickerRoot({ children, active }: { children: ReactNode; acti
   useEffect(() => {
     if (!active) dismiss();
   }, [active, dismiss]);
+  // A stale playback url can leave playMusic unsettled, which would strand the status chip.
+  useEffect(() => {
+    if (!resolving) return;
+    const timer = window.setTimeout(() => dismiss(), 25000);
+    return () => window.clearTimeout(timer);
+  }, [resolving, dismiss]);
   const openSourcePicker = useCallback(
     (track: MusicTrack, queue = [track], onReady?: PlaybackReady, forceChoice = false) => {
       if (!active) return;
@@ -102,44 +108,20 @@ function MusicSourcePickerRoot({ children, active }: { children: ReactNode; acti
       const ready: PlaybackReady = (selected, selectedQueue) => {
         if (generation.current === current) onReady?.(selected, selectedQueue);
       };
-      const preferred = readMusicPreference(SOURCE_KEY);
-      if (track.playbackUrl && !forceChoice) {
-        setResolving(track);
-        void playMusic(track, queue)
-          .then(() => ready(track, queue))
-          .catch(() => {})
-          .finally(() => { if (generation.current === current) setResolving(null); });
-        return;
-      }
       if (!forceChoice) {
         setResolving(track);
-        void getMusicSourceCandidates(track)
-          .then(async (candidates) => {
+        void resolveAndPlayMusicTrack(track, queue)
+          .then((result) => {
             if (generation.current !== current) return;
-            const usable = candidates.filter((candidate) => candidate.health !== "offline");
-            const match =
-              usable.find((candidate) => candidate.connectorId === preferred) ??
-              [...usable].sort(
-                (left, right) =>
-                  musicSourcePriority(left.connectorId) - musicSourcePriority(right.connectorId),
-              )[0];
-            if (!match) {
-              setResolving(null);
-              window.dispatchEvent(new Event("harbor:music-playback-source-required"));
+            if (!result) {
+              window.dispatchEvent(new Event(MUSIC_SOURCE_REQUIRED));
               return;
             }
-            const selected = adoptRequestedIdentity(match.track, track);
-            const selectedQueue = queue.map((item) =>
-              item.id === track.id && item.connectorId === track.connectorId ? selected : item,
-            );
-            await playMusic(selected, selectedQueue);
-            ready(selected, selectedQueue);
+            ready(result.track, result.queue);
           })
           .catch(() => {
-            if (generation.current === current) {
-              setResolving(null);
-              window.dispatchEvent(new Event("harbor:music-playback-source-required"));
-            }
+            if (generation.current === current)
+              window.dispatchEvent(new Event(MUSIC_SOURCE_REQUIRED));
           })
           .finally(() => {
             if (generation.current === current) setResolving(null);
@@ -147,7 +129,7 @@ function MusicSourcePickerRoot({ children, active }: { children: ReactNode; acti
         return;
       }
       setResolving(null);
-      window.dispatchEvent(new Event("harbor:music-playback-source-required"));
+      window.dispatchEvent(new Event(MUSIC_SOURCE_REQUIRED));
     },
     [active],
   );

@@ -1,4 +1,11 @@
+import { GAMES_IN_NAV } from "@/chrome/nav-items";
+import { GameAccessProvider } from "@/views/games/game-access-context";
+import { GameLibraryDock } from "@/views/games/game-library-dock";
+import { GameDockWelcome } from "@/views/games/game-dock-welcome";
+import { GameRouteLoading } from "@/views/games/game-route-loading";
+import { hasBackHandlers } from "@/lib/back-intercept";
 import { useSportsEnabled } from "@/lib/sports/enabled";
+import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { SportsAccessGate } from "@/views/sports/access-gate";
 import { SportsEventSkeleton } from "@/views/sports/sports-skeletons";
 import { SportsReminderLoop } from "@/components/sports-reminder-loop";
@@ -23,6 +30,7 @@ import { StremioRail } from "@/chrome/stremio-rail";
 import { TopDock } from "@/chrome/topdock";
 import { CinematicOverlay } from "@/chrome/cinematic-overlay";
 import { Topbar, TogetherButton } from "@/chrome/topbar";
+import { TabHotkeys } from "@/chrome/tab-hotkeys";
 import { startMaintenance, subscribeMemoryPressure } from "@/lib/maintenance";
 import { MiddleClickScroll } from "@/lib/use-middle-click-scroll";
 import { exitWindowFullscreenOnPlayerClose, toggleWindowFullscreen } from "@/lib/fullscreen-state";
@@ -91,6 +99,8 @@ import { authToken, currentAuthor } from "@/lib/theme-auth";
 import { startSessionRefresh } from "@/lib/account/session-refresh-runner";
 import { useAutoDownloadRunner } from "@/lib/auto-download/runner";
 import { RemindersRunner } from "@/lib/reminders-runner";
+import { GameDownloadNotificationsRunner } from "@/lib/games/download-notifications-runner";
+import { GameSourceAlertsRunner } from "@/lib/games/source-alerts-runner";
 import { MangaTrackingRunner } from "@/lib/manga-tracking";
 import { RemoteHostMount } from "@/lib/remote/host-mount";
 import { RemoteOpenBridge } from "@/lib/remote/remote-open-bridge";
@@ -146,6 +156,7 @@ import { useWatchShare } from "@/lib/social/watch-presence";
 import { usePluginCataloguesAvailable } from "@/lib/streams/plugins/available";
 import { SpooktoberHome } from "@/views/spooktober/spooktober-home";
 import { MusicDock } from "@/components/music/music-dock";
+import { MusicSurprisePrompt } from "@/components/music/music-surprise-prompt";
 import { ParentalProvider } from "@/lib/parental";
 import { TraktProvider } from "@/lib/trakt/provider";
 import { AnilistProvider } from "@/lib/anilist/provider";
@@ -197,6 +208,7 @@ const importService = () => import("@/views/service");
 const importSettings = () => import("@/views/settings");
 const importShows = () => import("@/views/shows");
 const importMusic = () => import("@/views/music");
+const importGames = () => import("@/views/games");
 const importLibrary = () => import("@/views/library");
 const importCommunityCollections = () => import("@/views/collections/community-hub");
 const importSports = () => import("@/views/sports");
@@ -259,6 +271,7 @@ const Settings = lazy(() => importSettings().then((m) => ({ default: m.Settings 
 const Shows = lazy(() => importShows().then((m) => ({ default: m.Shows })));
 const LibraryView = lazy(() => importLibrary().then((m) => ({ default: m.LibraryView })));
 const MusicView = lazy(() => importMusic().then((m) => ({ default: m.MusicView })));
+const GamesView = lazy(() => importGames().then((m) => ({ default: m.GamesView })));
 const LiveView = lazy(() => importLive().then((m) => ({ default: m.LiveView })));
 const MatchDetailView = lazy(() =>
   importMatchDetail().then((m) => ({ default: m.MatchDetailView })),
@@ -445,6 +458,8 @@ export function App({ onReady }: { onReady?: () => void }) {
                                                     <MediaServerSyncRunner />
                                                     <AutoDownloadRunner />
                                                     <RemindersRunner />
+                                                    <GameDownloadNotificationsRunner />
+                                                    <GameSourceAlertsRunner />
                                                     <MangaTrackingRunner />
                                                     <RemoteHostMount />
                                                     <RemoteOpenBridge />
@@ -788,6 +803,8 @@ function Shell({ onReady }: { onReady?: () => void }) {
     openPerson,
     peopleInit,
     openPlayer,
+    openGames,
+    openSportsEvent,
     stackKinds,
     chromeHidden,
   } = useView();
@@ -835,7 +852,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
   }, [onReady, topKind]);
 
   const handleTvBack = useCallback(() => {
-    if (canGoBack || topKind !== "home") {
+    if (canGoBack || topKind !== "home" || hasBackHandlers()) {
       goBack();
       return true;
     }
@@ -1011,7 +1028,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
           e.preventDefault();
           return;
         }
-        if (canGoBack) {
+        if (canGoBack || hasBackHandlers()) {
           e.preventDefault();
           goBack();
         }
@@ -1337,7 +1354,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
     }
   }, [activeProfile?.id]);
 
-  const playerActive = !!player && !player.sportsDocked;
+  const playerActive = !!player && !player.sportsDocked && !player.pipDocked;
   useEffect(() => setNativeMemoryActive(playerActive), [playerActive]);
   useEffect(() => {
     if (!playerActive) void exitWindowFullscreenOnPlayerClose();
@@ -1379,6 +1396,10 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const kidsTop = topKind === "kids";
   const showsTop = topKind === "shows";
   const musicTop = topKind === "music";
+  const gamesTop = topKind === "games";
+  const [gamesNavigationOpen, setGamesNavigationOpen] = useState(false);
+
+  useEffect(() => { if (!gamesTop) setGamesNavigationOpen(false); }, [gamesTop]);
   const libraryTop = topKind === "library";
   const collectionsHubTop = topKind === "collections-hub";
   const sportsEnabled = useSportsEnabled();
@@ -1392,6 +1413,8 @@ function Shell({ onReady }: { onReady?: () => void }) {
     if (!pluginCatalogues && topKind === "plugins") setView("home");
   }, [pluginCatalogues, topKind, setView]);
   const liveTop = topKind === "live";
+  const liveHasSources = usePlaylists().length > 0;
+  const standaloneLive = liveTop && liveHasSources;
   const matchDetailTop = topKind === "match-detail";
   const vodTop = topKind === "vod";
   const downloadsTop = topKind === "downloads";
@@ -1450,10 +1473,11 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const animeAlive = useIdleEvict(animeTop);
   const discoverAlive = useIdleEvict(discoverTop);
   const musicAlive = useIdleEvict(musicTop);
+  const gamesAlive = useIdleEvict(gamesTop, stackKinds.includes("games"));
   const catalogsAlive = useIdleEvict(catalogsTop);
   const pluginsAlive = useIdleEvict(pluginsTop);
   const addonsAlive = useIdleEvict(addonsTop);
-  const calendarAlive = useIdleEvict(calendarTop);
+  const calendarAlive = useIdleEvict(calendarTop, stackKinds.includes("calendar") && stackKinds.includes("games"));
   const wrappedAlive = useIdleEvict(wrappedTop);
   const queueAlive = useKeepAlive(queueTop, queueTop);
   const serviceAlive = useKeepAlive(serviceTop, serviceTop && !!service);
@@ -1479,7 +1503,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
     !!episodeDetail,
     stackKinds.includes("episode-detail"),
   );
-  const { matchDetailGame } = useView();
+  const { matchDetailGame, matchDetailEventGames } = useView();
   const matchDetailAlive = useKeepAlive(matchDetailTop, !!matchDetailGame);
   const filterAlive = useKeepAlive(filterTop, !!filter);
   const brandsAlive = useKeepAlive(brandsTop, !!brands);
@@ -1501,26 +1525,37 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const ebookAlive = useIdleEvict(ebookTop);
   const peopleAlive = useIdleEvict(peopleTop);
 
+  const gameDockVisible = !kid && !kidsTop && !playerActive && !pickerTop && !bigPicture && !immersive && !chromeHidden;
   return (
+    <GameAccessProvider profile={activeProfile?.id ?? "default"} enabled={!kid && !bigPicture && !playerActive} gamesActive={gamesTop} onNavigate={openGames} onLeave={goBack}>
     <div
       data-harbor-shell
+      data-games-library={gamesTop ? "" : undefined}
+      data-games-layout={gamesTop ? layout : undefined}
+      data-games-navigation={gamesTop && gamesNavigationOpen ? "" : undefined}
+      onClickCapture={event => {
+        if (gamesTop && gamesNavigationOpen && (event.target as Element).closest('[data-harbor-nav="games"]')) {
+          event.preventDefault(); event.stopPropagation(); setGamesNavigationOpen(false);
+          requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".games-library-sidebar:not(.is-collapsed) .games-library-home, .games-library-sidebar.is-collapsed .games-library-collapse")?.focus({ preventScroll: true }));
+        }
+      }}
       data-kids={kidsTop || kid ? "on" : undefined}
       className="relative flex h-full"
     >
       <div data-harbor-native-backdrop className="relative flex h-full min-w-0 flex-1">
-        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "sidebar" && (
+        {!settingsTop && !playerActive && !standaloneLive && !pickerTop && layout === "sidebar" && (
           <Sidebar />
         )}
-        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "dracula" && (
+        {!settingsTop && !playerActive && !standaloneLive && !pickerTop && layout === "dracula" && (
           <DraculaSidebar />
         )}
-        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "nord" && (
+        {!settingsTop && !playerActive && !standaloneLive && !pickerTop && layout === "nord" && (
           <NordSidebar />
         )}
-        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "forest" && (
+        {!settingsTop && !playerActive && !standaloneLive && !pickerTop && layout === "forest" && (
           <ForestSidebar />
         )}
-        {!settingsTop && !playerActive && !liveTop && !pickerTop && layout === "stremio" && (
+        {!settingsTop && !playerActive && !standaloneLive && !pickerTop && layout === "stremio" && (
           <StremioRail />
         )}
         {!settingsTop && !playerActive && !pickerTop && layout === "topdock" && !immersive && (
@@ -1537,19 +1572,19 @@ function Shell({ onReady }: { onReady?: () => void }) {
         )}
         {!playerActive && !pickerTop && layout === "minui" && !immersive && <MinUIDock />}
         {!playerActive && !pickerTop && layout === "topdock" && !immersive && (
-          <FloatingBack offsetTop={92} />
+          <div className={gamesTop ? "games-library-back" : "contents"}><FloatingBack offsetTop={92} /></div>
         )}
         {!playerActive && !pickerTop && layout === "cinematic" && !immersive && (
-          <FloatingBack offsetTop={92} />
+          <div className={gamesTop ? "games-library-back" : "contents"}><FloatingBack offsetTop={92} /></div>
         )}
         {!playerActive && !pickerTop && layout === "royal" && !immersive && (
-          <FloatingBack offsetTop={92} />
+          <div className={gamesTop ? "games-library-back" : "contents"}><FloatingBack offsetTop={92} /></div>
         )}
         {!playerActive && !pickerTop && layout === "rail" && !immersive && (
-          <FloatingBack offsetLeft={settings.sidebarCollapsed ? 88 : 220} offsetTop={28} />
+          <div className={gamesTop ? "games-library-back" : "contents"}><FloatingBack offsetLeft={settings.sidebarCollapsed ? 88 : 220} offsetTop={28} /></div>
         )}
         {!playerActive && !pickerTop && layout === "custom" && !immersive && (
-          <FloatingBack offsetLeft={20} offsetTop={20} />
+          <div className={gamesTop ? "games-library-back" : "contents"}><FloatingBack offsetLeft={20} offsetTop={20} /></div>
         )}
         {!playerActive && !pickerTop && layout === "custom" && !immersive && (
           <div className="fixed end-3 top-3 z-[120]">
@@ -1557,6 +1592,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
           </div>
         )}
         <MusicDock />
+        <MusicSurprisePrompt />
         {!playerActive && <WindowResizeEdges />}
         <HybridTitleBar suppressed={playerActive || immersive || chromeHidden} />
         <div
@@ -1610,7 +1646,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
           {calendarAlive && (
             <div {...layerProps(calendarTop)}>
               <Suspense fallback={null}>
-                <CalendarView />
+                <CalendarView active={calendarTop} gamesAllowed={!kid && GAMES_IN_NAV} />
               </Suspense>
             </div>
           )}
@@ -1654,6 +1690,14 @@ function Shell({ onReady }: { onReady?: () => void }) {
                     (themeHasTopbar || layout === "minui")
                   }
                 />
+              </Suspense>
+            </div>
+          )}
+          {gamesAlive && (
+            <div {...layerProps(gamesTop)}>
+              <Suspense fallback={<GameRouteLoading/>}>
+                <GameDockWelcome eligible={gamesTop && gameDockVisible && !gamesNavigationOpen}/>
+                <GamesView harborNavigationOpen={gamesNavigationOpen} onHarborNavigationChange={setGamesNavigationOpen} shellBackAvailable={canGoBack && !chromeHidden && !immersive && (themeHasTopbar || ["minui", "topdock", "cinematic", "royal", "rail", "custom"].includes(layout))} cloudKeys={{rd:settings.rdKey,tb:settings.tbKey,pm:settings.pmKey,ad:settings.adKey}} openSourceSettings={()=>openSettings("streaming")} key={activeProfile?.id ?? "default"} active={gamesTop} profileId={activeProfile?.id ?? "default"} openEsports={sportsEnabled?openSportsEvent:undefined} openSports={sportsEnabled?()=>openSportsEvent():undefined} openMedia={target=>{if(target.kind==="book")openEBook(target.id);else openMeta({id:target.id,type:target.kind,name:target.name,poster:target.poster});}} />
               </Suspense>
             </div>
           )}
@@ -1894,8 +1938,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
               >
                 <SportsAccessGate active={matchDetailTop}>
                   <MatchDetailView
-                    key={`match-${matchDetailGame.id}`}
+                    key={`match-${matchDetailGame.source ?? "espn"}-${matchDetailGame.league}-${matchDetailGame.id}-${matchDetailEventGames ? "event" : "match"}`}
                     game={matchDetailGame}
+                    eventGames={matchDetailEventGames}
                     shellBackAvailable={
                       canGoBack &&
                       !chromeHidden &&
@@ -1962,7 +2007,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
               </Suspense>
             </div>
           )}
-          {pickerTop && !themeHasTopbar && (
+            {pickerTop && !themeHasTopbar && (
             <div className="fixed end-3 top-3 z-[120]">
               <WindowControls />
             </div>
@@ -1995,6 +2040,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
           )}
         </div>
       </div>
+      <GameLibraryDock visible={gameDockVisible && !gamesTop}/>
       {player && (
         <Suspense fallback={null}>
           <PlayerView
@@ -2015,8 +2061,10 @@ function Shell({ onReady }: { onReady?: () => void }) {
       <WebhookLoopMount />
       <SportsReminderLoop />
       <MemoryHud />
+      <TabHotkeys />
       {!player && <OfflineBanner />}
     </div>
+    </GameAccessProvider>
   );
 }
 

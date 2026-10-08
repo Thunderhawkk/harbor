@@ -26,13 +26,18 @@ const NSOPENGL_PROFILE_VERSION_3_2_CORE: u32 = 0x3200;
 
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
-    static kCGColorSpaceExtendedLinearDisplayP3: *const c_void;
+    static kCGColorSpaceITUR_2100_PQ: *const c_void;
+    static kCGColorSpaceDisplayP3_PQ: *const c_void;
     fn CGColorSpaceCreateWithName(name: *const c_void) -> *mut c_void;
     fn CGColorSpaceRelease(space: *mut c_void);
 }
 
 const NS_VIEW_AUTORESIZE_WIDTH: usize = 2;
 const NS_VIEW_AUTORESIZE_HEIGHT: usize = 16;
+const NS_WINDOW_STYLE_BORDERLESS: usize = 0;
+const NS_BACKING_STORE_BUFFERED: usize = 2;
+const NS_WINDOW_BELOW: isize = -1;
+const WINDOW_CORNER_RADIUS: f64 = 14.0;
 
 const NSOPENGL_CONTEXT_PARAM_SURFACE_OPACITY: i32 = 236;
 
@@ -43,6 +48,50 @@ extern "C" {
 }
 const RTLD_DEFAULT: *mut c_void = -2isize as *mut c_void;
 
+unsafe fn content_rect_to_screen(
+    parent: &NSWindow,
+    rect: objc2_foundation::NSRect,
+) -> objc2_foundation::NSRect {
+    let Some(content_view) = parent.contentView() else {
+        return rect;
+    };
+    let nil_view: *const AnyObject = std::ptr::null();
+    let in_window: objc2_foundation::NSRect =
+        msg_send![&*content_view, convertRect: rect, toView: nil_view];
+    msg_send![parent, convertRectToScreen: in_window]
+}
+
+fn same_rect(a: objc2_foundation::NSRect, b: objc2_foundation::NSRect) -> bool {
+    (a.origin.x - b.origin.x).abs() < 0.5
+        && (a.origin.y - b.origin.y).abs() < 0.5
+        && (a.size.width - b.size.width).abs() < 0.5
+        && (a.size.height - b.size.height).abs() < 0.5
+}
+
+unsafe fn make_video_window(
+    mtm: MainThreadMarker,
+    parent: &NSWindow,
+    content_rect: objc2_foundation::NSRect,
+) -> Result<Retained<NSWindow>, String> {
+    let screen_rect = content_rect_to_screen(parent, content_rect);
+    let alloc = NSWindow::alloc(mtm);
+    let window: Option<Retained<NSWindow>> = msg_send![
+        alloc,
+        initWithContentRect: screen_rect,
+        styleMask: NS_WINDOW_STYLE_BORDERLESS,
+        backing: NS_BACKING_STORE_BUFFERED,
+        defer: false,
+    ];
+    let window = window.ok_or_else(|| "video NSWindow init failed".to_string())?;
+    let clear: *mut AnyObject = msg_send![objc2::class!(NSColor), clearColor];
+    let _: () = msg_send![&*window, setOpaque: false];
+    let _: () = msg_send![&*window, setBackgroundColor: clear];
+    let _: () = msg_send![&*window, setHasShadow: false];
+    let _: () = msg_send![&*window, setIgnoresMouseEvents: true];
+    let _: () = msg_send![&*window, setReleasedWhenClosed: false];
+    Ok(window)
+}
+
 fn main_queue() -> *mut c_void {
     unsafe { (&_dispatch_main_q as *const c_void) as *mut c_void }
 }
@@ -52,7 +101,7 @@ pub struct Embed {
     web_view: Option<Retained<NSView>>,
     web_view_was_opaque: bool,
     ns_window: Retained<NSWindow>,
-    edr: bool,
+    video_window: Option<Retained<NSWindow>>,
     css: Option<MpvGeometry>,
     render: Mutex<RenderContext>,
 }
@@ -161,15 +210,27 @@ pub fn install(mpv_ctx: NonNull<mpv_handle>, ns_window_ptr: i64, edr: bool) -> R
 
         let subviews = content_view.subviews();
         let first_subview: Option<Retained<NSView>> = subviews.firstObject();
-        if let Some(reference) = first_subview.as_deref() {
-            content_view.addSubview_positioned_relativeTo(
-                view_as_view,
-                NSWindowOrderingMode::Below,
-                Some(reference),
-            );
+        let video_window = if edr {
+            let window = make_video_window(mtm, ns_window, bounds)?;
+            let _: () = msg_send![&*window, setContentView: view_as_view];
+            let _: () = msg_send![
+                ns_window,
+                addChildWindow: &*window,
+                ordered: NS_WINDOW_BELOW,
+            ];
+            Some(window)
         } else {
-            content_view.addSubview(view_as_view);
-        }
+            if let Some(reference) = first_subview.as_deref() {
+                content_view.addSubview_positioned_relativeTo(
+                    view_as_view,
+                    NSWindowOrderingMode::Below,
+                    Some(reference),
+                );
+            } else {
+                content_view.addSubview(view_as_view);
+            }
+            None
+        };
         let mask = NS_VIEW_AUTORESIZE_WIDTH | NS_VIEW_AUTORESIZE_HEIGHT;
         let _: () = msg_send![view_as_view, setAutoresizingMask: mask];
 
@@ -179,6 +240,10 @@ pub fn install(mpv_ctx: NonNull<mpv_handle>, ns_window_ptr: i64, edr: bool) -> R
             let cg_black: *mut AnyObject = msg_send![&*black, CGColor];
             let _: () = msg_send![&*layer, setBackgroundColor: cg_black];
             let _: () = msg_send![&*layer, setOpaque: true];
+            if video_window.is_some() {
+                let _: () = msg_send![&*layer, setCornerRadius: WINDOW_CORNER_RADIUS];
+                let _: () = msg_send![&*layer, setMasksToBounds: true];
+            }
         }
 
         let gl_ctx = view
@@ -227,7 +292,7 @@ pub fn install(mpv_ctx: NonNull<mpv_handle>, ns_window_ptr: i64, edr: bool) -> R
             web_view: first_subview,
             web_view_was_opaque,
             ns_window: ns_window.retain(),
-            edr,
+            video_window,
             css: None,
             render: Mutex::new(render),
         });
@@ -238,7 +303,7 @@ pub fn install(mpv_ctx: NonNull<mpv_handle>, ns_window_ptr: i64, edr: bool) -> R
     Ok(())
 }
 
-pub fn set_hdr_active(active: bool, _bt2020: bool) {
+pub fn set_hdr_active(active: bool, bt2020: bool) {
     if MainThreadMarker::new().is_none() {
         eprintln!("[harbor::mpv_mac] ignored HDR update off the main thread");
         return;
@@ -249,25 +314,30 @@ pub fn set_hdr_active(active: bool, _bt2020: bool) {
     let Some(embed) = guard.as_ref() else {
         return;
     };
-    if !embed.edr {
+    let Some(video_window) = embed.video_window.as_deref() else {
         return;
-    }
+    };
     unsafe {
         let view_as_view: &NSView = embed.view.as_super();
         let _: () = msg_send![view_as_view, setWantsExtendedDynamicRangeOpenGLSurface: active];
         if active {
-            let cg = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearDisplayP3);
+            let space_name = if bt2020 {
+                kCGColorSpaceITUR_2100_PQ
+            } else {
+                kCGColorSpaceDisplayP3_PQ
+            };
+            let cg = CGColorSpaceCreateWithName(space_name);
             if !cg.is_null() {
                 let nscs_alloc: *mut AnyObject = msg_send![objc2::class!(NSColorSpace), alloc];
                 let nscs: *mut AnyObject = msg_send![nscs_alloc, initWithCGColorSpace: cg];
                 if !nscs.is_null() {
-                    let _: () = msg_send![&*embed.ns_window, setColorSpace: nscs];
+                    let _: () = msg_send![video_window, setColorSpace: nscs];
                 }
                 CGColorSpaceRelease(cg);
             }
         } else {
             let nil: *mut AnyObject = std::ptr::null_mut();
-            let _: () = msg_send![&*embed.ns_window, setColorSpace: nil];
+            let _: () = msg_send![video_window, setColorSpace: nil];
         }
     }
     schedule_redraw();
@@ -289,8 +359,7 @@ pub fn install_window_rounding(ns_window_ptr: i64) -> Result<(), String> {
         if let Some(content_view) = ns_window.contentView() {
             let _: () = msg_send![&*content_view, setWantsLayer: true];
             if let Some(layer) = content_view.layer() {
-                let radius: f64 = 14.0;
-                let _: () = msg_send![&*layer, setCornerRadius: radius];
+                let _: () = msg_send![&*layer, setCornerRadius: WINDOW_CORNER_RADIUS];
                 let _: () = msg_send![&*layer, setMasksToBounds: true];
                 let cg_clear: *mut AnyObject = msg_send![&*clear, CGColor];
                 let _: () = msg_send![&*layer, setBackgroundColor: cg_clear];
@@ -320,8 +389,7 @@ unsafe fn sync_frame(embed: &Embed) -> bool {
     let Some(css) = embed.css else {
         return false;
     };
-    let view_as_view: &NSView = embed.view.as_super();
-    let Some(parent) = view_as_view.superview() else {
+    let Some(parent) = embed.ns_window.contentView() else {
         return false;
     };
     let parent_bounds = parent.bounds();
@@ -341,15 +409,23 @@ unsafe fn sync_frame(embed: &Embed) -> bool {
             height: native.height,
         },
     };
-    let current = view_as_view.frame();
-    if (current.origin.x - next.origin.x).abs() < 0.5
-        && (current.origin.y - next.origin.y).abs() < 0.5
-        && (current.size.width - next.size.width).abs() < 0.5
-        && (current.size.height - next.size.height).abs() < 0.5
-    {
-        return false;
+    match embed.video_window.as_deref() {
+        Some(video_window) => {
+            let screen_rect = content_rect_to_screen(&embed.ns_window, next);
+            let current: objc2_foundation::NSRect = msg_send![video_window, frame];
+            if same_rect(current, screen_rect) {
+                return false;
+            }
+            let _: () = msg_send![video_window, setFrame: screen_rect, display: true];
+        }
+        None => {
+            let view_as_view: &NSView = embed.view.as_super();
+            if same_rect(view_as_view.frame(), next) {
+                return false;
+            }
+            view_as_view.setFrame(next);
+        }
     }
-    view_as_view.setFrame(next);
     true
 }
 
@@ -444,12 +520,14 @@ pub fn uninstall() -> Result<(), String> {
 
 fn teardown_embed(embed: Embed) {
     unsafe {
-        if embed.edr {
-            let nil: *mut AnyObject = std::ptr::null_mut();
-            let _: () = msg_send![&*embed.ns_window, setColorSpace: nil];
-        }
         let view_as_view: &NSView = embed.view.as_super();
         view_as_view.removeFromSuperview();
+        if let Some(video_window) = embed.video_window.as_deref() {
+            let nil: *mut AnyObject = std::ptr::null_mut();
+            let _: () = msg_send![video_window, setColorSpace: nil];
+            let _: () = msg_send![&*embed.ns_window, removeChildWindow: video_window];
+            let _: () = msg_send![video_window, orderOut: std::ptr::null::<AnyObject>()];
+        }
         if let Some(wv) = embed.web_view.as_deref() {
             let restored = embed.web_view_was_opaque;
             let restored_num = NSNumber::new_bool(restored);

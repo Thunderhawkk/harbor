@@ -174,7 +174,7 @@ export function useContinueWatching(excludeId?: string, limit = 12): CwCard[] {
           ...externalCw.filter((i) => !(i.external && disabledSources.has(i.external))),
         ];
     const local = listLocalCw(hideSharedCw).filter((e) =>
-      hideSharedCw && e.source === "library" ? cwSources.library : cwSources.local,
+      e.source === "library" ? cwSources.library : cwSources.local,
     );
     const merged = [...base, ...local.map(localToLibraryItem)]
       .filter((i) => {

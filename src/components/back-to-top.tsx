@@ -6,10 +6,12 @@ export function BackToTop({
   scrollRef,
   threshold = 600,
   icon,
+  onReturnToTop,
 }: {
   scrollRef: React.RefObject<HTMLElement | null>;
   threshold?: number;
   icon?: ReactNode;
+  onReturnToTop?: () => void;
 }) {
   const t = useT();
   const [show, setShow] = useState(false);
@@ -25,15 +27,18 @@ export function BackToTop({
 
   return (
     <button
-      onClick={() =>
+      onClick={() => {
+        onReturnToTop?.();
         scrollRef.current?.scrollTo({
           top: 0,
           behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
             ? "auto"
             : "smooth",
-        })
-      }
+        });
+      }}
       aria-label={t("Back to top")}
+      aria-hidden={!show}
+      tabIndex={show ? 0 : -1}
       style={{
         bottom: "calc(20px + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px))",
       }}

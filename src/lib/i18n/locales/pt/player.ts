@@ -478,6 +478,8 @@ const player: Record<string, string> = {
   "Ignore this title": "Ignorar este título",
   "Never show the content advisory for this title again":
     "Nunca mais mostrar o aviso de conteúdo deste título",
+  "Search audio language": "Buscar idioma de áudio",
+  "No audio track in that language.": "Nenhuma faixa de áudio nesse idioma.",
 };
 
 export default player;

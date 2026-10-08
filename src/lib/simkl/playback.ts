@@ -3,14 +3,7 @@ import { getSession } from "./session";
 import { simklEntryIdKeys, simklEpisodeWatchKeys, simklLookupIds } from "./ids";
 import type { SimklEpisodeCoords } from "./ids";
 import { isCwDismissed } from "@/lib/cw-dismiss";
-import { readResumeEntry, saveResumeMs } from "@/lib/resume";
-import {
-  aniZipByAnidb,
-  aniZipByAnilist,
-  aniZipByKitsu,
-  aniZipByMal,
-  type AniZipMapping,
-} from "@/lib/providers/anizip";
+import { readResumeEntry, saveResumeBatch } from "@/lib/resume";
 import type { LibraryItem } from "@/lib/stremio";
 
 type Ids = {
@@ -31,7 +24,13 @@ type RawSession = {
   movie?: Node;
   show?: Node;
   anime?: Node;
-  episode?: { season?: number; number?: number; episode?: number };
+  episode?: {
+    season?: number;
+    number?: number;
+    episode?: number;
+    tvdb_season?: number;
+    tvdb_number?: number;
+  };
 };
 
 const DURATION_MS = { movie: 6_300_000, series: 2_640_000 };
@@ -50,29 +49,6 @@ function seriesMetaId(ids?: Ids): string | null {
   if (ids.mal) return `mal:${ids.mal}`;
   if (ids.kitsu) return `kitsu:${ids.kitsu}`;
   return null;
-}
-
-/**
- * Simkl keeps anime as per-cour entries numbered from 1 inside the entry while
- * the entry's IMDb/TMDB ids name the umbrella series, so its episode coords are
- * entry-relative, not provider seasons. Resolve the season the provider aired
- * the episode in; without an anime-scheme id on the node the cour is unknown.
- */
-async function resolveProviderEpisodeCoords(
-  ids: Ids | undefined,
-  entryNumber: number,
-): Promise<{ season: number; episode: number } | null> {
-  if (!Number.isInteger(entryNumber) || entryNumber <= 0) return null;
-  let az: AniZipMapping | null = null;
-  if (ids?.mal) az = await aniZipByMal(ids.mal);
-  if (!az && ids?.kitsu) az = await aniZipByKitsu(ids.kitsu);
-  if (!az && ids?.anilist) az = await aniZipByAnilist(ids.anilist);
-  if (!az && ids?.anidb) az = await aniZipByAnidb(ids.anidb);
-  const azEp = az?.episodes?.[String(entryNumber)];
-  const season = azEp?.seasonNumber;
-  const episode = azEp?.episodeNumber;
-  if (!season || season < 1 || !episode || episode < 1) return null;
-  return { season, episode };
 }
 
 function buildItem(
@@ -138,20 +114,28 @@ async function toLibraryItem(raw: RawSession): Promise<LibraryItem | null> {
 
   const seriesNode = raw.show ?? raw.anime;
   if (seriesNode) {
-    const id = seriesMetaId(seriesNode.ids);
+    const anime = !!raw.anime && !raw.show;
+    const ids = seriesNode.ids;
+    const nativeId =
+      anime &&
+      (ids?.kitsu
+        ? `kitsu:${ids.kitsu}`
+        : ids?.mal
+          ? `mal:${ids.mal}`
+          : ids?.anilist
+            ? `anilist:${ids.anilist}`
+            : null);
+    const mappedAnime = anime && !nativeId;
+    const id = nativeId || seriesMetaId(ids);
     if (!id) return null;
-    let season = raw.episode?.season;
-    let episode = raw.episode?.number ?? raw.episode?.episode;
-    // An anime row resolved to an umbrella IMDb/TMDB id pairs that id with the
-    // cour entry's own numbering, which reads as a wrong season-1 episode. The
-    // anime-native pipeline already handles entry-relative ids like mal:….
-    if (!raw.show && season === 1 && episode != null && (id.startsWith("tt") || id.startsWith("tmdb:tv:"))) {
-      const coords = await resolveProviderEpisodeCoords(seriesNode.ids, episode);
-      if (coords) {
-        season = coords.season;
-        episode = coords.episode;
-      }
-    }
+    const season = mappedAnime
+      ? raw.episode?.tvdb_season
+      : (raw.episode?.season ?? (anime ? 1 : undefined));
+    const episode = mappedAnime
+      ? raw.episode?.tvdb_number
+      : (raw.episode?.number ?? raw.episode?.episode);
+    // Season-based anime IDs cannot be attached to franchise IDs without a mapping.
+    if (mappedAnime && (season == null || episode == null)) return null;
     return buildItem(
       id,
       "series",
@@ -161,7 +145,7 @@ async function toLibraryItem(raw: RawSession): Promise<LibraryItem | null> {
       when,
       season,
       episode,
-      !raw.show,
+      anime,
     );
   }
   return null;
@@ -199,7 +183,8 @@ export async function hasActiveSimklPlayback(
 }
 
 export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
-  if (!getSession()) return [];
+  const owner = getSession();
+  if (!owner) return [];
   let raw: RawSession[];
   try {
     raw = await simklRequest<RawSession[]>("/sync/playback?hide_watched=true&limit=40");
@@ -207,6 +192,7 @@ export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
     if (e instanceof SimklApiError && e.status === 404) return [];
     throw e;
   }
+  if (getSession() !== owner) throw new Error("SIMKL session changed");
   if (!Array.isArray(raw)) return [];
 
   const items: LibraryItem[] = [];
@@ -236,15 +222,17 @@ export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
       // can prefer pct x real runtime once migrated; pct rides along with the
       // winning write and is never mixed with another entry's ms.
       const pct01 = Math.min(100, Math.max(0, r.progress ?? 0)) / 100;
-      saveResumeMs(
-        item._id,
-        item.state.timeOffset,
-        item.state.season,
-        item.state.episode,
-        undefined,
-        pct01,
-        "simkl",
-      );
+      saveResumeBatch([
+        {
+          id: item._id,
+          ms: item.state.timeOffset,
+          season: item.state.season,
+          episode: item.state.episode,
+          pct: pct01,
+          source: "simkl",
+          t: remoteValid ? remoteT : 0,
+        },
+      ]);
     }
   }
   return items;

@@ -24,13 +24,15 @@ function creditedTo(track: MusicTrack, name: string): boolean {
   );
 }
 
+// Only reached when the artist's own connector returned nothing, so excluding that
+// connector here would discard the best source and leave a major artist on a handful
+// of guest features. Keep it, and search wide enough to be worth showing.
 async function artistTracksElsewhere(artist: MusicArtistRef): Promise<MusicTrack[]> {
-  const results = await searchTyped(artist.name, 24).catch(() => null);
+  const results = await searchTyped(artist.name, 60).catch(() => null);
   if (!results) return [];
   const seen = new Set<string>();
   const padded: MusicTrack[] = [];
   for (const track of results.tracks) {
-    if (track.connectorId === artist.connectorId) continue;
     if (!creditedTo(track, artist.name)) continue;
     const key = `${artistIdentityKey(track.title)}|${artistIdentityKey(track.artist)}`;
     if (seen.has(key)) continue;

@@ -40,6 +40,7 @@ function compile(
   path: string,
   require: (name: string) => any,
   source = readFileSync(path, "utf8"),
+  events: Record<string, () => void> = {},
 ) {
   const module = { exports: {} as any };
   const code = ts.transpileModule(source, {
@@ -48,11 +49,32 @@ function compile(
       target: ts.ScriptTarget.ES2022,
     },
   }).outputText;
-  new Function("require", "module", "exports", code)(require, module, module.exports);
+  new Function("require", "module", "exports", "window", "document", code)(
+    require,
+    module,
+    module.exports,
+    {
+      setInterval: (fn: () => void) => {
+        events.poll = fn;
+        return 1;
+      },
+      clearInterval: () => {
+        delete events.poll;
+      },
+      addEventListener: (name: string, fn: () => void) => {
+        events[name] = fn;
+      },
+      removeEventListener: (name: string) => {
+        delete events[name];
+      },
+    },
+    { visibilityState: "visible", addEventListener: () => {}, removeEventListener: () => {} },
+  );
   return module.exports;
 }
 
 function harness() {
+  const events: Record<string, () => void> = {};
   const resumes = new Map<string, any>(),
     manual = new Map<string, boolean>();
   const lastPlayed = new Map<string, any>();
@@ -178,7 +200,8 @@ function harness() {
     if (name in mocks) return mocks[name];
     if (name === "./anime-detect") return mocks["@/lib/anime-detect"];
     assert.ok(name.startsWith("@/"), `unexpected import ${name}`);
-    if (!modules.has(name)) modules.set(name, compile(`src/${name.slice(2)}.ts`, load));
+    if (!modules.has(name))
+      modules.set(name, compile(`src/${name.slice(2)}.ts`, load, undefined, events));
     return modules.get(name);
   };
   const { useCwAdvance } = load("@/views/home/hooks/use-cw-advance");
@@ -190,6 +213,7 @@ function harness() {
     return out;
   };
   return {
+    events,
     resumes,
     manual,
     dismissed,
@@ -244,6 +268,30 @@ test("remote completion advances an old pause and skips following remotely watch
   assert.equal(out.state.episode, 4);
   assert.equal(out.upNext, true);
   assert.equal(out.state.timeOffset, 0);
+});
+
+test("incoming completed history creates a new card while Home stays open without paused sessions", async () => {
+  const h = harness();
+  h.setRemote(progress([], "tt100"));
+  h.render([], "", true, []);
+  assert.deepEqual(await h.flush(), []);
+  h.setRemote(progress([1], "tt100", [anchor()]));
+  h.events.poll();
+  const out = await h.flush();
+  assert.equal(out[0]._id, "tt100");
+  assert.equal(out[0].state.episode, 2);
+  assert.equal(out[0].upNext, true);
+  assert.equal(h.remoteReads, 2);
+});
+
+test("returning focus refreshes watched progress before the next poll", async () => {
+  const h = harness();
+  h.setRemote(progress([]));
+  h.render([item()], "", true);
+  assert.equal((await h.flush())[0].state.episode, 1);
+  h.setRemote(progress([1]));
+  h.events.focus();
+  assert.equal((await h.flush())[0].state.episode, 2);
 });
 
 test("newer local and remote rewatches remain on the current episode", async () => {

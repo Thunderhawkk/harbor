@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { adoptRequestedIdentity } from "../src/lib/music/queue-source";
+import type { MusicTrack } from "../src/lib/music/types";
 import {
   buildNowPlayingKey,
   nowPlayingMatches,
@@ -71,4 +73,36 @@ test("the built key round-trips through the parser", () => {
 test("nothing playing lights nothing", () => {
   const now = parseNowPlayingKey(key(["", "", "", "", "idle"]));
   assert.equal(nowPlayingMatches(now, { id: "t1", connectorId: "spotify" }), false);
+});
+
+test("a saved source keeps its indicator when playback resolves to a new source", () => {
+  const catalog = { id: "catalog:42", connectorId: "catalog" } as MusicTrack;
+  const saved = adoptRequestedIdentity({ id: "old-upload", connectorId: "soundcloud" } as MusicTrack, catalog);
+  const playing = adoptRequestedIdentity({ id: "new-upload", connectorId: "youtube" } as MusicTrack, saved);
+  const now = parseNowPlayingKey(buildNowPlayingKey(playing, "playing"));
+  assert.equal(nowPlayingMatches(now, saved), true);
+  assert.equal(nowPlayingMatches(now, catalog), true);
+  assert.equal(nowPlayingMatches(now, { ...saved, collectionOrigin: { id: "catalog:99", connectorId: "catalog" } }), false);
+  assert.equal(nowPlayingMatches(now, { ...saved, collectionOrigin: { id: "catalog:42", connectorId: "spotify" } }), false);
+});
+
+test("a saved resolved row also matches playback of its original recording", () => {
+  const saved = {
+    id: "upload", connectorId: "youtube",
+    collectionOrigin: { id: "catalog:42", connectorId: "catalog" },
+  };
+  for (const phase of ["resolving", "playing", "paused"]) {
+    const now = parseNowPlayingKey(buildNowPlayingKey({ id: "catalog:42", connectorId: "catalog" }, phase));
+    assert.equal(nowPlayingMatches(now, saved), true);
+    assert.equal(now.phase, phase);
+  }
+  const idle = parseNowPlayingKey(buildNowPlayingKey(null, "idle"));
+  assert.equal(nowPlayingMatches(idle, saved), false);
+});
+
+test("missing origin connectors match only another missing connector", () => {
+  const saved = { id: "saved", connectorId: "local", collectionOrigin: { id: "original" } };
+  const now = parseNowPlayingKey(buildNowPlayingKey({ id: "original" }, "playing"));
+  assert.equal(nowPlayingMatches(now, saved), true);
+  assert.equal(nowPlayingMatches(now, { ...saved, collectionOrigin: { id: "original", connectorId: "local" } }), false);
 });

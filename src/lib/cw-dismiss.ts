@@ -8,6 +8,7 @@ import { privateCwProfileId } from "./cw-profile";
 const SIMKL_KEY = "harbor.cw.dismissed.simkl";
 const DISMISS_KEY = "harbor.cw.dismissed.v1";
 const PRIVATE_PREFIX = "harbor.cw.dismissed.private.v1.";
+const MIGRATION_KEY = "harbor.cw.dismissed.private-migrated.v1";
 let loadedKey: string | null = null;
 const dismissed = new Map<string, number>();
 const dismissedVid = new Map<string, string>();
@@ -15,7 +16,45 @@ const dismissedPos = new Map<string, { s?: number; e?: number; p: number }>();
 const listeners = new Set<() => void>();
 let version = 0;
 
+function migratePrivateDismissals(): void {
+  try {
+    if (localStorage.getItem(MIGRATION_KEY)) return;
+    const roster = JSON.parse(localStorage.getItem("harbor.profiles.v1") ?? "null");
+    if (!Array.isArray(roster?.profiles) || !roster.profiles.length) return;
+    // The old store applied to every existing profile. Snapshot it once for
+    // those profiles, preserving newer private stores (including explicit {}).
+    // Profiles created after migration must not inherit someone else's choices.
+    const raw = JSON.parse(localStorage.getItem(DISMISS_KEY) ?? "{}");
+    const now = Date.now();
+    const seed: Record<string, unknown> = Array.isArray(raw)
+      ? Object.fromEntries(raw.filter((id) => typeof id === "string").map((id) => [id, now]))
+      : raw && typeof raw === "object"
+        ? raw
+        : {};
+    const simkl = JSON.parse(localStorage.getItem(SIMKL_KEY) ?? "[]");
+    if (Array.isArray(simkl))
+      for (const id of simkl) {
+        if (typeof id !== "string" || !id) continue;
+        const key = id.startsWith("simkl|") ? id : `simkl|${id}`;
+        if (!Object.hasOwn(seed, key)) seed[key] = now;
+      }
+    const encoded = JSON.stringify(seed);
+    for (const profile of roster.profiles) {
+      if (typeof profile?.id !== "string" || !profile.id) continue;
+      const key = PRIVATE_PREFIX + profile.id;
+      if (localStorage.getItem(key) == null) {
+        setItemWithRecovery(key, encoded);
+        if (localStorage.getItem(key) !== encoded) return;
+      }
+    }
+    setItemWithRecovery(MIGRATION_KEY, "1");
+  } catch {
+    // Keep the original data intact if storage is unavailable or malformed.
+  }
+}
+
 function loadDismissed(): void {
+  migratePrivateDismissals();
   const profileId = privateCwProfileId();
   const key = profileId ? PRIVATE_PREFIX + profileId : DISMISS_KEY;
   if (key === loadedKey) return;

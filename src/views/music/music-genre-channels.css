@@ -33,3 +33,27 @@
   background: var(--color-ink);
   color: var(--color-canvas);
 }
+
+/* Channel identity on each chip. A monogram stands in when no logo URL is known,
+   so the row never shows a broken image. */
+.music-genre-channel-logo {
+  inline-size: 20px;
+  block-size: 20px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--color-ink) 12%, var(--color-elevated));
+}
+.music-genre-channel-logo[data-monogram] {
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-ink-muted);
+}
+.music-genre-channel-picker button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}

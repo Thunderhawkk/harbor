@@ -23,6 +23,10 @@ fn main() {
             // statically bound comctl32 leaves every cargo test binary unable to start.
             println!("cargo:rustc-link-arg=delayimp.lib");
             println!("cargo:rustc-link-arg=/DELAYLOAD:comctl32.dll");
+            // The main thread runs the window event loop, and WebView2 nests that loop
+            // while a second window is created. On the default 1 MB reserve that nesting
+            // overflowed the stack and took the process down with no panic to catch.
+            println!("cargo:rustc-link-arg=/STACK:16777216,1048576");
         }
         if !libmpv.join("libmpv-2.dll").exists() {
             println!("cargo:warning=libmpv-2.dll not found in src-tauri/libmpv. Run `pnpm run setup:libmpv` to fetch it (needed to run and bundle Harbor on Windows).");

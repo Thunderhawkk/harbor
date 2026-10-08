@@ -914,7 +914,7 @@ const catalog: Record<string, string> = {
     "Untuk cara manual: {code} 20+ dan CLI {code}.",
   "For users who want to deploy themselves or already have a wrangler workflow.":
     "Untuk pengguna yang ingin melakukan deployment sendiri atau sudah memiliki alur kerja wrangler.",
-  "For watching things": "Untuk menonton",
+  "Built for Adventure!": "Dibuat untuk Petualangan!",
   "Force of Nature": "Kekuatan Alam",
   "Force on": "Paksa aktif",
   "Force player menus and panels to pure black, ignoring your theme tint.":

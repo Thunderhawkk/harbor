@@ -5,6 +5,7 @@ import {
   FolderPlus,
   HardDrive,
   Loader2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
@@ -106,7 +107,7 @@ export function LocalTab({ scrollRef }: { scrollRef?: RefObject<HTMLElement | nu
     exitSelect();
   }, [selected, exitSelect, t]);
 
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const swept = useRef(false);
   const autoScan = scan.autoScan;
   useEffect(() => {
@@ -179,6 +180,8 @@ export function LocalTab({ scrollRef }: { scrollRef?: RefObject<HTMLElement | nu
     [items],
   );
   const reviewCount = reviewGroups.length;
+  // Dismissal hides the titles known at the time; a later scan that finds more brings it back.
+  const reviewShown = reviewCount > settings.localReviewDismissedCount;
   // Local files are one row per episode; count distinct shows/movies (as
   // grouped for the grid) rather than the underlying file count.
   const allGroups = useMemo(() => groupLocal(items), [items]);
@@ -425,22 +428,34 @@ export function LocalTab({ scrollRef }: { scrollRef?: RefObject<HTMLElement | nu
           onExport={bulkExport}
           onCancel={exitSelect}
         />
-      ) : reviewCount > 0 ? (
-        <button
-          type="button"
-          onClick={openFirstReview}
-          className="flex items-center gap-2.5 rounded-xl bg-amber-500/12 px-3.5 py-2.5 text-start ring-1 ring-amber-500/30 transition-colors hover:bg-amber-500/20"
-        >
+      ) : reviewShown ? (
+        <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/12 px-3.5 py-2.5 ring-1 ring-amber-500/30">
           <AlertTriangle size={15} className="shrink-0 text-amber-500" />
-          <span className="text-[12.5px] font-medium text-ink">
+          <button
+            type="button"
+            onClick={openFirstReview}
+            className="flex-1 text-start text-[12.5px] font-medium text-ink"
+          >
             {reviewCount === 1
               ? t("1 title needs review — help us identify it.")
               : t("{n} titles need review — help us identify them.", { n: reviewCount })}
-          </span>
-          <span className="ms-auto rounded-full bg-amber-500 px-3 py-1 text-[11.5px] font-semibold text-black">
+          </button>
+          <button
+            type="button"
+            onClick={openFirstReview}
+            className="rounded-full bg-amber-500 px-3 py-1 text-[11.5px] font-semibold text-black transition-colors hover:bg-amber-400"
+          >
             {t("Review")}
-          </span>
-        </button>
+          </button>
+          <button
+            type="button"
+            onClick={() => update({ localReviewDismissedCount: reviewCount })}
+            aria-label={t("Dismiss")}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-amber-500/20 hover:text-ink"
+          >
+            <X size={13} strokeWidth={2.4} />
+          </button>
+        </div>
       ) : null}
       <span className="text-[12px] text-ink-muted">
         {items.length === 1

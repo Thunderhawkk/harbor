@@ -1,3 +1,4 @@
+import { purgeGameNotes } from "./games/game-notes";
 import {
   createContext,
   useCallback,
@@ -46,7 +47,12 @@ export const DEFAULT_KID: KidConfig = { age: 7, curfewMinutes: null, parentPinHa
 // sync roster apply both purge, and a key that only one of them knows about is a leak
 // that outlives the profile.
 const PROFILE_KEY_PREFIXES = [
+  "harbor.games.sims.folder:",
+  "harbor.games.ffxiv.center:",
+  "harbor.games.eve.route:",
   "harbor.auth.",
+  "harbor.games.search-view:",
+  "harbor.games.download-notified.v1.",
   "harbor.theme-session.",
   "harbor.localcw.v1.",
   "harbor.localcw.private.v1.",
@@ -85,8 +91,16 @@ const PROFILE_KEY_PREFIXES = [
 ];
 
 function purgeProfileStorage(id: string): void {
+  try { purgeGameNotes(id); } catch { /* Keep the existing profile cleanup best-effort. */ }
   try {
     for (const prefix of PROFILE_KEY_PREFIXES) localStorage.removeItem(`${prefix}${id}`);
+    localStorage.removeItem(`harbor.games.search-history.v1:${encodeURIComponent(id)}`);
+    localStorage.removeItem(`harbor.league.pool:${encodeURIComponent(id)}`);
+    const tftPrefix = `harbor.games.tft.teams:${encodeURIComponent(id)}:`;
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(tftPrefix)) localStorage.removeItem(key);
+    }
   } catch {
     /* ignore */
   }

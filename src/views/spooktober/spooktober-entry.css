@@ -33,3 +33,16 @@
 
 @media(max-width:700px){.spooktober-invitation { gap:15px;padding:22px; }.spooktober-invitation-pumpkin { width:68px;height:68px; }.spooktober-invitation-copy strong { font-size:34px; }.spooktober-invitation-action { font-size:0;gap:0; }.spooktober-invitation-action svg { width:20px; }.spooktober-invitation-stone.stone-round { left:75%; }.spooktober-invitation-stone.stone-cross { left:87%; }}
 @media(prefers-reduced-motion:reduce){.spooktober-invitation-pumpkin-art { animation:none!important;transition:none; }}
+
+/* Hero corner slot: the seasonal invitation overlays the backdrop, so it drops the
+   full-width band proportions and reads as a compact card. */
+[data-hero-overlay-slot="seasonal"] .spooktober-invitation { min-height:0;gap:14px;padding:14px 16px;box-shadow:0 18px 40px -22px rgb(0 0 0 / .55); }
+[data-hero-overlay-slot="seasonal"] .spooktober-invitation-pumpkin { width:46px;height:46px; }
+[data-hero-overlay-slot="seasonal"] .spooktober-invitation-copy strong { font-size:24px; }
+[data-hero-overlay-slot="seasonal"] .spooktober-invitation-copy>span { font-size:12px; }
+[data-hero-overlay-slot="seasonal"] .spooktober-invitation-action { font-size:12px;gap:8px; }
+
+/* Collapsed chip: what dismissal leaves behind, so the festival stays reachable. */
+.spooktober-invitation-chip { display:inline-flex;align-items:center;gap:8px;padding:7px 13px 7px 8px;border-radius:999px;background:color-mix(in srgb,var(--color-surface) 82%,var(--color-canvas));color:var(--color-ink-muted);font-size:13px;font-weight:600;border:1px solid var(--color-edge-soft);transition:color 160ms ease-out,background 160ms ease-out; }
+.spooktober-invitation-chip:is(:hover,:focus-visible) { color:var(--color-ink);background:var(--color-surface); }
+.spooktober-invitation-chip-art { width:22px;height:22px;object-fit:contain; }

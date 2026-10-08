@@ -57,11 +57,17 @@ export function parseNowPlayingKey(value: string): MusicNowPlaying {
 
 export function nowPlayingMatches(
   now: MusicNowPlaying,
-  track: { id: string; connectorId?: string | null } | null | undefined,
+  track: NowPlayingTrack | null | undefined,
 ): boolean {
   if (!track) return false;
-  const connector = track.connectorId ?? null;
-  if (now.id && now.id === track.id && now.connectorId === connector) return true;
-  // The row that started playback still owns it after it was resolved to another source.
-  return !!now.originId && now.originId === track.id && now.originConnectorId === connector;
+  const matches = (id: string, connectorId?: string | null) => {
+    const connector = connectorId ?? null;
+    return (!!now.id && now.id === id && now.connectorId === connector)
+      || (!!now.originId && now.originId === id && now.originConnectorId === connector);
+  };
+  if (matches(track.id, track.connectorId)) return true;
+  // Saved rows can already be resolved uploads. Compare their original recording too,
+  // so resolving the same song to a new source does not lose its playing indicator.
+  const origin = track.collectionOrigin;
+  return !!origin && matches(origin.id, origin.connectorId);
 }

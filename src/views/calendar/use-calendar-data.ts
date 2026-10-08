@@ -71,6 +71,7 @@ export function useCalendarData({
     };
 
     const dispatch = () => {
+      if (source === "games") return stop();
       if (source === "library") {
         if (!authKey) return stop();
         return run(
@@ -157,10 +158,10 @@ export function useCalendarData({
   ]);
 
   useEffect(() => {
-    if (simklConnected) {
+    if (simklConnected && source !== "games") {
       void fetchSimklPremieresCalendar(year, month).catch(() => {});
     }
-  }, [simklConnected, year, month]);
+  }, [simklConnected, year, month, source]);
 
   return { items, loading, error };
 }

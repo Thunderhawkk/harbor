@@ -23,6 +23,13 @@ const DEEP_KINDS = new Set([
   "downloads",
 ]);
 
+/** The inline back controls defer to this one, so both read the same condition. */
+export function useFloatingBackShown(): boolean {
+  const { canGoBack, topKind, chromeHidden } = useView();
+  const sectionBack = useSectionBackActive();
+  return canGoBack && !chromeHidden && (sectionBack || DEEP_KINDS.has(topKind));
+}
+
 export function FloatingBack({
   offsetLeft = 24,
   offsetTop = 90,
@@ -30,10 +37,9 @@ export function FloatingBack({
   offsetLeft?: number;
   offsetTop?: number;
 }) {
-  const { canGoBack, goBack, topKind, chromeHidden } = useView();
-  const sectionBack = useSectionBackActive();
+  const { goBack } = useView();
   const t = useT();
-  const shown = canGoBack && !chromeHidden && (sectionBack || DEEP_KINDS.has(topKind));
+  const shown = useFloatingBackShown();
 
   useEffect(() => {
     if (!shown) return;
@@ -51,6 +57,7 @@ export function FloatingBack({
       type="button"
       onClick={goBack}
       aria-label={t("common.back")}
+      data-floating-back
       style={{ position: "fixed", top: offsetTop, insetInlineStart: offsetLeft, zIndex: 70 }}
       className={`${BACK_SHAPE} ${BACK_SKIN}`}
     >

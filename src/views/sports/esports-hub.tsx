@@ -24,9 +24,16 @@ import { EsportsImage, EsportsGameLogo } from "./esports-image";
 import { EsportsBroadcast, StreamPlatform } from "./esports-broadcast";
 import { SportsVideoPreview } from "./sports-video-preview";
 import type { EsportsTeamSelection } from "./esports-team-dialog";
+import { ESPORTS_ROW_GAMES } from "@/lib/sports/esports-series";
+import { EsportsEventsRow, type EsportsEventSummary } from "./esports-events-row";
 import "./esports-hub.css";
 const TeamDialog = lazy(() =>
   import("./esports-team-dialog").then((m) => ({ default: m.EsportsTeamDialog })),
+);
+const EventPage = lazy(() =>
+  import("./esports-event-page").then((module) => ({
+    default: module.EsportsEventPage,
+  })),
 );
 
 const Match = lazy(() =>
@@ -228,11 +235,19 @@ export function EsportsHub({ active, refresh = 0 }: { active: boolean; refresh?:
   const [selectedTeam, setSelectedTeam] = useState<EsportsTeamSelection | null>(null);
   const [teamId, setTeamId] = useState<number | null>(null);
   const [stream, setStream] = useState<EsportsStream | null>(null);
+  const [eventPage, setEventPage] = useState<EsportsEventSummary | null>(null);
   const content = useRef<HTMLDivElement>(null);
   const { ref: leagueRail, handlers: leagueHandlers } = useDragScroll<HTMLDivElement>();
   const { ref: teamsRail, handlers: teamsHandlers } = useDragScroll<HTMLDivElement>();
   const relevantFeeds = Object.values(feeds).filter(
     (feed) => feed && (selected === "all" || feed.game === selected),
+  );
+  const rowGames = useMemo(
+    () =>
+      selected === "all"
+        ? ESPORTS_ROW_GAMES
+        : ESPORTS_ROW_GAMES.filter((game) => game === selected),
+    [selected],
   );
   const matches = useMemo(() => {
     const logoById = new Map(teams.map((team) => [String(team.id), team.logo]));
@@ -530,6 +545,15 @@ export function EsportsHub({ active, refresh = 0 }: { active: boolean; refresh?:
         </button>
       </div>
       <div ref={content} className="ea-content">
+        {section === "matches" && (
+          <EsportsEventsRow
+            feeds={relevantFeeds}
+            games={rowGames}
+            active={active}
+            refresh={refresh + retry}
+            onOpen={setEventPage}
+          />
+        )}
         {(section === "matches" || section === "results") && (
           <>
             <div className="ea-board-heading">
@@ -781,6 +805,15 @@ export function EsportsHub({ active, refresh = 0 }: { active: boolean; refresh?:
             onMatch={setMatch}
           />
         )}
+        {eventPage && !match && !stream && teamId === null && !selectedTeam && (
+          <EventPage
+            event={eventPage}
+            matches={matches}
+            onClose={() => setEventPage(null)}
+            onMatch={setMatch}
+            onWatch={setStream}
+          />
+        )}
         {match && !stream && teamId === null && (
           <Match
             match={match}
@@ -797,6 +830,7 @@ export function EsportsHub({ active, refresh = 0 }: { active: boolean; refresh?:
           setMatch(null);
           setTeamId(null);
           setSelectedTeam(null);
+          setEventPage(null);
         }} />
       )}
     </section>

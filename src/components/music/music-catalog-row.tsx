@@ -359,6 +359,7 @@ export function MusicCatalogRow({
         onOpen={onOpen && (() => onOpen(item, index))}
         onMenu={(event) => openMenu(item, index, event)}
         overlay={(() => {
+          if (item.kind === "track") return undefined;
           const pending =
             playback.pending?.id === item.id &&
             playback.pending?.connectorId === item.connectorId;

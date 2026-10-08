@@ -20,6 +20,8 @@ import {
   X,
 } from "@/components/icons/music-icons";
 import { AnchoredMenu } from "@/components/anchored-menu";
+import { Spinner } from "@/components/spinner";
+import { useSectionBack } from "@/lib/section-back";
 import { MusicPlaylistCover } from "./music-playlist-cover";
 import { MusicCollectionControls } from "./music-collection-controls";
 import { MusicArtistLink } from "./music-artist-link";
@@ -33,7 +35,7 @@ import { nowPlayingMatches } from "@/lib/music/now-playing-key";
 import "./music-like-burst.css";
 
 const ROW_LIKE_SPOKES = [0, 45, 90, 135, 180, 225, 270, 315];
-import { addTrackToMusicPlaylist, createMusicPlaylist } from "@/lib/music/library";
+import { addTracksToMusicPlaylist, createMusicPlaylist } from "@/lib/music/library";
 import { recordMusicPlaylistPlayback } from "@/lib/music/playback-origin";
 import { useMusicNowPlaying } from "@/lib/music/use-now-playing";
 import { deleteMusicPlaylist, renameMusicPlaylist } from "@/lib/music/library";
@@ -428,8 +430,20 @@ export function PlaylistHeader({
   const [cloning, setCloning] = useState(false);
   const [asking, setAsking] = useState(false);
   const likeButton = useRef<HTMLButtonElement | null>(null);
+  const likeMenu = useRef<HTMLDivElement | null>(null), clonePending = useRef(false);
+  const closeLikeMenu = useCallback(() => {
+    setAsking(false);
+    requestAnimationFrame(() => likeButton.current?.focus({ preventScroll: true }));
+  }, []);
+  useSectionBack(closeLikeMenu, asking);
+  useEffect(() => {
+    if (!asking) return;
+    const frame = requestAnimationFrame(() => likeMenu.current?.querySelector<HTMLButtonElement>("button")?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [asking]);
   const cloneLikeThis = async (freshOnly: boolean) => {
-    if (cloning) return;
+    if (clonePending.current || working || !playlist.tracks.length) return;
+    clonePending.current = true;
     setAsking(false);
     setCloning(true);
     onError(null);
@@ -440,13 +454,15 @@ export function PlaylistHeader({
       const made = await createMusicPlaylist(
         t("music.playlist.likeThisName", { name: playlist.name }),
       );
-      let built = made;
-      for (const track of mix) built = await addTrackToMusicPlaylist(built.id, track);
+      const built = mix.length ? await addTracksToMusicPlaylist(made.id, mix) : made;
       onRenamed(built);
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : String(cause));
+      const message = cause instanceof Error ? cause.message : String(cause);
+      onError(message === "music.radio.error" ? t(message) : message);
     } finally {
+      clonePending.current = false;
       setCloning(false);
+      requestAnimationFrame(() => { if (document.activeElement === document.body) likeButton.current?.focus({ preventScroll: true }); });
     }
   };
   // Stored tracks may carry no playbackUrl, so playing goes through the picker rather than
@@ -555,21 +571,30 @@ export function PlaylistHeader({
           type="button"
           aria-haspopup="menu"
           aria-expanded={asking}
+          aria-busy={cloning}
           aria-label={t(cloning ? "music.playlist.likeThisWorking" : "music.playlist.likeThis")}
           disabled={working || busy || cloning || playlist.tracks.length === 0}
           onClick={() => setAsking(true)}
           className="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
         >
-          <PlaylistVariation size={30} />
+          {cloning ? <Spinner size={25}/> : <PlaylistVariation size={30} />}
         </button>
         </HoverTooltip>
         <AnchoredMenu
           anchorRef={likeButton}
           open={asking}
-          onClose={() => setAsking(false)}
+          onClose={closeLikeMenu}
           width={264}
         >
-          <div role="menu" className="music-like-this-ask">
+          <div role="menu" aria-label={t("music.playlist.likeThisAsk")} ref={likeMenu} className="music-like-this-ask harbor-float" onKeyDown={event => {
+            const buttons = [...(likeMenu.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+            const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+            if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+              event.preventDefault(); event.stopPropagation();
+              buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+            } else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeLikeMenu(); }
+            else if (event.key === "Tab") setAsking(false);
+          }}>
             <p>{t("music.playlist.likeThisAsk")}</p>
             <button type="button" role="menuitem" onClick={() => void cloneLikeThis(true)}>
               {t("music.playlist.likeThisFresh")}
@@ -614,6 +639,7 @@ export function PlaylistHeader({
           </button>
         </HoverTooltip>
       </div>
+      {cloning && <p className="music-playlist-build-status" role="status">{t("music.playlist.likeThisWorking")}</p>}
     </div>
   );
 }

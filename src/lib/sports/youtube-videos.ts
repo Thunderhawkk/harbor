@@ -73,7 +73,7 @@ const leagueKey = (league?: string) => {
   const key = (league || "").trim().toUpperCase();
   return ALIASES[key] || key;
 };
-function channelsForLeague(league?: string): YoutubeChannel[] {
+export function channelsForLeague(league?: string): YoutubeChannel[] {
   const key = leagueKey(league);
   return [CHANNELS[key], ...(key === "CS2" ? [CHANNELS.BLAST] : [])].filter(Boolean).slice(0, 2);
 }
@@ -818,7 +818,7 @@ const requestText = createYoutubeRequestPool(async (url, signal) => {
   const { safeFetchStream } = await import("@/lib/safe-fetch");
   signal.throwIfAborted();
   const response = await safeFetchStream(url, { signal });
-  const maximum = url.startsWith("https://www.youtube.com/channel/") ? 4_000_000 : 600_000;
+  const maximum = /^https:\/\/www\.youtube\.com\/(?:channel\/|results\?)/.test(url) ? 4_000_000 : 600_000;
   if (!response.ok || Number(response.headers.get("content-length")) > maximum)
     throw new Error("Video feed unavailable");
   const reader = response.body?.getReader();
@@ -847,6 +847,8 @@ const requestText = createYoutubeRequestPool(async (url, signal) => {
   if (text.length > maximum) throw new Error("Video feed too large");
   return text;
 });
+
+export { requestText as requestSportsYoutubeText };
 
 async function channelFeed(channel: YoutubeChannel, signal: AbortSignal): Promise<FeedVideo[]> {
   signal.throwIfAborted();

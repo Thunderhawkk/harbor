@@ -65,6 +65,27 @@ export function esportsEmbedUrl(stream: EsportsStream, hostname: string): string
   return null;
 }
 
+/**
+ * How a validated stream can actually play. Twitch answers both its player and its chat
+ * embed with `frame-ancestors https://<parent>`, and Harbor's packaged origin is
+ * `http://tauri.localhost`, so an iframe is refused in every build that is not the dev
+ * server on localhost. A top-level document is not constrained by that header, so Twitch
+ * opens in its own webview. YouTube and Kick send no frame rule and stay inline.
+ */
+export type EsportsPlayback = { mode: "iframe" | "window"; url: string };
+
+export function esportsPlayback(stream: EsportsStream, hostname: string): EsportsPlayback | null {
+  // The embed allowlist stays the only gate, so a channel Harbor will not inline is also a
+  // channel Harbor will not open in a window.
+  const embed = esportsEmbedUrl(stream, hostname);
+  if (!embed) return null;
+  if (stream.platform !== "twitch") return { mode: "iframe", url: embed };
+  const channel = new URL(embed).searchParams.get("channel");
+  return channel
+    ? { mode: "window", url: `https://www.twitch.tv/${encodeURIComponent(channel)}` }
+    : null;
+}
+
 export function esportsExternalUrl(raw: string): string | null {
   try {
     const url = new URL(raw);

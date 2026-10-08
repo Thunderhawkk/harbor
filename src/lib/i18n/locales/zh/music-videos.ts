@@ -3,6 +3,7 @@ const musicVideos: Record<string, string> = {
   "music.videos.concerts": "演唱会",
   "music.videos.youtubeSource": "来自 YouTube",
   "music.videos.title": "音乐视频",
+  "music.videos.studios": "来自工作室的视频",
   "music.videos.source": "来自 YouTube Music",
   "music.videos.search": "搜索音乐视频",
   "music.videos.loading": "正在查找音乐视频…",

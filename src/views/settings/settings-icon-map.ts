@@ -212,6 +212,7 @@ export const SETTINGS_ICON_FILE: Record<string, string> = {
   "SubtitleLanguages": "subtitle-languages",
   "SavedLibrary": "saved-library",
   "ThemeSwatches": "theme-swatches",
+  "ThemeLibrary": "theme-library",
   "TvAppearance": "tv-appearance",
   "InputDevices": "input-devices",
   "BadgeRules": "badge-rules",

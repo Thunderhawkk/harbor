@@ -2,6 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { playbackParams, playbackPersistenceHarness as resumeAutosaveHarness } from "./helpers/playback-persistence-harness.ts";
 
+test("unrelated rerenders cannot replace the live clock with a stale snapshot before exit", () => {
+  const h = resumeAutosaveHarness();
+  const p = playbackParams(); h.render(p);
+  const playing = { ...p, snap: { ...p.snap, status: "playing", positionSec: 30, durationSec: 3600 } };
+  h.render(playing);
+  h.clock(605);
+  h.render({ ...playing, snap: { ...playing.snap, subText: "A new subtitle" } });
+  h.clock(0);
+  h.unmount();
+  assert.equal(h.writes.at(-1)?.[1], 605000);
+});
+
+test("seeking backwards saves the actual new position instead of the furthest position", () => {
+  const h = resumeAutosaveHarness();
+  const p = playbackParams(); h.render(p);
+  const playing = { ...p, snap: { ...p.snap, status: "playing", positionSec: 600, durationSec: 3600 } };
+  h.render(playing); h.clock(600); h.clock(120); h.render(playing);
+  h.clock(0); h.unmount();
+  assert.equal(h.writes.at(-1)?.[1], 120000);
+});
+
 test("episode transition cleanup saves the old source with its old season and duration", () => {
   const h = resumeAutosaveHarness();
   let first = playbackParams(); h.render(first);

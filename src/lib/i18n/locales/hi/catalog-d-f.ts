@@ -1018,7 +1018,7 @@ const catalogDF: Record<string, string> = {
   "For the manual path: {code} 20+ and {code} CLI.": "मैन्युअल तरीके के लिए: {code} 20+ और {code} CLI।",
   "For users who want to deploy themselves or already have a wrangler workflow.":
     "उन उपयोगकर्ताओं के लिए जो खुद डिप्लॉय करना चाहते हैं या जिनके पास पहले से wrangler वर्कफ़्लो है।",
-  "For watching things": "फ़िल्में और शो देखने के लिए",
+  "Built for Adventure!": "रोमांच के लिए बना!",
   "Force of Nature": "प्रकृति की शक्ति",
   "Force on": "ज़बरन चालू",
   "Force player menus and panels to pure black, ignoring your theme tint.":

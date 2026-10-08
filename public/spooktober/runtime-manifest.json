@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "entrypoint": "native-entry.js",
-  "fileCount": 128,
-  "totalBytes": 4557358,
+  "fileCount": 131,
+  "totalBytes": 4593083,
   "files": [
     {
       "path": "alt-collections.json",
@@ -10,9 +10,14 @@
       "sha256": "c8ce825689e8d40d3ca15cd43d4fd418dfe5074a865dfd1c8d5f530a4f067a57"
     },
     {
+      "path": "anime-expanded.json",
+      "bytes": 24638,
+      "sha256": "465221f3ac3fb0878ac1d64bcc364b09b1d962cd4c859bccec3ff80739439ffa"
+    },
+    {
       "path": "app.js",
-      "bytes": 29158,
-      "sha256": "23bdd90437ffb122daf9f753361da6519e6aa40ca32cf1250cfa54d0f1a9a9b1"
+      "bytes": 30225,
+      "sha256": "5f2f33c90a6f062ab21fe1d8983b40f7caefc6e7a2632018a4a88464ae59f901"
     },
     {
       "path": "assets/art/cat-candy.svg",
@@ -255,6 +260,11 @@
       "sha256": "699d43c546d6b12795fbc73edd1bf45667e8cb63f17abcb1b5948e6d22f065e3"
     },
     {
+      "path": "assets/icons/anime-spirit.svg",
+      "bytes": 2319,
+      "sha256": "65a625cf33561d42535aed8a59518dd0739777af88682683f0d84f7f3b65181c"
+    },
+    {
       "path": "assets/icons/arrow-right.svg",
       "bytes": 1039,
       "sha256": "61920b73a86d2e7d14e6eba114cd00c5991bc7564cefeb41edc7d820c861945f"
@@ -370,6 +380,11 @@
       "sha256": "1c2db2ecf58d03bd6e0c72ae30c3448548f18845ede47f3f82a1e39259592885"
     },
     {
+      "path": "assets/services/myanimelist.svg",
+      "bytes": 703,
+      "sha256": "089d5e61d444500831461d349c804408a4356ee8251802c4d7cfdcb84e24644e"
+    },
+    {
       "path": "assets/services/neon.svg",
       "bytes": 6567,
       "sha256": "6459f8b6752c9d8f888bab15aed682374e3b2e8b6f455551045654b402752419"
@@ -401,8 +416,8 @@
     },
     {
       "path": "back-to-top.js",
-      "bytes": 6273,
-      "sha256": "a2f96d83f25c115bad646125603c72ebd9ac84f34d7757be1d3aafec8aa1d421"
+      "bytes": 6317,
+      "sha256": "225191b8d7da9f5e7772b127f1b0ef9dae416657ea9970b56cff242fc435e910"
     },
     {
       "path": "catalog.js",
@@ -426,8 +441,8 @@
     },
     {
       "path": "credits.html",
-      "bytes": 7173,
-      "sha256": "1ad1bd783b2f20b5e049c36541c1abaa251ff05fdd7554e694b83813ea2a7dab"
+      "bytes": 7884,
+      "sha256": "7a39f1ea63fd845efc28203b3bf4a058b65c17bac7dd59a0eedd9b7164c756a2"
     },
     {
       "path": "cult-features.css",
@@ -492,7 +507,7 @@
     {
       "path": "index.html",
       "bytes": 160439,
-      "sha256": "a76971e94fcb39ba253222214e58ee1e9036064694bcbc06fdd7b0a320e0956a"
+      "sha256": "3378ddfb3e2fa4ba3c5223a45ee006d44f00c670ddfb2008823898d29fbe02ba"
     },
     {
       "path": "inline-surface.js",
@@ -526,13 +541,13 @@
     },
     {
       "path": "native-entry.js",
-      "bytes": 2795,
-      "sha256": "37a35d01098bec49f5b8f4fa59386b7b9bb2c76c1473d4e7d524e1089db460bb"
+      "bytes": 2821,
+      "sha256": "2a64a65aa2d4207b1806fd1508d236b0321b99a64c59994dce747932befa5414"
     },
     {
       "path": "native-environment.js",
-      "bytes": 10565,
-      "sha256": "670264aeb6d92015530203aa37866e788be8db404045f0d74341596b338e626e"
+      "bytes": 10643,
+      "sha256": "b3cd4c1cf90df93643074c2fd3e0da6ad81f3ae13505eb9642bc7bcbee0f9ee3"
     },
     {
       "path": "native-fonts.json",
@@ -546,13 +561,13 @@
     },
     {
       "path": "native-runtime.js",
-      "bytes": 172104,
-      "sha256": "8dce91cf1cac42be2d67f01d7d67bc671ce4c5191d21712c1959cb0a9b558357"
+      "bytes": 173346,
+      "sha256": "1f87a4b3cd8ab0f0084eb8c0baef4d58757e3c803c9fa175d2e4f338d002df3f"
     },
     {
       "path": "native-styles.css",
-      "bytes": 151412,
-      "sha256": "1a95cbe237474e7a9fb29730b46caaa8dd19c735fa32c11c0c87fcebdb3b5765"
+      "bytes": 155870,
+      "sha256": "862c0a8df21bf5d2027ec97a36d75872cfca109a81105e1f6025faa056319942"
     },
     {
       "path": "new-releases-expanded.json",
@@ -606,8 +621,8 @@
     },
     {
       "path": "screening.css",
-      "bytes": 68154,
-      "sha256": "4f436a945e6aed3f6a597d08d382d6497c354af5ddcafa31ff0c06189acfb060"
+      "bytes": 68593,
+      "sha256": "191582ed7355c755cf9a1d84c0f25bc8dfa5019cedb44db7ebfd239cc4c25980"
     },
     {
       "path": "screening.json",

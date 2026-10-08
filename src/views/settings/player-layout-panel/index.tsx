@@ -37,6 +37,7 @@ import { FullscreenClockSettings } from "../theme-panel/fullscreen-clock-setting
 import { Section, Segmented, ToggleRow } from "../shared";
 import { pushActivityHint } from "@/lib/discord/activity-hint";
 import { useT } from "@/lib/i18n";
+import { CONTENT_ADVISORY_NUDGE, useOnboarding } from "@/lib/onboarding";
 
 function themeIdFromSettings(settings: ReturnType<typeof useSettings>["settings"]): ThemeId {
   return resolveChromeTheme(settings.theme, settings.playerChromeTheme);
@@ -45,6 +46,7 @@ function themeIdFromSettings(settings: ReturnType<typeof useSettings>["settings"
 export function PlayerLayoutPanel() {
   const t = useT();
   const { settings, update } = useSettings();
+  const { dismiss } = useOnboarding();
   const appTheme = themeIdFromSettings(settings);
   const [theme, setTheme] = useState<ThemeId>(appTheme);
   const [saved, setSaved] = useState<PlayerChromeConfig>(() => readPlayerChromeConfig(appTheme));
@@ -338,7 +340,10 @@ export function PlayerLayoutPanel() {
             "When a movie or episode starts, briefly show its IMDb parental guide (violence, profanity, substances, frightening scenes and more) with severity. Fades on its own.",
           )}
           value={settings.contentAdvisoryToast}
-          onChange={(v) => update({ contentAdvisoryToast: v })}
+          onChange={(v) => {
+            dismiss(CONTENT_ADVISORY_NUDGE);
+            update({ contentAdvisoryToast: v });
+          }}
           preview={<AdvisoryPreview />}
         />
         {settings.contentAdvisoryToast && (

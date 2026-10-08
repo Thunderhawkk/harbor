@@ -8,9 +8,17 @@ export function useSportsDockSurface(active: boolean, mount: RefObject<HTMLDivEl
     const video = mount.current;
     if (!backdrop || !video) return;
     const previous = backdrop.style.clipPath;
+    const previousBackground = backdrop.style.backgroundColor;
+    // Transparent pages must not reveal the native surface outside the dock,
+    // including while the OS is resizing it behind the WebView.
+    backdrop.style.backgroundColor = "var(--color-canvas)";
     const update = () => {
       const outer = backdrop.getBoundingClientRect();
       const inner = video.getBoundingClientRect();
+      if (inner.width <= 1 || inner.height <= 1) {
+        backdrop.style.clipPath = previous;
+        return;
+      }
       const left = inner.left - outer.left;
       const top = inner.top - outer.top;
       const right = left + inner.width;
@@ -28,6 +36,7 @@ export function useSportsDockSurface(active: boolean, mount: RefObject<HTMLDivEl
       window.removeEventListener("resize", update);
       window.removeEventListener("harbor:mpv-refresh-geom", update);
       backdrop.style.clipPath = previous;
+      backdrop.style.backgroundColor = previousBackground;
     };
   }, [active, mount]);
 }

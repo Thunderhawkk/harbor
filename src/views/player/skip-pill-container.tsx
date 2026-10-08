@@ -70,7 +70,7 @@ export function SkipPillContainer({
     autoSkippedRef.current = null;
   }, [skipSegments]);
   useEffect(() => {
-    if (!allowAutoSkip || !realActiveSkip) return;
+    if (!allowAutoSkip || positionSec <= 0 || !realActiveSkip) return;
     const wantSkip =
       (realActiveSkip.kind === "intro" && settings.autoSkipIntro) ||
       (realActiveSkip.kind === "recap" && settings.autoSkipRecap) ||
@@ -86,6 +86,7 @@ export function SkipPillContainer({
     settings.autoSkipOutro,
     settings.autoSkipAd,
     allowAutoSkip,
+    positionSec,
     realActiveSkip,
     onSkip,
   ]);

@@ -45,6 +45,17 @@ export type EBook = {
   volumes?: number;
   score?: number;
   trendingScore?: number;
+  /** Median across editions, so a work reads as one length rather than whichever printing answered. */
+  pages?: number;
+  editionCount?: number;
+  readerRating?: number;
+  readerRatingCount?: number;
+  shelvedBy?: number;
+  people?: string[];
+  places?: string[];
+  periods?: string[];
+  languages?: string[];
+  archiveCopies?: number;
   siteUrl?: string;
 };
 
@@ -747,10 +758,22 @@ type OpenLibraryDoc = {
   subject?: string[];
   alternative_title?: string | string[];
   first_sentence?: string | string[];
+  number_of_pages_median?: number;
+  edition_count?: number;
+  ratings_average?: number;
+  ratings_count?: number;
+  want_to_read_count?: number;
+  subject_people?: string[];
+  subject_places?: string[];
+  subject_times?: string[];
+  language?: string[];
+  ia?: string[];
 };
 
 const OPEN_LIBRARY_FIELDS =
-  "key,title,alternative_title,author_name,cover_i,first_publish_year,isbn,series,subject,first_sentence";
+  "key,title,alternative_title,author_name,cover_i,first_publish_year,isbn,series,subject,first_sentence," +
+  "number_of_pages_median,edition_count,ratings_average,ratings_count,want_to_read_count," +
+  "subject_people,subject_places,subject_times,language,ia";
 const OPEN_LIBRARY_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const OPEN_LIBRARY_STALE_MS = 30 * 24 * 60 * 60 * 1000;
 const openLibraryMetadata = new Map<string, EBook | null>();
@@ -1296,6 +1319,16 @@ function mapOpenLibrary(n: OpenLibraryDoc): EBook {
     year: n.first_publish_year,
     publishedAt: n.first_publish_year ? String(n.first_publish_year) : undefined,
     genres: n.subject?.slice(0, 8) ?? [],
+    pages: n.number_of_pages_median,
+    editionCount: n.edition_count,
+    readerRating: n.ratings_average,
+    readerRatingCount: n.ratings_count,
+    shelvedBy: n.want_to_read_count,
+    people: n.subject_people?.slice(0, 8),
+    places: n.subject_places?.slice(0, 8),
+    periods: n.subject_times?.slice(0, 6),
+    languages: n.language?.slice(0, 12),
+    archiveCopies: n.ia?.length || undefined,
     siteUrl: `https://openlibrary.org/works/${key}`,
   };
 }

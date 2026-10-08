@@ -1,4 +1,5 @@
 export default {
+  "No videos found.": "कोई वीडियो नहीं मिला।",
   "sports.guide.athletes": "खिलाड़ी",
   "sports.guide.athlete": "खिलाड़ी",
   "sports.guide.athleteCount": "{n} खिलाड़ी",

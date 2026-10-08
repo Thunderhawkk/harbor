@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import { useMal } from "@/lib/mal/provider";
 import { fetchMalList } from "@/lib/mal/lists";
@@ -37,24 +37,30 @@ export function useMalAnimeRails(): MalRail[] {
   return useMalAnimeRailsState().rails;
 }
 
-export function useMalAnimeRailsState(): MalRailsState {
-  const { isConnected } = useMal();
+export function useMalAnimeRailsState(): MalRailsState & { retry: () => void } {
+  const { isConnected, session } = useMal();
   const [state, setState] = useState<MalRailsState>(IDLE);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt(value => value + 1), []);
+  const owner = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!isConnected) {
+      owner.current = undefined;
       setState(IDLE);
       return;
     }
     let cancelled = false;
-    setState({ rails: [], loading: true, error: false });
+    const sameOwner = owner.current === session?.userName;
+    owner.current = session?.userName;
+    setState(previous => ({ rails: sameOwner ? previous.rails : [], loading: true, error: false }));
     (async () => {
       let groups: MalListGroup[];
       try {
         groups = await fetchMalList();
       } catch (e) {
         console.error("Failed to fetch MAL list", e);
-        if (!cancelled) setState({ rails: [], loading: false, error: true });
+        if (!cancelled) setState(previous => ({ ...previous, loading: false, error: true }));
         return;
       }
       if (cancelled) return;
@@ -77,7 +83,7 @@ export function useMalAnimeRailsState(): MalRailsState {
     return () => {
       cancelled = true;
     };
-  }, [isConnected]);
+  }, [isConnected, session?.userName, session?.accessToken, attempt]);
 
-  return state;
+  return { ...state, retry };
 }

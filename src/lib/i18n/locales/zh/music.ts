@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "较新一届",
+  "music.xxl.older": "较早一届",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -376,6 +378,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "从下方列表中添加已收藏或最近播放的歌曲。",
   "music.library.savedTracks": "已收藏歌曲",
   "music.library.readyForPlaylist": "可添加到 {name}",
+  "music.library.addTracks": "添加曲目",
+  "music.library.addTracksCount": "{count} 首可添加",
   "music.library.permanent": "你的永久收藏",
   "music.library.recent": "最近播放",
   "music.library.newestFirst": "最近播放优先",
@@ -547,6 +551,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "内容",
   "music.playlistTools.explicit": "露骨内容",
   "music.playlistTools.clean": "无露骨内容",
+  "music.surprise.rate.title": "这个混播怎么样?",
+  "music.surprise.rate.note": "已播放 {count} 首",
+  "music.surprise.rate.yes": "很喜欢",
+  "music.surprise.rate.no": "不合我口味",
+  "music.surprise.redirect.title": "你更想听什么?",
+  "music.surprise.redirect.note": "选一个方向,混播会重新开始。",
+  "music.surprise.redirect.more": "更多流派",
+  "music.surprise.back": "返回",
   "music.surprise.title": "随心听",
   "music.surprise.stop": "停止随心听",
   "music.surprise.body": "根据你的收听记录和播放列表，发现你还没听过的歌曲。",

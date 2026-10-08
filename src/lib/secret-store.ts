@@ -100,6 +100,24 @@ export async function loadSecrets(): Promise<void> {
       void 0;
     }
   }
+
+  // Readers that mounted before this resolved saw an empty store, and migration has
+  // already removed the localStorage copies they would have fallen back to, so every
+  // connected account read as signed out until something re-read it. Tell them now.
+  try {
+    window.dispatchEvent(new Event(SECRETS_READY));
+  } catch {
+    void 0;
+  }
+}
+
+/** Fires once the persisted store is in memory, so session readers can re-read. */
+export const SECRETS_READY = "harbor:secrets-ready";
+
+export function subscribeSecretsReady(fn: () => void): () => void {
+  if (loaded && rustAvailable) fn();
+  window.addEventListener(SECRETS_READY, fn);
+  return () => window.removeEventListener(SECRETS_READY, fn);
 }
 
 export function getSecret(key: string): string | null {

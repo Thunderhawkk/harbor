@@ -435,6 +435,11 @@ export type Settings = {
   songIdAiKey: string;
   songIdAiModel: string;
   aiSearchKey: string;
+  steamSearchShortcut: boolean;
+  gameAgeRatingAgency: "ESRB" | "PEGI";
+  gameArtworkSelection: "first" | "random" | "manual";
+  gameArtworkScreenshots: boolean;
+  gameArtworkCoverIcon: boolean;
   aiSearchModel: string;
   aiSearchProvider: "openrouter" | "groq";
   aiGroqKey: string;
@@ -472,6 +477,8 @@ export type Settings = {
   bigPictureDisplay: DisplaySelection;
   bigPictureSound: "none" | "glass" | "modern" | "retro" | "cinematic";
   bigPictureMosaic: boolean;
+  bigPictureBackdropZoom: boolean;
+  tabHotkeys: boolean;
   /**
    * Fraction of each edge a television is assumed to crop, 0 to 0.1. Read at
    * import time by bp-safe-area straight out of localStorage, which is why it
@@ -502,6 +509,8 @@ export type Settings = {
   hideWatchedInCatalogs: boolean;
   hideUnreleased: boolean;
   localEpisodeSortDesc: boolean;
+  /** Review count when the banner was last dismissed; it returns only if more turn up. */
+  localReviewDismissedCount: number;
   smoothScroll: boolean;
   showSimklCard: boolean;
   showLetterboxdCard: boolean;
@@ -664,7 +673,8 @@ export type Settings = {
     | "custom"
     | "simkl"
     | "simkl-anticipated"
-    | "anime";
+    | "anime"
+    | "games";
   simklHomeRailsEnabled: boolean;
   simklUpNextRailEnabled: boolean;
   simklTrendingRailEnabled: boolean;
@@ -718,6 +728,8 @@ export type Settings = {
   iptvForceProxy: boolean;
   iptvEpgOffsetHours: number;
   sidebarCollapsed: boolean;
+  showQuickGameLibrary: boolean;
+  gamesOpenInLibrary: boolean;
   wrappedButton: boolean;
   libraryHero: boolean;
   mangaEnabled: boolean;

@@ -10,6 +10,8 @@ import { sourceLabel } from "@/lib/music/source-label";
 import type { AlbumExplicitMark } from "@/lib/music/album-explicit";
 import type { MusicCatalogItem } from "@/lib/music/types";
 import "./music-cover-card.css";
+import { useTrackPlaybackState } from "@/lib/music/use-track-playback-state";
+import { MusicNowPlayingMark } from "./music-now-playing-mark";
 
 export type MusicCardBadge =
   | { kind: "connector"; connectorId: string; label?: string; itemId?: string }
@@ -145,6 +147,8 @@ export function MusicCoverCard({
 }) {
   const t = useT();
   const heading = title ?? coverCardTitle(item);
+  const status = useTrackPlaybackState(item.kind === "track" ? item : null);
+  const loading = playing || status.loading;
   const caption = subtitle ?? coverCardSubtitle(item);
   const seed = coverCardSeed(item);
   const chip = badge === undefined ? autoBadge(item) : badge;
@@ -178,6 +182,7 @@ export function MusicCoverCard({
               />
             )}
             {overlay}
+            {item.kind === "track" && (loading || status.current) && <MusicNowPlayingMark loading={loading} paused={status.paused}/>}
           </span>
           <span className="mt-[9px] flex min-w-0 items-center gap-[5px]">
             <span className="truncate text-[13px] font-semibold text-ink" title={heading}>
@@ -203,14 +208,14 @@ export function MusicCoverCard({
               type="button"
               className="music-cover-play no-press bg-ink text-canvas"
               aria-label={playLabel}
-              aria-busy={playing || undefined}
-              disabled={playing}
+              aria-busy={loading || undefined}
+              disabled={loading}
               onClick={(event) => {
                 event.stopPropagation();
                 onPlay();
               }}
             >
-              {playing ? (
+              {loading ? (
                 <LoaderCircle size={20} aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
               ) : (
                 <Play size={20} aria-hidden="true" />

@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "नई क्लास",
+  "music.xxl.older": "पुरानी क्लास",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -376,6 +378,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "नीचे दी गई सूचियों से कोई सहेजा गया या हाल का ट्रैक जोड़ें।",
   "music.library.savedTracks": "सहेजे गए ट्रैक",
   "music.library.readyForPlaylist": "{name} में जोड़ने के लिए तैयार",
+  "music.library.addTracks": "ट्रैक जोड़ें",
+  "music.library.addTracksCount": "{count} जोड़ने के लिए तैयार",
   "music.library.permanent": "आपका स्थायी संग्रह",
   "music.library.recent": "हाल में चलाए गए",
   "music.library.newestFirst": "सबसे नए प्ले पहले",
@@ -553,6 +557,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "सामग्री",
   "music.playlistTools.explicit": "अश्लील सामग्री",
   "music.playlistTools.clean": "अश्लीलता रहित",
+  "music.surprise.rate.title": "यह मिक्स कैसा लगा?",
+  "music.surprise.rate.note": "अब तक {count} गाने",
+  "music.surprise.rate.yes": "बहुत पसंद आया",
+  "music.surprise.rate.no": "मेरे लिए नहीं",
+  "music.surprise.redirect.title": "आप इसके बजाय क्या सुनना चाहेंगे?",
+  "music.surprise.redirect.note": "एक दिशा चुनें और मिक्स फिर से शुरू होगा।",
+  "music.surprise.redirect.more": "और शैलियाँ",
+  "music.surprise.back": "वापस",
   "music.surprise.title": "मुझे चौंकाएँ",
   "music.surprise.stop": "मुझे चौंकाएँ बंद करें",
   "music.surprise.body": "आपके सुनने के इतिहास और प्लेलिस्ट के आधार पर नए गाने खोजें।",

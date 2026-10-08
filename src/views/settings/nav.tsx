@@ -3227,6 +3227,13 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     keywords: ["api budget", "omdb budget", "daily requests", "counter", "rate limit"],
   },
   {
+    label: "games.dock.settingTitle",
+    section: "theme",
+    tab: "interface",
+    anchorTitle: "games.dock.settingTitle",
+    keywords: ["games", "quick game library", "game tab", "edge tab", "game bar", "hover", "half moon", "hide games tab"],
+  },
+  {
     label: "Onboarding & hints",
     section: "advanced",
     tab: "about",
@@ -3878,6 +3885,41 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     tab: "home",
     anchorTitle: "Continue Watching screenshots",
     keywords: ["clear snapshots", "wipe frames", "delete screenshots", "confirm clear", "storage"],
+  },
+  {
+    label: "games.artwork.selectionSetting",
+    section: "library",
+    tab: "providers",
+    anchorTitle: "Games",
+    keywords: ["IGDB", "artwork", "background", "screenshots", "cover icon", "random"],
+  },
+  {
+    label: "games.artwork.screenshotsSetting",
+    section: "library",
+    tab: "providers",
+    anchorTitle: "Games",
+    keywords: ["IGDB", "artwork", "background", "screenshots", "cover icon", "random"],
+  },
+  {
+    label: "games.artwork.iconSetting",
+    section: "library",
+    tab: "providers",
+    anchorTitle: "Games",
+    keywords: ["IGDB", "artwork", "background", "screenshots", "cover icon", "random"],
+  },
+  {
+    label: "games.details.agePreference",
+    section: "library",
+    tab: "providers",
+    anchorTitle: "Games",
+    keywords: ["ESRB", "PEGI", "age ratings", "game metadata", "IGDB"],
+  },
+  {
+    label: "Steam search shortcut",
+    section: "library",
+    tab: "ai",
+    anchorTitle: "Search shortcuts",
+    keywords: ["steam store", "st prefix", "st:", "game search", "disable steam search", "normal search"],
   },
   {
     label: "AI Search · natural-language search",
@@ -9637,6 +9679,20 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
+    label: "artwork.loading",
+    section: "theme",
+    tab: "logo",
+    anchorTitle: "artwork.title",
+    keywords: ["loading animation", "connecting", "boat", "lottie", "gif", "loader", "custom animation"],
+  },
+  {
+    label: "artwork.launch",
+    section: "theme",
+    tab: "logo",
+    anchorTitle: "artwork.title",
+    keywords: ["launch logo", "startup", "splash", "boot", "big picture", "custom logo"],
+  },
+  {
     label: "Wordmark",
     section: "theme",
     tab: "logo",
@@ -11074,8 +11130,9 @@ function SearchField({
   const t = useT();
   const SEARCH_NAV_HINT = "Press Enter or Space to type";
   const SEARCH_EDIT_HINT = "Text mode — Esc to exit";
+  // Let the field shrink inside the sidebar; its input's intrinsic width otherwise clips the corners.
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-w-0 flex-1 flex-col">
       <div data-settings-search-field data-tv-text-field className={NAV_FIELD}>
         <svg
           width="18"
@@ -11187,7 +11244,7 @@ export function SettingsTools({
 }) {
   const { settings } = useSettings();
   const navLayout = activeLayout(settings.theme);
-  const showBack = navLayout === "custom" || navLayout === "minui";
+  const showBack = navLayout === "custom";
   const { matches, optionMatches } = useNavSearch(query.trim().toLowerCase());
   const submit = () => {
     if (matches && matches.length > 0) {

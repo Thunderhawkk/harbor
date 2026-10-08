@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "Daha yeni sınıf",
+  "music.xxl.older": "Daha eski sınıf",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -378,6 +380,8 @@ const music: Record<string, string> = {
     "Aşağıdaki listelerden kaydedilmiş veya yakın zamanda çalınmış bir parça ekleyin.",
   "music.library.savedTracks": "Kaydedilen parçalar",
   "music.library.readyForPlaylist": "{name} listesine eklenmeye hazır",
+  "music.library.addTracks": "Parça ekle",
+  "music.library.addTracksCount": "Eklemeye hazır {count}",
   "music.library.permanent": "Kalıcı koleksiyonunuz",
   "music.library.recent": "Son çalınanlar",
   "music.library.newestFirst": "En son çalınanlar önce",
@@ -559,6 +563,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "İçerik",
   "music.playlistTools.explicit": "Müstehcen",
   "music.playlistTools.clean": "Müstehcen olmayan",
+  "music.surprise.rate.title": "Bu karışım nasıl?",
+  "music.surprise.rate.note": "{count} şarkı dinlendi",
+  "music.surprise.rate.yes": "Çok sevdim",
+  "music.surprise.rate.no": "Bana göre değil",
+  "music.surprise.redirect.title": "Bunun yerine ne dinlemek istersin?",
+  "music.surprise.redirect.note": "Bir yön seç, karışım yeniden başlasın.",
+  "music.surprise.redirect.more": "Diğer türler",
+  "music.surprise.back": "Geri",
   "music.surprise.title": "Beni şaşırt",
   "music.surprise.stop": "Beni şaşırt özelliğini durdur",
   "music.surprise.body": "Dinlediklerine ve çalma listelerine göre henüz duymadığın şarkılar.",
