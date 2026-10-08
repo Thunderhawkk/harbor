@@ -1,7 +1,7 @@
 import { fillStyle } from "@/components/slider";
 import { RotateCcw } from "../icons";
 import { useRef, useState } from "react";
-import seekPreviewBg from "@/assets/settings-preview/steamboat-river.webp";
+import seekPreviewBg from "@/assets/preview/seek-preview.png";
 import { SeekBarVisual } from "@/components/player/transport/seek-bar-visual";
 import { useSettings, type Settings } from "@/lib/settings";
 import { ColorPopoverTrigger } from "../color-picker";
@@ -176,6 +176,15 @@ export function SeekBarPanel() {
             targetQuality={0.88}
           />
         </SettingRow>
+
+        <ToggleRow
+          label={t("Reveal the dot on hover")}
+          sub={t(
+            "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.",
+          )}
+          value={settings.seekDotHover !== false}
+          onChange={(v) => update({ seekDotHover: v })}
+        />
 
         <ToggleRow
           label={t("Buffer fill")}

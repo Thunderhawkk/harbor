@@ -36,7 +36,29 @@ function fmtPercent(pct: number): string {
   return pct >= 10 ? `${Math.round(pct)}%` : `${pct.toFixed(1)}%`;
 }
 
-function localStorageBreakdown(): { total: number; top: { key: string; bytes: number }[] } {
+/** One cache writes an entry per request, so families collapse into a single readable row. */
+const FAMILIES = [
+  "harbor.ebook.openlibrary.",
+  "harbor.ebook.",
+  "harbor.cinemeta.",
+  "harbor.awards.",
+  "harbor.music.",
+  "harbor.addon.",
+];
+
+const FAMILY_NAMES: Record<string, string> = {
+  "harbor.ebook.openlibrary.": "eBook lookup cache",
+  "harbor.ebook.": "eBook data",
+  "harbor.cinemeta.": "Cinemeta meta",
+  "harbor.awards.": "Awards cache",
+  "harbor.music.": "Music preferences",
+  "harbor.addon.": "Addon data",
+};
+
+function localStorageBreakdown(): {
+  total: number;
+  top: { key: string; bytes: number; count: number }[];
+} {
   let total = 0;
   const rows: { key: string; bytes: number }[] = [];
   try {
@@ -50,11 +72,23 @@ function localStorageBreakdown(): { total: number; top: { key: string; bytes: nu
   } catch {
     return { total: 0, top: [] };
   }
-  rows.sort((a, b) => b.bytes - a.bytes);
-  return { total, top: rows.slice(0, 6) };
+  const grouped = new Map<string, { key: string; bytes: number; count: number }>();
+  for (const row of rows) {
+    const family = FAMILIES.find((prefix) => row.key.startsWith(prefix)) ?? row.key;
+    const held = grouped.get(family);
+    if (held) {
+      held.bytes += row.bytes;
+      held.count += 1;
+    } else {
+      grouped.set(family, { key: family, bytes: row.bytes, count: 1 });
+    }
+  }
+  const top = [...grouped.values()].sort((a, b) => b.bytes - a.bytes).slice(0, 6);
+  return { total, top };
 }
 
 function friendlyKey(key: string): string {
+  if (FAMILY_NAMES[key]) return FAMILY_NAMES[key];
   const known: Record<string, string> = {
     "harbor.jikancatalog2": "Anime catalog cache",
     "harbor.awards.wikidata": "Awards cache",
@@ -72,7 +106,8 @@ function friendlyKey(key: string): string {
     .replace(/[-_.]/g, " ")
     .trim();
   if (!words) return key;
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  const label = words.charAt(0).toUpperCase() + words.slice(1);
+  return label.length > 48 ? `${label.slice(0, 47)}…` : label;
 }
 
 function ClearRow({
@@ -263,7 +298,11 @@ export function StoragePanel() {
             >
               <SettingGroup>
                 {ls.top.map((row) => (
-                  <SettingRow key={row.key} label={t(friendlyKey(row.key))}>
+                  <SettingRow
+                    key={row.key}
+                    label={t(friendlyKey(row.key))}
+                    desc={row.count > 1 ? t("{count} entries", { count: row.count }) : undefined}
+                  >
                     <span className={READOUT}>{fmtBytes(row.bytes)}</span>
                   </SettingRow>
                 ))}

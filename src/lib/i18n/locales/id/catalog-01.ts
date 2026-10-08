@@ -911,6 +911,12 @@ const catalog: Record<string, string> = {
   "Comments are blurred until you reveal them, even if they are not tagged as spoilers.":
     "Komentar diburamkan hingga Anda menampilkannya, meskipun tidak ditandai sebagai spoiler.",
   "Comments are hidden": "Komentar disembunyikan",
+  "Hosted elsewhere": "Dihosting pihak lain",
+  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.": "Paket ini dijalankan pihak ketiga. Harbor tidak berafiliasi dan tidak menerima apa pun dari pendaftaran. Harga dan ketentuan terkini ada di situs mereka.",
+  "{name} can run on a hosted instance": "{name} bisa berjalan di instans terkelola",
+  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.": "Layanan ini dijalankan pihak ketiga. Harbor tidak berafiliasi, tidak menjualnya kembali, dan tidak menerima apa pun jika kamu mendaftar. Harga dan isinya ada di situs mereka.",
+  "Show comments": "Tampilkan komentar",
+  "Hide comments": "Sembunyikan komentar",
   "Comments may take a moment to appear on Trakt":
     "Komentar mungkin perlu waktu untuk muncul di Trakt",
   "Comments on anime pages are blurred until you reveal them, even if they are not tagged as spoilers.":

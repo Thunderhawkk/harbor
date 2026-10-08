@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { computeTvgIdCounts, epgProgramsForChannel } from "@/lib/iptv/epg-resolver";
 import { useEpgMapVersion } from "@/lib/iptv/epg-map";
@@ -91,6 +91,11 @@ export function GuideView({
   const tvgIdCounts = useMemo(() => computeTvgIdCounts(allChannels), [allChannels]);
   const epgMapVersion = useEpgMapVersion();
   const [matchTarget, setMatchTarget] = useState<IptvChannel | null>(null);
+  const matchTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeMatch = () => {
+    setMatchTarget(null);
+    matchTriggerRef.current?.focus({ preventScroll: true });
+  };
   const [preview, setPreview] = useState<{ channel: IptvChannel; title: string } | null>(null);
   const previewTimerRef = useRef<number | null>(null);
 
@@ -267,6 +272,10 @@ export function GuideView({
                   index={i}
                   width={colPx}
                   current={ch.id === currentChannelId}
+                  onMatch={epg ? (trigger) => {
+                    matchTriggerRef.current = trigger;
+                    setMatchTarget(ch);
+                  } : undefined}
                 />
                 <div
                   className="relative"
@@ -276,15 +285,6 @@ export function GuideView({
                   {!!epg && !epgLoading && programs.length === 0 && (
                     <div className="flex h-full items-center gap-3 px-3 text-[11.5px] text-ink-subtle">
                       <span>{t("No program info")}</span>
-                      {epg && epg.byChannel.size > 0 && (
-                        <button
-                          onClick={() => setMatchTarget(ch)}
-                          className="flex items-center gap-1.5 rounded-md border border-edge-soft/55 bg-elevated/70 px-2 py-1 font-medium text-ink-muted transition-colors hover:text-ink"
-                        >
-                          <Link2 size={11} strokeWidth={2.2} />
-                          {t("Match EPG")}
-                        </button>
-                      )}
                     </div>
                   )}
                   {programs.map((p) => {
@@ -363,7 +363,7 @@ export function GuideView({
       </button>
       <BackToTop scrollRef={scrollRef} threshold={400} />
       {matchTarget && epg && (
-        <EpgMatchModal channel={matchTarget} epg={epg} onClose={() => setMatchTarget(null)} />
+        <EpgMatchModal channel={matchTarget} epg={epg} onClose={closeMatch} />
       )}
     </div>
   );

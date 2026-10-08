@@ -3,7 +3,7 @@ import { useModalExit } from "@/components/modal-shell";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CodeEditor } from "@/components/code-editor";
-import { SETTINGS_FILMS } from "@/lib/sample-artwork";
+import { useSettingsSamples } from "@/lib/sample-artwork";
 import { useT } from "@/lib/i18n";
 import { tvFocus } from "@/lib/keyboard-navigation";
 import { isBackKey } from "@/lib/keyboard-navigation/geometry";
@@ -39,7 +39,7 @@ export function CardCssPopout({
   const t = useT();
   const { settings } = useSettings();
   const tvNav = settings.tvNavigation;
-  const picks = SETTINGS_FILMS;
+  const picks = useSettingsSamples().slice(0, 4);
   const hasStarter = css.includes(STARTER.trim());
   const doneRef = useRef<HTMLButtonElement>(null);
 

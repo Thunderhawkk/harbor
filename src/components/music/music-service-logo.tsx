@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Music2 } from "lucide-react";
+import { Music2 } from "@/components/icons/music-icons";
 import jellyfinLogo from "@/assets/service-logos/jellyfin.png";
 import plexLogo from "@/assets/service-logos/plex.png";
 import youtubeLogo from "@/assets/service-logos/youtube.ico";
@@ -15,6 +15,10 @@ const LOGOS: Record<string, readonly string[]> = {
   ],
   billboard: [
     "https://www.billboard.com/wp-content/themes/vip/pmc-billboard-2021/assets/app/icons/favicon.png",
+  ],
+  rollingstone: [
+    "https://www.rollingstone.com/wp-content/themes/vip/pmc-rollingstone-2022/assets/app/icons/apple-touch-icon.png",
+    "https://www.rollingstone.com/favicon.ico",
   ],
   plex: ["https://watch.plex.tv/icons/favicon.ico", plexLogo],
   jellyfin: ["https://jellyfin.org/images/favicon.ico", jellyfinLogo],
@@ -54,7 +58,7 @@ export function MusicServiceLogo({
       aria-hidden="true"
       width={size}
       height={size}
-      className={`shrink-0 select-none object-contain ${className}`}
+      className={`shrink-0 select-none object-contain ${service === "soundcloud" ? "rounded-[20%]" : ""} ${className}`}
       style={{ width: size, height: size }}
       loading="lazy"
       decoding="async"

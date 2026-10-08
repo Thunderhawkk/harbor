@@ -19,6 +19,7 @@ export type TennisTournament = {
 export type DrawPlayer = {
   name: string;
   flag: string;
+  flags?: string[];
   winner: boolean;
   sets: string[];
 };
@@ -119,10 +120,19 @@ function toDrawMatch(comp: Raw, draw: string): DrawMatch | null {
   const sorted = [...cs].sort((a, b) => Number(a.order ?? 99) - Number(b.order ?? 99));
   const players: DrawPlayer[] = sorted.map((c) => {
     const athlete = (c.athlete as Raw | undefined) ?? {};
+    const roster = (c.roster as Raw | undefined) ?? {};
     const lines = (c.linescores as Raw[] | undefined) ?? [];
+    const flagOf = (person: Raw) => String((person.flag as Raw | undefined)?.href ?? "");
+    const squad = (Array.isArray(roster.athletes) ? (roster.athletes as Raw[]) : []).map(
+      (entry) => ((entry.athlete as Raw | undefined) ?? entry) as Raw,
+    );
+    const flags = squad.map(flagOf).filter(Boolean);
     return {
-      name: String(athlete.displayName ?? athlete.shortName ?? ""),
-      flag: String((athlete.flag as Raw | undefined)?.href ?? ""),
+      name:
+        String(athlete.displayName ?? athlete.shortName ?? "") ||
+        String(roster.displayName ?? roster.shortDisplayName ?? "").trim(),
+      flag: flagOf(athlete) || flags[0] || "",
+      ...(flags.length > 1 ? { flags } : {}),
       winner: c.winner === true,
       sets: lines.map((l) => String(l.value ?? l.displayValue ?? "")).filter(Boolean),
     };

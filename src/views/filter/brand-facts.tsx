@@ -10,34 +10,34 @@ import {
   type BrandTitle,
 } from "@/lib/providers/tmdb/tmdb-brands";
 import { useSettings } from "@/lib/settings";
-import { useView, type MetaFilter } from "@/lib/view";
+import { useView } from "@/lib/view";
 import { openUrl } from "@/lib/window";
 import { compactMoney } from "./brand-rails";
+import { browsedId, type Browsed } from "./browsed";
 
-type Branded = MetaFilter & { kind: "studio" | "network"; id: number; name: string };
-
-export function useBrandStats(filter: Branded): {
+export function useBrandStats(filter: Browsed): {
   details: BrandDetails | null;
   stats: BrandStats | null;
 } {
   const { settings } = useSettings();
   const [details, setDetails] = useState<BrandDetails | null>(null);
   const [stats, setStats] = useState<BrandStats | null>(null);
+  const browseId = browsedId(filter);
   useEffect(() => {
     setDetails(null);
     setStats(null);
     if (!settings.tmdbKey) return;
     let alive = true;
-    void tmdbBrandDetails(settings.tmdbKey, filter.kind, filter.id).then((d) => {
+    void tmdbBrandDetails(settings.tmdbKey, filter.kind, browseId).then((d) => {
       if (alive) setDetails(d);
     });
-    void tmdbBrandStats(settings.tmdbKey, filter.kind, filter.id, filter.mediaType).then((s) => {
+    void tmdbBrandStats(settings.tmdbKey, filter.kind, browseId, filter.mediaType).then((s) => {
       if (alive) setStats(s);
     });
     return () => {
       alive = false;
     };
-  }, [settings.tmdbKey, filter.kind, filter.id, filter.mediaType]);
+  }, [settings.tmdbKey, filter.kind, browseId, filter.mediaType]);
   return { details, stats };
 }
 
@@ -84,7 +84,7 @@ export function BrandFacts({
   details,
   stats,
 }: {
-  filter: Branded;
+  filter: Browsed;
   details: BrandDetails | null;
   stats: BrandStats | null;
 }) {

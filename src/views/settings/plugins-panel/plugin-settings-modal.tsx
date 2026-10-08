@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "../icons";
 import { Dropdown } from "@/components/dropdown";
 import { useT } from "@/lib/i18n";
@@ -31,6 +31,12 @@ export function PluginSettingsModal({
   onClose: () => void;
 }) {
   const t = useT();
+  // `useT` hands back a new function on every render, so it cannot be a dependency of the read
+  // below: showing what came back renders again, that new function is a changed dependency, and the
+  // read starts over — which puts the form back to its loading state and never settles. Held in a
+  // ref instead, since it is only needed to report a failure that has already happened.
+  const tRef = useRef(t);
+  tRef.current = t;
   const [fields, setFields] = useState<SettingsField[] | null>(null);
   const [values, setValues] = useState<Values>({});
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +56,13 @@ export function PluginSettingsModal({
       .catch((e) => {
         if (cancelled) return;
         setFields([]);
-        setError(t("This plugin's settings form failed to load: {error}", { error: errorText(t, e) }));
+        const say = tRef.current;
+        setError(say("This plugin's settings form failed to load: {error}", { error: errorText(say, e) }));
       });
     return () => {
       cancelled = true;
     };
-  }, [adapter, plugin.id, t]);
+  }, [adapter, plugin.id]);
 
   const save = async () => {
     if (!fields || !adapter.saveSettings) return;

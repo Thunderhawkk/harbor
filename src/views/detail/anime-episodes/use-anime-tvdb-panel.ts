@@ -20,6 +20,7 @@ import {
   type TvdbOrder,
 } from "@/lib/providers/tvdb-order";
 import { foreignAnimeProviderSeasons } from "@/lib/streams/anime-identity";
+import { resolveAnimeSlotMatch } from "./anime-slot-match";
 import type { PickerItem } from "../series-episodes/season-arc-picker";
 
 export type AnimeTvdbPanel = {
@@ -224,8 +225,16 @@ export function useAnimeTvdbPanel(
           e.stillUrl ?? e.stillPath ?? (abs != null ? ordering.imageByAbs.get(abs) : undefined);
         let match: KitsuEpisode | undefined;
         if (e.seasonNumber > 0) {
-          match = byTvdbId.get(e.id) ?? byPair.get(`${e.seasonNumber}:${e.episodeNumber}`);
-          if (!match && abs != null) match = byAbs.get(abs);
+          match = resolveAnimeSlotMatch(
+            e.seasonNumber,
+            e.episodeNumber,
+            e.id,
+            abs ?? undefined,
+            byTvdbId,
+            byPair,
+            byAbs,
+            claimed,
+          );
         }
         const currentMatch =
           currentByTvdbId.get(e.id) ??
@@ -243,7 +252,6 @@ export function useAnimeTvdbPanel(
             { lang },
           );
         }
-        if (match && claimed.has(match.id)) match = undefined;
 
         let streamId: string | undefined;
         if (!match && franchise) {

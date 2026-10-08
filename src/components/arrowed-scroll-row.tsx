@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
-import { useT } from "@/lib/i18n";
+import { isRtl, useT, useUiLanguage } from "@/lib/i18n";
+import { horizontalScrollState } from "@/lib/horizontal-scroll";
 import { NavArrow } from "./nav-arrow";
 
 type DragState = {
@@ -30,13 +31,16 @@ export function ArrowedScrollRow({
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const [grabbing, setGrabbing] = useState(false);
+  const language = useUiLanguage();
+  const rtl = isRtl(language);
 
   useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
     const update = () => {
-      setCanPrev(el.scrollLeft > 2);
-      setCanNext(el.scrollWidth - (el.scrollLeft + el.clientWidth) > 2);
+      const { position, max } = horizontalScrollState(el);
+      setCanPrev(position > 2);
+      setCanNext(max - position > 2);
     };
     update();
     el.addEventListener("scroll", update, { passive: true });
@@ -46,12 +50,13 @@ export function ArrowedScrollRow({
       el.removeEventListener("scroll", update);
       ro.disconnect();
     };
-  }, []);
+  }, [language]);
 
   const scroll = (dir: -1 | 1) => {
     const el = trackRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+    const { rtl } = horizontalScrollState(el);
+    el.scrollBy({ left: (rtl ? -dir : dir) * el.clientWidth * 0.85, behavior: "smooth" });
   };
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
@@ -117,6 +122,7 @@ export function ArrowedScrollRow({
     <div className={`relative ${className}`}>
       <div
         ref={trackRef}
+        data-tauri-drag-region="false"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -127,27 +133,31 @@ export function ArrowedScrollRow({
       >
         {children}
       </div>
-      <Arrow side="left" visible={canPrev} onClick={() => scroll(-1)} />
-      <Arrow side="right" visible={canNext} onClick={() => scroll(1)} />
+      <Arrow side="left" rtl={rtl} visible={canPrev} onClick={() => scroll(-1)} />
+      <Arrow side="right" rtl={rtl} visible={canNext} onClick={() => scroll(1)} />
     </div>
   );
 }
 
 function Arrow({
   side,
+  rtl,
   visible,
   onClick,
 }: {
   side: "left" | "right";
+  rtl: boolean;
   visible: boolean;
   onClick: () => void;
 }) {
   const t = useT();
+  const direction = rtl ? (side === "left" ? "right" : "left") : side;
   return (
     <NavArrow
-      dir={side}
+      dir={direction}
       onClick={onClick}
-      label={t(side === "left" ? "Scroll left" : "Scroll right")}
+      label={t(direction === "left" ? "Scroll left" : "Scroll right")}
+      tabIndex={visible ? 0 : -1}
       size={28}
       className={`absolute top-1/2 z-20 h-11 w-11 -translate-y-1/2 transition-opacity ${
         side === "left" ? "start-1" : "end-1"

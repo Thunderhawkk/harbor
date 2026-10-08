@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
+import { useSettings } from "@/lib/settings";
 import { hasSportsSource } from "@/lib/sports/enabled";
 import { usePlaylists } from "@/lib/iptv/playlists-store";
 import {
@@ -16,7 +17,10 @@ import { ROW_ACTION } from "./kit";
 export function SportsAccessRow() {
   const t = useT();
   const { setView } = useView();
-  const available = hasSportsSource(usePlaylists());
+  const { settings, update } = useSettings();
+  const provider = hasSportsSource(usePlaylists());
+  const anyway = settings.sportsWithoutProvider === true;
+  const available = provider || anyway;
   const consent = useSyncExternalStore(
     subscribeSportsConsent,
     getSportsConsentSnapshot,
@@ -32,13 +36,21 @@ export function SportsAccessRow() {
         )}
         lockReason={
           !available
-            ? t("Configure a Live TV, M3U or Xtream source to make Sports available.")
+            ? t("Turn on Sports without a provider, or add a Live TV, M3U or Xtream source.")
             : undefined
         }
         onChange={(value) => {
           if (value) resetSportsConsent();
           else declineSportsConsent();
         }}
+      />
+      <ToggleRow
+        label={t("Show Sports without a TV provider")}
+        value={anyway}
+        sub={t(
+          "Scores, schedules and standings come from public sports data and need no provider. Harbor does not supply streams: watching a game still needs your own Live TV, M3U or Xtream source.",
+        )}
+        onChange={(value) => update({ sportsWithoutProvider: value })}
       />
       <div className="flex flex-wrap items-center justify-between gap-4 py-3">
         <p className={`max-w-[65ch] ${ROW_DESC}`}>

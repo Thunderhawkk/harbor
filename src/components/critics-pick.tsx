@@ -267,7 +267,7 @@ export function CriticsPick({ meta, title }: { meta: Meta; title?: string }) {
                   decoding="async"
                   onLoad={() => setLogoLoaded(true)}
                   onError={() => setLogo(null)}
-                  className="max-h-[84px] w-auto max-w-[60%] object-contain object-left rtl:object-right drop-shadow-[0_4px_20px_rgba(0,0,0,0.55)]"
+                  className="max-h-[84px] w-auto max-w-[54%] object-contain object-left rtl:object-right drop-shadow-[0_4px_20px_rgba(0,0,0,0.55)]"
                   style={{
                     opacity: logoLoaded ? 1 : 0,
                     transition: "opacity 420ms cubic-bezier(0.32, 0.72, 0.24, 1)",

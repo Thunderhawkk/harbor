@@ -234,7 +234,7 @@ function LiveSeekRowMock() {
       </span>
       <div className="pointer-events-none relative h-12 flex-1">
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
-          <SeekBarVisual settings={settings} pct={92} bufferedPct={95} />
+          <SeekBarVisual settings={settings} pct={92} bufferedPct={95} forceDot />
         </div>
       </div>
       <span className="shrink-0 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/85 drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
@@ -320,7 +320,7 @@ function SeekBarPlaceholder() {
   return (
     <div className="pointer-events-none relative h-12 w-full">
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
-        <SeekBarVisual settings={settings} pct={21} bufferedPct={28} />
+        <SeekBarVisual settings={settings} pct={21} bufferedPct={28} forceDot />
       </div>
     </div>
   );

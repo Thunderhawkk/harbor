@@ -93,9 +93,18 @@ function filenameFromUrl(url: string): string | undefined {
 }
 
 export function subtitleTitleOf(
-  r: Pick<SubResult, "source" | "title" | "displayTitle" | "release" | "url" | "upstreamProvider">,
+  r: Pick<
+    SubResult,
+    "source" | "title" | "displayTitle" | "release" | "url" | "upstreamProvider" | "label"
+  >,
 ): string {
-  return releaseOf(r) ?? filenameFromUrl(r.url) ?? r.displayTitle ?? providerLabel(r);
+  return (
+    releaseOf(r) ??
+    filenameFromUrl(r.url) ??
+    r.label?.trim() ??
+    r.displayTitle ??
+    providerLabel(r)
+  );
 }
 
 export function subtitleLoadMetadataOf(result: SubResult): SubtitleLoadMetadata {
@@ -128,6 +137,7 @@ export function subtitleLoadMetadataOf(result: SubResult): SubtitleLoadMetadata 
     providerMatch: result.providerMatch,
     downloadAuth: result.downloadAuth,
     originalUrl: result.url,
+    refreshable: result.source === "addon",
     subId: result.id,
   };
 }

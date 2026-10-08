@@ -4,9 +4,8 @@
   align-items: center;
   gap: 4px;
   max-width: 100%;
-  border-radius: 4px;
-  background: var(--color-raised);
-  padding: 3px 6px;
+  background: transparent;
+  padding: 0;
   color: var(--color-ink-muted);
   font-size: 10px;
   font-weight: 650;
@@ -194,4 +193,14 @@
   .music-level-fill {
     transition: none;
   }
+}
+.music-signal-stage h4 { display: inline-flex; align-items: center; gap: 5px; }
+.music-signal-stage h4 > svg { color: var(--color-ink-subtle); flex: none; }
+.music-signal-stages { padding-block-end: 10px; }
+
+[data-art-colors] .music-level-fill {
+  background: color-mix(in srgb, var(--music-art-accent) 40%, var(--color-ink));
+}
+[data-art-colors] .music-level-peak {
+  background: color-mix(in srgb, var(--music-art-accent) 75%, var(--color-ink));
 }

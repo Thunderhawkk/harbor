@@ -1,6 +1,9 @@
+import { useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { useSectionBackActive } from "@/lib/section-back";
 import { useView } from "@/lib/view";
+import { BACK_SHAPE, BACK_SKIN } from "./back-affordance";
 
 const DEEP_KINDS = new Set([
   "meta",
@@ -10,13 +13,22 @@ const DEEP_KINDS = new Set([
   "filter",
   "award",
   "anime-award",
+  "curated-list",
   "service",
   "addon-detail",
   "queue",
   "groups",
   "group",
   "list",
+  "downloads",
 ]);
+
+/** The inline back controls defer to this one, so both read the same condition. */
+export function useFloatingBackShown(): boolean {
+  const { canGoBack, topKind, chromeHidden } = useView();
+  const sectionBack = useSectionBackActive();
+  return canGoBack && !chromeHidden && (sectionBack || DEEP_KINDS.has(topKind));
+}
 
 export function FloatingBack({
   offsetLeft = 24,
@@ -25,18 +37,29 @@ export function FloatingBack({
   offsetLeft?: number;
   offsetTop?: number;
 }) {
-  const { canGoBack, goBack, topKind, chromeHidden } = useView();
+  const { goBack } = useView();
   const t = useT();
-  if (!canGoBack || chromeHidden) return null;
-  if (!DEEP_KINDS.has(topKind)) return null;
-  const skin = "border border-edge-soft bg-canvas/90 text-ink-muted shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] backdrop-blur-md hover:bg-canvas hover:text-ink";
+  const shown = useFloatingBackShown();
+
+  useEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement;
+    root.style.setProperty("--harbor-floating-back-space", `${offsetTop + 56}px`);
+    return () => {
+      root.style.removeProperty("--harbor-floating-back-space");
+    };
+  }, [shown, offsetTop]);
+
+  if (!shown) return null;
+
   return (
     <button
       type="button"
       onClick={goBack}
       aria-label={t("common.back")}
+      data-floating-back
       style={{ position: "fixed", top: offsetTop, insetInlineStart: offsetLeft, zIndex: 70 }}
-      className={`flex h-10 items-center gap-2 rounded-full ps-3 pe-5 text-[13.5px] font-medium transition-colors ${skin}`}
+      className={`${BACK_SHAPE} ${BACK_SKIN}`}
     >
       <ArrowLeft size={15} className="dir-icon" />
       {t("common.back")}

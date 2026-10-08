@@ -21,6 +21,187 @@ export type EBookAwardCollection = {
 
 export const EBOOK_AWARD_COLLECTIONS: EBookAwardCollection[] = [
   {
+    id: "nyt-21st",
+    name: t("The Times: Best Books of the 21st Century"),
+    subtitle: t("From the New York Times critics' list of the century so far"),
+    titles: [
+      { title: "My Brilliant Friend" },
+      { title: "The Warmth of Other Suns" },
+      { title: "Wolf Hall" },
+      { title: "The Known World" },
+      { title: "The Corrections" },
+      { title: "2666" },
+      { title: "The Underground Railroad" },
+      { title: "Austerlitz" },
+      { title: "Never Let Me Go" },
+      { title: "Gilead" },
+      { title: "The Road" },
+      { title: "Pachinko" },
+      { title: "Normal People" },
+      { title: "The Sympathizer" },
+      { title: "Station Eleven" },
+      { title: "A Visit from the Goon Squad" },
+      { title: "The Brief Wondrous Life of Oscar Wao" },
+      { title: "Atonement" },
+      { title: "Life After Life" },
+      { title: "The Overstory" },
+    ],
+  },
+  {
+    id: "screen",
+    name: t("Read It Before You Watch It"),
+    subtitle: t("Books behind the films and series everyone knows"),
+    titles: [
+      { title: "Dune" },
+      { title: "The Lord of the Rings" },
+      { title: "Fight Club" },
+      { title: "No Country for Old Men" },
+      { title: "The Shining" },
+      { title: "Gone Girl" },
+      { title: "The Martian" },
+      { title: "Jurassic Park" },
+      { title: "Do Androids Dream of Electric Sheep?" },
+      { title: "The Godfather" },
+      { title: "The Silence of the Lambs" },
+      { title: "A Clockwork Orange" },
+      { title: "The Hunger Games" },
+      { title: "Ready Player One" },
+      { title: "Call Me by Your Name" },
+      { title: "The Handmaid's Tale" },
+      { title: "The Girl with the Dragon Tattoo" },
+      { title: "Life of Pi" },
+      { title: "The English Patient" },
+      { title: "Trainspotting" },
+      { title: "American Psycho" },
+      { title: "Shutter Island" },
+      { title: "Fear and Loathing in Las Vegas" },
+    ],
+  },
+  {
+    id: "banned",
+    name: t("Banned and Challenged"),
+    subtitle: t("Books someone tried to pull from a shelf"),
+    titles: [
+      { title: "1984" },
+      { title: "Brave New World" },
+      { title: "Fahrenheit 451" },
+      { title: "To Kill a Mockingbird" },
+      { title: "The Catcher in the Rye" },
+      { title: "Beloved" },
+      { title: "The Handmaid's Tale" },
+      { title: "Lolita" },
+      { title: "Animal Farm" },
+      { title: "Slaughterhouse-Five" },
+      { title: "The Color Purple" },
+      { title: "Of Mice and Men" },
+      { title: "Ulysses" },
+      { title: "Lady Chatterley's Lover" },
+    ],
+  },
+  {
+    id: "nobel",
+    name: t("Nobel Laureates in Literature"),
+    subtitle: t("Signature works by winners of the Nobel Prize"),
+    titles: [
+      { title: "One Hundred Years of Solitude" },
+      { title: "The Old Man and the Sea" },
+      { title: "Never Let Me Go" },
+      { title: "Beloved" },
+      { title: "The Stranger" },
+      { title: "Snow" },
+      { title: "Blindness" },
+      { title: "Disgrace" },
+      { title: "The Tin Drum" },
+      { title: "Doctor Zhivago" },
+      { title: "Lord of the Flies" },
+    ],
+  },
+  {
+    id: "modern-classics",
+    name: t("Modern Classics"),
+    subtitle: t("Twentieth century books that never left the shelf"),
+    titles: [
+      { title: "The Great Gatsby" },
+      { title: "Catch-22" },
+      { title: "On the Road" },
+      { title: "The Bell Jar" },
+      { title: "One Flew Over the Cuckoo's Nest" },
+      { title: "Slaughterhouse-Five" },
+      { title: "The Catcher in the Rye" },
+      { title: "Invisible Man" },
+      { title: "Things Fall Apart" },
+      { title: "Mrs Dalloway" },
+      { title: "The Sun Also Rises" },
+    ],
+  },
+  {
+    id: "dystopia",
+    name: t("Dystopias"),
+    subtitle: t("Futures nobody would choose to live in"),
+    titles: [
+      { title: "1984" },
+      { title: "Brave New World" },
+      { title: "Fahrenheit 451" },
+      { title: "The Handmaid's Tale" },
+      { title: "We" },
+      { title: "The Road" },
+      { title: "Never Let Me Go" },
+      { title: "Parable of the Sower" },
+      { title: "The Children of Men" },
+      { title: "A Clockwork Orange" },
+      { title: "Station Eleven" },
+    ],
+  },
+  {
+    id: "crime",
+    name: t("Crime and Mystery Essentials"),
+    subtitle: t("The cases that set the genre"),
+    titles: [
+      { title: "The Big Sleep" },
+      { title: "The Maltese Falcon" },
+      { title: "Gone Girl" },
+      { title: "The Girl with the Dragon Tattoo" },
+      { title: "And Then There Were None" },
+      { title: "The Hound of the Baskervilles" },
+      { title: "In Cold Blood" },
+      { title: "The Talented Mr. Ripley" },
+      { title: "The Silence of the Lambs" },
+      { title: "Murder on the Orient Express" },
+      { title: "The Secret History" },
+    ],
+  },
+  {
+    id: "womens-prize",
+    name: t("Women's Prize for Fiction"),
+    subtitle: t("Full length fiction by women writing in English"),
+    titles: [
+      { title: "Hamnet" },
+      { title: "Piranesi" },
+      { title: "The Power" },
+      { title: "Home Fire" },
+      { title: "An American Marriage" },
+      { title: "Half of a Yellow Sun" },
+      { title: "Demon Copperhead" },
+      { title: "The Book of Form and Emptiness" },
+    ],
+  },
+  {
+    id: "national-book",
+    name: t("National Book Award Winners"),
+    subtitle: t("The American award for the year's best writing"),
+    titles: [
+      { title: "The Underground Railroad" },
+      { title: "Sing, Unburied, Sing" },
+      { title: "The Friend" },
+      { title: "Trust Exercise" },
+      { title: "Hell of a Book" },
+      { title: "The Rabbit Hutch" },
+      { title: "Let the Great World Spin" },
+      { title: "Salvage the Bones" },
+    ],
+  },
+
+  {
     id: "hugo",
     name: t("Hugo Award Winners"),
     subtitle: t("Landmark winners in science fiction and fantasy"),
@@ -218,6 +399,51 @@ function awardCopy(id: string): Pick<EBookAwardCollection, "name" | "subtitle"> 
         name: t("Pulitzer Prize for Fiction"),
         subtitle: t("Distinguished fiction honored by the Pulitzer Prize"),
       };
+    case "nyt-21st":
+      return {
+        name: t("The Times: Best Books of the 21st Century"),
+        subtitle: t("From the New York Times critics' list of the century so far"),
+      };
+    case "screen":
+      return {
+        name: t("Read It Before You Watch It"),
+        subtitle: t("Books behind the films and series everyone knows"),
+      };
+    case "banned":
+      return {
+        name: t("Banned and Challenged"),
+        subtitle: t("Books someone tried to pull from a shelf"),
+      };
+    case "nobel":
+      return {
+        name: t("Nobel Laureates in Literature"),
+        subtitle: t("Signature works by winners of the Nobel Prize"),
+      };
+    case "modern-classics":
+      return {
+        name: t("Modern Classics"),
+        subtitle: t("Twentieth century books that never left the shelf"),
+      };
+    case "dystopia":
+      return {
+        name: t("Dystopias"),
+        subtitle: t("Futures nobody would choose to live in"),
+      };
+    case "crime":
+      return {
+        name: t("Crime and Mystery Essentials"),
+        subtitle: t("The cases that set the genre"),
+      };
+    case "womens-prize":
+      return {
+        name: t("Women's Prize for Fiction"),
+        subtitle: t("Full length fiction by women writing in English"),
+      };
+    case "national-book":
+      return {
+        name: t("National Book Award Winners"),
+        subtitle: t("The American award for the year's best writing"),
+      };
     default:
       return null;
   }
@@ -286,8 +512,7 @@ export function buildSourceEBookCollections(items: EBook[]): EBookSourceCollecti
       award.titles.flatMap((title) => findAwardSourceBook(title, awardBooks) ?? []),
     );
     if (!books.length) continue;
-    const copy = awardCopy(award.id);
-    if (!copy) continue;
+    const copy = awardCopy(award.id) ?? { name: award.name, subtitle: award.subtitle };
     collections.push({
       id: `award:${award.id}`,
       ...copy,

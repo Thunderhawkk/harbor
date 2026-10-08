@@ -255,6 +255,11 @@ async function readExperimentalManifest(path = "latest-experimental.json"): Prom
 
 export async function checkForUpdate(manual = false): Promise<void> {
   if (!IS_TAURI) return;
+  // The downloaded update package always installs to the real Harbor install
+  // location regardless of this build's identifier, so in dev it would silently
+  // update and relaunch the user's separately installed release build instead
+  // of this one. Never check for updates from a dev build.
+  if (import.meta.env.DEV) return;
   if (
     state.status === "checking" ||
     state.status === "downloading" ||
@@ -437,6 +442,7 @@ async function refreshBetaReturnContext(): Promise<void> {
 }
 
 export async function prepareBetaReturn(version: string): Promise<void> {
+  if (import.meta.env.DEV) return;
   if (!IS_TAURI || updateChannelLocked() || state.status === "checking") return;
   clearStagedUpdate();
   const request = revision;
@@ -502,6 +508,7 @@ async function saveTransitionBackup(): Promise<void> {
 }
 
 export async function downloadUpdate(): Promise<void> {
+  if (import.meta.env.DEV) return;
   if (state.status !== "available") return;
   const request = revision;
   const selected = checkedChannel;
@@ -579,6 +586,7 @@ export async function downloadUpdate(): Promise<void> {
 }
 
 export async function installUpdate(): Promise<void> {
+  if (import.meta.env.DEV) return;
   if (state.status !== "downloaded") return;
   const request = revision;
   const selected = checkedChannel;
@@ -708,20 +716,18 @@ export async function openManualDownload(): Promise<void> {
     const beta =
       selectedUpdateChannel() === "beta" ||
       (!readChannelPreference() && (await runningPrerelease()));
-    const res = await safeFetch(
-      `${HARBOR_API_BASE}/updates/latest.json`,
-      beta ? BETA_HEADERS : undefined,
-    );
-    const manifest = (await res.json()) as { platforms?: Record<string, { url?: string }> };
-    const platforms = manifest.platforms ?? {};
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const want = ua.includes("Windows") ? "windows" : ua.includes("Mac") ? "darwin" : "linux";
-    const key =
-      Object.keys(platforms).find((k) => k.toLowerCase().startsWith(want)) ??
-      Object.keys(platforms)[0];
-    const url = key ? platforms[key]?.url : undefined;
-    if (typeof url === "string" && url) {
-      target = url.endsWith(".app.tar.gz") ? `${url.slice(0, -".app.tar.gz".length)}.dmg` : url;
+    const [res, probe] = await Promise.all([
+      safeFetch(`${HARBOR_API_BASE}/updates/latest.json`, beta ? BETA_HEADERS : undefined),
+      probeHandoff(),
+    ]);
+    if (res.ok && probe) {
+      const manifest = (await res.json()) as { platforms?: Record<string, { url?: string }> };
+      // The probe reports OS and architecture even where installer handoff is unsupported.
+      // A missing build must not fall back to a different processor or operating system.
+      const url = manifest.platforms?.[probe.platformKey]?.url;
+      if (typeof url === "string" && url) {
+        target = url.endsWith(".app.tar.gz") ? `${url.slice(0, -".app.tar.gz".length)}.dmg` : url;
+      }
     }
   } catch {
     /* fall back to the site download */
@@ -908,6 +914,7 @@ export function clearStagedUpdate(): void {
 
 let started = false;
 export function startUpdateWatcher(): void {
+  if (import.meta.env.DEV) return;
   if (started || !IS_TAURI) return;
   started = true;
   void refreshBetaReturnContext();

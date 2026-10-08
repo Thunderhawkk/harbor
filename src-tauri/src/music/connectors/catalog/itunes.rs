@@ -140,6 +140,7 @@ fn album(entry: SearchResult) -> Option<MusicAlbumRef> {
         artwork: artwork(entry.artwork_url100),
         year: entry.release_date.as_deref().and_then(release_year),
         track_count: entry.track_count,
+        explicit: None,
     })
 }
 

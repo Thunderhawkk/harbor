@@ -57,6 +57,26 @@ pub async fn music_spotify_connect(
 }
 
 #[tauri::command]
+pub async fn music_spotify_devices(
+    state: tauri::State<'_, MusicState>,
+) -> Result<Vec<spotify::devices::SpotifyDevice>, String> {
+    state.spotify.devices().await
+}
+
+#[tauri::command]
+pub async fn music_spotify_set_device(
+    state: tauri::State<'_, MusicState>,
+    device: Option<String>,
+) -> Result<(), String> {
+    state.spotify.set_remote_device(device).await
+}
+
+#[tauri::command]
+pub fn music_spotify_device(state: tauri::State<'_, MusicState>) -> Option<String> {
+    state.spotify.remote_device()
+}
+
+#[tauri::command]
 pub async fn music_spotify_disconnect(state: tauri::State<'_, MusicState>) -> Result<(), String> {
     state.spotify.disconnect().await?;
     if state.active_engine() == ACTIVE_SPOTIFY {

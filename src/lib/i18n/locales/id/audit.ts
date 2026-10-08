@@ -184,6 +184,8 @@ const audit: Record<string, string> = {
   "British Television": "Televisi Britania",
   "British independent film": "Film independen Britania",
   "Buffer fill": "Isian buffer",
+  "Reveal the dot on hover": "Tampilkan titik saat disorot",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Titik tidak mengganggu dan muncul saat kamu mengarahkan kursor ke bilah. Matikan agar titik selalu terlihat.",
   "Buffer fill brightness": "Kecerahan isian buffer",
   "Build a pack in any of these, export the JSON, host it as a gist, and paste the raw link below.":
     "Buat paket dengan salah satu alat ini, ekspor JSON, unggah sebagai gist, lalu tempel tautan mentahnya di bawah.",

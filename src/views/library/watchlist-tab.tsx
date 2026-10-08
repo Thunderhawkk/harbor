@@ -5,7 +5,7 @@ import { type Meta } from "@/lib/cinemeta";
 import {
   library,
   libraryMetaType,
-  removeStremioLibraryItem,
+  removeStremioBookmark,
   type LibraryItem,
 } from "@/lib/stremio";
 import { fetchWatchlist } from "@/lib/trakt/watchlist";
@@ -130,7 +130,7 @@ export function WatchlistTab({
               stremioId,
               ...stremio.filter((item) => closure.has(item._id)).map((item) => item._id),
             ]),
-            (id) => removeStremioLibraryItem(authKey, id),
+            (id) => removeStremioBookmark(authKey, id),
           ),
           ...(tr.ok ? [removeTraktWatchlist(tr.target).catch(() => false)] : []),
           ...(simklTarget ? [removeSimklWatchlist(simklTarget).catch(() => false)] : []),

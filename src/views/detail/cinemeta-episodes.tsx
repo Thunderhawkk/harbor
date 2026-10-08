@@ -16,10 +16,21 @@ import { useLocalAwareSeriesPlay } from "@/lib/local-library/use-series-play";
 import { useT } from "@/lib/i18n";
 import { EpisodeDownloadButton } from "./episode-download-button";
 import { resumeDefaultSeason } from "@/lib/episode-progress";
+import { DragStrip } from "@/components/drag-strip";
+import { EpisodeGrid } from "./episode-grid";
+import { EpisodeGridCard } from "./episode-grid-card";
+import type { GridEpisode, Progress } from "./episode-grid-types";
+import { EpisodeLayoutToggle } from "./episode-layout-toggle";
+import { isUpcomingDate } from "./helpers";
+import {
+  episodeNumber,
+  episodeSeason,
+  groupEpisodes,
+  NO_SEASON,
+  type CinemetaVideo,
+} from "./episode-groups";
 
 type Translator = (key: string, vars?: Record<string, string | number>) => string;
-
-type CinemetaVideo = NonNullable<Meta["videos"]>[number];
 
 export function CinemetaEpisodes({
   meta,
@@ -33,6 +44,8 @@ export function CinemetaEpisodes({
   resumeSeason?: number;
 }) {
   const t = useT();
+  const { settings, update } = useSettings();
+  const playLocalAware = useLocalAwareSeriesPlay();
   const mwVersion = useSyncExternalStore(subscribeManualWatched, manualWatchedVersion);
   const [watchedMenu, setWatchedMenu] = useState<WatchedMenuTarget | null>(null);
   const openWatchedMenu = (
@@ -44,32 +57,7 @@ export function CinemetaEpisodes({
     e.preventDefault();
     setWatchedMenu({ x: e.clientX, y: e.clientY, season, episode, watched });
   };
-  const grouped = useMemo(() => {
-    const map = new Map<number, CinemetaVideo[]>();
-    const flat: CinemetaVideo[] = [];
-    for (const v of videos) {
-      if (v.season == null || (v.episode ?? v.number) == null) {
-        flat.push(v);
-        continue;
-      }
-      const arr = map.get(v.season) ?? [];
-      arr.push(v);
-      map.set(v.season, arr);
-    }
-    const numbered = Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([s, eps]) => ({
-        seasonNumber: s,
-        episodes: eps
-          .slice()
-          .sort((a, b) => (a.episode ?? a.number ?? 0) - (b.episode ?? b.number ?? 0)),
-      }));
-    if (flat.length > 0 && numbered.length === 0) {
-      flat.sort((a, b) => (a.released ?? "").localeCompare(b.released ?? ""));
-      return [{ seasonNumber: -1, episodes: flat }];
-    }
-    return numbered;
-  }, [videos]);
+  const grouped = useMemo(() => groupEpisodes(videos), [videos]);
   const combinedWatched = useMemo(() => {
     const watched = new Set(stremioWatched ?? []);
     const manual = manualEpisodeKeys(meta.id);
@@ -114,50 +102,140 @@ export function CinemetaEpisodes({
     setActive(resumeDefaultSeason(meta.id, seasonStats, combinedWatched, resumeSeason));
   }, [meta.id, seasonStats, combinedWatched, resumeSeason]);
 
-  if (grouped.length === 0) return null;
   const activeEps = grouped.find((g) => g.seasonNumber === active)?.episodes ?? [];
+
+  const watchedAt = (season: number, number: number): boolean => {
+    const st = manualWatchedState(meta.id, season, number);
+    return st === true || (st === undefined && (stremioWatched?.has(`${season}:${number}`) ?? false));
+  };
+
+  const progressFor = (g: GridEpisode): Progress => ({
+    ratio: 0,
+    watched: watchedAt(g.season, g.number),
+    startedAt: 0,
+  });
+
+  // The grid and the strip read the same model; only the list walks the raw videos, because it
+  // shows a description the card layouts would clip away.
+  const gridEpisodes = useMemo<GridEpisode[]>(
+    () =>
+      activeEps.map((ep, i) => {
+        const season = episodeSeason(ep);
+        const number = episodeNumber(ep, i);
+        const stills = ep.thumbnail ? [ep.thumbnail] : [];
+        const overview = ep.overview ?? ep.description;
+        const airDate = ep.released ?? null;
+        const runtime = ep.runtime ?? null;
+        return {
+          key: `${meta.id}:${season}:${number}`,
+          number,
+          season,
+          title: ep.name || ep.title || t("Episode {n}", { n: number }),
+          stills,
+          runtime,
+          airDate,
+          overview,
+          upcoming: isUpcomingDate(airDate),
+          play: (opts) =>
+            playLocalAware({
+              meta,
+              episode: {
+                season,
+                episode: number,
+                videoId: ep.id || undefined,
+                runtime: runtime ?? undefined,
+                name: ep.name || ep.title || undefined,
+                still: stills[0],
+                overview,
+              },
+              opts: {
+                autoPlay: settings.instantPlay || settings.seasonSourceLock,
+                resume: opts?.resume,
+              },
+            }),
+        };
+      }),
+    [
+      activeEps,
+      meta,
+      t,
+      playLocalAware,
+      settings.instantPlay,
+      settings.seasonSourceLock,
+    ],
+  );
+
+  if (grouped.length === 0) return null;
 
   return (
     <div data-episodes className="flex scroll-mt-24 flex-col gap-6">
       <div className="flex items-end justify-between gap-6">
         <h3 className="text-[22px] font-medium tracking-tight text-ink">{t("Episodes")}</h3>
-        {grouped.length > 1 && (
-          <SeasonDropdown
-            seasons={grouped.map((g) => g.seasonNumber)}
-            active={active}
-            onChange={(n) => {
-              userPickedRef.current = true;
-              setActive(n);
-            }}
+        <div className="flex items-center gap-3">
+          {grouped.length > 1 && (
+            <SeasonDropdown
+              seasons={grouped.map((g) => g.seasonNumber)}
+              active={active}
+              onChange={(n) => {
+                userPickedRef.current = true;
+                setActive(n);
+              }}
+            />
+          )}
+          <EpisodeLayoutToggle
+            value={settings.episodeLayout}
+            onChange={(v) => update({ episodeLayout: v })}
           />
-        )}
+        </div>
       </div>
       <p className="text-[13px] text-ink-subtle">
         {activeEps.length === 1
           ? t("{n} episode", { n: activeEps.length })
           : t("{n} episodes", { n: activeEps.length })}
       </p>
-      <div className="flex flex-col gap-1">
-        {activeEps.map((ep, i) => {
-          const season = ep.season ?? 0;
-          const epNumber = ep.episode ?? ep.number ?? (ep.season == null ? i + 1 : 1);
-          return (
-            <CinemetaEpisodeRow
-              key={ep.id ?? `${ep.season ?? "x"}-${ep.episode ?? i}`}
-              meta={meta}
-              ep={ep}
-              flatIndex={ep.season == null ? i + 1 : undefined}
-              watched={(() => {
-                const st = manualWatchedState(meta.id, season, epNumber);
-                return (
-                  st === true ||
-                  (st === undefined && (stremioWatched?.has(`${season}:${epNumber}`) ?? false))
-                );
-              })()}
-              onContextMenu={openWatchedMenu}
-            />
-          );
-        })}
+      <div key={settings.episodeLayout} className="animate-fade-in">
+        {settings.episodeLayout === "grid" ? (
+          <EpisodeGrid
+            meta={meta}
+            episodes={gridEpisodes}
+            progressFor={progressFor}
+            onContextMenu={openWatchedMenu}
+          />
+        ) : settings.episodeLayout === "strip" ? (
+          <DragStrip itemCount={gridEpisodes.length}>
+            {gridEpisodes.map((g) => (
+              <div
+                key={g.key}
+                className="shrink-0"
+                style={{ width: Math.round(244 * (settings.episodeCardScale || 1)) }}
+              >
+                <EpisodeGridCard
+                  meta={meta}
+                  g={g}
+                  progress={progressFor(g)}
+                  onContextMenu={openWatchedMenu}
+                />
+              </div>
+            ))}
+          </DragStrip>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {activeEps.map((ep, i) => {
+              const season = episodeSeason(ep);
+              const epNumber = episodeNumber(ep, i);
+              return (
+                <CinemetaEpisodeRow
+                  key={ep.id ?? `${ep.season ?? "x"}-${ep.episode ?? i}`}
+                  meta={meta}
+                  ep={ep}
+                  flatIndex={ep.season == null ? i + 1 : undefined}
+                  watched={watchedAt(season, epNumber)}
+                  onContextMenu={openWatchedMenu}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
       {watchedMenu && (
         <EpisodeWatchedMenu
@@ -196,13 +274,15 @@ export function CinemetaEpisodeRow({
   const aired = ep.released ?? ep.firstAired ?? null;
   const epNumber = ep.episode ?? ep.number ?? flatIndex ?? 1;
   const season = ep.season ?? 0;
+  const runtime = ep.runtime ?? null;
   const playEpisode = {
     season: ep.season ?? 0,
     episode: epNumber,
+    runtime: runtime ?? undefined,
     name: ep.name || ep.title || undefined,
     videoId: ep.id || undefined,
     still: ep.thumbnail || undefined,
-    overview: undefined,
+    overview: ep.overview ?? ep.description,
   };
   return (
     <div
@@ -248,10 +328,19 @@ export function CinemetaEpisodeRow({
             {ep.name || ep.title || formatAired(aired) || t("Episode {n}", { n: epNumber })}
           </h4>
           <p className="text-[12px] text-ink-subtle">
-            {[ep.season != null ? `S${ep.season} E${epNumber}` : null, formatAired(aired)]
+            {[
+              ep.season != null ? `S${ep.season} E${epNumber}` : null,
+              runtime ? t("{n} min", { n: runtime }) : null,
+              formatAired(aired),
+            ]
               .filter(Boolean)
               .join("  ·  ")}
           </p>
+          {(ep.overview ?? ep.description) && (
+            <p className="line-clamp-2 text-[13.5px] leading-relaxed text-ink-muted">
+              {ep.overview ?? ep.description}
+            </p>
+          )}
         </div>
       </button>
       <EpisodeDownloadButton meta={meta} episode={playEpisode} />
@@ -369,7 +458,7 @@ function SeasonDropdown({
 
 function seasonLabel(t: Translator, n: number): string {
   if (n === 0) return t("Specials");
-  if (n === -1) return t("Videos");
+  if (n === NO_SEASON) return t("No Season");
   return t("Season {n}", { n });
 }
 

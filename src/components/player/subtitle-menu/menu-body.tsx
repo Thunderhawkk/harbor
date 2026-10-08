@@ -5,15 +5,17 @@ import {
   Loader2,
   RotateCw,
   Search as SearchIcon,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Flag } from "@/components/flag";
 import { hasImportedSubTitle, markImportedSub, useImportedSubs } from "@/lib/player/imported-subs";
 import { setSecondarySub } from "@/lib/player/secondary-sub";
+import { canBeSecondarySub } from "@/lib/player/sub-format";
 import { useT } from "@/lib/i18n";
 import { HoverTooltip } from "@/components/hover-tooltip";
-import { filterTracksByPreferredLanguage } from "@/lib/subtitles/language";
+import { filterTracksByPreferredLanguage, isGeneratedLangLabel } from "@/lib/subtitles/language";
 import { SearchSection } from "./search-section";
 import { VariantRow } from "./variant-row";
 import { MenuHeader } from "./menu-header";
@@ -39,7 +41,12 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
     const keep = new Set(filtered);
     for (const t of tracks) {
       const isImported = hasImportedSubTitle(t.title) || importedTitles.has(t.title ?? "");
-      if (isImported || t.id === props.selectedId || t.secondary) keep.add(t);
+      // A generated subtitle ("Make Hindi") has no real language code, so the preferred
+      // language filter would drop it the moment it stops being selected. Keep it visible
+      // so the translated track stays reachable once it has been added.
+      if (isImported || t.id === props.selectedId || t.secondary || isGeneratedLangLabel(t.lang)) {
+        keep.add(t);
+      }
     }
     return tracks.filter((t) => keep.has(t));
   }, [tracks, preferredLanguages, importedTitles, props.selectedId]);
@@ -50,6 +57,7 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
   const [hideHI, setHideHI] = useState(false);
   const [forcedOnly, setForcedOnly] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFocusLang, setSearchFocusLang] = useState<string | null>(null);
   const [justImported, setJustImported] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,6 +109,7 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
   const secondaryTrack = useMemo(() => tracks.find((t) => t.secondary) ?? null, [tracks]);
   const pickSecondary = props.onSelectSecondary ?? setSecondarySub;
   const search = useSubtitleSearch();
+  const generatedOptions = search?.generated ?? [];
 
   const bestPool = allLangs ? languageTracks : (activeGroup?.variants ?? []);
   const streamHints = search?.hints ?? null;
@@ -149,7 +158,7 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
     <div className="flex h-full flex-col overflow-hidden">
       <MenuHeader
         engine={props.engine ?? "html5"}
-        count={languageTracks.length}
+        count={visibleVariants.length}
         selectedTrack={selectedTrack}
         hasSecondary={secondaryTrack != null}
         delaySec={delaySec}
@@ -216,6 +225,7 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
             <button
               onClick={() => {
                 setActiveLang(ALL_LANGS);
+                setSearchFocusLang(null);
                 setSearchOpen(false);
               }}
               className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-start text-[12.5px] font-medium transition-colors ${
@@ -239,6 +249,7 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
                 key={g.langKey}
                 onClick={() => {
                   setActiveLang(g.langKey);
+                  setSearchFocusLang(null);
                   setSearchOpen(false);
                 }}
                 className={`group flex items-center gap-2 rounded-md px-2.5 py-2 text-start text-[12.5px] transition-colors ${
@@ -256,6 +267,31 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
               </button>
             );
           })}
+          {generatedOptions.length > 0 && (
+            <>
+              <div className="mt-1.5 mb-0.5 px-2.5 text-[10px] font-bold uppercase tracking-[0.16em] text-ink-subtle">
+                {tr("Translations")}
+              </div>
+              {generatedOptions.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => {
+                    setSearchFocusLang(option.key);
+                    setSearchOpen(true);
+                  }}
+                  className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-start text-[12.5px] transition-colors ${
+                    searchOpen && searchFocusLang === option.key
+                      ? "bg-elevated text-ink ring-1 ring-edge"
+                      : "text-ink-muted hover:bg-elevated/60 hover:text-ink"
+                  }`}
+                >
+                  <Sparkles size={14} strokeWidth={2} className="shrink-0" />
+                  <span className="flex-1 truncate font-medium">{option.label}</span>
+                  <span className="text-[10.5px] tabular-nums text-ink-subtle">{option.count}</span>
+                </button>
+              ))}
+            </>
+          )}
         </aside>
 
         {/* Track list section */}
@@ -355,7 +391,14 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
 
           {searchOpen ? (
             <div className="flex min-h-0 flex-1 flex-col">
-              <SearchSection {...props} />
+              <SearchSection
+                {...props}
+                focusLang={searchFocusLang}
+                focusLabel={
+                  generatedOptions.find((option) => option.key === searchFocusLang)?.label ?? null
+                }
+                onClearFocus={() => setSearchFocusLang(null)}
+              />
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto">
@@ -382,8 +425,10 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
                         onPick={() => {
                           onSelect(t.id);
                         }}
-                        onPickSecondary={() =>
-                          pickSecondary(t.id === secondaryTrack?.id ? null : t.id)
+                        onPickSecondary={
+                          canBeSecondarySub(t)
+                            ? () => pickSecondary(t.id === secondaryTrack?.id ? null : t.id)
+                            : undefined
                         }
                       />
                     );
@@ -422,7 +467,10 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
 
           <div className="flex shrink-0 items-stretch border-t border-edge-soft">
             <button
-              onClick={() => setSearchOpen((v) => !v)}
+              onClick={() => {
+                setSearchFocusLang(null);
+                setSearchOpen((v) => !v);
+              }}
               className="flex flex-1 items-center gap-2 px-3 py-2 text-start text-[12px] font-semibold text-ink-muted transition-colors hover:bg-canvas/40 hover:text-ink"
             >
               <SearchIcon size={12} strokeWidth={2.2} />

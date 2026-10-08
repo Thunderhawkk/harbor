@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link2, Loader2, Package } from "../icons";
 import { useT } from "@/lib/i18n";
 import { addRepoAnyKind, pluginKinds, usePluginKindsVersion, type RepoView } from "@/lib/plugins";
 import { useSettings } from "@/lib/settings";
-import { splitRepoLinks } from "@/lib/streams/plugins";
+import { loadStreamPlugins, splitRepoLinks } from "@/lib/streams/plugins";
 import { ROW_ACTION_PRIMARY, SettingRow } from "../kit";
 import { Section, ToggleRow } from "../shared";
 import { errorText } from "./copy";
@@ -44,12 +44,20 @@ export function RepositoriesTab() {
 
   const repos = pluginKinds().flatMap((adapter) => adapter.repos().map((repo) => ({ repo, adapter })));
 
+  // The list is read from memory, and the read that fills it runs once per session. An edit that
+  // hot-replaces these modules leaves the new instance with an empty list and nothing left to ask
+  // again, so the tab asks for itself rather than reporting that the repositories are gone. The
+  // call is the same cached one the boot makes, so this costs nothing when the list is already in.
+  useEffect(() => {
+    if (!repos.length) void loadStreamPlugins();
+  }, [repos.length]);
+
   return (
     <>
       <Section
         title={t("Add a repository")}
         subtitle={t(
-          "Paste the manifest link of a repository you trust. Harbor reads its own plugin repositories and provider-script repositories as they are, and installs nothing until you choose to.",
+          "Paste the manifest link of a repository you trust. Harbor reads its own plugin repositories, provider-script repositories and Android extension repositories as they are, and installs nothing until you choose to.",
         )}
       >
         <SettingRow

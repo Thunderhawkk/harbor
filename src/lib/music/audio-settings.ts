@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useSyncExternalStore } from "react";
 import { clampNumber, normalizePeq, type PeqFilter } from "./parametric-eq";
+import { broadcastWindowState, subscribeWindowState } from "./window-sync";
+
+const AUDIO_CHANNEL = "harbor://music-audio-settings";
 
 export const MUSIC_EQ_FREQUENCIES = [
   31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000,
@@ -23,6 +26,13 @@ export type MusicAudioSettingsValue = {
   dspBypass: boolean;
   exclusive: boolean;
   sampleRate: number;
+  speed: number;
+  keepPitch: boolean;
+  reverb: number;
+  /** Semitones, independent of speed. */
+  pitch: number;
+  broadcastEnabled: boolean;
+  broadcastDevice: string;
 };
 export type MusicAudioDevice = { name: string; description: string };
 export const DEFAULT_MUSIC_AUDIO: MusicAudioSettingsValue = {
@@ -43,7 +53,20 @@ export const DEFAULT_MUSIC_AUDIO: MusicAudioSettingsValue = {
   dspBypass: false,
   exclusive: false,
   sampleRate: 0,
+  speed: 1,
+  keepPitch: false,
+  reverb: 0,
+  pitch: 0,
+  broadcastEnabled: false,
+  broadcastDevice: "auto",
 };
+
+// eslint-disable-next-line no-control-regex
+const DEVICE_CONTROL = /[\x00-\x1f]/;
+const deviceName = (value: unknown): string =>
+  typeof value === "string" && value.length > 0 && value.length <= 500 && !DEVICE_CONTROL.test(value)
+    ? value
+    : "auto";
 
 export function normalizeMusicAudio(
   value: Partial<MusicAudioSettingsValue> | null,
@@ -55,20 +78,18 @@ export function normalizeMusicAudio(
     eqStrength: clampNumber(value?.eqStrength, 0, 1, 1),
     preampDb: clampNumber(value?.preampDb, -60, 12, 0),
     crossfeed: clampNumber(value?.crossfeed, 0, 1, 0),
+    speed: clampNumber(value?.speed, 0.5, 1.6, 1),
+    keepPitch: value?.keepPitch === true,
+    reverb: clampNumber(value?.reverb, 0, 1, 0),
+    pitch: clampNumber(value?.pitch, -12, 12, 0),
     dspBypass: value?.dspBypass === true,
     exclusive: value?.exclusive === true,
     sampleRate: [0, 44100, 48000, 88200, 96000, 176400, 192000].includes(value?.sampleRate ?? -1)
       ? value!.sampleRate!
       : 0,
-    device:
-      typeof value?.device === "string" &&
-      value.device.length > 0 &&
-      value.device.length <= 500 &&
-      // Reject control characters in native device identifiers.
-      // eslint-disable-next-line no-control-regex
-      !/[\u0000-\u001f]/.test(value.device)
-        ? value.device
-        : "auto",
+    device: deviceName(value?.device),
+    broadcastEnabled: value?.broadcastEnabled === true,
+    broadcastDevice: deviceName(value?.broadcastDevice),
     eqEnabled: value?.eqEnabled === true,
     eqBands: MUSIC_EQ_FREQUENCIES.map((_, i) =>
       Number.isFinite(value?.eqBands?.[i]) ? Math.max(-12, Math.min(12, value!.eqBands![i])) : 0,
@@ -107,6 +128,10 @@ let snapshot: AudioSnapshot = {
   error: false,
 };
 const listeners = new Set<() => void>();
+subscribeWindowState<MusicAudioSettingsValue>(AUDIO_CHANNEL, (settings) => {
+  snapshot = { ...snapshot, settings: normalizeMusicAudio(settings), ready: true };
+  listeners.forEach((listener) => listener());
+});
 let initialization: Promise<void> | null = null;
 const publish = (next: Partial<AudioSnapshot>) => {
   snapshot = { ...snapshot, ...next };
@@ -164,6 +189,7 @@ export async function saveMusicAudioSettings(
       }),
     );
     publish({ settings: saved, saving: false, ready: true });
+    broadcastWindowState(AUDIO_CHANNEL, saved);
     return saved;
   } catch (error) {
     publish({ saving: false, error: true });

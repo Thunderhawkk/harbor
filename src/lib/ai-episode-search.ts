@@ -1,5 +1,5 @@
 import { AiSearchError, extractJsonArray, friendlyAiError } from "./ai-search";
-import { DEFAULT_AI_MODEL, migrateModelId } from "./ai-models";
+import { DEFAULT_AI_MODEL, migrateModelId, supportsSampling } from "./ai-models";
 import { HARBOR_API_BASE } from "@/lib/config/endpoints";
 
 const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
@@ -34,12 +34,13 @@ export async function aiFindEpisodes(
     headers["HTTP-Referer"] = HARBOR_API_BASE;
     headers["X-Title"] = "Harbor";
   }
+  const resolved = migrateModelId(model.trim()) || DEFAULT_AI_MODEL;
   const res = await fetch(isGroq ? GROQ : OPENROUTER, {
     method: "POST",
     headers,
     body: JSON.stringify({
-      model: migrateModelId(model.trim()) || DEFAULT_AI_MODEL,
-      temperature: 0.3,
+      model: resolved,
+      ...(supportsSampling(resolved) ? { temperature: 0.3 } : {}),
       max_tokens: 400,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },

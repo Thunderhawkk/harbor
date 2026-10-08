@@ -7,7 +7,7 @@ import {
   type SuwayomiSource,
 } from "./model";
 import { restSourceList, restSourceListOk, restSources } from "./rest";
-import { gqlAvailable, gqlSources } from "./graphql";
+import { gqlAvailable, gqlSources, SuwayomiServerError } from "./graphql";
 import { registerSuwayomiSourceBase } from "./auth-registry";
 
 export type ServerConfig = { baseUrl: string; auth?: { username: string; password: string } };
@@ -63,6 +63,9 @@ export async function withTransportFallback<T>(
   try {
     return await run(first);
   } catch (err) {
+    // The server understood and refused this mutation. A transport retry can
+    // hide its explanation or repeat an action with an uncertain outcome.
+    if (err instanceof SuwayomiServerError) throw err;
     const alt: Transport = first === "rest" ? "graphql" : "rest";
     const altOk = alt === "rest" ? await restSourceListOk(client) : await gqlAvailable(client);
     if (!altOk) throw err;

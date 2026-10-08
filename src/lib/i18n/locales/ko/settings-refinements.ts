@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "재생 캐시 폴더",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "디브리드 스트림을 포함한 동영상의 임시 버퍼링에 사용됩니다. 재생을 다시 시작하면 적용되며, 기존 파일은 현재 폴더에 남습니다.",
   "1 option formatted correctly": "옵션 1개의 형식이 올바릅니다",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. 영화 열기\n2. 작품 선택\n3. 재생 누르기\n4. 발생한 상황 설명",
   "3 to 24 letters, numbers, or underscores.": "3~24자의 영문자, 숫자 또는 밑줄을 사용하세요.",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "저장된 {name}이(가) 제거되고 해당 변경 사항이 더 이상 적용되지 않습니다.",
   "The server responded in {ms} ms.": "서버가 {ms}밀리초 만에 응답했습니다.",
   "The six largest local settings entries, including preferences and lookup data.": "환경설정과 조회 데이터를 포함하여 용량이 가장 큰 로컬 설정 항목 6개입니다.",
+  "{count} entries": "{count}개 항목",
   "The volume pop-up is hidden.": "음량 팝업이 숨겨져 있습니다.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "테마, 플레이어 레이아웃, 이미지, 카드에 표시할 내용입니다.",
   "This account has been suspended. Reach out to support if you think that's wrong.": "이 계정은 이용이 정지되었습니다. 잘못된 조치라고 생각하면 지원팀에 문의하세요.",

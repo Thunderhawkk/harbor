@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { captureFocusReturn } from "@/lib/keyboard-navigation";
 import { isBackKey } from "@/lib/keyboard-navigation/geometry";
-import { SETTINGS_SAMPLE_META } from "@/lib/sample-artwork";
+import { useSettingsSampleMeta } from "@/lib/sample-artwork";
 import { CustomHoverOverlay, customHoverPosterProps } from "@/components/pick-card/custom-hover";
 import {
   DEFAULT_CUSTOM,
@@ -39,10 +39,7 @@ export function CustomHoverEditor({
   const [draft, setDraft] = useState<CustomHoverConfig>(() =>
     initial ? { ...DEFAULT_CUSTOM, ...initial } : { id: "", name: "", ...DEFAULT_CUSTOM },
   );
-  const sample = {
-    ...SETTINGS_SAMPLE_META,
-    description: t(SETTINGS_SAMPLE_META.description),
-  };
+  const sample = useSettingsSampleMeta(13);
   useEffect(() => captureFocusReturn(), []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => isBackKey(e) && close();

@@ -632,6 +632,8 @@ const playback: Record<string, string> = {
     "自动模式适合大多数用户。mpv 能处理最棘手的 4K、HDR 和音频格式。",
   "Blur stream backdrop": "模糊播放源背景图",
   "Buffer fill": "缓冲区填充",
+  "Reveal the dot on hover": "悬停时显示圆点",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "圆点平时隐藏，指向进度条时才出现。关闭后会一直显示。",
   "Buffer fill brightness": "缓冲区填充亮度",
   "Build a named filter once, then apply it in the source picker to hide everything that doesn't match. Each filter ANDs its dimensions and ignores any you leave blank.":
     "创建一次命名筛选，然后在来源选择器中应用它，隐藏所有不匹配的内容。筛选条件各维度之间采用“且”逻辑，留空的维度将被忽略。",

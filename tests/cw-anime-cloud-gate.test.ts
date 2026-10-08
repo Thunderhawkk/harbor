@@ -99,8 +99,8 @@ test("every CW rail excludes cloud anime items", () => {
 
 test("anime room sources local CW entries", () => {
   assert.match(anime, /const localAnimeCw = useMemo<LibraryItem\[\]>/);
-  assert.match(anime, /listLocalCw\(\)\s*\.filter\(\(e\) => ANIME_CLOUD_ID\.test\(e\.id\)\)/);
-  assert.match(anime, /\[\.\.\.localAnimeCw, \.\.\.libItems\.filter/);
+  assert.match(anime, /listLocalCw\(hideSharedCw\)\s*\.filter\(\(e\) => ANIME_CLOUD_ID\.test\(e\.id\) \|\| e\.isAnime\)/);
+  assert.match(anime, /\[\s*\.\.\.localAnimeCw,\s*\.\.\.\(hideSharedCw \? \[\] : libItems\.filter/);
 });
 
 test("home and anime room absorb legacy cloud anime items into local CW", () => {

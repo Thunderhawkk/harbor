@@ -1,3 +1,4 @@
+import { evictLocalPrefix, idbCacheGet, idbCacheSet } from "@/lib/idb-cache";
 import { useEffect, useState } from "react";
 import { fetchCommunityAddons } from "@/lib/addons-store/community";
 import { registerEvictable } from "@/lib/maintenance";
@@ -56,16 +57,13 @@ const LS_PREFIX = "harbor.sa.v1.";
 const MAX_CACHE_ENTRIES = 48;
 const cache = new Map<string, { at: number; data: unknown }>();
 
-function lsGet(key: string): { at: number; data: unknown } | null {
-  try {
-    const raw = localStorage.getItem(LS_PREFIX + key);
-    if (!raw) return null;
-    const p = JSON.parse(raw) as { at: number; data: unknown };
-    if (!p || typeof p.at !== "number" || Date.now() - p.at > STALE_TTL_MS) return null;
-    return p;
-  } catch {
-    return null;
-  }
+evictLocalPrefix(LS_PREFIX);
+
+async function storedGet(key: string): Promise<{ at: number; data: unknown } | null> {
+  const entry = await idbCacheGet(LS_PREFIX + key);
+  if (!entry || typeof entry.at !== "number") return null;
+  if (Date.now() - entry.at > STALE_TTL_MS) return null;
+  return entry;
 }
 
 function writeCache(key: string, data: unknown): void {
@@ -77,17 +75,13 @@ function writeCache(key: string, data: unknown): void {
     if (oldest === undefined) break;
     cache.delete(oldest);
   }
-  try {
-    localStorage.setItem(LS_PREFIX + key, JSON.stringify(entry));
-  } catch {
-    /* ignore quota */
-  }
+  void idbCacheSet(LS_PREFIX + key, entry);
 }
 
 const revalidating = new Set<string>();
 
 async function cachedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
-  const entry = cache.get(key) ?? lsGet(key);
+  const entry = cache.get(key) ?? (await storedGet(key));
   if (entry) {
     if (!cache.has(key)) cache.set(key, entry);
     if (Date.now() - entry.at > CACHE_TTL_MS && !revalidating.has(key)) {

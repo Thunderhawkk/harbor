@@ -1,8 +1,17 @@
+import type { ReactNode } from "react";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/feed/tags";
+import { useFilmSoundtrack } from "@/lib/providers/musicbrainz-soundtrack";
 import { tmdbCompanyIdByName, type TmdbDetail } from "@/lib/providers/tmdb";
+import { useCriticism } from "@/lib/providers/podcast-criticism";
+import { useAdaptationFamily } from "@/lib/providers/wikidata-graph";
 import { useSettings } from "@/lib/settings";
 import { useView } from "@/lib/view";
 import { useT } from "@/lib/i18n";
+import { AdaptationRow } from "./adaptation-row";
+import { CriticismRow } from "./criticism-row";
+import { productionRows } from "./production-rows";
+import { useProductionFacts } from "./use-production-facts";
+import { SoundtrackRow } from "./soundtrack-row";
 
 const ANIME_ROW_BY_GENRE: Record<string, string> = {
   Action: "genre-action",
@@ -29,6 +38,28 @@ function focusAnimeRow(key: string) {
 export function InfoBlock({ detail, isAnime = false }: { detail: TmdbDetail; isAnime?: boolean }) {
   const t = useT();
   const { openFilter, setView } = useView();
+  const adaptation = useAdaptationFamily(isAnime ? undefined : (detail.imdbId ?? undefined));
+  const soundtrack = useFilmSoundtrack(detail.imdbId ?? undefined);
+  const production = useProductionFacts(
+    !isAnime && detail.kind === "movie" && detail.year
+      ? {
+          title: detail.title,
+          originalTitle: detail.originalTitle || undefined,
+          year: detail.year,
+          imdbId: detail.imdbId,
+        }
+      : null,
+  );
+  const criticism = useCriticism(
+    isAnime || detail.kind === "tv"
+      ? undefined
+      : {
+          title: detail.title,
+          originalTitle: detail.originalTitle || undefined,
+          year: detail.year,
+          directors: detail.directors.map((person) => person.name),
+        },
+  );
   const mediaType: "movie" | "tv" = detail.kind === "tv" ? "tv" : "movie";
 
   const fmtMoney = (n?: number) =>
@@ -91,6 +122,7 @@ export function InfoBlock({ detail, isAnime = false }: { detail: TmdbDetail; isA
   type Row = { label: string } & (
     | { kind: "text"; value: string }
     | { kind: "chips"; chips: Array<{ label: string; onClick: () => void }> }
+    | { kind: "node"; node: ReactNode }
   );
 
   const rows: Array<Row | null> = [
@@ -117,12 +149,28 @@ export function InfoBlock({ detail, isAnime = false }: { detail: TmdbDetail; isA
     detail.originalTitle && detail.originalTitle !== detail.title
       ? { label: t("Original title"), kind: "text", value: detail.originalTitle }
       : null,
+    adaptation
+      ? { label: t("Based on"), kind: "node", node: <AdaptationRow family={adaptation} /> }
+      : null,
+    soundtrack
+      ? { label: t("Soundtrack"), kind: "node", node: <SoundtrackRow album={soundtrack} /> }
+      : null,
     genreChips.length > 0 ? { label: t("Genres"), kind: "chips", chips: genreChips } : null,
     fmtMoney(detail.budget) != null
       ? { label: t("Budget"), kind: "text", value: fmtMoney(detail.budget)! }
       : null,
     fmtMoney(detail.revenue) != null
       ? { label: t("Revenue"), kind: "text", value: fmtMoney(detail.revenue)! }
+      : null,
+    ...(production ? productionRows(production, t) : []).map(
+      (row): Row => ({ label: row.label, kind: "node", node: row.node }),
+    ),
+    criticism.length > 0
+      ? {
+          label: t("Discussed on"),
+          kind: "node",
+          node: <CriticismRow title={detail.title} episodes={criticism} />,
+        }
       : null,
     detail.rating
       ? {
@@ -148,20 +196,22 @@ export function InfoBlock({ detail, isAnime = false }: { detail: TmdbDetail; isA
             <dd className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14.5px] text-ink">
               {row.kind === "text"
                 ? row.value
-                : row.chips.map((c, i) => (
-                    <span key={c.label} className="flex items-center">
-                      <button
-                        type="button"
-                        onClick={c.onClick}
-                        className="rounded-md text-ink underline-offset-4 transition-colors hover:text-accent hover:underline"
-                      >
-                        {c.label}
-                      </button>
-                      {i < row.chips.length - 1 && (
-                        <span className="ms-1.5 text-ink-subtle">·</span>
-                      )}
-                    </span>
-                  ))}
+                : row.kind === "node"
+                  ? row.node
+                  : row.chips.map((c, i) => (
+                      <span key={c.label} className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={c.onClick}
+                          className="rounded-md text-ink underline-offset-4 transition-colors hover:text-accent hover:underline"
+                        >
+                          {c.label}
+                        </button>
+                        {i < row.chips.length - 1 && (
+                          <span className="ms-1.5 text-ink-subtle">·</span>
+                        )}
+                      </span>
+                    ))}
             </dd>
           </div>
         ))}

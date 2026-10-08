@@ -21,11 +21,22 @@ export function upgradeArtworkUrl(url: string, targetPx: number): string {
   return url;
 }
 
+/** metahub only publishes small/medium/large, and "medium" is its full-size art, so "small" is the
+ *  one genuinely cheaper rung. Its width varies by title (480 and 780 both observed), so it is only
+ *  chosen below the smallest width ever seen, which can never under-resolve a box. */
+const METAHUB_SMALL_MIN_WIDTH = 480;
+const METAHUB = /(https?:\/\/images\.metahub\.space\/[^/]+\/)(small|medium|large)(\/)/i;
+
 export function sizeImageUrl(url: string, targetPx: number): string {
   if (!url || targetPx <= 0) return url;
   const seg = tmdbSegment(targetPx);
   const sized = url.replace(/(\/t\/p\/)(w\d+|original)(\/)/, `$1${seg}$3`);
-  return sized === url ? upgradeArtworkUrl(url, targetPx) : sized;
+  if (sized !== url) return sized;
+  if (targetPx <= METAHUB_SMALL_MIN_WIDTH) {
+    const shrunk = url.replace(METAHUB, "$1small$3");
+    if (shrunk !== url) return shrunk;
+  }
+  return upgradeArtworkUrl(url, targetPx);
 }
 
 export type PosterQuality = "balanced" | "high" | "max";

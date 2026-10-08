@@ -1,8 +1,10 @@
-import { readMusicPreference, writeMusicPreference } from "./preferences";
+import { useSyncExternalStore } from "react";
+import { hydrateJsonStore, readJsonStore, writeLocalJson } from "./local-store";
 
 export const MUSIC_SOURCE_CONSENT_VERSION = 1;
 export const MUSIC_SOURCE_CONSENT_KEY = "harbor.music.source-consent.v1";
 export const MUSIC_SOURCE_CONSENT_EVENT = "harbor:music-source-consent";
+const CONSENT_STORE = "source-consent";
 
 export const GATED_MUSIC_SOURCES = ["youtube", "soundcloud"] as const;
 export type GatedMusicSource = (typeof GATED_MUSIC_SOURCES)[number];
@@ -27,9 +29,8 @@ function dated(value: unknown): value is string {
   );
 }
 
-export function parseMusicSourceConsent(raw: string | null): MusicSourceConsent {
+function normalizeConsent(value: unknown): MusicSourceConsent {
   try {
-    const value: unknown = JSON.parse(raw ?? "null");
     if (!value || typeof value !== "object") return BLANK;
     const record = value as Record<string, unknown>;
     if (record.version !== MUSIC_SOURCE_CONSENT_VERSION || !dated(record.acceptedAt)) return BLANK;
@@ -49,14 +50,38 @@ export function parseMusicSourceConsent(raw: string | null): MusicSourceConsent 
   }
 }
 
-let consent = parseMusicSourceConsent(readMusicPreference(MUSIC_SOURCE_CONSENT_KEY));
+export function parseMusicSourceConsent(raw: string | null): MusicSourceConsent {
+  try {
+    return normalizeConsent(JSON.parse(raw ?? "null"));
+  } catch {
+    return BLANK;
+  }
+}
+
+let consent = normalizeConsent(
+  readJsonStore<unknown>(CONSENT_STORE, MUSIC_SOURCE_CONSENT_KEY, null),
+);
 const listeners = new Set<() => void>();
 
 function publish(next: MusicSourceConsent): MusicSourceConsent {
   consent = next;
-  writeMusicPreference(MUSIC_SOURCE_CONSENT_KEY, JSON.stringify(next));
+  writeLocalJson(CONSENT_STORE, next);
   for (const listener of listeners) listener();
   return consent;
+}
+
+/** Migrates the old browser-storage value once, then keeps consent in the JSON store. */
+export async function hydrateMusicSourceConsent(): Promise<void> {
+  await hydrateJsonStore(CONSENT_STORE, MUSIC_SOURCE_CONSENT_KEY);
+  const next = normalizeConsent(
+    readJsonStore<unknown>(CONSENT_STORE, MUSIC_SOURCE_CONSENT_KEY, null),
+  );
+  const same =
+    next.acceptedAt === consent.acceptedAt &&
+    GATED_MUSIC_SOURCES.every((id) => next.sources[id] === consent.sources[id]);
+  if (same) return;
+  consent = next;
+  for (const listener of listeners) listener();
 }
 
 export const getMusicSourceConsent = () => consent;
@@ -66,6 +91,15 @@ export function subscribeMusicSourceConsent(listener: () => void) {
   return () => {
     listeners.delete(listener);
   };
+}
+
+/** Subscribing keeps a row honest: accepting must flip its label without a reload. */
+export function useMusicSourceConsent(): MusicSourceConsent {
+  return useSyncExternalStore(
+    subscribeMusicSourceConsent,
+    getMusicSourceConsent,
+    getMusicSourceConsentServer,
+  );
 }
 
 export function isGatedMusicSource(

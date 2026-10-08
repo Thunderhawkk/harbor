@@ -7,6 +7,7 @@ import type { PlayEpisode } from "@/lib/view";
 import { resolveAddonRanks } from "./addon-priority";
 import { animeAbsoluteFromScopedId } from "./anime-identity-core";
 import type { PipelineInput } from "./pipeline";
+import { PLUGIN_ADDON_PREFIX, isPluginAddon, pluginAddonById, pluginIdFromCatalogueBase, pluginsForAddon } from "./plugins/addon";
 import { unverifiedAnimeSeasonId } from "./stream-ids";
 import type { Stream } from "./types";
 
@@ -58,6 +59,9 @@ export function buildEpisodePipelineInput(params: {
   strictMode: boolean;
   filterDisabled: boolean;
   animeTitles?: string[] | null;
+  /** Resolve the item's own plugin when it names one, even where plugins are otherwise kept out.
+   * Background work opts out, so the switch keeps plugins out of it entirely. */
+  resolvePinnedPlugin?: boolean;
 }): PipelineInput {
   const {
     meta,
@@ -72,6 +76,42 @@ export function buildEpisodePipelineInput(params: {
     animeTitles,
   } = params;
   const originBases = addonBasesForOrigin(addons, meta.addonOrigin);
+  // An item that names the plugin that listed it is that plugin's to answer, even where plugins
+  // are otherwise kept out: this is the item's own source being resolved, not plugins being
+  // browsed. Without this a saved plugin row plays nowhere the moment the outside-tab switch is
+  // off, because the switch keeps every plugin addon out of the list above.
+  let effectiveAddons = addons;
+  let pinnedId: string | undefined;
+  // The master switch wins: with every plugin paused there is nothing to resolve an item with,
+  // however it names its source.
+  if (params.resolvePinnedPlugin !== false && settings.pluginsEnabled) {
+    pinnedId = originBases
+      .map((base) => pluginIdFromCatalogueBase(base))
+      .find((id) => id != null);
+    // A plugin row names its plugin by id rather than by base, and a saved row may have kept
+    // only that; either way the name is enough when it belongs to an installed plugin.
+    if (!pinnedId && meta.addonOrigin?.id && pluginAddonById(meta.addonOrigin.id)) {
+      pinnedId = meta.addonOrigin.id;
+    }
+  }
+  // The pin is honoured only while its addon answers: a repository grouping that already covers
+  // the plugin is left to answer as a group rather than being asked twice.
+  let appendedBase: string | undefined;
+  if (pinnedId) {
+    const url = `${PLUGIN_ADDON_PREFIX}${pinnedId}`;
+    const covered = effectiveAddons.some(
+      (a) =>
+        a.transportUrl === url ||
+        (isPluginAddon(a) && pluginsForAddon(a).some((p) => `${PLUGIN_ADDON_PREFIX}${p.id}` === url)),
+    );
+    if (!covered) {
+      const only = pluginAddonById(pinnedId);
+      if (only) {
+        effectiveAddons = [...effectiveAddons, only];
+        appendedBase = url;
+      }
+    }
+  }
   const embedded = embeddedStreams(meta, episode, originBases[0]);
   const addonNative = isAddonNativeMeta(meta);
   const requestType = addonNative
@@ -131,16 +171,19 @@ export function buildEpisodePipelineInput(params: {
       season: animeReq && episode?.imdbSeason == null ? undefined : effSeason,
       episode: animeReq && episode?.imdbEpisode == null ? episode?.episode : effEpisode,
     },
-    addons,
+    addons: effectiveAddons,
     debrids,
     isAnime: animeReq,
     animeAbsoluteEpisode,
     animeEpisodeAliases,
     presetStreams: embedded.length > 0 ? embedded : undefined,
     addonTimeoutMs: Math.max(8, Math.min(120, settings.addonTimeoutSec ?? 30)) * 1000,
-    addonRanks: resolveAddonRanks(addons, settings.streamPriority),
-    forcedAddonBases:
-      originBases.length > 0 ? originBases.map((base) => ({ base, id: meta.id })) : undefined,
+    addonRanks: resolveAddonRanks(effectiveAddons, settings.streamPriority),
+    forcedAddonBases: (() => {
+      const forced = originBases.map((base) => ({ base, id: meta.id }));
+      if (appendedBase) forced.push({ base: appendedBase, id: meta.id });
+      return forced.length > 0 ? forced : undefined;
+    })(),
     trust: {
       kind: episode ? "series" : meta.type === "series" ? "series" : "movie",
       expectedTitle: meta.name,

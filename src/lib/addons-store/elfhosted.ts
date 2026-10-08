@@ -82,15 +82,6 @@ export function elfProductUrl(slug: string): string {
   return `${STORE}/${slug}/`;
 }
 
-export const ELF_BUNDLE = {
-  url: `${STORE}/stremio-addons-bundle/`,
-  monthlyUsd: 29,
-  trialUsd: 1,
-  trialDays: 7,
-  addonCount: 15,
-  singleUsd: 9,
-};
-
 export function isElfHostedInstance(transportUrl: string | null | undefined): boolean {
   if (!transportUrl) return false;
   try {

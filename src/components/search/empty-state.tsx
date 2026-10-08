@@ -42,7 +42,7 @@ import { PickCard } from "@/components/pick-card";
 type Jump = {
   view: View;
   label: string;
-  parentalKey: LockableTab;
+  parentalKey?: LockableTab;
   icon: React.ReactNode;
 };
 
@@ -56,6 +56,9 @@ const JUMP_TARGETS: Jump[] = [
   { view: "calendar", label: "Calendar", parentalKey: "calendar", icon: <CalendarIcon /> },
   { view: "library", label: "My Library", parentalKey: "library", icon: <LibraryIcon /> },
   { view: "addons", label: "Addons", parentalKey: "addons", icon: <AddonsIcon /> },
+  { view: "music", label: "Music", icon: <NavGlyph name="music" className="h-[26px] w-[26px] p-[2px]" /> },
+  { view: "manga", label: "Manga", parentalKey: "anime", icon: <NavGlyph name="manga" className="h-[26px] w-[26px] p-[2px]" /> },
+  { view: "ebook", label: "eBook", parentalKey: "anime", icon: <NavGlyph name="ebook" className="h-[26px] w-[26px] p-[2px]" /> },
 ];
 
 type FilterTab = "all" | "movies" | "shows" | StreamingService;
@@ -226,7 +229,10 @@ export function EmptyState({ onClose, onOpenGuide }: { onClose: () => void; onOp
     (!wantMovies || movieDone) &&
     (!wantSeries || tvDone);
 
-  const visibleJumps = JUMP_TARGETS.filter((j) => !hiddenTabs[j.parentalKey]);
+  const visibleJumps = JUMP_TARGETS.filter((j) => {
+    if (j.parentalKey && hiddenTabs[j.parentalKey]) return false;
+    return j.view !== "manga" || settings.mangaEnabled;
+  });
   const visibleGenres = Object.keys(MOVIE_GENRES).filter((name) => {
     if (hiddenTabs.anime && name === "Animation") return false;
     return true;
@@ -345,7 +351,7 @@ export function EmptyState({ onClose, onOpenGuide }: { onClose: () => void; onOp
   }
 
   return (
-    <div className="flex flex-col gap-10 pt-1">
+    <div className="harbor-search-cascade flex flex-col gap-10 pt-1">
       {recent.length > 0 && (
         <section>
           <div className="mb-3.5 flex items-center justify-between gap-3">

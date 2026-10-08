@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Globe, Layers, Settings, Star } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
+import { useEscape } from "@/components/modal-shell";
 import { mangaTags, type MangaTag } from "@/lib/manga/api";
 import {
   activeMangaSource,
@@ -138,17 +139,37 @@ export function TagDropdown({
   const [filter, setFilter] = useState("");
   const ref = useOutsideClose(open, () => setOpen(false));
   const t = useT();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuLeft, setMenuLeft] = useState(0);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const bounds = ref.current?.getBoundingClientRect();
+      if (!bounds) return;
+      const width = Math.min(240, window.innerWidth - 16);
+      setMenuLeft(Math.max(8, Math.min(bounds.left, window.innerWidth - width - 8)) - bounds.left);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open, ref]);
+  useEscape(() => {
+    setOpen(false);
+    triggerRef.current?.focus({ preventScroll: true });
+  }, open);
 
   useEffect(() => {
     let alive = true;
+    let request = 0;
     const load = (opts?: { clear?: boolean }) => {
+      const id = ++request;
       if (opts?.clear && alive) setTags([]);
       mangaTags()
         .then((list) => {
-          if (alive) setTags(list);
+          if (alive && id === request) setTags(list);
         })
         .catch((err) => {
-          console.warn("[manga] extension list refresh failed", err);
+          console.warn("[manga] filter list refresh failed", err);
         });
     };
     load();
@@ -169,13 +190,19 @@ export function TagDropdown({
   const allLabel = "All Extensions";
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    const list = q ? tags.filter((t) => t.name.toLowerCase().includes(q)) : tags;
-    return [...list].sort((a, b) => a.name.localeCompare(b.name));
+    return q ? tags.filter((t) => t.name.toLowerCase().includes(q)) : tags;
   }, [tags, filter]);
+  const categories = shown.filter((tag) => tag.group === "Categories");
+  const sources = shown.filter((tag) => tag.group !== "Categories")
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const renderTag = (tag: MangaTag) => (
+    <TagRow key={tag.id} label={tag.name} active={tag.id === tagId}
+      onClick={() => (onSelect(tag.id), setOpen(false))} />
+  );
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((v) => !v)} className={TRIGGER}>
+      <button ref={triggerRef} type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className={TRIGGER}>
         <Layers size={15} className="text-ink-subtle" />
         <span className="max-w-[140px] truncate font-medium">
           {tagId === FAVORITES ? t("Library") : active ? active.name : t(allLabel)}
@@ -183,13 +210,14 @@ export function TagDropdown({
         <ChevronDown size={14} className="text-ink-subtle" />
       </button>
       {open && (
-        <div className="absolute z-30 mt-1.5 w-[240px] overflow-hidden rounded-lg border border-edge-soft bg-raised shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]">
+        <div style={{ left: menuLeft }} className="absolute z-30 mt-1.5 w-[240px] max-w-[calc(100vw-16px)] overflow-hidden rounded-lg border border-edge-soft bg-raised shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]">
           <div className="border-b border-edge-soft/60 p-2">
             <input
               autoFocus
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder={t("Filter extensions...")}
+              placeholder={t("Filter tags...")}
+              aria-label={t("Filter tags...")}
               className="w-full rounded-md bg-elevated/50 px-3 py-1.5 text-[12.5px] text-ink placeholder:text-ink-subtle outline-none focus:ring-1 focus:ring-edge"
             />
           </div>
@@ -210,19 +238,18 @@ export function TagDropdown({
               {tagId === FAVORITES && <Check size={14} className="text-accent" />}
             </button>
             <div className="my-1 border-t border-edge-soft/60" />
+            {categories.length > 0 && <>
+              <div className="px-3 py-1.5 text-[11px] font-medium text-ink-subtle">{t("Categories")}</div>
+              {categories.map(renderTag)}
+              <div className="my-1 border-t border-edge-soft/60" />
+            </>}
+            <div className="px-3 py-1.5 text-[11px] font-medium text-ink-subtle">{t("Extensions")}</div>
             <TagRow
               label={t(allLabel)}
               active={!tagId}
               onClick={() => (onSelect(""), setOpen(false))}
             />
-            {shown.map((t) => (
-              <TagRow
-                key={t.id}
-                label={t.name}
-                active={t.id === tagId}
-                onClick={() => (onSelect(t.id), setOpen(false))}
-              />
-            ))}
+            {sources.map(renderTag)}
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import { ArrowDownToLine, ChevronRight, Star } from "lucide-react";
 import { useRatingPoster } from "@/lib/ratings/poster";
+import { useProfileTitle } from "./use-profile-title";
 import { useT } from "@/lib/i18n";
 import { ArrowedScrollRow } from "@/components/arrowed-scroll-row";
 import { RatingPoster } from "@/components/ratings/rating-poster";
@@ -92,13 +93,14 @@ function RatingTile({
   onOpenMeta?: (metaId: string, kind?: string, hint?: { name?: string; poster?: string }) => void;
 }) {
   const poster = useRatingPoster(r.itemKey, r.mediaType, r.title, r.posterUrl);
+  const media = useProfileTitle(r.itemKey, r.title, poster, r.mediaType);
   return (
-    <div className="w-[104px] shrink-0">
+    <div ref={media.ref} className="w-[104px] shrink-0">
       <RatingPoster
-        title={r.title}
-        posterUrl={poster}
+        title={media.title || r.title}
+        posterUrl={media.poster}
         score={r.score}
-        onOpen={onOpenMeta ? () => onOpenMeta(r.itemKey, r.mediaType, { name: r.title, poster }) : undefined}
+        onOpen={onOpenMeta ? () => onOpenMeta(r.itemKey, r.mediaType, { name: media.title, poster: media.poster }) : undefined}
       />
     </div>
   );

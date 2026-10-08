@@ -1,28 +1,14 @@
 /* Shared music-page rhythm; surfaces and contrast follow the selected Harbor theme. */
 [data-music-view] {
   container-type: inline-size;
-  padding-block-start: 80px;
+  padding-block-start: max(80px, var(--harbor-floating-back-space, 0px));
+}
+[data-music-view][data-music-opening],
+[data-music-view][data-music-opening] button {
+  cursor: progress;
 }
 .music-page-mast {
   align-items: center;
-}
-.music-page-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 14px;
-  border-radius: var(--radius-md, 10px);
-  background: var(--color-elevated);
-  color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-  width: fit-content;
-}
-.music-page-back:hover {
-  background: var(--color-raised);
 }
 .music-page-sections {
   display: flex;
@@ -246,7 +232,7 @@
 [data-music-view] .music-detail-film {
   margin-inline-start: auto;
 }
-[data-music-view] .music-collection-controls button {
+[data-music-view] .music-collection-controls button:not(.music-collection-play):not(.music-collection-shuffle):not(.music-collection-extra) {
   min-height: 48px;
   padding-inline: 18px;
   font-size: 14px;
@@ -295,7 +281,6 @@
     font-size: 20px;
   }
 }
-/* Nested pages share the mast's back action; their standalone fallback stays out of this shell. */
 [data-music-view] [data-music-consolidated-back] [data-music-inner-back] {
   display: none;
 }

@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { fetchTrailer, resolveTrailerQuality, trailerSrc, type TrailerInfo } from "@/lib/trailer";
+import { useTrailerVideo } from "@/lib/use-trailer-video";
 import { useSettings } from "@/lib/settings";
 import { usePageVisible } from "@/lib/visibility";
 import { useT } from "@/lib/i18n";
+
+const VIDEO_CLASS = "absolute inset-0 h-full w-full object-cover";
 
 export function DetailHeroTrailer({
   candidateId,
@@ -15,15 +18,18 @@ export function DetailHeroTrailer({
   const t = useT();
   const { settings } = useSettings();
   const [info, setInfo] = useState<TrailerInfo | null>(null);
-  const [ready, setReady] = useState(false);
   const [muted, setMuted] = useState(!settings.detailTrailerAudio);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const pageVisible = usePageVisible();
   const wantsPlayback = !!info && !paused && pageVisible;
+  const { slot, video, ready } = useTrailerVideo({
+    src: info ? trailerSrc(info) : null,
+    active: !!info && pageVisible,
+    className: VIDEO_CLASS,
+    loop: true,
+  });
 
   useEffect(() => {
     setInfo(null);
-    setReady(false);
     setMuted(!settings.detailTrailerAudio);
     if (!candidateId) return;
     let cancelled = false;
@@ -36,9 +42,14 @@ export function DetailHeroTrailer({
   }, [candidateId, settings.trailerQuality]);
 
   useEffect(() => {
-    const v = videoRef.current;
+    const v = video.current;
+    if (v) v.muted = muted;
+  }, [muted, ready, video]);
+
+  useEffect(() => {
+    const v = video.current;
     if (!v) return;
-    if (wantsPlayback) {
+    if (wantsPlayback && ready) {
       v.play().catch(() => {
         if (!v.muted) {
           v.muted = true;
@@ -46,39 +57,17 @@ export function DetailHeroTrailer({
           v.play().catch(() => {});
         }
       });
-    } else {
+    } else if (!wantsPlayback) {
       v.pause();
     }
-  }, [wantsPlayback]);
-
-  useEffect(() => {
-    if (!info) return;
-    const v = videoRef.current;
-    return () => {
-      if (!v) return;
-      try {
-        v.pause();
-        v.removeAttribute("src");
-        v.load();
-      } catch {
-        void 0;
-      }
-    };
-  }, [info]);
-
-  if (!info) return null;
+  }, [wantsPlayback, ready, video]);
 
   return (
     <>
-      <video
-        ref={videoRef}
-        src={trailerSrc(info)}
-        muted={muted}
-        loop
-        playsInline
-        preload="none"
-        onCanPlay={() => setReady(true)}
-        className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
+      <div
+        ref={slot}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden transition-opacity duration-700"
         style={{ opacity: wantsPlayback && ready ? 1 : 0 }}
       />
       {wantsPlayback && ready && (

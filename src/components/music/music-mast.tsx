@@ -1,7 +1,7 @@
-import { MusicBackButton } from "./music-back-button";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Check, ChevronDown, LoaderCircle, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Check, ChevronDown, Globe2, Library, LoaderCircle, Search, X } from "@/components/icons/music-icons";
 import { AnchoredMenu } from "@/components/anchored-menu";
+import { MusicServiceLogo } from "@/components/music/music-service-logo";
 import {
   useMusicConnections,
   type MusicConnectionsStatus,
@@ -9,11 +9,12 @@ import {
 import { useT } from "@/lib/i18n";
 import { MusicSearchSuggest, useMusicSuggest } from "@/components/music/music-search-suggest";
 import type { MusicCatalogItem } from "@/lib/music/types";
+import { rememberMusicSearch, rememberMusicSearchItem, useMusicSearchHistory, type MusicSearchHistoryEntry } from "@/lib/music/search-history";
+import { MusicSearchHistory } from "./music-search-history";
 
 export function MusicMast({
   onSubmit,
   onClear,
-  onBack,
   onPick,
   initialQuery = "",
   searching = false,
@@ -21,7 +22,6 @@ export function MusicMast({
 }: {
   onSubmit: (query: string, connector: string | null) => void;
   onClear?: () => void;
-  onBack?: () => void;
   onPick?: (item: MusicCatalogItem) => void;
   initialQuery?: string;
   searching?: boolean;
@@ -40,18 +40,34 @@ export function MusicMast({
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const history = useMusicSearchHistory();
 
-  const suggestGroups = useMusicSuggest(query, scope, focused && !dismissed && !!onPick);
+  const { groups: suggestGroups, loading: suggesting } = useMusicSuggest(query, scope, focused && !dismissed && !!onPick);
   const suggestFlat = suggestGroups.flatMap((group) => group.items);
-  const suggestOpen = suggestFlat.length > 0;
+  const showingHistory = !query.trim();
+  const suggestOpen = focused && !dismissed && !!onPick;
+  const optionCount = showingHistory ? history.length : suggestFlat.length;
 
   useEffect(() => setActiveIndex(-1), [query, scope]);
 
   const choose = (item: MusicCatalogItem) => {
+    rememberMusicSearchItem(item);
     setDismissed(true);
     setActiveIndex(-1);
     inputRef.current?.blur();
     onPick?.(item);
+  };
+
+  const recall = (entry: MusicSearchHistoryEntry) => {
+    if (entry.item) { choose(entry.item); return; }
+    if (!entry.query) return;
+    const connector = scopeOptions.some((option) => option.id === entry.scope) ? entry.scope! : null;
+    setQuery(entry.query);
+    setScope(connector);
+    setDismissed(true);
+    inputRef.current?.blur();
+    rememberMusicSearch(entry.query, connector);
+    onSubmit(entry.query, connector);
   };
 
   const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -60,20 +76,21 @@ export function MusicMast({
       setDismissed(true);
       return;
     }
-    if (!suggestOpen) return;
+    if (!suggestOpen || !optionCount) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveIndex((current) => (current + 1) % suggestFlat.length);
+      setActiveIndex((current) => (current + 1) % optionCount);
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((current) => (current <= 0 ? suggestFlat.length - 1 : current - 1));
+      setActiveIndex((current) => (current <= 0 ? optionCount - 1 : current - 1));
       return;
     }
     if (event.key === "Enter" && activeIndex >= 0) {
       event.preventDefault();
-      choose(suggestFlat[activeIndex]);
+      if (showingHistory && history[activeIndex]) recall(history[activeIndex]);
+      else if (suggestFlat[activeIndex]) choose(suggestFlat[activeIndex]);
     }
   };
 
@@ -106,11 +123,13 @@ export function MusicMast({
     if (!next) return;
     setDismissed(true);
     inputRef.current?.blur();
+    rememberMusicSearch(next, scope);
     onSubmit(next, scope);
   };
 
   const clear = () => {
     setQuery("");
+    setDismissed(false);
     onClear?.();
     inputRef.current?.focus();
   };
@@ -134,12 +153,9 @@ export function MusicMast({
       className={`music-page-mast flex min-w-0 flex-wrap items-center justify-between gap-5 ${className}`}
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          {onBack && <MusicBackButton onClick={onBack} mast />}
-          <h1 tabIndex={-1} className="text-[32px] font-bold leading-tight tracking-tight text-ink">
-            {t("music.title")}
-          </h1>
-        </div>
+        <h1 tabIndex={-1} className="text-[32px] font-bold leading-tight tracking-tight text-ink">
+          {t("music.title")}
+        </h1>
         <div
           aria-live="polite"
           className="mt-2 flex min-h-5 flex-wrap items-center gap-2 text-[13px] text-ink-subtle"
@@ -173,13 +189,18 @@ export function MusicMast({
         </button>
         <input
           ref={inputRef}
+          data-music-mast-search
           value={query}
           onChange={(event) => {
             setQuery(event.currentTarget.value);
             setDismissed(false);
           }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={() => { setFocused(true); setDismissed(false); }}
+          onClick={() => { setFocused(true); setDismissed(false); }}
+          onBlur={(event) => {
+            const next = event.relatedTarget as HTMLElement | null;
+            if (next && !formRef.current?.contains(next) && !next.closest("[data-music-search-panel]")) setDismissed(true);
+          }}
           onKeyDown={onInputKeyDown}
           placeholder={t("music.searchPlaceholder")}
           aria-label={t("music.searchLabel")}
@@ -219,13 +240,16 @@ export function MusicMast({
         anchorRef={formRef}
         open={suggestOpen && !menuOpen}
         onClose={() => setDismissed(true)}
+        backdrop={false}
       >
-        <MusicSearchSuggest
+        {showingHistory ? <div data-music-search-panel className="harbor-float animate-menu-in max-h-[min(560px,60vh)] overflow-y-auto overscroll-contain rounded-md bg-elevated ring-1 ring-edge-soft">
+          <MusicSearchHistory entries={history} activeIndex={activeIndex} onPick={recall} />
+        </div> : suggestFlat.length ? <MusicSearchSuggest
           groups={suggestGroups}
           activeIndex={activeIndex}
           onPick={choose}
           onHover={setActiveIndex}
-        />
+        /> : <div className="rounded-md bg-elevated p-5 text-sm text-ink-muted" role="status">{t(query.trim().length < 2 ? "music.searchPlaceholder" : suggesting ? "music.loading" : "music.searchEmpty")}</div>}
       </AnchoredMenu>
 
       <AnchoredMenu anchorRef={chipRef} open={menuOpen} onClose={closeMenu} width={224}>
@@ -235,6 +259,7 @@ export function MusicMast({
         >
           <ScopeOption
             label={t("music.search.scopeAll")}
+            icon={<Globe2 size={16} aria-hidden="true" />}
             selected={scope === null}
             onSelect={() => pick(null)}
           />
@@ -242,6 +267,7 @@ export function MusicMast({
             <ScopeOption
               key={row.id}
               label={row.name}
+              icon={<MusicServiceLogo source={row.id} size={16} fallback={row.kind === "catalog" ? <Library size={16} aria-hidden="true" /> : undefined} />}
               detail={row.account}
               selected={scope === row.id}
               onSelect={() => pick(row.id)}
@@ -255,11 +281,13 @@ export function MusicMast({
 
 function ScopeOption({
   label,
+  icon,
   detail,
   selected,
   onSelect,
 }: {
   label: string;
+  icon: ReactNode;
   detail?: string;
   selected: boolean;
   onSelect: () => void;
@@ -273,6 +301,7 @@ function ScopeOption({
         selected ? "text-ink" : "text-ink-muted"
       }`}
     >
+      <span className="inline-flex size-4 shrink-0 items-center justify-center" aria-hidden="true">{icon}</span>
       <span className="min-w-0 flex-1 truncate">
         {label}
         {detail ? <span className="ms-1.5 text-ink-subtle">{detail}</span> : null}

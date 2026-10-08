@@ -29,6 +29,11 @@ import { createSearchRequestGuard } from "@/lib/search-request-guard";
 import { normalizeSearchQuery } from "@/lib/search-query";
 import { searchManga } from "@/lib/manga/api";
 import type { MangaSummary } from "@/lib/manga/model";
+import { searchEBooks, type EBook } from "@/lib/ebook/api";
+import { searchTyped } from "@/lib/music/catalog";
+import { toMusicHits } from "@/lib/search-music-hits";
+import type { MusicSearchHit } from "@/lib/search";
+import { searchSportsEvents, type SportsEventHit } from "@/lib/sports/search-events";
 import { anilistCharacterSearch, type CharacterHit } from "@/lib/anilist/character";
 import { gatherCatalogAddons, type Addon } from "@/lib/addons";
 import { useAuth } from "@/lib/auth";
@@ -283,6 +288,12 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       const mangaPromise: Promise<MangaSummary[]> = mangaAllowed
         ? guard(searchManga(trimmed), [])
         : Promise.resolve([]);
+      const musicPromise: Promise<MusicSearchHit[]> = guard(
+        searchTyped(trimmed, 10).then(toMusicHits),
+        [],
+      );
+      const ebookPromise: Promise<EBook[]> = guard(searchEBooks(trimmed), []);
+      const sportsPromise: Promise<SportsEventHit[]> = guard(searchSportsEvents(trimmed), []);
       const charactersPromise: Promise<CharacterHit[]> = franchiseAllowed
         ? guard(anilistCharacterSearch(trimmed), [])
         : Promise.resolve([]);
@@ -328,6 +339,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       const acc = {
         anime: [] as Awaited<typeof animePromise>,
         manga: [] as MangaSummary[],
+        music: [] as MusicSearchHit[],
+        ebooks: [] as EBook[],
+        sports: [] as SportsEventHit[],
         characters: [] as CharacterHit[],
         addon: { movies: [], series: [] } as Awaited<typeof addonPromise>,
         cine: { movies: [], series: [] } as Awaited<typeof cinemetaPromise>,
@@ -344,6 +358,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
           liveTv: [],
           anime: [],
           manga: [],
+          music: [],
+          ebooks: [],
+          sports: [],
           characters: [],
           addonGroups: [],
           addons: [],
@@ -380,6 +397,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
           liveTv,
           anime: acc.anime,
           manga: acc.manga,
+          music: acc.music,
+          ebooks: acc.ebooks,
+          sports: acc.sports,
           characters: acc.characters,
           addonGroups: dedupedGroups,
           addons: searchAddonIndex(trimmed),
@@ -395,6 +415,18 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       });
       void mangaPromise.then((m) => {
         acc.manga = m;
+        publish();
+      });
+      void musicPromise.then((m) => {
+        acc.music = m;
+        publish();
+      });
+      void ebookPromise.then((b) => {
+        acc.ebooks = b;
+        publish();
+      });
+      void sportsPromise.then((s) => {
+        acc.sports = s;
         publish();
       });
       void charactersPromise.then((c) => {

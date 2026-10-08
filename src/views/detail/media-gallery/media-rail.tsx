@@ -175,6 +175,7 @@ export function MediaRail({ children, min = 300 }: { children: React.ReactNode; 
     <div ref={containerRef} className="group/rail relative min-w-0">
       <div
         ref={trackRef}
+        data-tauri-drag-region="false"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

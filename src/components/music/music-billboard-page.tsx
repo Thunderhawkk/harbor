@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, ChevronLeft, LoaderCircle } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, LoaderCircle } from "@/components/icons/music-icons";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import { Dropdown } from "@/components/dropdown";
 import { openUrl } from "@/lib/window";
@@ -12,8 +12,10 @@ import {
 } from "@/lib/music/discovery-billboard";
 import type { MusicCatalogItem } from "@/lib/music/types";
 import { MusicServiceLogo } from "./music-service-logo";
+import { useMusicItemMenu } from "./music-item-menu";
 import { MusicArtistLink } from "./music-artist-link";
 import "./music-billboard-page.css";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 export type MusicBillboardPageProps = {
   onBack: () => void;
   onOpen: (item: MusicCatalogItem, siblings: MusicCatalogItem[]) => void;
@@ -99,6 +101,7 @@ export function MusicBillboardPage({
       if (run === generation.current) setBusy(null);
     }
   };
+  const itemMenu = useMusicItemMenu({ onOpen: (item) => void open(item) });
   const entries =
     result?.entries.filter(({ item }) =>
       (item.kind === "track" || item.kind === "album" ? `${item.title} ${item.artist}` : item.name)
@@ -195,8 +198,8 @@ export function MusicBillboardPage({
         </p>
       ) : (
         <ol>
-          {entries.map(({ rank, item }) => (
-            <li key={item.id}>
+          {entries.map(({ rank, item }, index) => (
+            <li key={item.id} onContextMenu={itemMenu.openFor(item, index)}>
               <span className="music-billboard-rank">{String(rank).padStart(2, "0")}</span>
               <button
                 type="button"
@@ -213,6 +216,7 @@ export function MusicBillboardPage({
                     loading="lazy"
                   />
                 )}
+                {item.kind === "track" && <MusicTrackPlaybackMark track={item} loading={busy === item.id}/>}
               </button>
               <div className="music-billboard-copy">
                 <button type="button" disabled={busy === item.id} onClick={() => void open(item)}>
@@ -238,6 +242,7 @@ export function MusicBillboardPage({
           ))}
         </ol>
       )}
+      {itemMenu.menu}
     </section>
   );
 }

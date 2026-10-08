@@ -47,6 +47,7 @@
 }
 .sh-field-tools {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;

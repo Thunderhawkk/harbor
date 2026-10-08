@@ -63,6 +63,39 @@ const event = {
   strVideo: "https://www.youtube.com/watch?v=SAjrSUNCQbc",
 };
 
+test("opened individual results share athlete enrichment while provider failure preserves the event", async () => {
+  const selected = { ...game, id: "761", league: "WST" };
+  const snooker = { ...league, key: "WST", tag: "WST", path: "4555", group: "snooker" };
+  const urls: string[] = [];
+  const json = async (url: string) => {
+    urls.push(url);
+    if (url.includes("eventresults")) return { results: [
+      { idEvent: "761", idResult: "999", idPlayer: "1234", strPlayer: "Published Player", intPosition: "1" },
+      { idEvent: "other", idPlayer: "5678", strPlayer: "Other Player", intPosition: "2" },
+    ] };
+    return { events: [{ ...event, idEvent: "761", idLeague: "4555" }] };
+  };
+  const first = loadPublishedEvent(selected, snooker, new AbortController().signal, json);
+  const second = loadPublishedEvent(selected, snooker, new AbortController().signal, json);
+  const [a, b] = await Promise.all([first, second]);
+  assert.strictEqual(a, b);
+  assert.equal(urls.length, 2, "One event lookup and one shared athlete classification request");
+  assert.equal(a?.entrants?.[0].athletes?.[0].id, "1234");
+  assert.equal(a?.entrants?.length, 1);
+  await loadPublishedEvent(selected, snooker, new AbortController().signal, json);
+  assert.equal(urls.length, 2);
+  const partial = await loadPublishedEvent(
+    { ...selected, id: "762" }, snooker, new AbortController().signal,
+    async (url) => {
+      if (url.includes("eventresults")) throw new Error("Classification unavailable");
+      return { events: [{ ...event, idEvent: "762", idLeague: "4555" }] };
+    },
+  );
+  assert.equal(partial?.game.state, "post");
+  assert.equal(partial?.partial, true);
+  assert.equal(partial?.entrants, undefined);
+});
+
 test("a verified TSDB volleyball event keeps its published score, photography and venue", () => {
   const found = parsePublishedEvent(game, league, event)!;
   assert.equal(found.game.state, "post");

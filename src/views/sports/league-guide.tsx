@@ -14,6 +14,8 @@ import {
 import { LeagueLogo } from "./league-logo";
 import { normalizeSportsSearch } from "@/lib/sports/search-text";
 import { SportIcon } from "./sport-icon";
+import { isIndividualCompetition } from "@/lib/sports/competition-metadata";
+import { LeagueGuideAthlete, LeagueGuideAthletes } from "./league-guide-athletes";
 import "./league-guide.css";
 
 function Artwork({
@@ -75,11 +77,27 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
     ),
   );
   const table = data.standings;
+  const individual = isIndividualCompetition(league.group);
+  const people = data.athletes ?? [];
+  const athletes = people.filter((person) =>
+    normalizeSportsSearch(person.name).includes(normalizeSportsSearch(query)),
+  );
+  const sections = [
+    "Overview",
+    ...(individual || people.length ? ["Athletes"] : []),
+    ...(!individual || data.teams.length ? ["Teams"] : []),
+    "Standings",
+  ];
   const selectedGroup = table?.groups.find((item) => item.id === group) || table?.groups[0];
   const columns =
     table?.columns.filter((column) => !["rank", "playoffSeed"].includes(column.name)) || [];
   return (
-    <ModalShell closing={false} onDismiss={onClose} width={1080} labelledBy="league-guide-title">
+    <ModalShell
+      closing={false}
+      onDismiss={onClose}
+      width={1080}
+      labelledBy="league-guide-title"
+    >
       <article className="sh-league-guide">
         <header className="sh-league-guide-head">
           <span className="sh-eyebrow">{t("League guide")}</span>
@@ -111,13 +129,16 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
                   </span>
                 )}
                 {!!data.teams.length && <span>{t("{n} teams", { n: data.teams.length })}</span>}
+                {!!people.length && (
+                  <span>{t("sports.guide.athleteCount", { n: people.length })}</span>
+                )}
               </div>
             </div>
           </div>
           <div className="sh-league-guide-tabs" role="group" aria-label={t("League sections")}>
-            {["Overview", "Teams", "Standings"].map((label) => (
+            {sections.map((label) => (
               <button key={label} aria-pressed={tab === label} onClick={() => setTab(label)}>
-                {t(label)}
+                {t(label === "Athletes" ? "sports.guide.athletes" : label)}
               </button>
             ))}
           </div>
@@ -147,13 +168,17 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
                 <div className="sh-league-guide-description">
                   {data.description.length > 1100 ? (
                     <>
-                      <p>{data.description.slice(0, data.description.lastIndexOf(" ", 1100))}…</p>
+                      <p>
+                        {data.description.slice(0, data.description.lastIndexOf(" ", 1100))}…
+                      </p>
                       <details>
                         <summary className="cursor-pointer py-3 font-semibold">
                           {t("Read more")}
                         </summary>
                         <p>
-                          {data.description.slice(data.description.lastIndexOf(" ", 1100)).trim()}
+                          {data.description
+                            .slice(data.description.lastIndexOf(" ", 1100))
+                            .trim()}
                         </p>
                       </details>
                     </>
@@ -165,10 +190,24 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
                 status !== "loading" && (
                   <p className="sh-league-guide-description">
                     {t(
-                      "Browse the published teams and standings, or visit the competition’s official website.",
+                      individual
+                        ? "sports.guide.athleteIntro"
+                        : "Browse the published teams and standings, or visit the competition’s official website.",
                     )}
                   </p>
                 )
+              )}
+              {!!people.length && (
+                <>
+                  <h3 className="mt-6 mb-4">{t("sports.guide.athletes")}</h3>
+                  <LeagueGuideAthletes athletes={people.slice(0, 6)} league={league} />
+                  {people.length > 6 && (
+                    <button className="sh-button mt-4" onClick={() => setTab("Athletes")}>
+                      {t("sports.guide.viewAthletes")}
+                      <ArrowUpRight size={15} />
+                    </button>
+                  )}
+                </>
               )}
               {!!data.teams.length && (
                 <>
@@ -211,6 +250,36 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
                     </button>
                   )}
                 </>
+              )}
+            </>
+          )}
+          {tab === "Athletes" && (
+            <>
+              <label className="sh-board-search mb-4">
+                <Search size={16} />
+                <input
+                  aria-label={t("sports.guide.searchAthletes")}
+                  placeholder={t("sports.guide.searchAthletes")}
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setLimit(60);
+                  }}
+                />
+              </label>
+              <LeagueGuideAthletes athletes={athletes.slice(0, limit)} league={league} />
+              {athletes.length > limit && (
+                <button
+                  className="sh-button mt-4"
+                  onClick={() => setLimit((count) => count + 60)}
+                >
+                  {t("Show more")}
+                </button>
+              )}
+              {!athletes.length && status !== "loading" && (
+                <p className="sh-league-guide-description">
+                  {t(people.length ? "sports.guide.noAthleteMatch" : "sports.guide.noAthletes")}
+                </p>
               )}
             </>
           )}
@@ -273,7 +342,10 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
                 ))}
               </div>
               {teams.length > limit && (
-                <button className="sh-button mt-4" onClick={() => setLimit((count) => count + 60)}>
+                <button
+                  className="sh-button mt-4"
+                  onClick={() => setLimit((count) => count + 60)}
+                >
                   {t("Show more")}
                 </button>
               )}
@@ -321,7 +393,13 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
                     <thead>
                       <tr>
                         <th>{t("Position")}</th>
-                        <th>{t("Team")}</th>
+                        <th>
+                          {t(
+                            selectedGroup.rows.some((row) => row.athlete)
+                              ? "sports.guide.athlete"
+                              : "Team",
+                          )}
+                        </th>
                         {columns.map((column) => (
                           <th key={column.name} title={column.label}>
                             {column.abbr || column.label}
@@ -331,26 +409,31 @@ export function LeagueGuide({ league, onClose }: { league: LeagueDef; onClose: (
                     </thead>
                     <tbody>
                       {selectedGroup.rows.map((row) => (
-                        <tr key={row.teamId}>
+                        <tr key={`${row.teamId}:${row.name}`}>
                           <td>{row.rank || "—"}</td>
                           <td>
-                            <TeamProfileLink
-                              className="sh-team-table-link"
-                              team={{
-                                id: row.teamId,
-                                name: row.name,
-                                logo: row.logo,
-                                league: league.key,
-                                source: data.provider,
-                              }}
-                            >
-                              <Artwork key={row.logo} src={row.logo} />
-                              <strong>{row.name}</strong>
-                            </TeamProfileLink>
+                            {row.athlete ? (
+                              <LeagueGuideAthlete athlete={row.athlete} league={league} />
+                            ) : (
+                              <TeamProfileLink
+                                className="sh-team-table-link"
+                                team={{
+                                  id: row.teamId,
+                                  name: row.name,
+                                  logo: row.logo,
+                                  league: league.key,
+                                  source: data.provider,
+                                }}
+                              >
+                                <Artwork key={row.logo} src={row.logo} />
+                                <strong>{row.name}</strong>
+                              </TeamProfileLink>
+                            )}
                           </td>
                           {columns.map((column) => (
                             <td key={column.name}>
-                              {row.cells.find((cell) => cell.name === column.name)?.display || "—"}
+                              {row.cells.find((cell) => cell.name === column.name)?.display ||
+                                "—"}
                             </td>
                           ))}
                         </tr>

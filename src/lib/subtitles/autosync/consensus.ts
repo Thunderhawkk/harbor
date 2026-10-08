@@ -3,7 +3,7 @@ import { searchSubtitles } from "@/lib/subtitles/search";
 import type { SubCue } from "@/lib/subtitles/parser";
 import { prepareSubtitle } from "@/lib/subtitles/prepare";
 import { providerSubtitleDownloadHeaders } from "@/lib/subtitles/provider-auth";
-import { normalizeLang } from "@/lib/subtitles/language";
+import { isGeneratedLangLabel, normalizeLang } from "@/lib/subtitles/language";
 import { normalizeArabicForMatch } from "@/lib/subtitles/arabic-normalize";
 import { gatherSubtitleAddons } from "@/lib/subtitles/addon-source";
 import type { SubResult, SubSearchQuery } from "@/lib/subtitles/types";
@@ -240,7 +240,7 @@ export async function prepareConsensusCandidate(
   timeoutMs: number,
   ctx: PipelineContext,
 ): Promise<Candidate | null> {
-  if (!r.url) return null;
+  if (!r.url || isGeneratedLangLabel(r.lang)) return null;
   return withTimeout(
     (async () => {
       const prepared = await prepareSubtitle({

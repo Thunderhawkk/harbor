@@ -10,7 +10,7 @@ const SAMPLE: Advisory[] = [
 
 export function AdvisoryPreview() {
   const t = useT();
-  const art = useSampleArtwork();
+  const art = useSampleArtwork(11);
 
   return (
     <div className="flex w-full flex-col gap-2">

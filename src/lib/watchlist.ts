@@ -18,6 +18,7 @@ import {
   removeStremioBookmark,
 } from "@/lib/stremio";
 import { readActiveStremioAuthKey } from "@/lib/auth";
+import { cloudReachOf, watchlistImdbId } from "@/lib/watchlist-cloud-id";
 import { persistableAddonOrigin, persistableVideos, type Meta } from "@/lib/cinemeta";
 
 const KEY_PREFIX = "harbor.watchlist.v1.";
@@ -366,8 +367,12 @@ async function syncWithStremio(input: string | WatchlistInput, added: boolean): 
   const imdb = typeof input === "string" ? null : (input.imdbId ?? null);
   try {
     if (added) {
-      const writeId = cloudWriteId(id, imdb, !!imdb);
-      if (!writeId) return;
+      const resolved = imdb ?? (await watchlistImdbId(id));
+      const writeId = cloudWriteId(id, resolved, !!resolved);
+      if (!writeId) {
+        console.warn(`[watchlist] ${id} stays local only (${cloudReachOf(id, writeId)})`);
+        return;
+      }
       const meta =
         typeof input === "string"
           ? {}
@@ -380,8 +385,9 @@ async function syncWithStremio(input: string | WatchlistInput, added: boolean): 
       for (const s of subs) s();
     } else {
       const forms = new Set<string>();
-      const withImdb = cloudWriteId(id, imdb, !!imdb);
-      const withMeta = cloudWriteId(id, imdb, false);
+      const resolved = imdb ?? (await watchlistImdbId(id));
+      const withImdb = cloudWriteId(id, resolved, !!resolved);
+      const withMeta = cloudWriteId(id, resolved, false);
       if (withImdb) forms.add(withImdb);
       if (withMeta) forms.add(withMeta);
       if (ANIME_CLOUD_ID.test(id)) forms.add(id);

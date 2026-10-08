@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, LoaderCircle, Plus } from "lucide-react";
+import { LoaderCircle, Plus } from "@/components/icons/music-icons";
+import { MusicActionGlyph, useMusicActionReceipt } from "./music-action-feedback";
 import { useT } from "@/lib/i18n";
 import { connectSource } from "@/lib/music/catalog";
 import {
@@ -12,14 +13,17 @@ import {
 } from "@/lib/music/spotify-library";
 import type { MusicTrack } from "@/lib/music/types";
 import { useMusicConnections } from "./music-connections";
+import { matchesPlaylistSearch } from "./music-playlist-search";
 import "./music-spotify-library.css";
 
 export function MusicSpotifyDestination({
   track,
+  query = "",
   onDone,
   onSetup,
 }: {
   track: MusicTrack;
+  query?: string;
   onDone: () => void;
   onSetup: () => void;
 }) {
@@ -34,6 +38,8 @@ export function MusicSpotifyDestination({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState("");
+  const [target, setTarget] = useState<string | null>(null);
+  const created = useMusicActionReceipt(`${account?.account}:${uri}`);
   const [name, setName] = useState("");
   const generation = useRef(0);
   const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,10 +50,11 @@ export function MusicSpotifyDestination({
     setError("");
     try {
       const next = await loadSpotifyLibraryPage("playlists", offset);
+      if (next.nextOffset != null && (!Number.isSafeInteger(next.nextOffset) || next.nextOffset <= offset || next.nextOffset > 100_000)) throw new Error("Invalid playlist pagination");
       if (generation.current === run)
         setPage((previous) =>
           offset && previous
-            ? { ...next, playlists: [...previous.playlists, ...next.playlists] }
+            ? { ...next, playlists: [...new Map([...previous.playlists, ...next.playlists].map(playlist => [playlist.id, playlist])).values()] }
             : next,
         );
     } catch (error) {
@@ -58,6 +65,9 @@ export function MusicSpotifyDestination({
   };
 
   useEffect(() => {
+    setSaved("");
+    setBusy(false);
+    setTarget(null);
     if (connected && uri) void load();
     return () => {
       generation.current += 1;
@@ -65,26 +75,39 @@ export function MusicSpotifyDestination({
     };
   }, [connected, account?.account, uri]);
 
+  useEffect(() => {
+    if (!query.trim() || loading || busy || saved || error || !connected || !uri || page?.nextOffset == null) return;
+    void load(page.nextOffset);
+  }, [query, loading, busy, saved, error, connected, uri, page?.nextOffset]);
+
   const add = async (playlistId: string) => {
+    if (busy || saved) return;
+    const run = generation.current;
     setBusy(true);
+    setTarget(playlistId);
     setError("");
     try {
       await addTrackToSpotifyPlaylist(playlistId, track);
+      if (generation.current !== run) return;
       setSaved(playlistId);
-      finishTimer.current = setTimeout(onDone, 500);
+      finishTimer.current = setTimeout(onDone, 600);
     } catch (error) {
-      setError(spotifyLibraryErrorKey(error));
+      if (generation.current === run) setError(spotifyLibraryErrorKey(error));
     } finally {
-      setBusy(false);
+      if (generation.current === run) setBusy(false);
     }
   };
 
   const create = async () => {
-    if (!name.trim() || busy) return;
+    if (!name.trim() || busy || saved) return;
+    const run = generation.current;
     setBusy(true);
+    setTarget(null);
     setError("");
     try {
       const playlist = await createSpotifyPlaylist(name);
+      if (generation.current !== run) return;
+      created.confirm();
       setName("");
       setNotice(t("music.spotifyLibrary.created", { name: playlist.name }));
       setPage((previous) =>
@@ -98,14 +121,15 @@ export function MusicSpotifyDestination({
       );
       window.dispatchEvent(new Event("harbor:spotify-library-changed"));
     } catch (error) {
-      setError(spotifyLibraryErrorKey(error));
+      if (generation.current === run) setError(spotifyLibraryErrorKey(error));
     } finally {
-      setBusy(false);
+      if (generation.current === run) setBusy(false);
     }
   };
 
   const reconnect = async () => {
     setBusy(true);
+    setTarget("reconnect");
     setError("");
     try {
       connections.apply(await connectSource("spotify"));
@@ -152,23 +176,26 @@ export function MusicSpotifyDestination({
           {notice}
         </p>
       )}
-      <ul className="max-h-64 overflow-y-auto">
-        {page?.playlists.map((playlist) => (
+      <span role="status" className="sr-only">{saved ? t("music.similar.saved") : ""}</span>
+      <ul className="music-playlist-destination-list">
+        {page?.playlists.filter(playlist => matchesPlaylistSearch(playlist.name, query)).map((playlist) => (
           <li key={playlist.id}>
             <button
               type="button"
               disabled={busy || !!saved || !playlist.editable}
+              aria-busy={busy && target === playlist.id}
+              data-music-action-state={saved === playlist.id ? "done" : busy && target === playlist.id ? "busy" : "idle"}
               onClick={() => void add(playlist.id)}
-              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-start text-sm text-ink hover:bg-raised disabled:opacity-40"
+              className="music-action-button flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-start text-sm text-ink hover:bg-raised disabled:opacity-40"
             >
               <span className="truncate">{playlist.name}</span>
-              {saved === playlist.id && <Check size={17} />}
+              <MusicActionGlyph state={saved === playlist.id ? "done" : busy && target === playlist.id ? "busy" : "idle"} idle={null} size={17} identity={uri ?? undefined} />
             </button>
           </li>
         ))}
       </ul>
-      {!loading && page && !page.playlists.length && (
-        <p className="text-sm text-ink-muted">{t("music.playlist.none")}</p>
+      {!loading && !error && page && page.nextOffset == null && !page.playlists.some(playlist => matchesPlaylistSearch(playlist.name, query)) && (
+        <p role="status" className="text-sm text-ink-muted">{t(query.trim() ? "music.playlist.noMatches" : "music.playlist.none")}</p>
       )}
       {loading && (
         <p role="status" className="music-spotify-actions text-sm text-ink-muted">
@@ -208,12 +235,13 @@ export function MusicSpotifyDestination({
           <input
             value={name}
             maxLength={100}
+            disabled={busy || !!saved}
             onChange={(event) => setName(event.target.value)}
             aria-label={t("music.playlist.nameLabel")}
             placeholder={t("music.playlist.namePlaceholder")}
           />
-          <button type="submit" className="music-spotify-button" disabled={busy || !name.trim()}>
-            <Plus size={17} />
+          <button type="submit" className="music-spotify-button music-action-button" disabled={busy || !!saved || !name.trim()} aria-busy={busy && target === null} data-music-action-state={busy && target === null ? "busy" : created.confirmed ? "done" : "idle"}>
+            <MusicActionGlyph state={busy && target === null ? "busy" : created.confirmed ? "done" : "idle"} idle={<Plus size={17} />} size={17} />
             {t("music.spotifyLibrary.create")}
           </button>
         </form>

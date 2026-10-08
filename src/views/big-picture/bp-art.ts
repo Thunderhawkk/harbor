@@ -26,10 +26,14 @@ export type BpHeroShape = "wide" | "portrait";
 export function bpHeroArt(
   url: string | undefined,
   shape: BpHeroShape = "wide",
+  fullQuality = false,
 ): string | undefined {
   if (!url) return url;
 
   if (TMDB_SIZE.test(url)) {
+    // Android TV keeps its measured decode budget; desktop can opt into the
+    // original hero without inflating every card that also uses this helper.
+    if (fullQuality && !isAndroidTv()) return url.replace(TMDB_SIZE, "/t/p/original/");
     const want = Math.ceil((bpViewportHeight() * 16) / 9);
     const bucket = TMDB_BUCKETS.find((b) => b >= want) ?? TMDB_BUCKETS[TMDB_BUCKETS.length - 1];
     const size = shape === "portrait" ? "w780" : `w${bucket}`;
@@ -54,11 +58,14 @@ function heroRank(source: BpHeroSource): number {
   return source.url?.includes(TVDB_HOST) ? 1 : 0;
 }
 
-export function bpHeroCandidates(sources: readonly BpHeroSource[]): BpHeroCandidate[] {
+export function bpHeroCandidates(
+  sources: readonly BpHeroSource[],
+  fullQuality = false,
+): BpHeroCandidate[] {
   const taken = new Set<string>();
   const out: BpHeroCandidate[] = [];
   for (const { url, portrait } of [...sources].sort((a, b) => heroRank(a) - heroRank(b))) {
-    const src = bpHeroArt(url, portrait ? "portrait" : "wide");
+    const src = bpHeroArt(url, portrait ? "portrait" : "wide", fullQuality);
     if (!src || taken.has(src)) continue;
     taken.add(src);
     out.push({ src, portrait });

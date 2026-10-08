@@ -2,8 +2,14 @@ import { ChevronDown } from "lucide-react";
 import { Search } from "@/components/icons/search-icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { browseFetcher, listBrowseCatalogs, type BrowseCatalog } from "@/lib/catalog-browse";
+import {
+  browseFetcher,
+  listBrowseCatalogs,
+  subscribeBrowseCatalogs,
+  type BrowseCatalog,
+} from "@/lib/catalog-browse";
 import { useT } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
 import { useView } from "@/lib/view";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -137,6 +143,7 @@ function PillSelect({
 export function CatalogBrowser() {
   const t = useT();
   const { authKey } = useAuth();
+  const { settings } = useSettings();
   const { openGrid } = useView();
   const [catalogs, setCatalogs] = useState<BrowseCatalog[]>([]);
   const [type, setType] = useState("");
@@ -145,13 +152,19 @@ export function CatalogBrowser() {
 
   useEffect(() => {
     let cancelled = false;
-    void listBrowseCatalogs(authKey).then((list) => {
-      if (!cancelled) setCatalogs(list);
-    });
+    const reload = () => {
+      void listBrowseCatalogs(authKey, { pluginRows: settings.pluginsOutsideTab }).then((list) => {
+        if (!cancelled) setCatalogs(list);
+      });
+    };
+    reload();
+    // A plugin's own catalogs arrive after its runtime is up, which is later than the addons.
+    const stop = subscribeBrowseCatalogs(reload);
     return () => {
       cancelled = true;
+      stop();
     };
-  }, [authKey]);
+  }, [authKey, settings.pluginsOutsideTab]);
 
   const types = useMemo(() => {
     const seen = new Set<string>();

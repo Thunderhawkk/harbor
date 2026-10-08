@@ -208,6 +208,7 @@ export function ListDetail({
                 else itemElsRef.current.delete(it.id);
               }}
               onPointerDown={(e) => startItemDrag(e, it.id, index)}
+              data-tauri-drag-region="false"
               onClickCapture={(e) => {
                 if (suppressClick.current) {
                   e.stopPropagation();

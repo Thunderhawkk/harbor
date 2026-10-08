@@ -373,6 +373,7 @@ const DEPS: Dep[] = [
 ];
 
 const LICENSES: LicenseDoc[] = [
+  { id: "miku-visualizer", title: "Hatsune Miku · MikuMikuDance", used: "music.miku.adaptation", file: "miku-visualizer" },
   { id: "harbor", title: "Harbor, MIT License", used: "The licence Harbor itself is released under.", file: "Harbor" },
   { id: "mit", title: "MIT License", used: "Used by the majority of Harbor's bundled components, including React and Tauri.", file: "MIT" },
   { id: "apache", title: "Apache License 2.0", used: "Used by Tauri, librqbit and other bundled components.", file: "Apache-2.0" },
@@ -464,6 +465,10 @@ export function LicensesPanel() {
           <LicenseRow key={doc.id} doc={doc} download={download} onSave={save} />
         ))}
         <AssetDownloadFeedback status={download.status} />
+      </Section>
+
+      <Section title={t("music.legal.personalTitle")}>
+        <p className={"max-w-[74ch] " + ROW_DESC}>{t("music.legal.personal")}</p>
       </Section>
 
       <Section title={t("Independence")}>

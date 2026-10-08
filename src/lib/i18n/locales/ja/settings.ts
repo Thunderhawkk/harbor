@@ -1809,6 +1809,9 @@ const settings: Record<string, string> = {
   "Update now": "今すぐ更新",
   "Check for updates": "更新を確認",
   "Show on Discord": "Discordに表示",
+  "Show what you are listening to": "再生中の曲を表示",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "音楽の再生中に曲名、アーティスト、アルバムアートを表示し、「Listen in Harbor」ボタンを添えます。",
   "Display what you are watching on your Discord profile, with the show poster and a live progress bar. Requires the Discord desktop app to be running.":
     "視聴中の作品を、ポスターとリアルタイムの進行状況バー付きでDiscordプロフィールに表示します。Discordデスクトップアプリが起動している必要があります。",
   "Hide the title": "タイトルを隠す",

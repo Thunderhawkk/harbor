@@ -107,6 +107,7 @@ pub fn album(config: &PlexConfig, node: &Value) -> Option<MusicAlbumRef> {
         artwork: artwork(config, node, &["thumb", "parentThumb"], client::COVER_SIZE),
         year: count(node, "year").map(|year| year as u32),
         track_count: count(node, "leafCount").map(|value| value as u32),
+        explicit: None,
     })
 }
 

@@ -205,6 +205,54 @@ fn read_linux() -> ProcMem {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn macos_total_phys() -> u64 {
+    let mut name = [libc::CTL_HW, libc::HW_MEMSIZE];
+    let mut value: u64 = 0;
+    let mut len = std::mem::size_of::<u64>();
+    let status = unsafe {
+        libc::sysctl(
+            name.as_mut_ptr(),
+            name.len() as libc::c_uint,
+            &mut value as *mut u64 as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if status == 0 {
+        value
+    } else {
+        0
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn read_macos() -> ProcMem {
+    let mut info: libc::proc_taskinfo = unsafe { std::mem::zeroed() };
+    let size = std::mem::size_of::<libc::proc_taskinfo>() as libc::c_int;
+    let written = unsafe {
+        libc::proc_pidinfo(
+            std::process::id() as libc::c_int,
+            libc::PROC_PIDTASKINFO,
+            0,
+            &mut info as *mut libc::proc_taskinfo as *mut libc::c_void,
+            size,
+        )
+    };
+    let harbor_rss = if written == size {
+        info.pti_resident_size
+    } else {
+        0
+    };
+    ProcMem {
+        harbor_rss,
+        webview_rss: 0,
+        total: harbor_rss,
+        total_phys: macos_total_phys(),
+    }
+}
+
 #[cfg(windows)]
 fn working_set(pid: u32) -> u64 {
     use windows::Win32::Foundation::CloseHandle;
@@ -326,7 +374,11 @@ pub async fn harbor_process_memory() -> ProcMem {
             .await
             .unwrap_or_default()
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        read_macos()
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         ProcMem::default()
     }

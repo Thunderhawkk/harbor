@@ -2,15 +2,14 @@ import { loadRecordingProfile } from "@/lib/music/recording-profile";
 import { resolveDisplayCredits } from "@/lib/music/artist-credit";
 import { requestMusicExplore } from "@/lib/music/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, TriangleAlert, Unplug } from "lucide-react";
+import { ChevronRight, TriangleAlert, Unplug } from "@/components/icons/music-icons";
 import type { MusicCardBadge } from "@/components/music/music-cover-card";
 import { useMusicNavigate } from "@/components/music/music-navigate";
-import { useMusicSourcePicker } from "@/components/music/music-source-picker";
 import { useMusicPlaylistPicker } from "@/components/music/music-playlist-picker";
 import { MusicTrackRow } from "@/components/music/music-track-row";
 import { useT } from "@/lib/i18n";
-import { enqueueMusic, musicRadioTracks } from "@/lib/music/player";
-import { armTrackRadio } from "@/lib/music/radio";
+import { enqueueMusic } from "@/lib/music/player";
+import { useMusicPlayback } from "@/lib/music/use-music-playback";
 import type { MusicTrack } from "@/lib/music/types";
 
 export type MusicSectionStatus = "loading" | "ready" | "error";
@@ -162,11 +161,12 @@ export function MusicTrackGrid({
   badgeFor,
   leadingFor,
   onPlay,
+  onOpen,
   onAddToQueue,
   onAddToPlaylist,
   onGoToArtist,
   onGoToAlbum,
-  onStartRadio,
+  onMoreLikeThis,
   onViewAll,
   viewAllLabel,
   className = "",
@@ -185,18 +185,22 @@ export function MusicTrackGrid({
   badgeFor?: (track: MusicTrack, index: number) => MusicCardBadge | null | undefined;
   leadingFor?: (track: MusicTrack, index: number) => ReactNode;
   onPlay: (track: MusicTrack, index: number) => void;
+  onOpen?: (track: MusicTrack, index: number) => void;
   onAddToQueue?: (track: MusicTrack, index: number) => void;
   onAddToPlaylist?: (track: MusicTrack, index: number) => void;
   onGoToArtist?: (track: MusicTrack, index: number) => void;
   onGoToAlbum?: (track: MusicTrack, index: number) => void;
-  onStartRadio?: (track: MusicTrack, index: number) => void;
+  onMoreLikeThis?: (track: MusicTrack, index: number) => void;
   onViewAll?: () => void;
   viewAllLabel?: string;
   className?: string;
 }) {
   const visible = tracks.slice(0, count);
   const radioRequest = useRef(0);
-  const [radioStatus, setRadioStatus] = useState<"loading" | "error" | null>(null);
+  const [radioStatus, setRadioStatus] = useState<{
+    op: "radio" | "similar";
+    state: "loading" | "error";
+  } | null>(null);
   const t = useT();
   useEffect(
     () => () => {
@@ -206,32 +210,25 @@ export function MusicTrackGrid({
   );
   const { openPlaylistPicker } = useMusicPlaylistPicker();
   const { goToArtist, goToAlbum } = useMusicNavigate();
-  const { openSourcePicker } = useMusicSourcePicker();
+  const player = useMusicPlayback();
+  const isCurrent = (track: MusicTrack) =>
+    [player.current, player.current?.collectionOrigin].some(
+      (identity) => identity?.id === track.id && identity.connectorId === track.connectorId,
+    );
   // Queueing, saving and starting a radio mean the same thing wherever a track is listed,
   // so the grid supplies them and a caller only overrides for something view specific.
   const addToQueue = onAddToQueue ?? ((track: MusicTrack) => enqueueMusic(track));
   const addToPlaylist = onAddToPlaylist ?? ((track: MusicTrack) => openPlaylistPicker(track));
-  const startRadio =
-    onStartRadio ??
-    (async (track: MusicTrack) => {
-      const request = ++radioRequest.current;
-      setRadioStatus("loading");
-      try {
-        const station = await musicRadioTracks(track);
-        if (request !== radioRequest.current) return;
-        setRadioStatus(null);
-        openSourcePicker(station[0], station);
-        armTrackRadio(station);
-      } catch {
-        if (request === radioRequest.current) setRadioStatus("error");
-      }
-    });
+  // The mix page opens straight away and builds itself, so there is nothing to
+  // wait on here and no status to show.
+  const moreLikeThis =
+    onMoreLikeThis ?? ((track: MusicTrack) => requestMusicExplore({ kind: "similar", track }));
   const toArtist = onGoToArtist ?? ((track: MusicTrack) => goToArtist(track.artist, track));
   const toAlbum =
     onGoToAlbum ??
     (async (track: MusicTrack) => {
       const request = ++radioRequest.current;
-      setRadioStatus("loading");
+      setRadioStatus({ op: "radio", state: "loading" });
       try {
         const recording = await loadRecordingProfile(track).catch(() => null);
         if (request !== radioRequest.current) return;
@@ -252,7 +249,7 @@ export function MusicTrackGrid({
   } else if (status === "error") {
     body = <MusicSectionError message={error} onRetry={onRetry} />;
   } else if (status === "loading") {
-    body = <MusicTrackGridSkeleton count={count} />;
+    body = <MusicTrackGridSkeleton count={count || 9} />;
   } else if (visible.length === 0) {
     body = <MusicSectionEmpty label={emptyLabel} />;
   } else {
@@ -262,6 +259,8 @@ export function MusicTrackGrid({
           <MusicTrackRow
             key={`${track.connectorId ?? ""}:${track.sourceId ?? track.id}:${index}`}
             track={track}
+            nowPlaying={isCurrent(track)}
+            paused={player.phase === "paused"}
             index={numbered ? startIndex + index : undefined}
             leading={leadingFor?.(track, index)}
             badge={badgeFor?.(track, index)}
@@ -270,11 +269,12 @@ export function MusicTrackGrid({
               setRadioStatus(null);
               onPlay(track, index);
             }}
+            onOpen={onOpen && (() => onOpen(track, index))}
             onAddToQueue={() => addToQueue(track, index)}
             onAddToPlaylist={() => addToPlaylist(track, index)}
             onGoToArtist={() => toArtist(track, index)}
             onGoToAlbum={() => toAlbum(track, index)}
-            onStartRadio={() => startRadio(track, index)}
+            onMoreLikeThis={() => moreLikeThis(track, index)}
           />
         ))}
       </div>
@@ -290,8 +290,19 @@ export function MusicTrackGrid({
         viewAllLabel={viewAllLabel}
       />
       {radioStatus && (
-        <p role={radioStatus === "error" ? "alert" : "status"} className="text-sm text-ink-muted">
-          {t(radioStatus === "error" ? "music.radio.error" : "music.loading")}
+        <p
+          role={radioStatus.state === "error" ? "alert" : "status"}
+          className="text-sm text-ink-muted"
+        >
+          {t(
+            radioStatus.op === "similar"
+              ? radioStatus.state === "error"
+                ? "music.similar.error"
+                : "music.similar.building"
+              : radioStatus.state === "error"
+                ? "music.radio.error"
+                : "music.loading",
+          )}
         </p>
       )}
       {body}

@@ -45,6 +45,17 @@ export type EBook = {
   volumes?: number;
   score?: number;
   trendingScore?: number;
+  /** Median across editions, so a work reads as one length rather than whichever printing answered. */
+  pages?: number;
+  editionCount?: number;
+  readerRating?: number;
+  readerRatingCount?: number;
+  shelvedBy?: number;
+  people?: string[];
+  places?: string[];
+  periods?: string[];
+  languages?: string[];
+  archiveCopies?: number;
   siteUrl?: string;
 };
 
@@ -747,10 +758,22 @@ type OpenLibraryDoc = {
   subject?: string[];
   alternative_title?: string | string[];
   first_sentence?: string | string[];
+  number_of_pages_median?: number;
+  edition_count?: number;
+  ratings_average?: number;
+  ratings_count?: number;
+  want_to_read_count?: number;
+  subject_people?: string[];
+  subject_places?: string[];
+  subject_times?: string[];
+  language?: string[];
+  ia?: string[];
 };
 
 const OPEN_LIBRARY_FIELDS =
-  "key,title,alternative_title,author_name,cover_i,first_publish_year,isbn,series,subject,first_sentence";
+  "key,title,alternative_title,author_name,cover_i,first_publish_year,isbn,series,subject,first_sentence," +
+  "number_of_pages_median,edition_count,ratings_average,ratings_count,want_to_read_count," +
+  "subject_people,subject_places,subject_times,language,ia";
 const OPEN_LIBRARY_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const OPEN_LIBRARY_STALE_MS = 30 * 24 * 60 * 60 * 1000;
 const openLibraryMetadata = new Map<string, EBook | null>();
@@ -759,14 +782,88 @@ const jsonInflight = new Map<string, Promise<unknown>>();
 
 type CachedJsonValue<T> = { at: number; value: T };
 
+const OPEN_LIBRARY_PREFIX = "harbor.ebook.openlibrary.v2.";
+const OPEN_LIBRARY_LEGACY = "harbor.ebook.openlibrary.v1.";
+const OPEN_LIBRARY_BUDGET = 512 * 1024;
+
+/** Keys hold a digest, not the request: a search URL is longer than the answer is worth. */
+function openLibraryKey(scope: string, url: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < url.length; index += 1) {
+    hash ^= url.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${OPEN_LIBRARY_PREFIX}${scope}.${(hash >>> 0).toString(36)}.${url.length.toString(36)}`;
+}
+
+function openLibraryKeys(prefix: string): string[] {
+  const keys: string[] = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(prefix)) keys.push(key);
+    }
+  } catch {}
+  return keys;
+}
+
+/** A cache may not crowd out the settings beside it, so the oldest answers go first. */
+function pruneOpenLibraryCache(): void {
+  const held: { key: string; at: number; bytes: number }[] = [];
+  let total = 0;
+  for (const key of openLibraryKeys(OPEN_LIBRARY_PREFIX)) {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {
+      continue;
+    }
+    const bytes = (raw?.length ?? 0) + key.length;
+    total += bytes;
+    let at = 0;
+    try {
+      at = Number((JSON.parse(raw ?? "null") as CachedJsonValue<unknown> | null)?.at) || 0;
+    } catch {}
+    held.push({ key, at, bytes });
+  }
+  if (total <= OPEN_LIBRARY_BUDGET) return;
+  held.sort((left, right) => left.at - right.at);
+  for (const entry of held) {
+    if (total <= OPEN_LIBRARY_BUDGET) return;
+    try {
+      localStorage.removeItem(entry.key);
+      total -= entry.bytes;
+    } catch {}
+  }
+}
+
+function dropLegacyOpenLibraryCache(): void {
+  for (const key of openLibraryKeys(OPEN_LIBRARY_LEGACY)) {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  }
+}
+
+let legacyDropped = false;
+
+
 async function cachedJson<T>(url: string, timeoutMs = 8_000): Promise<T> {
   const cacheUrl = new URL(url);
   const authenticated = cacheUrl.searchParams.has("key");
   cacheUrl.searchParams.delete("key");
-  const key = `harbor.ebook.openlibrary.v1.${authenticated ? "authenticated" : "anonymous"}.${cacheUrl}`;
+  if (!legacyDropped) {
+    legacyDropped = true;
+    dropLegacyOpenLibraryCache();
+  }
+  const request_url = cacheUrl.toString();
+  const key = openLibraryKey(authenticated ? "authenticated" : "anonymous", request_url);
   let cached: CachedJsonValue<T> | null = null;
   try {
-    cached = JSON.parse(localStorage.getItem(key) ?? "null") as CachedJsonValue<T> | null;
+    const held = JSON.parse(localStorage.getItem(key) ?? "null") as
+      | (CachedJsonValue<T> & { url?: string })
+      | null;
+    cached = held && held.url === request_url ? held : null;
     if (cached && Date.now() - cached.at < OPEN_LIBRARY_CACHE_MS) return cached.value;
   } catch {}
   const existing = jsonInflight.get(key) as Promise<T> | undefined;
@@ -786,7 +883,8 @@ async function cachedJson<T>(url: string, timeoutMs = 8_000): Promise<T> {
       if (!response.ok) throw new Error(`eBook metadata HTTP ${response.status}`);
       const value = (await response.json()) as T;
       try {
-        setItemWithRecovery(key, JSON.stringify({ at: Date.now(), value }));
+        setItemWithRecovery(key, JSON.stringify({ at: Date.now(), url: request_url, value }));
+        pruneOpenLibraryCache();
       } catch {}
       return value;
     })().finally(() => jsonInflight.delete(key));
@@ -843,7 +941,7 @@ export function setGoogleBooksApiKey(value: string): void {
   googleUnavailableUntil = 0;
   for (let index = localStorage.length - 1; index >= 0; index -= 1) {
     const key = localStorage.key(index);
-    if (key?.startsWith("harbor.ebook.openlibrary.v1.") && key.includes("www.googleapis.com"))
+    if (key?.startsWith(OPEN_LIBRARY_PREFIX) && key.includes(".authenticated."))
       localStorage.removeItem(key);
   }
   window.dispatchEvent(new Event("harbor:ebook-metadata"));
@@ -1138,7 +1236,7 @@ SELECT DISTINCT ?matched ?item ?itemDescription WHERE {
   VALUES ?kind { wd:Q571 wd:Q8261 wd:Q277759 wd:Q1667921 wd:Q7725634 wd:Q47461344 }
   ?item (rdfs:label|skos:altLabel) ?matched.
   ?item wdt:P31 ?kind.
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "${getUiLanguage()},en,ar". }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "${getUiLanguage()},en,ar,mul". }
 }`;
       const url = new URL("https://query.wikidata.org/sparql");
       url.searchParams.set("query", query);
@@ -1221,6 +1319,16 @@ function mapOpenLibrary(n: OpenLibraryDoc): EBook {
     year: n.first_publish_year,
     publishedAt: n.first_publish_year ? String(n.first_publish_year) : undefined,
     genres: n.subject?.slice(0, 8) ?? [],
+    pages: n.number_of_pages_median,
+    editionCount: n.edition_count,
+    readerRating: n.ratings_average,
+    readerRatingCount: n.ratings_count,
+    shelvedBy: n.want_to_read_count,
+    people: n.subject_people?.slice(0, 8),
+    places: n.subject_places?.slice(0, 8),
+    periods: n.subject_times?.slice(0, 6),
+    languages: n.language?.slice(0, 12),
+    archiveCopies: n.ia?.length || undefined,
     siteUrl: `https://openlibrary.org/works/${key}`,
   };
 }
@@ -1307,7 +1415,7 @@ SELECT DISTINCT ?seed ?item ?series ?seriesLabel ?ordinal ?kind WHERE {
     BIND(?seed AS ?series)
     BIND("sequence" AS ?kind)
   }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,ar". }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,ar,mul". }
 }`;
   const url = new URL("https://query.wikidata.org/sparql");
   url.searchParams.set("query", query);
@@ -1629,7 +1737,7 @@ SELECT DISTINCT ?item ?series ?seriesLabel ?ordinal WHERE {
   wd:${ebook.wikidataId} wdt:P179 ?series.
   ?item wdt:P179 ?series.
   OPTIONAL { ?item p:P179 ?statement. ?statement ps:P179 ?series. ?statement pq:P1545 ?ordinal. }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "${getUiLanguage()},en,ar". }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "${getUiLanguage()},en,ar,mul". }
 }`;
     const url = new URL("https://query.wikidata.org/sparql");
     url.searchParams.set("query", query);

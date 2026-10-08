@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  adoptCollectionOrigin,
+  adoptRequestedIdentity,
   replaceQueueTrack,
   selectableSources,
 } from "../src/lib/music/queue-source";
@@ -41,12 +41,25 @@ test("the swap keeps the collection it came from, so going back still works", ()
     collectionOrigin: { id: "playlist1", connectorId: "spotify" },
   });
   const next = replaceQueueTrack([original], 0, track("b2", "youtube_music"));
-  assert.deepEqual(next[0].collectionOrigin, { id: "playlist1", connectorId: "spotify" });
+  assert.equal(next[0].collectionOrigin?.id, "playlist1");
+  assert.equal(next[0].collectionOrigin?.connectorId, "spotify");
 });
 
 test("a track with no collection adopts itself as the origin", () => {
-  const next = adoptCollectionOrigin(track("b2", "youtube_music"), track("b", "spotify"));
-  assert.deepEqual(next.collectionOrigin, { id: "b", connectorId: "spotify" });
+  const next = adoptRequestedIdentity(track("b2", "youtube_music"), track("b", "spotify"));
+  assert.equal(next.collectionOrigin?.id, "b");
+  assert.equal(next.collectionOrigin?.connectorId, "spotify");
+});
+
+test("a swapped source keeps the requested song's credits, not the uploader's", () => {
+  const requested = track("b", "spotify", { title: "Violent Kiss", artist: "Eyes Set To Kill" });
+  const rip = track("b2", "soundcloud", { title: "violent kiss (full)", artist: "angelicold" });
+  const next = adoptRequestedIdentity(rip, requested);
+  assert.equal(next.connectorId, "soundcloud");
+  assert.equal(next.id, "b2");
+  assert.equal(next.title, "Violent Kiss");
+  assert.equal(next.artist, "Eyes Set To Kill");
+  assert.equal(next.collectionOrigin?.artist, "Eyes Set To Kill");
 });
 
 test("swapping to the identical source is a no-op, so the queue identity is stable", () => {

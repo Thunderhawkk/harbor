@@ -12,6 +12,7 @@ import { setSecondarySub } from "@/lib/player/secondary-sub";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
 import { wasLimitReached } from "@/lib/subtitles/limit-signal";
+import { wasPendingSub } from "@/lib/subtitles/pending-subs";
 import { bindSubtitleDownloadAuth } from "@/lib/subtitles/provider-auth";
 import type { SubtitleLoadMetadata } from "@/lib/subtitles/types";
 import { MenuBody } from "./subtitle-menu/menu-body";
@@ -106,7 +107,15 @@ export function SubtitleMenu(props: Props) {
           const mainWindowMetadata: SubtitleLoadMetadata = { ...metadata, downloadAuth };
           return propsRef.current.onAddSubtitle(url, lang, title, mainWindowMetadata);
         })()
-          .then((result) => (result !== false ? "ok" : wasLimitReached(url) ? "limited" : "failed"))
+          .then((result) =>
+            result !== false
+              ? "ok"
+              : wasPendingSub(url)
+                ? "pending"
+                : wasLimitReached(url)
+                  ? "limited"
+                  : "failed",
+          )
           .catch(() => "failed" as const)
           .then((result) => {
             if (!requestId) return;

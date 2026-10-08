@@ -65,6 +65,7 @@
   flex-shrink: 0;
 }
 .music-billboard-art {
+  position: relative;
   width: 58px;
   height: 58px;
   background: var(--color-elevated);

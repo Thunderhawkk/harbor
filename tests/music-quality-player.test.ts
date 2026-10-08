@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 import { queueTrackKey } from "../src/lib/music/queue-order.ts";
+import { dedupeMusicTracks, sameMusicTrack } from "../src/lib/music/track-identity.ts";
 import type { MusicTrack } from "../src/lib/music/types.ts";
 
 type Player = typeof import("../src/lib/music/player.ts");
@@ -45,6 +46,14 @@ function player() {
     react: {},
     "./catalog": {},
     "./queue-order": { queueTrackKey },
+    "./track-identity": { dedupeMusicTracks, sameMusicTrack },
+    "./deck-sync": {
+      answerDeckRequests: () => () => {},
+      broadcastDeckState: () => {},
+      sendDeckAdopted: () => {},
+      serveDeckCommands: () => () => {},
+    },
+    "./deck-primary": { createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }) },
     "./liked": {
       isMusicLiked: (ids: readonly string[], t: any) => !!t && ids.includes(t.id),
       likedIdsFor: (t: any) => (t ? [t.id] : []),
@@ -71,6 +80,7 @@ function player() {
       restoreMusicPlaybackOrigin: () => {},
     },
     "./preferences": { readMusicPreference: () => null, writeMusicPreference: () => {} },
+    "./hidden-recents": { unhideMusicRecent: () => {} },
     "./audio-settings": {
       initializeMusicAudioSettings: async () => {},
       clampMusicVolume: (value: number) => Math.max(0, Math.min(1, value)),

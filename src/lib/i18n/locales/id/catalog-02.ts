@@ -75,8 +75,7 @@ const catalog: Record<string, string> = {
   "Connect your Trakt account": "Hubungkan akun Trakt Anda",
   "Connect your Trakt account to scrobble playback, sync your watchlist, and pull personalized recommendations.":
     "Hubungkan akun Trakt Anda untuk melakukan scrobble Pemutaran, menyinkronkan daftar tontonan, dan mengambil rekomendasi yang dipersonalisasi.",
-  "Connect your Trakt account to see comments and reviews.":
-    "Hubungkan akun Trakt Anda untuk melihat komentar dan ulasan.",
+  "Connect your Trakt account to leave comments and reviews.": "Hubungkan akun Trakt untuk menulis komentar dan ulasan.",
   "Connect your provider.": "Hubungkan penyedia Anda.",
   "Connect {name} in Settings first": "Hubungkan {name} di Pengaturan terlebih dahulu",
   Connected: "Terhubung",

@@ -4,6 +4,7 @@ import test from "node:test";
 import ts from "typescript";
 import { castOwnershipFixture } from "./helpers/cast-ownership.ts";
 import { queueTrackKey } from "../src/lib/music/queue-order.ts";
+import { dedupeMusicTracks, sameMusicTrack } from "../src/lib/music/track-identity.ts";
 
 const track = {
   id: "youtube:one",
@@ -71,6 +72,14 @@ function fixture(respond?: (command: string, args?: any) => unknown, realCasting
     react: {},
     "./catalog": {},
     "./queue-order": { queueTrackKey },
+    "./track-identity": { dedupeMusicTracks, sameMusicTrack },
+    "./deck-sync": {
+      answerDeckRequests: () => () => {},
+      broadcastDeckState: () => {},
+      sendDeckAdopted: () => {},
+      serveDeckCommands: () => () => {},
+    },
+    "./deck-primary": { createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }) },
     "./liked": {
       isMusicLiked: (ids: readonly string[], t: any) => !!t && ids.includes(t.id),
       likedIdsFor: (t: any) => (t ? [t.id] : []),
@@ -97,6 +106,7 @@ function fixture(respond?: (command: string, args?: any) => unknown, realCasting
       restoreMusicPlaybackOrigin: () => {},
     },
     "./preferences": { readMusicPreference: () => null, writeMusicPreference: () => {} },
+    "./hidden-recents": { unhideMusicRecent: () => {} },
     "./audio-settings": {
       initializeMusicAudioSettings: async () => {},
       clampMusicVolume: (n: number) => Math.max(0, Math.min(1, n)),

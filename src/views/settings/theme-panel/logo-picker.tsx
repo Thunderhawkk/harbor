@@ -4,6 +4,7 @@ import { applyAppIcon } from "@/lib/app-icon";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
 import { SettingRow } from "../kit";
+import { ToggleRow } from "../shared";
 import { SButton, SRow } from "../ui";
 import { processLogoImage } from "./image-utils";
 import { APP_ICON_PRESETS } from "./app-icon-presets";
@@ -319,6 +320,14 @@ function AppIconPicker() {
           </button>
         </div>
       )}
+      <ToggleRow
+        label={t("Use the album art as the app icon while music plays")}
+        sub={t(
+          "The taskbar button becomes the cover of the track you are listening to, and goes back to your Harbor icon when music stops. The thumbnail preview always shows the cover either way.",
+        )}
+        value={settings.musicArtworkAppIcon}
+        onChange={(v) => update({ musicArtworkAppIcon: v })}
+      />
       <input
         ref={inputRef}
         type="file"

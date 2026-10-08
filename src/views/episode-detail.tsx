@@ -7,7 +7,7 @@ import type { CastEntry } from "@/lib/providers/tmdb";
 import { fetchEpisodeData } from "@/lib/episode-data-fetcher";
 import { meta as fetchCinemetaMeta } from "@/lib/cinemeta";
 import { useSettings, type Settings } from "@/lib/settings";
-import { useScrollMemory, useView, type PlayEpisode } from "@/lib/view";
+import { useScrollMemory, useView, type EpisodeDetailPlayback, type PlayEpisode } from "@/lib/view";
 import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 import { useOmdbScores, omdbScores as fetchOmdbScores } from "@/lib/providers/omdb";
@@ -29,6 +29,7 @@ export interface EpisodeDetailViewProps {
   season: number;
   episode: number;
   seriesMeta?: Meta;
+  playback?: EpisodeDetailPlayback;
 }
 
 export function EpisodeDetailView({
@@ -36,6 +37,7 @@ export function EpisodeDetailView({
   season,
   episode,
   seriesMeta: initialSeriesMeta,
+  playback,
 }: EpisodeDetailViewProps) {
   const t = useT();
   const { settings } = useSettings();
@@ -47,8 +49,8 @@ export function EpisodeDetailView({
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLElement>(null);
 
-  const resolvedImdb = useTmdbImdbId(seriesMeta?.id);
-  const imdbId = resolvedImdb ?? (seriesMeta?.id.startsWith("tt") ? seriesMeta.id : null);
+  const resolvedImdb = useTmdbImdbId(seriesId);
+  const imdbId = resolvedImdb ?? (seriesId.startsWith("tt") ? seriesId : null);
   const omdbScores = useOmdbScores(imdbId ?? undefined);
   const episodeImdbId = episodeData?.imdbId ?? undefined;
   const episodeOmdbScores = useOmdbScores(episodeImdbId);
@@ -88,18 +90,26 @@ export function EpisodeDetailView({
     setLoading(true);
     setError(null);
     setEpisodeData(null);
+    setSeriesMeta(initialSeriesMeta ?? null);
 
     (async () => {
       try {
         let meta: Meta | undefined = initialSeriesMeta;
         if (!meta) {
           const fetched = await fetchCinemetaMeta("series", seriesId);
-          if (cancelled || !fetched) return;
+          if (cancelled) return;
+          if (!fetched) {
+            setError(t("Episode information is not available"));
+            return;
+          }
           meta = fetched;
           setSeriesMeta(meta);
         }
 
-        const data = await fetchEpisodeData(seriesId, meta, season, episode, { tmdbKey } as Settings);
+        const lookupMeta = playback?.meta.id === seriesId ? playback.meta : meta;
+        const data = await fetchEpisodeData(
+          seriesId, lookupMeta, season, episode, { tmdbKey } as Settings, playback?.episode,
+        );
         if (cancelled) return;
 
         if (data) {
@@ -119,7 +129,7 @@ export function EpisodeDetailView({
     })();
 
     return () => { cancelled = true; };
-  }, [episodeKey, initialSeriesMeta, tmdbKey]);
+  }, [episodeKey, initialSeriesMeta, playback, tmdbKey]);
 
   const getImageUrl = (path: string | null | undefined, size = "original"): string | undefined => {
     if (!path) return undefined;
@@ -160,9 +170,10 @@ export function EpisodeDetailView({
       name: episodeData.name,
       still: getImageUrl(episodeData.stillPath, "w300") || undefined,
       overview: episodeData.overview || undefined,
+      ...playback?.episode,
     };
-    openPicker(seriesMeta, playEpisode, { autoPlay: settings.instantPlay });
-  }, [seriesMeta, episodeData, openPicker, settings.instantPlay]);
+    openPicker(playback?.meta ?? seriesMeta, playEpisode, { autoPlay: settings.instantPlay });
+  }, [seriesMeta, episodeData, playback, openPicker, settings.instantPlay]);
 
   const handleSeriesClick = useCallback(() => {
     if (seriesMeta) openMeta(seriesMeta);

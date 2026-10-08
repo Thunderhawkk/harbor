@@ -1594,6 +1594,9 @@ const settings: Record<string, string> = {
   "Show MAL score on cards": "Mostrar puntuación de MAL en las tarjetas",
   "Show my rating on movie posters": "Mostrar mi calificación en los pósteres de películas",
   "Show on Discord": "Mostrar en Discord",
+  "Show what you are listening to": "Mostrar lo que estás escuchando",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Comparte la canción, el artista y la portada mientras suena la música, con un botón «Listen in Harbor».",
   "Show or hide the playback stats overlay.":
     "Mostrar u ocultar la superposición de estadísticas de reproducción.",
   "Show P2P status overlay": "Mostrar la superposición de estado de P2P",

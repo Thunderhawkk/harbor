@@ -176,6 +176,8 @@ const extra: Record<string, string> = {
   "Browse by country": "Duyệt theo quốc gia",
   "Browse channels": "Duyệt kênh",
   "Buffer fill": "Mức đầy bộ đệm",
+  "Reveal the dot on hover": "Hiện chấm khi di chuột",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Chấm không vướng mắt và xuất hiện khi bạn trỏ vào thanh. Tắt tuỳ chọn này để chấm luôn hiển thị.",
   "Buffer fill brightness": "Độ sáng mức đầy bộ đệm",
   Build: "Tạo",
   "Build a named filter once, then apply it in the source picker to hide everything that doesn't match. Each filter ANDs its dimensions and ignores any you leave blank.":
@@ -220,8 +222,7 @@ const extra: Record<string, string> = {
     "Kết nối dịch vụ debrid (Real-Debrid, TorBox, AllDebrid) để xem HD ngay mà không phải chờ.",
   "Connect MyAnimeList": "Kết nối MyAnimeList",
   "Connect your MyAnimeList account": "Kết nối tài khoản MyAnimeList",
-  "Connect your Trakt account to see comments and reviews.":
-    "Kết nối tài khoản Trakt để xem bình luận và bài đánh giá.",
+  "Connect your Trakt account to leave comments and reviews.": "Kết nối tài khoản Trakt để để lại bình luận và đánh giá.",
   "Connected as {username}": "Đã kết nối với tên {username}",
   "Connected as @{user}": "Đã kết nối với tên @{user}",
   "Connected as @{username}": "Đã kết nối với tên @{username}",

@@ -57,9 +57,7 @@ export function SharedListHero({
           interactive={signedIn && !summary.isOwner}
         />
         <ListShareButton handle={summary.handle} listId={list.id} name={list.name} />
-        {signedIn && !summary.isOwner && (
-          <SaveListButton handle={summary.handle} listId={list.id} />
-        )}
+        {!summary.isOwner && <SaveListButton handle={summary.handle} listId={list.id} />}
         {openMaker && (
           <button
             type="button"

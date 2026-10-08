@@ -1,6 +1,6 @@
 import { fillStyle } from "@/components/slider";
 import { useEffect, useRef } from "react";
-import { SETTINGS_FILMS, SETTINGS_SAMPLE_META, useSampleArtwork } from "@/lib/sample-artwork";
+import { useSettingsSamples, useSettingsSampleMeta, useSampleArtwork } from "@/lib/sample-artwork";
 import { TvCardArtwork } from "@/components/tv-card";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
@@ -31,6 +31,7 @@ export function PosterCardSection() {
   const t = useT();
   const { settings, update } = useSettings();
   const art = useSampleArtwork();
+  const sample = useSettingsSampleMeta();
   const tv = settings.rowCardStyle === "tv";
 
   return (
@@ -85,7 +86,7 @@ export function PosterCardSection() {
             {tv ? (
               <div
                 role="img"
-                aria-label={t("TV card preview for {title}", { title: SETTINGS_SAMPLE_META.name })}
+                aria-label={t("TV card preview for {title}", { title: sample.name })}
                 className="relative aspect-[16/9] max-w-full overflow-hidden bg-elevated ring-1 ring-edge-soft transition-[width,border-radius] duration-[260ms] ease-in-out motion-reduce:transition-none"
                 style={{
                   width: Math.round(236 * settings.posterScale),
@@ -93,7 +94,7 @@ export function PosterCardSection() {
                 }}
               >
                 <TvCardArtwork
-                  meta={SETTINGS_SAMPLE_META}
+                  meta={sample}
                   logo={art.logo ?? undefined}
                   posterSrc={art.poster}
                 />
@@ -265,6 +266,7 @@ export function PosterCardSection() {
 
 function PosterDockPreview({ transitionMs }: { transitionMs: number }) {
   const t = useT();
+  const samples = useSettingsSamples();
   const trackRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
   const pointerXRef = useRef<number | null>(null);
@@ -314,7 +316,7 @@ function PosterDockPreview({ transitionMs }: { transitionMs: number }) {
           }}
           className="grid grid-cols-4 items-start gap-3"
         >
-          {SETTINGS_FILMS.map(({ poster }, index) => (
+          {samples.slice(0, 4).map(({ poster }, index) => (
             <div key={`${poster}-${index}`} className="min-w-0">
               <div data-preview-anchor className="overflow-hidden rounded-[10px]">
                 <PreviewImage src={poster} className="aspect-[2/3] w-full object-cover" />

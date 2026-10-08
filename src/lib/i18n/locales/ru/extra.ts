@@ -190,6 +190,8 @@ const extra: Record<string, string> = {
   Browsing: "Просмотр",
   Budget: "Бюджет",
   "Buffer fill": "Заполнение буфера",
+  "Reveal the dot on hover": "Показывать точку при наведении",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Точка не мешает и появляется, когда вы наводите курсор на полосу. Отключите, чтобы она была видна постоянно.",
   "Buffer fill brightness": "Яркость заполнения буфера",
   Buffering: "Буферизация",
   Build: "Сборка",
@@ -246,8 +248,7 @@ const extra: Record<string, string> = {
     "Подключите debrid-сервис (Real-Debrid, TorBox, AllDebrid), чтобы смотреть в HD сразу и без ожидания.",
   "Connect MyAnimeList": "Подключить MyAnimeList",
   "Connect your MyAnimeList account": "Подключите аккаунт MyAnimeList",
-  "Connect your Trakt account to see comments and reviews.":
-    "Подключите аккаунт Trakt, чтобы видеть комментарии и отзывы.",
+  "Connect your Trakt account to leave comments and reviews.": "Подключите аккаунт Trakt, чтобы оставлять комментарии и отзывы.",
   "Connected as {username}": "Подключено как {username}",
   "Connected as @{user}": "Подключено как @{user}",
   "Connected as @{username}": "Подключено как @{username}",

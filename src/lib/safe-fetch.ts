@@ -1,6 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetch as tauriFetchImpl } from "@tauri-apps/plugin-http";
 import { TrackerBlockedError, isBlockedUrl, noteBlocked } from "./privacy/blocklist";
+import { bridgeOutcome, recordBridge } from "./fetch-bridge-stats";
+import {
+  allowDirectHost,
+  classifyDirectFailure,
+  clearDirectFailures,
+  directHostFor,
+  noteDirectFailure,
+} from "./direct-host-policy";
 import { hasSensitiveRequestHeaders, shouldFallbackToPluginHttp } from "./fetch-fallback-policy";
 import {
   isSafeProviderSubtitleUrl,
@@ -54,6 +62,8 @@ function countCrossing(kind: BridgeKind, url: string): void {
 const DIRECT_HOSTS = new Set(["torrentio.strem.fun", "stremio.torbox.app"]);
 
 const PROXY_HOSTS = new Set([
+  "jikanfortheweebs.midnightignite.me",
+  "mcp-api.op.gg",
   "v3-cinemeta.strem.io",
   "opensubtitles-v3.strem.io",
   "opensubtitles.strem.io",
@@ -71,11 +81,35 @@ const PROXY_HOSTS = new Set([
   "api.deepseek.com",
   "api.deezer.com",
   "api.igdb.com",
+  "api.steampowered.com",
   "images.igdb.com",
   "store.steampowered.com",
+  "steamcommunity.com",
+  "www.speedrun.com",
+  "partner.steamgames.com",
+  "help.steampowered.com",
+  "worldofwarcraft.blizzard.com",
+  "api.warframe.com",
+  "www.youtube.com",
+  "www.pcgamingwiki.com",
+  "kick.com",
+  "prosettings.net",
   "cdn.cloudflare.steamstatic.com",
 ]);
 const DEV_PROXY_HOSTS = new Set([
+  "mcp-api.op.gg",
+  "worldofwarcraft.blizzard.com",
+  "api.warframe.com",
+  "www.youtube.com",
+  "www.pcgamingwiki.com",
+  "kick.com",
+  "prosettings.net",
+  "api.steampowered.com",
+  "store.steampowered.com",
+  "steamcommunity.com",
+  "www.speedrun.com",
+  "partner.steamgames.com",
+  "help.steampowered.com",
   "graphql.anilist.co",
   "openlibrary.org",
   "covers.openlibrary.org",
@@ -101,55 +135,6 @@ const PROXY_SUFFIXES = [
   ".deno.dev",
   ".dzcdn.net",
 ];
-
-const TAURI_DIRECT_HOSTS = new Set([
-  "v3-cinemeta.strem.io",
-  "api.ani.zip",
-  "anime-kitsu.strem.fun",
-  "kitsu.io",
-  "api.themoviedb.org",
-  "graphql.anilist.co",
-]);
-
-const DIRECT_FAIL_LIMIT = 2;
-const DIRECT_FAIL_DECAY_MS = 60000;
-const directFailures = new Map<string, { count: number; at: number }>();
-
-function directDemoted(host: string): boolean {
-  const entry = directFailures.get(host);
-  if (!entry) return false;
-  if (Date.now() - entry.at >= DIRECT_FAIL_DECAY_MS) {
-    directFailures.delete(host);
-    return false;
-  }
-  return entry.count >= DIRECT_FAIL_LIMIT;
-}
-
-function noteDirectFailure(host: string): void {
-  const now = Date.now();
-  const entry = directFailures.get(host);
-  const count = entry && now - entry.at < DIRECT_FAIL_DECAY_MS ? entry.count + 1 : 1;
-  directFailures.set(host, { count, at: now });
-}
-
-export function allowDirectHost(url: string): void {
-  try {
-    const u = new URL(url);
-    if (u.protocol !== "https:") return;
-    TAURI_DIRECT_HOSTS.add(u.hostname);
-  } catch {}
-}
-
-function tauriDirectHost(url: string): string | null {
-  try {
-    const host = new URL(url).hostname;
-    if (!TAURI_DIRECT_HOSTS.has(host)) return null;
-    if (directDemoted(host)) return null;
-    return host;
-  } catch {
-    return null;
-  }
-}
 
 function isCancellation(e: unknown): boolean {
   const err = e as { name?: string; message?: string } | undefined;
@@ -206,6 +191,8 @@ type HarborFetchResponse = {
 
 export const FINAL_URL_HEADER = "x-harbor-final-url";
 
+export { allowDirectHost };
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let offset = 0; offset < bytes.length; offset += 0x8000)
@@ -215,7 +202,14 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 function base64ToBytes(value: string): Uint8Array {
   const binary = atob(value);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  // Every image crosses the native bridge through here, so this runs while rows are
+  // scrolling into view. Uint8Array.from with a callback pays an iterator step and a JS
+  // call per byte; writing straight into the buffer does the same work far cheaper.
+  const size = binary.length;
+  // Backed by a concrete ArrayBuffer so the result stays usable as a Response body.
+  const bytes = new Uint8Array(new ArrayBuffer(size));
+  for (let i = 0; i < size; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 async function invokeHarborFetch(
@@ -258,7 +252,8 @@ async function invokeHarborFetch(
         : init?.body && !binaryBody
           ? JSON.stringify(init.body)
           : undefined;
-  const resp = await invoke<HarborFetchResponse>("harbor_fetch", {
+  const started = Date.now();
+  const request = invoke<HarborFetchResponse>("harbor_fetch", {
     args: {
       url: input,
       method: init?.method ?? "GET",
@@ -276,7 +271,16 @@ async function invokeHarborFetch(
         init?.redirect === "manual" || init?.redirect === "error" ? false : undefined,
     },
   });
-  return resp;
+  return request.then(
+    (resp) => {
+      recordBridge("harborFetch", input, Date.now() - started, "ok");
+      return resp;
+    },
+    (error: unknown) => {
+      recordBridge("harborFetch", input, Date.now() - started, bridgeOutcome(error));
+      throw error;
+    },
+  );
 }
 
 async function tauriHarborFetch(
@@ -299,7 +303,9 @@ async function tauriHarborFetch(
     resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
   );
   if (resp.url) responseHeaders.set(FINAL_URL_HEADER, resp.url);
-  return new Response(responseType === "base64" ? base64ToBytes(resp.body) : resp.body, {
+  const bodyless = init?.method?.toUpperCase() === "HEAD" || [204, 205, 304].includes(resp.status);
+  const body = bodyless ? null : responseType === "base64" ? base64ToBytes(resp.body) : resp.body;
+  return new Response(body, {
     status: resp.status,
     headers: responseHeaders,
   });
@@ -360,8 +366,19 @@ function normalizeAbort(p: Promise<Response>): Promise<Response> {
 }
 
 function pluginHttpFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  countCrossing("pluginHttp", urlOf(input));
-  return normalizeAbort(tauriFetchImpl(input, init) as Promise<Response>);
+  const url = urlOf(input);
+  countCrossing("pluginHttp", url);
+  const started = Date.now();
+  return normalizeAbort(tauriFetchImpl(input, init) as Promise<Response>).then(
+    (res) => {
+      recordBridge("pluginHttp", url, Date.now() - started, "ok");
+      return res;
+    },
+    (error: unknown) => {
+      recordBridge("pluginHttp", url, Date.now() - started, bridgeOutcome(error));
+      throw error;
+    },
+  );
 }
 
 async function materializeRequest(
@@ -426,22 +443,58 @@ function withDeadline<T>(
   });
 }
 
+const DIRECT_ATTEMPT_MS = 12000;
+
+function directAttempt(host: string, input: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const caller = init?.signal;
+  const started = Date.now();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, DIRECT_ATTEMPT_MS);
+  const relay = () => controller.abort();
+  caller?.addEventListener("abort", relay);
+  const release = () => {
+    clearTimeout(timer);
+    caller?.removeEventListener("abort", relay);
+  };
+  return fetch(input, { ...init, signal: controller.signal }).then(
+    (res) => {
+      release();
+      recordBridge("direct", input, Date.now() - started, "ok");
+      clearDirectFailures(host);
+      return res;
+    },
+    (error: unknown) => {
+      release();
+      const verdict = classifyDirectFailure({
+        callerAborted: caller?.aborted === true,
+        timedOut,
+        cancelled: isCancellation(error),
+        idempotent: isIdempotent(init?.method),
+      });
+      recordBridge("direct", input, Date.now() - started, verdict.outcome);
+      if (verdict.action === "rethrow") {
+        if (caller?.aborted) throw new DOMException("Aborted", "AbortError");
+        throw error;
+      }
+      if (verdict.demote) noteDirectFailure(host);
+      if (verdict.action === "giveUp") {
+        throw new DOMException(`direct host ${host} exceeded its attempt budget`, "TimeoutError");
+      }
+      countCrossing("directFail", input);
+      return tauriHarborFetch(input, init);
+    },
+  );
+}
+
 function tauriStringFetch(input: string, init?: RequestInit): Promise<Response> {
-  const directHost = hasSensitiveRequestHeaders(init?.headers) ? null : tauriDirectHost(input);
+  const directHost = hasSensitiveRequestHeaders(init?.headers) ? null : directHostFor(input);
   if (directHost) {
     countCrossing("direct", input);
-    const attempt = fetch(input, init)
-      .then((res) => {
-        directFailures.delete(directHost);
-        return res;
-      })
-      .catch((e: unknown) => {
-        if (isCancellation(e)) throw e;
-        countCrossing("directFail", input);
-        noteDirectFailure(directHost);
-        return tauriHarborFetch(input, init);
-      });
-    return withDeadline(attempt, init?.signal);
+    return withDeadline(directAttempt(directHost, input, init), init?.signal);
   }
   const exec = isIdempotent(init?.method)
     ? tauriHarborFetch(input, init).catch((e: unknown) => {
@@ -516,10 +569,7 @@ export const safeFetchStream: typeof fetch = (input, init) => {
     noteBlocked();
     return Promise.reject(new TrackerBlockedError(new URL(target).hostname));
   }
-  if (isTauri)
-    return normalizeAbort(
-      tauriFetchImpl(input as unknown as string, init as RequestInit) as Promise<Response>,
-    );
+  if (isTauri) return pluginHttpFetch(input, init);
   if (typeof input === "string") {
     const rewritten = rewriteForWeb(input, init);
     return fetch(rewritten.url, rewritten.init);

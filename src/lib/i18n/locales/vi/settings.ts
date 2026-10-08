@@ -1723,6 +1723,9 @@ const settings: Record<string, string> = {
   "Update now": "Cập nhật ngay",
   "Check for updates": "Kiểm tra bản cập nhật",
   "Show on Discord": "Hiển thị trên Discord",
+  "Show what you are listening to": "Hiển thị bài bạn đang nghe",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Chia sẻ bài hát, nghệ sĩ và ảnh bìa album khi nhạc đang phát, kèm nút «Listen in Harbor».",
   "Display what you are watching on your Discord profile, with the show poster and a live progress bar. Requires the Discord desktop app to be running.":
     "Hiển thị nội dung bạn đang xem trên hồ sơ Discord, kèm áp phích và thanh tiến trình trực tiếp. Yêu cầu ứng dụng Discord trên máy tính đang chạy.",
   "Hide the title": "Ẩn tiêu đề",

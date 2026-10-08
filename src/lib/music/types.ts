@@ -8,10 +8,18 @@ export type MusicAudioQuality = {
 };
 
 export type MusicTrack = {
+  releaseDate?: string;
   explicit?: boolean;
   version?: string;
   /** Original collection entry retained when the source chooser selects a provider. */
-  collectionOrigin?: { id: string; connectorId?: string };
+  /** Where the recording was asked for: the credit survives whichever source supplies audio. */
+  collectionOrigin?: {
+    id: string;
+    connectorId?: string;
+    title?: string;
+    artist?: string;
+    artwork?: string;
+  };
   mediaKind?: "audio" | "video";
   connectorId?: string;
   sourceId?: string;
@@ -78,6 +86,8 @@ export type MusicPlaylist = {
   name: string;
   createdAt: string;
   updatedAt: string;
+  /** Collection-specific timestamps; older entries may have no recorded date. */
+  trackAddedAt?: Record<string, string>;
   tracks: MusicTrack[];
 };
 
@@ -92,6 +102,8 @@ export type MusicPlayerState = {
   duration: number;
   volume: number;
   error: string | null;
+  /** A scrobble is bookkeeping, not playback, so its failure must never read as a stuck track. */
+  scrobbleError: string | null;
   likedIds: string[];
   likedTracks: MusicTrack[];
   recents: MusicTrack[];
@@ -105,6 +117,8 @@ export type MusicAlbumRef = {
   artwork: string;
   year?: number;
   trackCount?: number;
+  /** Undefined where the provider does not say. Only a real false means clean. */
+  explicit?: boolean;
 };
 
 export type MusicArtistRef = {
@@ -191,4 +205,6 @@ export type MusicConnection = {
   error?: string;
   capabilities: MusicConnectionCapability[];
   needs: MusicConnectionField[];
+  /** A source needing no account: always usable, never signed in or out of. */
+  anonymous?: boolean;
 };

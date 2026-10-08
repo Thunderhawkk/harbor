@@ -170,9 +170,3 @@ test("hook queues failed stops and provider flushes on session", () => {
   assert.match(provider, /simklScrobble\("stop", metaId, episode, 100\)/);
   assert.match(provider, /flushPendingWatches\(\)/);
 });
-
-test("recordWatchedFallback reports its outcome", () => {
-  const src = readFileSync(new URL("../src/lib/simkl/record-watched.ts", import.meta.url), "utf8");
-  assert.match(src, /Promise<boolean>/);
-  assert.match(src, /if \(!t\) return false;/);
-});

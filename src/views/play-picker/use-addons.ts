@@ -113,11 +113,21 @@ export function useAddons(
           list.push(torbox);
         }
       }
+      // The store is read even while the switch keeps the extensions back: an item that names the
+      // plugin that listed it is still that plugin's to answer, and answering needs the installed
+      // set. Reading it starts no runtime; only querying one does.
+      await loadStreamPlugins();
+      if (cancelled) return;
+      setStreamPluginConfig({ tmdbKey: settings.tmdbKey });
       if (settings.pluginsEnabled) {
-        await loadStreamPlugins();
-        if (cancelled) return;
-        setStreamPluginConfig({ tmdbKey: settings.tmdbKey });
-        list.push(...pluginAddons({ enabled: true, groupByRepo: settings.pluginsGroupByRepo }));
+        // The switch holds back the extensions that have a page of their own. A plugin with no rows
+        // of its own is asked either way: holding it back would leave it unreachable.
+        list.push(
+          ...pluginAddons({
+            groupByRepo: settings.pluginsGroupByRepo,
+            includeExtensions: settings.pluginsOutsideTab,
+          }),
+        );
         void import("@/lib/plugins/auto-check").then((m) =>
           m.schedulePluginAutoCheck(settings.pluginsAutoCheck),
         );
@@ -139,6 +149,7 @@ export function useAddons(
     settings.dlKey,
     settings.tmdbKey,
     settings.pluginsEnabled,
+    settings.pluginsOutsideTab,
     settings.pluginsGroupByRepo,
     pluginTick,
   ]);

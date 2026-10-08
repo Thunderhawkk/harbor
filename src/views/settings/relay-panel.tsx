@@ -9,7 +9,7 @@ import {
   Link2,
   Loader2,
   Power,
-  Radio,
+  Relay,
   ShieldCheck,
   Trash2,
   Users,
@@ -72,7 +72,7 @@ function RelayMark({ kind, status }: { kind: RelayKind; status?: RelayStatus }) 
       />
     );
   }
-  return <Radio size={18} strokeWidth={1.9} className="shrink-0" />;
+  return <Relay size={18} strokeWidth={1.9} className="shrink-0" />;
 }
 
 function BroadcastGlyph({ status }: { status: RelayStatus }) {
@@ -365,7 +365,7 @@ export function TogetherRelayPanel({
               onClick={() => update({ togetherRelayUrl: HARBOR_PUBLIC_RELAY })}
               className={ROW_ACTION}
             >
-              <Radio size={16} strokeWidth={1.9} />
+              <Relay size={16} strokeWidth={1.9} />
               {t("Use Harbor's public relay")}
             </button>
           </SettingRow>

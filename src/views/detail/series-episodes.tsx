@@ -106,16 +106,23 @@ export function SeriesEpisodes({
   const combinedWatched = useMemo(() => {
     const s = new Set<string>(stremioWatched ?? []);
     for (const k of simklWatched) s.add(k);
+    // Trakt answers with the whole account's history, not this show's.
+    const mine = new Set<string>();
+    if (imdbId) mine.add(`imdb:${imdbId}`);
+    const tmdb = /^tmdb:(\d+)/.exec(meta.id)?.[1];
+    if (tmdb) mine.add(`tmdb:${tmdb}`);
     for (const k of traktWatched) {
       const e = k.lastIndexOf(":");
       const se = e > 0 ? k.lastIndexOf(":", e - 1) : -1;
-      if (se >= 0) s.add(k.slice(se + 1));
+      if (se < 0) continue;
+      if (!mine.has(k.slice(0, se))) continue;
+      s.add(k.slice(se + 1));
     }
     const manual = manualEpisodeKeys(meta.id);
     for (const k of manual.watched) s.add(k);
     for (const k of manual.unwatched) s.delete(k);
     return s;
-  }, [stremioWatched, simklWatched, traktWatched, meta.id, mwVersion]);
+  }, [stremioWatched, simklWatched, traktWatched, meta.id, imdbId, mwVersion]);
   const cache = useRef<Map<number, Episode[]>>(new Map());
 
   const traktKey = imdbId ?? meta.id;

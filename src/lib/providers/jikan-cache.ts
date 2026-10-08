@@ -1,3 +1,4 @@
+import { evictLocalPrefix, idbCacheGet, idbCacheSet } from "@/lib/idb-cache";
 import type { Meta } from "@/lib/cinemeta";
 import { registerEvictable } from "@/lib/maintenance";
 
@@ -109,21 +110,16 @@ function isSearchKey(key: string): boolean {
   return /[?&]q=/.test(key);
 }
 
-(() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(CATALOG_KEY) ?? "{}") as Record<
-      string,
-      CatalogEntry
-    >;
-    const now = Date.now();
-    for (const [k, e] of Object.entries(raw)) {
-      if (isSearchKey(k)) continue;
-      if (e && Array.isArray(e.metas) && now - e.t < JIKAN_CACHE_TTL) catalog.set(k, e);
-    }
-  } catch {
-    localStorage.removeItem(CATALOG_KEY);
+evictLocalPrefix(CATALOG_KEY);
+
+void idbCacheGet(CATALOG_KEY).then((stored) => {
+  const raw = (stored?.data ?? {}) as Record<string, CatalogEntry>;
+  const now = Date.now();
+  for (const [k, e] of Object.entries(raw)) {
+    if (isSearchKey(k) || catalog.has(k)) continue;
+    if (e && Array.isArray(e.metas) && e.metas.length > 0 && now - e.t < JIKAN_CACHE_TTL) catalog.set(k, e);
   }
-})();
+});
 
 let catalogFlushTimer = 0;
 
@@ -150,10 +146,8 @@ function persistCatalog() {
             ),
           },
         ]);
-      localStorage.setItem(CATALOG_KEY, JSON.stringify(Object.fromEntries(entries)));
-    } catch {
-      localStorage.removeItem(CATALOG_KEY);
-    }
+      void idbCacheSet(CATALOG_KEY, { at: Date.now(), data: Object.fromEntries(entries) });
+    } catch {}
   }, 1000);
 }
 

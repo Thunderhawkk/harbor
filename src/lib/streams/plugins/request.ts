@@ -1,6 +1,7 @@
 import { meta as cinemetaMeta } from "@/lib/cinemeta";
 import { tmdbIdFromImdb } from "@/lib/providers/tmdb/tmdb-imdb-resolve";
 import type { StreamRequest } from "../addons";
+import { parseCapstanId } from "./extension/detail";
 import { settingsValuesFor } from "./source";
 import type { InstalledStreamPlugin, StreamPluginRequest } from "./types";
 
@@ -88,6 +89,26 @@ export async function resolveTmdb(
   return p;
 }
 
+const named = new Map<string, { title: string; year: number | null }>();
+
+async function nameFromMeta(
+  imdbId: string,
+  type: "movie" | "series",
+): Promise<{ title: string; year: number | null } | null> {
+  const key = `${imdbId}:${type}`;
+  const hit = named.get(key);
+  if (hit) return hit;
+  const m = (await cinemetaMeta(type, imdbId, true).catch(() => null)) as
+    | ({ name?: unknown; releaseInfo?: unknown } & Record<string, unknown>)
+    | null;
+  const title = typeof m?.name === "string" ? m.name.trim() : "";
+  if (!title) return null;
+  const value = { title, year: parseInt(String(m?.releaseInfo ?? ""), 10) || null };
+  if (named.size > MAP_MAX) named.clear();
+  named.set(key, value);
+  return value;
+}
+
 function imdbFromIds(ids: string[]): string | null {
   for (const id of ids) {
     const m = /^(tt\d+)/.exec(id);
@@ -120,20 +141,34 @@ export async function buildPluginRequest(
   const kind = type === "series" ? "tv" : "movie";
   const ctx = req.context;
   const imdbId = ctx?.imdbId ?? imdbFromIds(req.ids);
+  // A catalogue row addresses itself with the page it came from, so the plugin is asked to open
+  // that page rather than to find one by name.
+  const listedAt = parseCapstanId(pickedId);
   const fromId = episodeFromId(pickedId);
   let tmdb = tmdbFromIds(req.ids, kind);
   if (!tmdb && imdbId) tmdb = await resolveTmdb(imdbId, type, tmdbKey);
+  let title = ctx?.title?.trim() ?? "";
+  let year = ctx?.year ?? null;
+  if (!title && imdbId) {
+    const meta = await nameFromMeta(imdbId, type);
+    if (meta) {
+      title = meta.title;
+      year = year ?? meta.year;
+    }
+  }
   return {
     type,
     id: pickedId,
     ids: req.ids,
     imdbId,
     tmdb,
-    title: ctx?.title ?? "",
-    year: ctx?.year ?? null,
+    title,
+    year,
     season: ctx?.season ?? fromId?.season ?? null,
     episode: ctx?.episode ?? fromId?.episode ?? null,
     absoluteEpisode: ctx?.absoluteEpisode ?? null,
+    url: listedAt?.url,
+    providerId: listedAt?.providerId,
     settings: settingsValuesFor(plugin),
   };
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Shield } from "lucide-react";
+import "./esports-image.css";
 
 export function EsportsGameLogo({
   game,
@@ -47,19 +48,24 @@ export function EsportsImage({
   fallback?: string;
 }) {
   const [failed, setFailed] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState("");
   const url = [src, fallback].find((value) => value && !failed.includes(value));
+  const ready = !!url && loaded === url;
   return (
-    <span className={`ea-image ${className}`} aria-hidden="true">
-      {url ? (
+    <span className={`ea-image ${className}`} aria-hidden="true" data-image-ready={ready}>
+      {url && (
         <img
+          key={url}
           src={url}
           alt=""
           loading="lazy"
           decoding="async"
           draggable={false}
+          onLoad={() => setLoaded(url)}
           onError={() => setFailed((prev) => [...prev, url])}
         />
-      ) : (
+      )}
+      {!ready && (
         <span className="ea-image-fallback">
           <Shield size={32} />
           <b>

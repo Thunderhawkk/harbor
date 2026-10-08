@@ -29,27 +29,37 @@ export function MusicArtistLink({
       setShift(0);
       return;
     }
-    const frame = requestAnimationFrame(() => {
-      const box = viewport.current,
-        text = line.current;
-      if (box && text) setShift(Math.max(0, text.scrollWidth - box.clientWidth));
-    });
-    return () => cancelAnimationFrame(frame);
+    const box = viewport.current,
+      text = line.current;
+    if (!box || !text) return;
+    const measure = () => {
+      const overflow = text.scrollWidth - box.clientWidth;
+      setShift(box.clientWidth > 0 && overflow > 1 ? overflow : 0);
+    };
+    const frame = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    observer.observe(text);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [hovered, credit]);
+  const marquee = hovered && shift > 0;
   return (
     <span
       ref={viewport}
-      className={`min-w-0 truncate text-start ${className}`}
+      className={`block min-w-0 truncate text-start ${className}`}
       title={credit}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
       <span
         ref={line}
-        className={`harbor-marquee-line ${hovered ? "block w-max whitespace-nowrap" : "block truncate"}`}
-        data-marquee={shift > 0 || undefined}
+        className={`harbor-marquee-line ${marquee ? "block w-max whitespace-nowrap" : "block truncate"}`}
+        data-marquee={marquee || undefined}
         style={
-          shift > 0
+          marquee
             ? ({
                 "--harbor-marquee": `${-shift}px`,
                 animationDuration: `${Math.round(marqueeDurationMs(shift) / SWEEP_SHARE)}ms`,

@@ -1,4 +1,4 @@
-import { MoreHorizontal } from "lucide-react";
+import { MusicGlyph } from "@/components/icons/music-glyph";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { AnchoredMenu } from "@/components/anchored-menu";
 import { useT } from "@/lib/i18n";
@@ -55,16 +55,16 @@ export function MusicDockOverflow({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t("music.card.moreActions", { title })}
-        title={t("music.card.moreActions", { title })}
+        data-music-tooltip=""
         className={className}
       >
-        <MoreHorizontal size={18} aria-hidden="true" />
+        <MusicGlyph name="more" size={18} aria-hidden="true" />
       </button>
       <AnchoredMenu anchorRef={anchor} open={open} onClose={close} width={232}>
         <div
           role="menu"
           ref={bind}
-          className="music-dock-overflow-menu"
+          className="music-dock-overflow-menu animate-menu-in-up"
           onKeyDown={(event) => {
             const buttons = [
               ...(menu.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []),

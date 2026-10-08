@@ -12,6 +12,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+const UPLOADS_PER_SOURCE: usize = 3;
+
 pub struct ConnectorRegistry {
     connectors: RwLock<HashMap<String, Arc<dyn MusicConnector>>>,
 }
@@ -179,7 +181,7 @@ impl ConnectorRegistry {
         let results = join_all(connectors.into_iter().map(|connector| {
             let query = query.to_string();
             async move {
-                let tracks = connector.search(app, &query, 5).await;
+                let tracks = connector.search(app, &query, 12).await;
                 (connector, tracks)
             }
         }))
@@ -190,25 +192,24 @@ impl ConnectorRegistry {
             let Ok(tracks) = result else {
                 continue;
             };
-            let selected = tracks
+            let mut scored = tracks
                 .into_iter()
                 .filter_map(|candidate| {
                     candidate_score(track, &candidate).map(|score| (score, candidate))
                 })
-                .max_by_key(|(score, _)| *score)
-                .map(|(_, candidate)| candidate);
-            let Some(selected) = selected else {
-                continue;
-            };
-            if !seen.insert(source_key(&selected)) {
-                continue;
+                .collect::<Vec<_>>();
+            scored.sort_by(|left, right| right.0.cmp(&left.0));
+            for (_, selected) in scored.into_iter().take(UPLOADS_PER_SOURCE) {
+                if !seen.insert(source_key(&selected)) {
+                    continue;
+                }
+                alternatives.push(MusicSourceCandidate {
+                    connector_id: connector.id().to_string(),
+                    connector_name: connector.name().to_string(),
+                    health: connector.health(),
+                    track: selected,
+                });
             }
-            alternatives.push(MusicSourceCandidate {
-                connector_id: connector.id().to_string(),
-                connector_name: connector.name().to_string(),
-                health: connector.health(),
-                track: selected,
-            });
         }
         alternatives
     }

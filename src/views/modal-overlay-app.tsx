@@ -13,6 +13,7 @@ import {
 import { AudioModal, type AudioModalState } from "@/components/popups/audio-modal";
 import { SubtitleModal, type SubtitleModalState } from "@/components/popups/subtitle-modal";
 import { markLimitReached } from "@/lib/subtitles/limit-signal";
+import { markPendingSub } from "@/lib/subtitles/pending-subs";
 
 export function ModalOverlayApp() {
   useEffect(() => {
@@ -75,7 +76,7 @@ function ModalRouter() {
         onDelay={(sec) => modalOverlayEmitAction("modal://subtitle/delay", { sec })}
         onEnterSync={() => modalOverlayEmitAction("modal://subtitle/live-sync", {})}
         onAddSubtitle={async (url, lang, title, metadata) => {
-          const result = await modalOverlayRequestAction<"ok" | "failed" | "limited">(
+          const result = await modalOverlayRequestAction<"ok" | "failed" | "limited" | "pending">(
             "modal://subtitle/add",
             {
               url,
@@ -85,6 +86,9 @@ function ModalRouter() {
             },
           );
           if (result === "limited") markLimitReached(url);
+          // The overlay is a separate window, so the main window's pending signal must
+          // be re-marked locally for this menu instance to show "translating".
+          if (result === "pending") markPendingSub(url);
           return result === "ok";
         }}
         onClose={close}

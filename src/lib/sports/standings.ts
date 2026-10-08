@@ -1,5 +1,7 @@
 import { safeFetch } from "@/lib/safe-fetch";
 import { LEAGUES, type LeagueDef } from "./espn";
+import { espnPublishedAthleteId, type AthleteIdentityRequest } from "./athlete-identity";
+import { publishedPortraitUrl } from "./athlete-portraits";
 
 const BASE = "https://site.web.api.espn.com/apis/v2/sports";
 const TTL = 300_000;
@@ -16,6 +18,7 @@ export type StandingsColumn = { name: string; label: string; abbr: string };
 
 export type StandingsRow = {
   teamId: string;
+  athlete?: AthleteIdentityRequest;
   name: string;
   shortName: string;
   abbr: string;
@@ -51,7 +54,8 @@ type Raw = Record<string, unknown>;
 const obj = (v: unknown): Raw => (v && typeof v === "object" ? (v as Raw) : {});
 const arr = (v: unknown): Raw[] => (Array.isArray(v) ? (v as Raw[]) : []);
 const str = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
-const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const num = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
 
 const COLUMN_ORDER = [
   "rank",
@@ -159,10 +163,20 @@ function toRow(entry: Raw, index: number): StandingsRow | null {
   const headshot = obj(subject.headshot);
   return {
     teamId: str(subject.id),
+    athlete: isAthlete
+      ? {
+          id: espnPublishedAthleteId(entry),
+          name,
+          source: "espn",
+          image: publishedPortraitUrl(headshot.href || subject.headshot) || undefined,
+        }
+      : undefined,
     name,
     shortName: str(subject.shortDisplayName) || str(subject.shortName) || name,
     abbr: str(subject.abbreviation),
-    logo: isAthlete ? str(headshot.href) || str(flag.href) : str(team.logo) || str(logos[0]?.href),
+    logo: isAthlete
+      ? str(headshot.href) || str(flag.href)
+      : str(team.logo) || str(logos[0]?.href),
     rank: seeded != null && seeded > 0 ? seeded : index + 1,
     note: str(note.description),
     played: pickNumber(cells, PICK.played),
@@ -230,7 +244,8 @@ function parseTable(data: Raw, def: LeagueDef): StandingsTable | null {
     leagueTag: def.tag,
     leagueName,
     sport: def.group,
-    season: str(season.displayName) || str(firstStandings.seasonDisplayName) || str(season.year),
+    season:
+      str(season.displayName) || str(firstStandings.seasonDisplayName) || str(season.year),
     columns: orderColumns(groups),
     groups,
   };
@@ -254,7 +269,10 @@ async function fetchStandingsRaw(
   return parseTable(data, def);
 }
 
-export function fetchStandings(leagueTag: string, season?: number): Promise<StandingsTable | null> {
+export function fetchStandings(
+  leagueTag: string,
+  season?: number,
+): Promise<StandingsTable | null> {
   const key = season ? `${leagueTag}@${season}` : leagueTag;
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at < TTL) return Promise.resolve(cached.table);

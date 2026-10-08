@@ -281,7 +281,13 @@ function EpisodePreview({
           />
           <HoverTooltip label={t("Episode details")} align="center" className="shrink-0">
             <button
-              onClick={() => openEpisodeDetail(meta.id, g.season, g.number, meta)}
+              onClick={() => {
+                if (g.openDetail) {
+                  g.openDetail();
+                  return;
+                }
+                openEpisodeDetail(meta.id, g.season, g.number, meta);
+              }}
               aria-label={t("Episode details")}
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.06] text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
             >

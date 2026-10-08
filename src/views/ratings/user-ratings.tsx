@@ -8,6 +8,7 @@ import { useT } from "@/lib/i18n";
 import { fetchUserRatings } from "@/lib/social/ratings-api";
 import type { PublicRating, RatingCounts } from "@/lib/ratings/types";
 import { timeAgo } from "@/views/profile/profile-bits";
+import { useProfileTitle } from "@/views/profile/use-profile-title";
 
 const TABS: Array<{ id: string; label: string; countKey: keyof RatingCounts }> = [
   { id: "all", label: "All", countKey: "total" },
@@ -18,6 +19,14 @@ const TABS: Array<{ id: string; label: string; countKey: keyof RatingCounts }> =
 ];
 
 const EMPTY_COUNTS: RatingCounts = { movie: 0, series: 0, anime: 0, manga: 0, total: 0 };
+
+type RatingsRequest = {
+  handle: string;
+  type: string;
+  controller: AbortController;
+  loading: boolean;
+  more: boolean;
+};
 
 export function UserRatings({
   handle,
@@ -37,7 +46,8 @@ export function UserRatings({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [more, setMore] = useState(false);
-  const seen = useRef(false);
+  const seen = useRef<string | null>(null);
+  const request = useRef<RatingsRequest | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -52,33 +62,57 @@ export function UserRatings({
 
   useEffect(() => {
     const ac = new AbortController();
+    const current = { handle, type, controller: ac, loading: true, more: false };
+    request.current = current;
     setLoading(true);
+    setMore(false);
+    setCursor(undefined);
     setItems([]);
+    if (seen.current !== handle) setCounts(EMPTY_COUNTS);
     fetchUserRatings(handle, { type }, ac.signal)
       .then((page) => {
         if (ac.signal.aborted) return;
         setItems(page.items);
         setCursor(page.nextCursor);
-        if (!seen.current || type === "all") setCounts(page.counts);
-        seen.current = true;
+        if (seen.current !== handle || type === "all") setCounts(page.counts);
+        seen.current = handle;
+        current.loading = false;
         setLoading(false);
       })
       .catch(() => {
-        if (!ac.signal.aborted) setLoading(false);
+        if (!ac.signal.aborted) {
+          current.loading = false;
+          setLoading(false);
+        }
       });
-    return () => ac.abort();
+    return () => {
+      ac.abort();
+      if (request.current === current) request.current = null;
+    };
   }, [handle, type]);
 
-  const loadMore = useCallback(() => {
-    if (!cursor || more) return;
+  const loadMore = useCallback(async () => {
+    const current = request.current;
+    if (
+      !cursor || !current || current.loading || current.more ||
+      current.handle !== handle || current.type !== type || current.controller.signal.aborted
+    ) return;
+    current.more = true;
     setMore(true);
-    fetchUserRatings(handle, { type, cursor })
-      .then((page) => {
-        setItems((prev) => [...prev, ...page.items]);
-        setCursor(page.nextCursor);
-      })
-      .finally(() => setMore(false));
-  }, [cursor, more, handle, type]);
+    try {
+      const page = await fetchUserRatings(handle, { type, cursor }, current.controller.signal);
+      if (request.current !== current || current.controller.signal.aborted) return;
+      setItems((prev) => [...prev, ...page.items]);
+      setCursor(page.nextCursor);
+    } catch {
+      // Keep the current page and cursor available for a retry.
+    } finally {
+      if (request.current === current && !current.controller.signal.aborted) {
+        current.more = false;
+        setMore(false);
+      }
+    }
+  }, [cursor, handle, type]);
 
   return createPortal(
     <div
@@ -169,20 +203,21 @@ function RatingRow({
 }) {
   const t = useT();
   const [revealed, setRevealed] = useState(false);
+  const poster = useRatingPoster(r.itemKey, r.mediaType, r.title, r.posterUrl);
+  const media = useProfileTitle(r.itemKey, r.title, poster, r.mediaType);
   const open = onOpenMeta
-    ? () => onOpenMeta(r.itemKey, r.mediaType, { name: r.title, poster: r.posterUrl })
+    ? () => onOpenMeta(r.itemKey, r.mediaType, { name: media.title, poster: media.poster })
     : undefined;
 
-  const poster = useRatingPoster(r.itemKey, r.mediaType, r.title, r.posterUrl);
   return (
-    <div className="flex gap-4 rounded-2xl border border-edge-soft bg-canvas/40 p-3.5">
+    <div ref={media.ref} className="flex gap-4 rounded-2xl border border-edge-soft bg-canvas/40 p-3.5">
       <button
         type="button"
         onClick={open}
         disabled={!open}
         className="w-16 shrink-0 disabled:cursor-default"
       >
-        <Poster src={poster} seed={r.title} ratio="portrait" lazy className="rounded-[8px] ring-1 ring-edge-soft" />
+        <Poster src={media.poster} seed={r.title} ratio="portrait" lazy className="rounded-[8px] ring-1 ring-edge-soft" />
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -192,7 +227,7 @@ function RatingRow({
             disabled={!open}
             className="truncate text-start text-[15px] font-semibold text-ink hover:underline disabled:cursor-default disabled:no-underline"
           >
-            {r.title}
+            {media.title}
           </button>
           <span className="shrink-0 text-[12px] tabular-nums text-ink-subtle">{timeAgo(r.at)}</span>
         </div>

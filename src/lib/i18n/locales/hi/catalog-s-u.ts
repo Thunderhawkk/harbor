@@ -720,6 +720,9 @@ const catalogSU: Record<string, string> = {
   "Show off. [b]bold[/b], [color=gold]color[/color], [youtube]link[/youtube], [img]https://...[/img] and more.":
     "अपना हुनर दिखाएँ। [b]बोल्ड[/b], [color=gold]रंग[/color], [youtube]लिंक[/youtube], [img]https://...[/img] और भी बहुत कुछ।",
   "Show on Discord": "Discord पर दिखाएँ",
+  "Show what you are listening to": "आप जो सुन रहे हैं, वह दिखाएँ",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "संगीत चलने के दौरान ट्रैक, कलाकार और एल्बम आर्ट साझा करें, साथ में «Listen in Harbor» बटन।",
   "Show on home": "होम पर दिखाएँ",
   "Show or hide the playback stats overlay.": "प्लेबैक आँकड़ों का ओवरले दिखाएँ या छिपाएँ।",
   "Show original language": "मूल भाषा दिखाएँ",

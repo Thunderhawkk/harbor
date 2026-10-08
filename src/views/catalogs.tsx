@@ -3,7 +3,12 @@ import { Check, Pin, Puzzle, SlidersHorizontal, X } from "lucide-react";
 import { PencilOutlineIcon } from "@/components/icons/pencil-outline";
 import { Search } from "@/components/icons/search-icon";
 import { useAuth } from "@/lib/auth";
-import { catalogTypeLabelKey, listBrowseCatalogs, type BrowseCatalog } from "@/lib/catalog-browse";
+import {
+  catalogTypeLabelKey,
+  listBrowseCatalogs,
+  subscribeBrowseCatalogs,
+  type BrowseCatalog,
+} from "@/lib/catalog-browse";
 import { useView } from "@/lib/view";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
@@ -30,7 +35,7 @@ export function Catalogs({ active = true }: { active?: boolean }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void listBrowseCatalogs(authKey).then((list) => {
+    void listBrowseCatalogs(authKey, { pluginRows: settings.pluginsOutsideTab }).then((list) => {
       if (cancelled) return;
       setCatalogs(list);
       setLoading(false);
@@ -38,7 +43,21 @@ export function Catalogs({ active = true }: { active?: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [authKey]);
+  }, [authKey, settings.pluginsOutsideTab]);
+
+  // A plugin's own catalogs arrive after its runtime is up, which is later than the addons.
+  useEffect(() => {
+    let cancelled = false;
+    const stop = subscribeBrowseCatalogs(() => {
+      void listBrowseCatalogs(authKey, { pluginRows: settings.pluginsOutsideTab }).then((list) => {
+        if (!cancelled) setCatalogs(list);
+      });
+    });
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, [authKey, settings.pluginsOutsideTab]);
 
   const pinned = settings.catalogsPinned ?? [];
   const hidden = settings.catalogsHidden ?? [];

@@ -177,6 +177,7 @@ pub(super) fn albums(
                     artwork: row.get(3)?,
                     year: row.get::<_, Option<i64>>(4)?.map(|year| year.max(0) as u32),
                     track_count: Some(row.get::<_, i64>(5)?.max(0) as u32),
+                    explicit: None,
                 })
             })
             .map_err(|error| error.to_string())?

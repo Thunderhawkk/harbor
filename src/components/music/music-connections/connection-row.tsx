@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import {
   AudioLines,
   FolderOpen,
@@ -7,15 +7,20 @@ import {
   LoaderCircle,
   Radio,
   Server,
-  type LucideIcon,
-} from "lucide-react";
+  type MusicIconComponent,
+} from "@/components/icons/music-icons";
 import { MusicServiceLogo } from "../music-service-logo";
+import { SpotifyPlaybackTarget } from "./spotify-devices";
 import { SpotifySetupFields } from "./spotify-setup";
+import { MusicLastFm } from "@/components/music/music-lastfm";
 import { useT } from "@/lib/i18n";
+import "@/components/music/music-connect-field.css";
 import { connectSource, disconnectSource, scanLocalFolder } from "@/lib/music/catalog";
 import {
   isGatedMusicSource,
+  type GatedMusicSource,
   musicSourceAllowed,
+  useMusicSourceConsent,
   requestMusicSourceConsent,
   setMusicSourceEnabled,
 } from "@/lib/music/source-consent";
@@ -37,7 +42,7 @@ export const PRIMARY_BUTTON =
 export const SECONDARY_BUTTON =
   "inline-flex h-11 items-center gap-2 rounded-full border border-edge px-4 text-[12px] font-medium text-ink transition-colors duration-200 ease-out hover:bg-elevated disabled:opacity-40";
 
-const KIND_ICON: Record<MusicConnectionKind, LucideIcon> = {
+const KIND_ICON: Record<MusicConnectionKind, MusicIconComponent> = {
   streaming: AudioLines,
   server: Server,
   local: HardDrive,
@@ -73,12 +78,17 @@ export function MusicConnectionRow({
   onRefresh: () => void;
 }) {
   const t = useT();
+  const rowRef = useRef<HTMLLIElement>(null);
+  useMusicSourceConsent();
   const [open, setOpen] = useState(defaultOpen && connection.needs.length > 0);
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Busy>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [scanned, setScanned] = useState<number | null>(null);
   const spotifySetup = connection.id === "spotify";
+  // The connector never implements connect or disconnect, so the generic buttons only ever raise
+  // "does not support sign in". The panel below owns the real Last.fm handshake.
+  const lastFm = connection.id === "lastfm";
   const displayError = (message: string) => {
     const key = spotifySetup ? spotifySetupErrorKey(message) : null;
     return key ? t(key) : message;
@@ -154,7 +164,7 @@ export function MusicConnectionRow({
       : null;
 
   return (
-    <li className="border-b border-edge-soft last:border-b-0">
+    <li ref={rowRef} className="border-b border-edge-soft last:border-b-0">
       <div className="grid min-h-24 grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4">
         <span className="grid size-10 place-items-center text-ink-muted">
           <MusicServiceLogo
@@ -172,7 +182,15 @@ export function MusicConnectionRow({
             <strong className="truncate text-[14px] font-semibold text-ink" title={connection.name}>
               {connection.name}
             </strong>
-            <span className="text-[11px] text-ink-muted">{t(STATUS_LABEL[connection.status])}</span>
+            <span className="text-[11px] text-ink-muted">
+              {t(
+                isGatedMusicSource(connection.id) && !musicSourceAllowed(connection.id)
+                  ? "music.consent.needed"
+                  : connection.anonymous && connection.status === "connected"
+                    ? "music.connections.statusAvailable"
+                    : STATUS_LABEL[connection.status],
+              )}
+            </span>
           </span>
           {(account ?? connection.detail) && (
             <span className="mt-1 block break-words text-[13px] leading-5 text-ink-muted">
@@ -185,8 +203,23 @@ export function MusicConnectionRow({
             </span>
           )}
           {failure && (
-            <span role="alert" className="mt-1 block text-[13px] leading-5 text-danger">
-              {displayError(failure)}
+            <span role="alert" className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] leading-5 text-danger">
+              <span className="min-w-0">{displayError(failure)}</span>
+              <button
+                type="button"
+                className="inline-flex h-7 shrink-0 items-center rounded-full border border-danger/40 px-3 text-[12px] font-medium text-danger transition-colors duration-200 ease-out hover:bg-danger/10"
+                onClick={() => connect(connection.needs.length > 0 ? values : {})}
+              >
+                {t("common.retry")}
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-7 shrink-0 items-center rounded-full px-2 text-[12px] font-medium text-ink-subtle transition-colors duration-200 ease-out hover:text-ink"
+                aria-label={t("common.close")}
+                onClick={() => setFailure(null)}
+              >
+                {t("common.close")}
+              </button>
             </span>
           )}
           {busy === "connect" && handoff && (
@@ -217,14 +250,28 @@ export function MusicConnectionRow({
             </span>
           )}
         </span>
-        <RowAction
-          connection={connection}
-          busy={busy}
-          open={open}
-          onConnect={() => (connection.needs.length > 0 ? setOpen(true) : connect({}))}
-          onDisconnect={disconnect}
-        />
+        {lastFm || (open && connection.needs.length > 0) ? (
+          <span />
+        ) : (
+          <RowAction
+            connection={connection}
+            busy={busy}
+            open={open}
+            onConnect={() => (connection.needs.length > 0 ? setOpen(true) : connect({}))}
+            onDisconnect={disconnect}
+          />
+        )}
       </div>
+
+      {lastFm && (
+        <div className="border-t border-edge-soft px-4 py-4">
+          <MusicLastFm embedded />
+        </div>
+      )}
+
+      {connection.id === "spotify" && connection.status === "connected" && (
+        <SpotifyPlaybackTarget />
+      )}
 
       {open && connection.needs.length > 0 && (
         <form
@@ -250,6 +297,7 @@ export function MusicConnectionRow({
                   value={values[field.key] ?? ""}
                   onChange={(next) => setValues((current) => ({ ...current, [field.key]: next }))}
                   onPick={() => pickFolder(field.key)}
+                  disabled={busy !== null}
                 />
               ))}
             </div>
@@ -261,7 +309,10 @@ export function MusicConnectionRow({
                 ? t(spotifySetup ? "music.spotifySetup.authorize" : "music.connect.action")
                 : t("music.connect.connecting")}
             </button>
-            <button type="button" onClick={() => setOpen(false)} className={SECONDARY_BUTTON}>
+            <button type="button" disabled={busy !== null} onClick={() => {
+              setOpen(false);
+              requestAnimationFrame(() => rowRef.current?.querySelector<HTMLButtonElement>(":scope > div:first-child > button")?.focus());
+            }} className={SECONDARY_BUTTON}>
               {t("common.cancel")}
             </button>
           </div>
@@ -300,7 +351,25 @@ function RowAction({
   onDisconnect: () => void;
 }) {
   const t = useT();
+  useMusicSourceConsent();
   if (connection.status === "unavailable") return <span />;
+  if (isGatedMusicSource(connection.id)) {
+    const allowed = musicSourceAllowed(connection.id);
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          allowed
+            ? setMusicSourceEnabled(connection.id as GatedMusicSource, false)
+            : requestMusicSourceConsent(undefined, connection.id as GatedMusicSource)
+        }
+        className={allowed ? SECONDARY_BUTTON : PRIMARY_BUTTON}
+      >
+        {t(allowed ? "music.consent.turnOff" : "music.consent.review")}
+      </button>
+    );
+  }
+  if (connection.anonymous) return <span />;
   if (connection.status === "connected") {
     return (
       <button
@@ -332,13 +401,16 @@ function FieldControl({
   value,
   onChange,
   onPick,
+  disabled,
 }: {
   field: MusicConnectionField;
   value: string;
   onChange: (next: string) => void;
   onPick: () => void;
+  disabled: boolean;
 }) {
   const t = useT();
+  const id = useId();
   const label = (
     <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-ink-subtle">
       {field.label}
@@ -347,16 +419,12 @@ function FieldControl({
 
   if (field.kind === "folder") {
     return (
-      <div>
-        {label}
-        <div className="mt-1.5 flex items-center gap-2">
-          <span
-            className="min-w-0 flex-1 truncate rounded-md border border-edge bg-canvas px-3 py-3 text-[13px] text-ink"
-            title={value || undefined}
-          >
-            {value || field.placeholder || ""}
-          </span>
-          <button type="button" onClick={onPick} className={SECONDARY_BUTTON}>
+      <div className="music-connect-folder">
+        <label htmlFor={id}>{field.label}</label>
+        <div className="music-connect-folder-control">
+          <input id={id} readOnly value={value} placeholder={field.placeholder || t("music.connect.chooseFolder")}
+            disabled={disabled} title={value || undefined} dir="auto" />
+          <button type="button" onClick={onPick} disabled={disabled} className={SECONDARY_BUTTON}>
             <FolderOpen size={20} aria-hidden="true" />
             {t("music.connect.chooseFolder")}
           </button>
@@ -366,7 +434,7 @@ function FieldControl({
   }
 
   return (
-    <label className="block">
+    <label className="music-connect-field block">
       {label}
       <input
         type={field.kind === "password" ? "password" : field.kind === "url" ? "url" : "text"}
@@ -374,9 +442,10 @@ function FieldControl({
         onChange={(event) => onChange(event.currentTarget.value)}
         placeholder={field.placeholder}
         required={field.required}
+        disabled={disabled}
         autoComplete="off"
         aria-label={field.label}
-        className="mt-1.5 h-11 w-full rounded-md border border-edge bg-canvas px-3 text-[14px] text-ink outline-none transition-colors duration-200 ease-out focus:border-ink-muted"
+        className="mt-1.5 h-11 w-full rounded-md border border-edge bg-canvas px-3 text-[14px] text-ink"
       />
     </label>
   );

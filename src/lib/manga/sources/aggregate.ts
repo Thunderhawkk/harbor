@@ -206,18 +206,34 @@ async function mergeSearchLists(query: string, opts?: SearchAllOpts): Promise<Ma
 async function mergeTags(): Promise<MangaTag[]> {
   const lists = await Promise.all(
     aggregateSubProviders().map((p) =>
-      withTimeout(p.tags?.() ?? Promise.resolve([]), [] as MangaTag[]),
+      withTimeout(p.tags?.() ?? Promise.resolve([]), [] as MangaTag[]).then((tags) =>
+        tags.map((tag) => tag.group === "Categories" && tag.id.startsWith("category:")
+          ? { ...tag, id: prefixId(p.id, tag.id) }
+          : tag),
+      ),
     ),
   );
   const seen = new Set<string>();
   return lists.flat().filter((tg) => (seen.has(tg.id) ? false : (seen.add(tg.id), true)));
 }
 
+/** Server categories belong to one provider, even in the combined browse view. */
+export function withProviderTag<T>(
+  provider: MangaProvider,
+  tagId: string | undefined,
+  run: (tagId: string | undefined) => Promise<T[]>,
+): Promise<T[]> {
+  const split = tagId?.indexOf(SEP) ?? -1;
+  if (split < 0 || provider.id === "all") return run(tagId);
+  if (tagId!.slice(0, split) !== provider.id) return Promise.resolve([]);
+  return run(tagId!.slice(split + SEP.length));
+}
+
 export const aggregateProvider: MangaProvider = {
   id: "all",
   name: "All Sources",
-  popular: (offset, tagId) => mergeLists((p) => p.popular(offset, tagId)),
-  search: (query, offset, tagId) => mergeLists((p) => p.search(query, offset, tagId)),
+  popular: (offset, tagId) => mergeLists((p) => withProviderTag(p, tagId, (tag) => p.popular(offset, tag))),
+  search: (query, offset, tagId) => mergeLists((p) => withProviderTag(p, tagId, (tag) => p.search(query, offset, tag))),
   searchAll: mergeSearchLists,
   detail: async (id) => {
     const { source, orig } = parseId(id);

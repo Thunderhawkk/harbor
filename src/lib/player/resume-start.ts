@@ -1,4 +1,5 @@
 import { readResumeEntry, saveResumeBatch } from "@/lib/resume";
+import { privateCwProfileId } from "@/lib/cw-profile";
 import { episodeFromVideoId, libraryGetOne, type LibraryItem } from "@/lib/stremio";
 
 const RESTART_THRESHOLD = 0.8;
@@ -66,6 +67,7 @@ export function resumeLibraryGetOne(authKey: string, id: string): Promise<Librar
 }
 
 export function isResumeStartReady(identity: ResumeIdentity): boolean {
+  if (privateCwProfileId()) return true;
   if (!identity.authKey) return true;
   const account = remoteByAccount.get(identity.authKey);
   if (!account) return false;
@@ -82,6 +84,7 @@ function remoteItems(identity: ResumeIdentity): Promise<Array<LibraryItem | null
 }
 
 export function prefetchResumeStart(identity: ResumeIdentity): void {
+  if (privateCwProfileId()) return;
   if (!identity.authKey) return;
   void remoteItems(identity);
 }
@@ -98,7 +101,7 @@ export async function resolveStartMs({
   const localEntry = readResumeEntry(metaId, season, episode);
   const local = localEntry?.ms ?? 0;
   const isEpisode = typeof season === "number" && typeof episode === "number";
-  if (!authKey) return { ms: local, fromRemote: false, finished: false };
+  if (!authKey || privateCwProfileId()) return { ms: local, fromRemote: false, finished: false };
   const matchesEpisode = (item: LibraryItem | null) => {
     if (!item) return false;
     if (typeof season !== "number" || typeof episode !== "number") return true;
@@ -120,16 +123,17 @@ export async function resolveStartMs({
       typeof localPct === "number" && Number.isFinite(localPct) && remoteDuration > 0
         ? localPct * remoteDuration
         : local;
-    const flaggedWatched = (remote.state as { flaggedWatched?: number })?.flaggedWatched === 1;
-    const finished =
-      isEpisode &&
-      (flaggedWatched || (remoteDuration > 0 && remoteMs / remoteDuration >= RESTART_THRESHOLD));
-    const rawMtime = (remote as { _mtime?: unknown })._mtime;
+    // Trackers can leave flaggedWatched set during a rewatch. Completion must
+    // describe the selected progress, not an unrelated historical watched flag.
+    const finishedAt = (ms: number) =>
+      isEpisode && remoteDuration > 0 && ms / remoteDuration >= RESTART_THRESHOLD;
+    const rawMtime = remote.state?.lastWatched ?? (remote as { _mtime?: unknown })._mtime;
     const remoteMtime =
       typeof rawMtime === "number" ? rawMtime : Date.parse(String(rawMtime ?? ""));
-    const remoteIsNewer =
-      Number.isFinite(remoteMtime) && (!localEntry || remoteMtime > localEntry.t);
-    if (remoteIsNewer || remoteMs >= effectiveLocal) {
+    const useRemote =
+      !localEntry ||
+      (Number.isFinite(remoteMtime) ? remoteMtime > localEntry.t : remoteMs >= effectiveLocal);
+    if (useRemote) {
       saveResumeBatch([
         {
           id: metaId,
@@ -139,9 +143,9 @@ export async function resolveStartMs({
           t: Number.isFinite(remoteMtime) ? remoteMtime : undefined,
         },
       ]);
-      return { ms: remoteMs, fromRemote: true, finished };
+      return { ms: remoteMs, fromRemote: true, finished: finishedAt(remoteMs) };
     }
-    return { ms: effectiveLocal, fromRemote: false, finished };
+    return { ms: effectiveLocal, fromRemote: false, finished: finishedAt(effectiveLocal) };
   }
   return { ms: local, fromRemote: false, finished: false };
 }

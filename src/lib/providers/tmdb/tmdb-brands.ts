@@ -1,10 +1,12 @@
 import type { Meta } from "@/lib/cinemeta";
+import { browseDiscoverKey, type BrowseId, type BrowseKind } from "./browse-kind";
 import { cacheGet, cacheSet } from "./brand-cache";
 import { tmdbDiscover } from "./tmdb-catalogs";
 import { get, IMG } from "./tmdb-client";
 import type { CastEntry } from "./tmdb-details";
 
 export type BrandKind = "studio" | "network";
+export type { BrowseId, BrowseKind };
 export type BrandScope = "top" | "all";
 
 export type BrandSummary = {
@@ -175,10 +177,10 @@ const detailsInflight = new Map<string, Promise<BrandDetails | null>>();
 
 export async function tmdbBrandDetails(
   key: string,
-  kind: BrandKind,
-  id: number,
+  kind: BrowseKind,
+  id: BrowseId,
 ): Promise<BrandDetails | null> {
-  if (!key || !id) return null;
+  if (!key || !id || kind === "country") return null;
   const cacheKey = `details:${kind}:${id}`;
   const hit = await cacheGet<Entry<BrandDetails | null>>(cacheKey);
   if (isFresh(hit, DETAILS_TTL)) return hit.value;
@@ -192,7 +194,7 @@ export async function tmdbBrandDetails(
     ).catch(() => null);
     const value: BrandDetails | null = raw?.name
       ? {
-          id,
+          id: Number(id),
           name: raw.name,
           logo: raw.logo_path ? `${IMG}/w300${raw.logo_path}` : null,
           country: raw.origin_country || null,
@@ -321,8 +323,8 @@ const statsInflight = new Map<string, Promise<BrandStats>>();
 
 export async function tmdbBrandStats(
   key: string,
-  kind: BrandKind,
-  id: number,
+  kind: BrowseKind,
+  id: BrowseId,
   mediaType: "movie" | "tv",
 ): Promise<BrandStats> {
   const empty: BrandStats = {
@@ -347,7 +349,7 @@ export async function tmdbBrandStats(
   const running = statsInflight.get(cacheKey);
   if (running) return running;
   const p = (async () => {
-    const base = { [kind === "network" ? "with_networks" : "with_companies"]: String(id) };
+    const base = { [browseDiscoverKey(kind)]: String(id) };
     const dateKey = mediaType === "movie" ? "primary_release_date" : "first_air_date";
     const [popular, grossing, earliest] = await Promise.all([
       withSlot(() =>

@@ -251,6 +251,9 @@ const catalog: Record<string, string> = {
   "Show off. [b]bold[/b], [color=gold]color[/color], [youtube]link[/youtube], [img]https://...[/img] and more.":
     "Pamerkan. [b]tebal[/b], [color=gold]warna[/color], [youtube]tautan[/youtube], [img]https://...[/img] dan lainnya.",
   "Show on Discord": "Tampilkan di Discord",
+  "Show what you are listening to": "Tampilkan yang sedang Anda dengarkan",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Bagikan judul lagu, artis, dan sampul album saat musik diputar, lengkap dengan tombol «Listen in Harbor».",
   "Show on home": "Tampilkan di beranda",
   "Show or hide the playback stats overlay.":
     "Tampilkan atau sembunyikan overlay statistik pemutaran.",

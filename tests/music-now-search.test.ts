@@ -154,10 +154,10 @@ test("a page never lands past the end of the list it scrolls in", () => {
   assert.match(listRule(), /overscroll-behavior:\s*contain/);
 });
 
-test("video mode asks for the page it is about to render", () => {
+test("video mode follows the provider continuation instead of increasing a fixed search cap", () => {
   assert.match(
     TSX,
-    /searchMusicVideos\(value,\s*false,\s*false,\s*limit\)/,
-    "a fixed video request cannot page",
+    /searchMusicVideoPage\(value,\s*false,\s*videoCursors\.current\.get\(limit\)/,
+    "each video page needs its provider cursor, including on retry",
   );
 });

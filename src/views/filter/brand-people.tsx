@@ -6,7 +6,7 @@ import type { MetaFilter } from "@/lib/view";
 
 type Branded = MetaFilter & { kind: "studio" | "network"; id: number; name: string };
 
-function PeopleRail({ title, kicker, people, note }: { title: string; kicker: string; people: BrandPerson[]; note: (p: BrandPerson) => string }) {
+export function PeopleRail<T extends BrandPerson>({ title, kicker, people, note }: { title: string; kicker: string; people: T[]; note: (p: T) => string }) {
   const posterRow = usePosterRow();
   if (people.length === 0) return null;
   const heading = (

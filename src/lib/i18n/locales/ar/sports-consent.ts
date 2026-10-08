@@ -32,8 +32,11 @@ export default {
   "Show Sports": "إظهار الرياضة",
   "Show Sports in navigation. You must acknowledge the Sports notice before the page loads.":
     "إظهار الرياضة في التنقل. يجب الموافقة على إشعار الرياضة قبل تحميل الصفحة.",
-  "Configure a Live TV, M3U or Xtream source to make Sports available.":
-    "اضبط مصدر تلفزيون مباشر أو M3U أو Xtream لإتاحة قسم الرياضة.",
+  "Turn on Sports without a provider, or add a Live TV, M3U or Xtream source.": "فعّل الرياضة بدون مزوّد، أو أضف مصدر Live TV أو M3U أو Xtream.",
+  "Set up Live TV": "إعداد Live TV",
+  "Scores, schedules and standings work without a provider. Harbor does not supply streams, so watching a game needs your own Live TV, M3U or Xtream source.": "النتائج والجداول والترتيب تعمل بدون مزوّد. Harbor لا يوفّر البث، لذا تحتاج مشاهدة المباراة إلى مصدر Live TV أو M3U أو Xtream خاص بك.",
+  "Scores, schedules and standings come from public sports data and need no provider. Harbor does not supply streams: watching a game still needs your own Live TV, M3U or Xtream source.": "النتائج والجداول والترتيب تأتي من بيانات رياضية عامة ولا تحتاج مزوّدًا. Harbor لا يوفّر البث: مشاهدة المباراة تحتاج مصدر Live TV أو M3U أو Xtream خاصًا بك.",
+  "Show Sports without a TV provider": "إظهار الرياضة بدون مزوّد تلفزيوني",
   "Enabling Sports does not accept the notice. Your choice is kept on this device and is not synced to your account.":
     "تمكين الرياضة لا يعني قبول الإشعار. يُحفظ اختيارك على هذا الجهاز ولا تتم مزامنته مع حسابك.",
   "Review Sports notice": "مراجعة إشعار الرياضة",

@@ -70,6 +70,7 @@ export function BpSearchField({
           data-bp-autofocus="true"
           data-bp-restore-key="bp-search-field"
           data-tv-text-auto
+          data-controller-keyboard-managed
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           onFocus={() => setFocused(true)}

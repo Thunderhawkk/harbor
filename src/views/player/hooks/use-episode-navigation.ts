@@ -41,6 +41,7 @@ function videoAsEpisode(video: MetaVideo, index: number): PlayEpisode {
     name: video.name || video.title || undefined,
     videoId: video.id || undefined,
     still: video.thumbnail || undefined,
+    airDate: video.released || video.firstAired,
   };
 }
 

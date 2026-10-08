@@ -1,229 +1,123 @@
+import { musicGenreName } from "@/lib/music/genre-catalog";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, LoaderCircle } from "lucide-react";
+import { HoverTooltip } from "@/components/hover-tooltip";
+import { useFloatingBackShown } from "@/chrome/floating-back";
+import { ChevronLeft } from "@/components/icons/music-icons";
 import { MusicCatalogRow } from "@/components/music/music-catalog-row";
-import {
-  MusicBillboardCharts,
-  MusicDiscoveryChartRow,
-} from "@/components/music/music-discovery-charts";
+import { MusicBillboardCharts, MusicDiscoveryChartRow } from "@/components/music/music-discovery-charts";
 import { MusicDiscoveryIcon } from "@/components/music/music-discovery-icon";
-import {
-  MusicSectionEmpty,
-  MusicSectionError,
-  MusicSectionHead,
-} from "@/components/music/music-track-grid";
+import { MusicTasteIcon } from "@/components/music/music-taste-icon";
+import { MusicVideoDiscovery } from "@/components/music/music-video-discovery";
+import { MusicSectionHead } from "@/components/music/music-track-grid";
 import { useT } from "@/lib/i18n";
-import {
-  loadMusicDiscoveryChart,
-  loadMusicDiscoveryGenres,
-  type MusicDiscoveryChart,
-} from "@/lib/music/discovery";
-import type { MusicCatalogItem } from "@/lib/music/types";
+import { loadMusicDiscoveryChart, loadMusicGenreSelection, type MusicGenreSelection } from "@/lib/music/discovery";
+import { type MusicDiscoveryGenre } from "@/lib/music/genre-catalog";
+import type { MusicCatalogItem, MusicTrack } from "@/lib/music/types";
+import { MusicGenreBrowser } from "./music-genre-browser";
+import { MUSIC_GENRE_ARTWORK } from "@/lib/music/genre-artwork";
+import { EDITORIAL_SCENES } from "@/lib/music/genre-editorial";
+import { isPlaylistScene } from "@/lib/music/genre-playlist-pool";
+import { MusicExploreRecommendations } from "./music-explore-recommendations";
+import { MusicPerformanceSpotlight } from "./music-performance-spotlight";
+import { MusicEventDiscovery } from "./music-event-discovery";
+import { MusicGenreArtists } from "./music-genre-artists";
+import { MusicGenreScenes } from "./music-genre-scenes";
+import { MusicGenreVideos } from "./music-genre-videos";
+import { MusicGenreChannels } from "./music-genre-channels";
+import { MusicGenreDeep } from "./music-genre-deep";
+import { MusicXxlFreshmen } from "./music-xxl-freshmen";
+import { MusicRockHall } from "./music-rock-hall";
 import "./music-discovery.css";
 
-export type MusicGenreEntry = {
-  id: number;
-  name: string;
-  picture_big?: string;
-  picture_medium?: string;
-};
-// Song/artist detail temporarily unmounts discovery; keep the genre-grid return point.
-let genreOrigin: { id: number; top: number } | null = null;
-export function MusicGenres({
-  onOpen,
-  genre,
-  onGenre,
-  onBillboard,
-}: {
+export type MusicGenreEntry = MusicDiscoveryGenre;
+
+// The Hall inducts across rock's whole family tree, so every rock scene page earns the row.
+const ROCK_HALL_SLUGS = new Set(["rock", "classic-rock", "hard-rock", "punk", "indie-rock",
+  "alternative", "grunge", "psychedelic-rock", "progressive-rock", "southern-rock", "glam-rock",
+  "garage-rock", "blues-rock", "new-wave", "post-punk", "heartland-rock", "rockabilly"]);
+let genreOrigin: { id: number; top: number; offset: number } | null = null;
+const EMPTY: MusicGenreSelection = { tracks: [], positions: [], artists: [], playlists: [] };
+export function MusicGenres({ onOpen, genre, onGenre, onBillboard, onTastes, onWatch, onPlay, active = true }: {
   onBillboard?: (chartId?: string) => void;
+  onTastes: () => void;
+  onWatch: (track: MusicTrack, queue: MusicTrack[]) => void;
+  onPlay: (track: MusicTrack, queue: MusicTrack[]) => void;
+  active?: boolean;
   genre: MusicGenreEntry | null;
   onGenre: (genre: MusicGenreEntry | null) => void;
   onOpen: (item: MusicCatalogItem, siblings: MusicCatalogItem[]) => void;
 }) {
   const t = useT();
-  const [genres, setGenres] = useState<MusicGenreEntry[]>([]);
-  const [genreLoading, setGenreLoading] = useState(true);
-  const [genreError, setGenreError] = useState(false);
-  const [chart, setChart] = useState<MusicDiscoveryChart>({
-    tracks: [],
-    positions: [],
-    artists: [],
-  });
-  const [chartLoading, setChartLoading] = useState(true);
-  const [chartError, setChartError] = useState(false);
-  const [genreRetry, setGenreRetry] = useState(0);
-  const [chartRetry, setChartRetry] = useState(0);
+  const [chart, setChart] = useState<MusicGenreSelection>(EMPTY);
+  const [loading, setLoading] = useState(true), [error, setError] = useState(false), [retry, setRetry] = useState(0);
   const root = useRef<HTMLElement>(null);
-
+  const floatingBack = useFloatingBackShown();
   useEffect(() => {
-    let cancelled = false;
-    setGenreLoading(true);
-    setGenreError(false);
-    loadMusicDiscoveryGenres()
-      .then((result) => {
-        if (!cancelled) setGenres(result);
-      })
-      .catch(() => {
-        if (!cancelled) setGenreError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setGenreLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [genreRetry]);
-
+    let live = true;
+    setLoading(true); setError(false); setChart(EMPTY);
+    (genre ? loadMusicGenreSelection(genre.id) : loadMusicDiscoveryChart().then(value => ({ ...value, playlists: [] })))
+      .then(value => { if (live) setChart(value); })
+      .catch(() => { if (live) setError(true); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [genre?.id, retry]);
   useEffect(() => {
-    let cancelled = false;
-    setChartLoading(true);
-    setChartError(false);
-    setChart({ tracks: [], positions: [], artists: [] });
-    loadMusicDiscoveryChart(genre?.id)
-      .then((result) => {
-        if (!cancelled) setChart(result);
-      })
-      .catch(() => {
-        if (!cancelled) setChartError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setChartLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [genre?.id, chartRetry]);
-
-  useEffect(() => {
-    if (genre || genreLoading || chartLoading || !genreOrigin) return;
+    if (genre || loading || !genreOrigin) return;
     const saved = genreOrigin;
-    const frame = requestAnimationFrame(() => {
-      const scroll = root.current?.closest<HTMLElement>("[data-music-view]");
-      if (scroll) scroll.scrollTop = saved.top;
-      root.current
-        ?.querySelector<HTMLButtonElement>(`[data-music-genre="${saved.id}"]`)
-        ?.focus({ preventScroll: true });
-      genreOrigin = null;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [genre, genreLoading, chartLoading]);
-
+    const scroll = root.current?.closest<HTMLElement>("[data-music-view]");
+    const restore = () => {
+      const button = root.current?.querySelector<HTMLButtonElement>(`[data-music-genre="${saved.id}"]`);
+      if (scroll) scroll.scrollTop = button ? scroll.scrollTop + button.getBoundingClientRect().top - scroll.getBoundingClientRect().top - saved.offset : saved.top;
+      button?.focus({ preventScroll: true });
+    };
+    const frame = requestAnimationFrame(restore);
+    // Cached video shelves can settle one frame after the genre grid returns.
+    const observer = new ResizeObserver(restore);
+    if (root.current) observer.observe(root.current);
+    const stop = () => { observer.disconnect(); genreOrigin = null; };
+    const timer = window.setTimeout(stop, 1500);
+    for (const event of ["wheel", "pointerdown", "keydown"]) scroll?.addEventListener(event, stop, { once: true });
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer); observer.disconnect(); for (const event of ["wheel", "pointerdown", "keydown"]) scroll?.removeEventListener(event, stop); };
+  }, [genre, loading]);
   const selectGenre = (selected: MusicGenreEntry) => {
     const scroll = root.current?.closest<HTMLElement>("[data-music-view]");
-    genreOrigin = { id: selected.id, top: scroll?.scrollTop ?? 0 };
-    onGenre(selected);
-    scroll?.scrollTo({ top: 0 });
-    requestAnimationFrame(() =>
-      (
-        document.querySelector<HTMLElement>("[data-music-mast-back]") ??
-        document.querySelector<HTMLElement>("[data-music-consolidated-back] h1") ??
-        root.current?.querySelector<HTMLButtonElement>(".music-discovery-back")
-      )?.focus({ preventScroll: true }),
-    );
+    const button = root.current?.querySelector(`[data-music-genre="${selected.id}"]`);
+    if (!genre) genreOrigin = { id: selected.id, top: scroll?.scrollTop ?? 0, offset: (button?.getBoundingClientRect().top ?? 0) - (scroll?.getBoundingClientRect().top ?? 0) };
+    onGenre(selected); scroll?.scrollTo({ top: 0 });
+    requestAnimationFrame(() => (document.querySelector<HTMLElement>("[data-floating-back]") ?? root.current?.querySelector<HTMLButtonElement>(".music-discovery-back"))?.focus({ preventScroll: true }));
   };
-
-  return (
-    <section
-      ref={root}
-      className="music-discovery"
-      aria-busy={chartLoading || (!genre && genreLoading)}
-    >
-      {genre ? (
-        <>
-          <button
-            data-music-inner-back
-            className="music-discovery-back"
-            type="button"
-            onClick={() => onGenre(null)}
-          >
-            <ChevronLeft className="dir-icon" size={18} aria-hidden="true" />
-            {t("music.tab.explore")}
-          </button>
-          <header className="music-discovery-hero">
-            {(genre.picture_big || genre.picture_medium) && (
-              <img src={genre.picture_big ?? genre.picture_medium} alt="" />
-            )}
-            <div>
-              <h2>{genre.name}</h2>
-              <p>
-                <MusicDiscoveryIcon genreId={genre.id} />
-                Deezer
-              </p>
-            </div>
-          </header>
-        </>
-      ) : (
-        <h2 className="text-[28px] font-semibold tracking-tight text-ink">{t("music.discover")}</h2>
-      )}
-
-      <MusicDiscoveryChartRow
-        tracks={chart.tracks}
-        positions={chart.positions}
-        loading={chartLoading}
-        error={chartError}
-        genreId={genre?.id}
-        onRetry={() => setChartRetry((value) => value + 1)}
-        onOpen={onOpen}
-      />
-
-      {genre ? (
-        !chartError && (
-          <MusicCatalogRow
-            row={{
-              id: `genre:${genre.id}:artists`,
-              title: "music.search.artists",
-              titleLiteral: false,
-              layout: "circles",
-              source: "deezer",
-              items: chart.artists,
-            }}
-            status={chartLoading ? "loading" : "ready"}
-            onOpen={(item) => onOpen(item, chart.artists)}
-          />
-        )
-      ) : (
-        <>
-          <MusicBillboardCharts onOpen={onOpen} onBrowse={onBillboard} />
-          <section className="flex flex-col gap-4">
-            <MusicSectionHead title={t("music.tab.explore")} subtitle="Deezer" />
-            {genreLoading ? (
-              <div role="status" className="flex items-center gap-3 py-8 text-ink-muted">
-                <LoaderCircle
-                  className="animate-spin motion-reduce:animate-none"
-                  size={20}
-                  aria-hidden="true"
-                />
-                {t("music.loading")}
-              </div>
-            ) : genreError ? (
-              <MusicSectionError onRetry={() => setGenreRetry((value) => value + 1)} />
-            ) : !genres.length ? (
-              <MusicSectionEmpty />
-            ) : (
-              <div className="music-discovery-genres">
-                {genres.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    data-music-genre={item.id}
-                    onClick={() => selectGenre(item)}
-                  >
-                    {(item.picture_big || item.picture_medium) && (
-                      <img
-                        src={item.picture_big ?? item.picture_medium}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    )}
-                    <MusicDiscoveryIcon genreId={item.id} />
-                    <span>{item.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
-      )}
-    </section>
-  );
+  const popular = genre && !genre.deezerId && genre.slug !== "ukrainian-wartime" ? chart.tracks.filter(track => chart.popularity?.[track.id]).sort((a,b) => (chart.popularity?.[b.id] ?? 0) - (chart.popularity?.[a.id] ?? 0)).slice(0,24) : [];
+  const popularIds = new Set(popular.map(track => track.id));
+  const selections = genre && !genre.deezerId ? chart.tracks.filter(track => !popularIds.has(track.id)) : chart.tracks;
+  return <section ref={root} className="music-discovery">
+    {genre ? <>
+      {!floatingBack && <button className="music-discovery-back" type="button" onClick={() => onGenre(null)}><ChevronLeft className="dir-icon" size={18} aria-hidden />{t("music.explore.back")}</button>}
+      <header className="music-discovery-hero"><img src={MUSIC_GENRE_ARTWORK[genre.id]} alt=""/><div><h2>{musicGenreName(genre, t)}</h2><p><MusicDiscoveryIcon genreId={genre.id}/>{t(genre.deezerId ? "music.explore.chartSource" : !isPlaylistScene(genre.slug) && EDITORIAL_SCENES[genre.slug] ? "music.explore.editorialSource" : "music.explore.selectionSource")}</p></div></header>
+    </> : <>
+      <header className="music-explore-heading"><h2>{t("music.discover")}</h2><HoverTooltip label={t("music.taste.choose")} align="end"><button type="button" className="music-explore-tastes" aria-label={t("music.taste.choose")} onClick={onTastes}><MusicTasteIcon /></button></HoverTooltip></header>
+      <MusicEventDiscovery onWatch={onWatch} active={active}/>
+      <MusicPerformanceSpotlight onWatch={onWatch} active={active}/>
+      <MusicVideoDiscovery active={active} onWatch={onWatch}/>
+      <MusicExploreRecommendations active={active} onOpen={onOpen}/>
+    </>}
+    {genre && <MusicGenreScenes genre={genre} onSelect={selectGenre}/>}
+    {genre?.slug === "hip-hop" && <MusicXxlFreshmen active={active}/>}
+    {ROCK_HALL_SLUGS.has(genre?.slug ?? "") && <MusicRockHall active={active}/>}
+    {genre && !genre.deezerId && (loading || popular.length > 0) && <MusicDiscoveryChartRow tracks={popular} positions={popular.map(() => null)} loading={loading} error={false}
+      title={t("music.artist.popular")} source={t(isPlaylistScene(genre.slug) ? "music.explore.selectionSource" : EDITORIAL_SCENES[genre.slug] ? "music.explore.editorialSource" : "music.explore.popularitySource")} rowId={`genre:${genre.id}:popular`} onRetry={() => setRetry(value => value + 1)} onOpen={onOpen}/>}
+    {(loading || error || selections.length > 0) && <MusicDiscoveryChartRow tracks={selections} positions={genre && !genre.deezerId ? selections.map(() => null) : chart.positions} loading={loading} error={error}
+      genreId={genre?.id} title={genre && !genre.deezerId ? t("music.explore.selections") : undefined}
+      onRetry={() => setRetry(value => value + 1)} onOpen={onOpen}/>}
+    {genre ? <>
+      <MusicGenreArtists key={genre.id} genreId={genre.id} artists={chart.artists} onOpen={onOpen}/>
+      {!loading && <MusicGenreVideos key={`videos:${genre.id}`} genre={genre} artists={chart.artists} active={active} onWatch={onWatch}/>}
+      {!loading && <MusicGenreChannels key={`channels:${genre.id}`} genre={genre} active={active} onWatch={onWatch}/>}
+      {!!chart.albums?.length && <MusicCatalogRow row={{ id: `genre:${genre.id}:albums`, title: "music.explore.sceneAlbums", titleLiteral: false, layout: "covers", source: "deezer", items: chart.albums.slice(0,24) }} playable onOpen={item => onOpen(item, chart.albums ?? [])}/>}
+      {!!chart.playlists.length && <MusicCatalogRow row={{ id: `genre:${genre.id}:playlists`, title: "music.search.playlists", titleLiteral: false, layout: "covers", source: "deezer", items: chart.playlists }} playable onOpen={item => onOpen(item, chart.playlists)}/>}
+      {!loading && <MusicGenreDeep key={`deep:${genre.id}`} genre={genre} active={active} onOpen={onOpen} onPlay={onPlay}/>}
+    </> : <>
+      <MusicBillboardCharts onOpen={onOpen} onBrowse={onBillboard}/>
+      <section className="flex flex-col gap-4" data-explore-genres><MusicSectionHead title={t("music.explore.genres")} subtitle={t("music.explore.sceneHint")}/><MusicGenreBrowser onSelect={selectGenre}/></section>
+    </>}
+  </section>;
 }

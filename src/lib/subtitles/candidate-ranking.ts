@@ -1,4 +1,4 @@
-import { langScore, normalizeLang } from "./language";
+import { isGeneratedLangLabel, langScore, normalizeLang } from "./language";
 import {
   releaseAffinity,
   subtitleConfidenceRank,
@@ -154,6 +154,7 @@ export function rankSubtitleCandidates(
   hints?: StreamHints,
 ): SubResult[] {
   return results
+    .filter((result) => !isGeneratedLangLabel(result.lang))
     .filter((result) => preferredLangs.length === 0 || langScore(result.lang, preferredLangs) >= 0)
     .filter((result) => !result.forced && !result.foreignOnly)
     .filter((result) => !explicitEpisodeMismatch(result, hints))

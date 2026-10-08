@@ -1,10 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import { prepareSubtitle } from "@/lib/subtitles/prepare";
+import { SubtitlePreparationError, prepareSubtitle } from "@/lib/subtitles/prepare";
 import { subtitleTrackDownloadHeaders } from "@/lib/subtitles/provider-auth";
 import { takePreparedSubtitle } from "@/lib/subtitles/prepared-registry";
 import { markLimitReached } from "@/lib/subtitles/limit-signal";
+import { clearPendingSub, markPendingSub } from "@/lib/subtitles/pending-subs";
+import { registerTranslationJob } from "@/lib/subtitles/translation-jobs";
 import { mpvFailureSnapshot } from "./mpv-failure";
 import { isLinuxDesktop, isMacDesktop, isWindowsDesktop } from "@/lib/platform";
+import type { MonitorInfo } from "@/lib/monitors";
 import { makeSafeTauriUnlisten } from "@/lib/tauri-unlisten";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { SubtitleLoadMetadata } from "@/lib/subtitles/types";
@@ -23,6 +26,7 @@ import { isSafeProviderSubtitleUrl } from "@/lib/subtitles/provider-url";
 import {
   initialPlayerSnapshot,
   type PlayerBridge,
+  type PlayerEmbedRect,
   type PlayerCapabilities,
   type PlayerSeekPrecision,
   type PlayerSnapshot,
@@ -123,14 +127,7 @@ type ExternalSubtitleMetadata = {
   subId?: string;
 };
 
-export type MpvRect = {
-  cssLeft: number;
-  cssTop: number;
-  cssWidth: number;
-  cssHeight: number;
-  cssViewW: number;
-  cssViewH: number;
-};
+export type MpvRect = PlayerEmbedRect;
 
 export type MpvOptions = {
   anime4k: boolean;
@@ -145,6 +142,8 @@ export type MpvOptions = {
   forceYuv420p?: boolean;
   extraOptions?: string;
   fullDownload?: boolean;
+  separateDisplay?: MonitorInfo | null;
+  separateCoverTaskbar?: boolean;
   getEmbedRect?: () => Promise<MpvRect | null> | MpvRect | null;
 };
 
@@ -270,7 +269,8 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   let unlistenEvent: UnlistenFn | null = null;
   let unlistenLog: UnlistenFn | null = null;
   let pendingTracks: Record<string, unknown[]> = {};
-  let geomTimer: number | null = null;
+  let stopGeometryTracking: (() => void) | null = null;
+  let moveEmbeddedSurface: PlayerBridge["moveEmbeddedSurface"];
   let geomKickHandler: ((e?: Event) => void) | null = null;
   let geomForceHandler: (() => void) | null = null;
   let geomResizeObserver: ResizeObserver | null = null;
@@ -440,12 +440,35 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
     if (!opts.embed || !opts.getEmbedRect || geomKickHandler != null || isLinuxDesktop()) return;
 
     let lastRect: MpvRect | null = null;
-    let geomDebounce: number | null = null;
+    let frame: number | null = null;
+    let active = true;
+    let inFlight = false;
+    let queued = false;
+    let force = false;
+    let pendingMove: { rect: MpvRect; commit: () => void } | null = null;
+    const schedule = () => {
+      if (!active) return;
+      queued = true;
+      if (inFlight || frame != null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        void tick();
+      });
+    };
     const tick = async () => {
+      if (!active) return;
+      if (inFlight) { queued = true; return; }
+      inFlight = true;
+      queued = false;
+      const forced = force;
+      force = false;
+      const move = pendingMove;
+      pendingMove = null;
       try {
-        const r = await opts.getEmbedRect!();
-        if (!r) return;
+        const r = move?.rect ?? await opts.getEmbedRect!();
+        if (!active || !r) return;
         if (
+          !forced &&
           lastRect &&
           lastRect.cssLeft === r.cssLeft &&
           lastRect.cssTop === r.cssTop &&
@@ -454,27 +477,51 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
           lastRect.cssViewW === r.cssViewW &&
           lastRect.cssViewH === r.cssViewH
         ) {
+          move?.commit();
           return;
         }
-        lastRect = r;
         await invoke("mpv_set_geometry", { geom: r });
-      } catch {}
+        if (active) {
+          lastRect = r;
+          move?.commit();
+        }
+      } catch {
+        lastRect = null;
+      } finally {
+        inFlight = false;
+        if (active && queued) void tick();
+      }
     };
 
-    geomKickHandler = () => {
-      if (geomDebounce != null) window.clearTimeout(geomDebounce);
-      geomDebounce = window.setTimeout(() => void tick(), 40);
+    // A trailing debounce never runs during a continuous drag. Coalesce frames,
+    // with one native write in flight and the latest bounds queued behind it.
+    // Dock movement is already batched by useDockDrag. Send its new bounds in
+    // that same frame instead of making native video trail the chrome by a frame.
+    geomKickHandler = () => { void tick(); };
+    moveEmbeddedSurface = (rect, commit) => {
+      if (!active) return false;
+      pendingMove = { rect, commit };
+      void tick();
+      return true;
     };
     geomForceHandler = () => {
-      lastRect = null;
-      geomKickHandler?.();
+      force = true;
+      schedule();
+    };
+    stopGeometryTracking = () => {
+      active = false;
+      queued = false;
+      pendingMove = null;
+      moveEmbeddedSurface = undefined;
+      if (frame != null) window.cancelAnimationFrame(frame);
+      frame = null;
     };
     window.addEventListener("resize", geomKickHandler);
     window.addEventListener("harbor:mpv-refresh-geom", geomKickHandler);
     window.addEventListener("harbor:mpv-force-geom", geomForceHandler);
     if (host && typeof ResizeObserver !== "undefined") {
       try {
-        geomResizeObserver = new ResizeObserver(() => void tick());
+        geomResizeObserver = new ResizeObserver(schedule);
         geomResizeObserver.observe(host);
       } catch {
         /* noop */
@@ -483,8 +530,9 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
     try {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const win = getCurrentWindow();
-      const unResized = await win.onResized(() => geomKickHandler?.());
-      const unMoved = await win.onMoved(() => geomKickHandler?.());
+      const unResized = await win.onResized(() => geomForceHandler?.());
+      const unMoved = await win.onMoved(() => geomForceHandler?.());
+      if (!active) { unResized(); unMoved(); return; }
       geomTauriUnlisten.push(makeSafeTauriUnlisten(unResized), makeSafeTauriUnlisten(unMoved));
     } catch {
       /* noop */
@@ -766,6 +814,7 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
         return;
       }
       snap.status = observedPaused === true ? "paused" : "playing";
+      snap.buffering = false; // Playback recovered, including when the user remains paused.
       snap.firstFrameReady = true;
       if (currentIsLive === false && currentStartupProfile && steadyBufferLoadId !== mediaLoadId) {
         steadyBufferLoadId = mediaLoadId;
@@ -782,6 +831,7 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   };
 
   return {
+    moveEmbeddedSurface: (rect, commit) => moveEmbeddedSurface?.(rect, commit) ?? false,
     attach(h) {
       host = h;
       const embed = mpvOptions?.embed === true;
@@ -935,6 +985,8 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
             renderer: opts.renderer ?? "gpu-next",
             forceYuv420p: opts.forceYuv420p === true,
             extraOptions: opts.extraOptions || undefined,
+            separateDisplay: opts.embed === true ? null : (opts.separateDisplay ?? null),
+            separateCoverTaskbar: opts.separateCoverTaskbar ?? true,
           },
         });
         preparedSubtitleCleanups.clearBefore(activeLoadId);
@@ -1139,6 +1191,28 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
       if (!transferredPrepared && providerDerived && !isSafeProviderSubtitleUrl(url)) {
         return false;
       }
+      // A provider subtitle can be re-fetched (e.g. a translating addon that only serves
+      // the finished file later). Replace the previous track for the same source rather
+      // than stacking a duplicate. mpv's sub-remove only touches external subtitle files,
+      // which is the only case that can match here.
+      const sourceUrl = metadata?.originalUrl ?? url;
+      const prior = transferredPrepared
+        ? undefined
+        : snap.subtitleTracks.find(
+            (track) =>
+              track.kind === "subtitle" &&
+              track.external === true &&
+              (track.originalUrl === sourceUrl || track.url === sourceUrl),
+          );
+      if (prior) {
+        try {
+          await invoke("mpv_sub_remove", { id: prior.id });
+        } catch {
+          // Track already gone; adding the refreshed file below still works.
+        }
+        const priorFile = prior.externalFilename?.replace(/\\/g, "/");
+        if (priorFile) urlByExternalFilename.delete(priorFile);
+      }
       let preparedCleanup: (() => void) | null = transferredPrepared?.cleanup ?? null;
       let preparedCues: SubCue[] | undefined = transferredPrepared?.cues;
       let registeredMetadata: ExternalSubtitleMetadata | null = null;
@@ -1168,6 +1242,7 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
             archive: prepared.archive,
             prepared: true,
           };
+          clearPendingSub(url);
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
           console.warn("[mpv] subtitle preparation failed", {
@@ -1176,6 +1251,16 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
           preparedCleanup?.();
           if (/status 429/.test(message)) {
             markLimitReached(url);
+          }
+          if (
+            metadata?.refreshable === true &&
+            e instanceof SubtitlePreparationError &&
+            (e.reason === "invalid-cues" || e.reason === "unsupported-format")
+          ) {
+            // The addon answered before the subtitle was ready. Treat it as a pending
+            // job so the UI says "try again shortly", and never surface the placeholder.
+            markPendingSub(url);
+            registerTranslationJob({ url, lang, title, metadata });
           }
           return false;
         }
@@ -1372,6 +1457,8 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
       };
     },
     destroy() {
+      stopGeometryTracking?.();
+      stopGeometryTracking = null;
       mediaRevision += 1;
       invalidateSubtitleSelections();
       clearPreparedSubtitles();
@@ -1409,10 +1496,6 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
         retainedMpv = null;
         markMpvSubtitleFpsSessionRecreated();
         invoke("mpv_stop").catch(() => {});
-      }
-      if (geomTimer != null) {
-        window.clearInterval(geomTimer);
-        geomTimer = null;
       }
       if (geomKickHandler) {
         window.removeEventListener("resize", geomKickHandler);

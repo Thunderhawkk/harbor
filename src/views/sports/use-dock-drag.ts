@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -8,7 +9,8 @@ import {
   type RefObject,
 } from "react";
 
-type Spot = { x: number; y: number };
+export type DockSpot = { x: number; y: number };
+type Spot = DockSpot;
 
 const EDGE = 8;
 let held: Spot | null = null;
@@ -20,9 +22,33 @@ function clamp(spot: Spot, box: DOMRect): Spot {
   };
 }
 
-export function useDockDrag(root: RefObject<HTMLElement | null>, enabled: boolean) {
+export function useDockDrag(
+  root: RefObject<HTMLElement | null>,
+  enabled: boolean,
+  onPositionChange?: () => void,
+  prepareMove?: (spot: Spot, commit: () => void) => boolean,
+) {
   const [spot, setSpot] = useState<Spot | null>(held);
-  const grab = useRef<Spot | null>(null);
+  const grab = useRef<(Spot & { pointerId: number }) | null>(null);
+  const frame = useRef<number | null>(null);
+  const generation = useRef(0);
+  useLayoutEffect(() => { if (enabled) onPositionChange?.(); }, [enabled, spot, onPositionChange]);
+  useLayoutEffect(() => () => {
+    generation.current += 1;
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    grab.current = null;
+  }, [enabled]);
+  const move = useCallback((next: Spot) => {
+    const currentGeneration = generation.current;
+    const commit = () => {
+      if (!root.current || generation.current !== currentGeneration) return;
+      Object.assign(root.current.style, { left: `${next.x}px`, right: "auto", top: `${next.y}px`, bottom: "auto" });
+      onPositionChange?.();
+      if (!grab.current) setSpot(next);
+    };
+    if (!prepareMove?.(next, commit)) commit();
+  }, [root, onPositionChange, prepareMove]);
   useEffect(() => {
     if (!enabled) return;
     const element = root.current;
@@ -48,7 +74,8 @@ export function useDockDrag(root: RefObject<HTMLElement | null>, enabled: boolea
       if ((event.target as HTMLElement).closest("button, a, input, iframe")) return;
       const box = root.current?.getBoundingClientRect();
       if (!box) return;
-      grab.current = { x: event.clientX - box.left, y: event.clientY - box.top };
+      event.preventDefault();
+      grab.current = { x: event.clientX - box.left, y: event.clientY - box.top, pointerId: event.pointerId };
       event.currentTarget.setPointerCapture(event.pointerId);
     },
     [enabled, root],
@@ -57,24 +84,33 @@ export function useDockDrag(root: RefObject<HTMLElement | null>, enabled: boolea
     (event: PointerEvent<HTMLElement>) => {
       const hold = grab.current;
       const box = root.current?.getBoundingClientRect();
-      if (!hold || !box) return;
+      if (!enabled || !hold || hold.pointerId !== event.pointerId || !box) return;
       event.preventDefault();
       held = clamp({ x: event.clientX - hold.x, y: event.clientY - hold.y }, box);
-      setSpot(held);
+      // Move once per frame without rerendering the entire playback tree on every pointer event.
+      if (frame.current === null) frame.current = requestAnimationFrame(() => {
+        frame.current = null;
+        if (!root.current || !held) return;
+        move(held);
+      });
     },
-    [root],
+    [enabled, root, move],
   );
   const onPointerUp = useCallback((event: PointerEvent<HTMLElement>) => {
+    if (grab.current?.pointerId !== event.pointerId) return;
     grab.current = null;
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    if (held) move(held);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
-  }, []);
+  }, [move]);
   const style: CSSProperties | undefined =
     enabled && spot
       ? { left: `${spot.x}px`, right: "auto", top: `${spot.y}px`, bottom: "auto" }
       : undefined;
   return {
     style,
-    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onLostPointerCapture: onPointerUp },
   };
 }

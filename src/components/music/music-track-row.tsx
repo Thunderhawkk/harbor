@@ -1,16 +1,21 @@
-import { useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { GripVertical, Heart, LoaderCircle, MoreHorizontal, Pause, Play } from "lucide-react";
+import { useTrackPlaybackState } from "@/lib/music/use-track-playback-state";
+import { useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { GripVertical, Heart, LoaderCircle, MoreHorizontal, Pause, Play } from "@/components/icons/music-icons";
 import { MusicTrackMenu, useMusicTrackMenuItems } from "./music-track-menu";
 import { MusicCardBadgeChip, type MusicCardBadge } from "@/components/music/music-cover-card";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";
 import type { MusicTrack } from "@/lib/music/types";
-import { toggleMusicPlayback } from "@/lib/music/player";
-import { MusicQualityBadge } from "./music-quality-badge";
+import { toggleMusicLiked, toggleMusicPlayback } from "@/lib/music/player";
+import { useMusicTrackLiked } from "@/lib/music/use-track-liked";
 import { MusicMediaBadge } from "./music-media-badge";
 import { MusicArtistLink } from "./music-artist-link";
 import { MusicTrackLabels } from "./music-track-labels";
 import { MusicTrackPlaylistChip } from "./music-playlist-chip";
+import "./music-like-burst.css";
+import "./music-track-row.css";
+
+const ROW_LIKE_SPOKES = [0, 45, 90, 135, 180, 225, 270, 315];
 
 export function MusicTrackRowHandle({ label }: { label: string }) {
   return (
@@ -29,13 +34,15 @@ export function MusicTrackRow({
   index,
   leading,
   onPlay,
+  onOpen,
   onAddToQueue,
   onAddToPlaylist,
   onGoToArtist,
   onGoToAlbum,
-  onStartRadio,
-  liked = false,
+  onMoreLikeThis,
+  liked,
   onToggleFavorite,
+  saveable = true,
   showDuration = false,
   nowPlaying = false,
   loading = false,
@@ -47,13 +54,15 @@ export function MusicTrackRow({
   index?: number;
   leading?: ReactNode;
   onPlay: () => void;
+  onOpen?: () => void;
   onAddToQueue?: () => void;
   onAddToPlaylist?: () => void;
   onGoToArtist?: () => void;
   onGoToAlbum?: () => void;
-  onStartRadio?: () => void;
+  onMoreLikeThis?: () => void;
   liked?: boolean;
   onToggleFavorite?: () => void;
+  saveable?: boolean;
   showDuration?: boolean;
   nowPlaying?: boolean;
   loading?: boolean;
@@ -61,8 +70,17 @@ export function MusicTrackRow({
   className?: string;
 }) {
   const t = useT();
+  const status = useTrackPlaybackState(track);
+  loading = loading || status.loading;
+  nowPlaying = nowPlaying || status.current;
+  paused = paused || status.paused;
+  const tracked = useMusicTrackLiked(track);
+  const saved = liked ?? tracked;
+  const rowBadge = badge?.kind === "connector" ? { ...badge, itemId: track.id } : badge;
+  const save = onToggleFavorite ?? (() => toggleMusicLiked(track));
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
+  const [burst, setBurst] = useState(0);
   const seed = `track:${track.connectorId ?? ""}:${track.sourceId ?? track.id}`;
 
   const items = useMusicTrackMenuItems(track, {
@@ -71,7 +89,7 @@ export function MusicTrackRow({
     onAddToPlaylist,
     onGoToArtist,
     onGoToAlbum,
-    onStartRadio,
+    onMoreLikeThis,
   });
 
   const openMenu = (event: MouseEvent<HTMLElement>) => {
@@ -93,7 +111,7 @@ export function MusicTrackRow({
             {String(index).padStart(2, "0")}
           </span>
         ) : null)}
-      <div onContextMenu={openMenu} className="flex h-14 min-w-0 flex-1 items-center text-start">
+      <div onContextMenu={openMenu} className="music-track-details flex h-14 min-w-0 flex-1 items-center text-start">
         <button
           type="button"
           onClick={nowPlaying ? toggleMusicPlayback : onPlay}
@@ -102,7 +120,7 @@ export function MusicTrackRow({
               ? t(paused ? "music.play" : "music.pause")
               : t("music.playTrack", { title: track.title, artist: track.artist })
           }
-          className="relative block size-14 shrink-0 overflow-hidden rounded-[4px] bg-elevated"
+          className="music-track-cover relative block size-14 shrink-0 overflow-hidden rounded-[4px] bg-elevated"
         >
           <Poster
             src={track.artwork}
@@ -114,11 +132,9 @@ export function MusicTrackRow({
               aria-hidden="true"
               className="absolute inset-0 grid place-items-center bg-canvas/55 text-ink opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 group-focus-within:opacity-100 group-data-[menu-open]:opacity-100"
             >
-              {nowPlaying && !paused ? (
-                <Pause size={16} fill="currentColor" />
-              ) : (
-                <Play size={16} fill="currentColor" />
-              )}
+              <span className="music-track-cover-symbol grid size-8 place-items-center text-ink/85">
+                {nowPlaying && !paused ? <Pause size={18} /> : <Play size={18} />}
+              </span>
             </span>
           </Poster>
           {loading && (
@@ -132,6 +148,7 @@ export function MusicTrackRow({
           {nowPlaying && !loading && (
             <span
               aria-hidden="true"
+              data-paused={paused || undefined}
               className="music-eq absolute inset-0 grid place-items-center bg-black/45 group-hover:opacity-0"
             >
               <span className="music-eq-bars">
@@ -143,20 +160,17 @@ export function MusicTrackRow({
             </span>
           )}
         </button>
-        <span className="flex min-w-0 flex-col ps-3">
+        <span className="music-track-title flex min-w-0 flex-1 flex-col ps-3">
           <span className="flex min-w-0 items-center gap-[5px]">
             <button
               type="button"
-              onClick={onPlay}
-              className="truncate text-start text-[13px] font-semibold text-ink"
+              onClick={onOpen ?? onPlay}
+              className="min-w-0 flex-1 truncate text-start text-[13px] font-semibold text-ink"
               title={track.title}
             >
               {track.title}
             </button>
-            {badge && <MusicCardBadgeChip badge={badge} />}
-            <MusicMediaBadge kind={track.mediaKind} compact />
-            <MusicTrackLabels track={track} />
-            <MusicQualityBadge track={track} />
+            {showDuration && rowBadge && <MusicCardBadgeChip badge={rowBadge} />}
           </span>
           <span className="flex min-w-0 items-center gap-2">
             <MusicArtistLink
@@ -167,24 +181,56 @@ export function MusicTrackRow({
             <MusicTrackPlaylistChip track={track} />
           </span>
         </span>
+        {!showDuration && (
+          <span className="music-track-badges ms-2 inline-flex shrink-0 items-center gap-[5px]">
+            {rowBadge && <MusicCardBadgeChip badge={rowBadge} />}
+            <MusicMediaBadge kind={track.mediaKind} compact />
+            <MusicTrackLabels track={track} />
+          </span>
+        )}
       </div>
       {showDuration && (
-        <span className="ms-4 shrink-0 text-xs tabular-nums text-ink-muted">
-          {track.durationLabel}
+        <span data-music-duration className="ms-4 inline-flex shrink-0 items-center gap-3 text-xs tabular-nums text-ink-muted">
+          <MusicTrackLabels track={track} />
+          <MusicMediaBadge kind={track.mediaKind} compact />
+          <span>{track.durationLabel}</span>
         </span>
       )}
-      {onToggleFavorite && (
+      {saveable && (
         <button
           type="button"
+          data-like-burst
+          data-burst={burst || undefined}
           onClick={(event) => {
             event.stopPropagation();
-            onToggleFavorite();
+            setBurst((count) => saved ? 0 : count + 1);
+            save();
           }}
-          aria-pressed={liked}
-          aria-label={t(liked ? "music.unsaveTrack" : "music.saveTrack")}
-          className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-[color,background-color,opacity] duration-200 ease-out hover:bg-elevated ${liked ? "text-accent opacity-100" : "text-ink-subtle opacity-0 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 group-data-[menu-open]:opacity-100"}`}
+          aria-pressed={saved}
+          aria-label={t(saved ? "music.unsaveTrack" : "music.saveTrack")}
+          title={t(saved ? "music.unsaveTrack" : "music.saveTrack")}
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-[color,background-color,opacity] duration-200 ease-out hover:bg-elevated ${saved ? "text-accent opacity-100" : "text-ink-subtle opacity-0 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 group-data-[menu-open]:opacity-100"}`}
         >
-          <Heart size={16} fill={liked ? "currentColor" : "none"} aria-hidden="true" />
+          <Heart size={16} fill={saved ? "currentColor" : "none"} aria-hidden="true" />
+          {burst > 0 && saved && (
+            <span key={burst} className="dock-like-burst" aria-hidden="true" onAnimationEnd={(event) => {
+              if (event.animationName === "dock-like-ring") setBurst(0);
+            }}>
+              <span className="dock-like-ring" />
+              {ROW_LIKE_SPOKES.map((rotate, index) => (
+                <span
+                  key={index}
+                  className="dock-like-dot"
+                  style={
+                    {
+                      "--rotate": `${rotate}deg`,
+                      "--translate-y": index % 2 ? "-16px" : "-21px",
+                    } as CSSProperties
+                  }
+                />
+              ))}
+            </span>
+          )}
         </button>
       )}
       <button

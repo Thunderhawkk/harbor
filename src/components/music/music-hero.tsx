@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FolderOpen, Music2, Pause, Play, Radio, Server } from "lucide-react";
+import { FolderOpen, Music2, Pause, Play, Radio, Server } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
 import {
   useMusicConnections,

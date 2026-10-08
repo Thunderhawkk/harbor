@@ -33,6 +33,8 @@ export function esportsRailMatches(feeds: EsportsFeed[], now = Date.now()): Espo
 
 const LEAGUE_GAMES: Record<string, EsportsGameId> = {
   DOTA2: "dota2",
+  CS2: "cs2",
+  VALORANT: "valorant",
   LCK: "lol",
   LEC: "lol",
   LPL: "lol",
@@ -54,12 +56,27 @@ export function selectedEsportsFeeds(
   const games = esportsRailGames(leagueKeys)!;
   return feeds
     .filter((feed) => games.includes(feed.game))
-    .map((feed) => ({
-      ...feed,
-      matches: feed.matches.filter((match) => {
-        if (match.game !== "lol") return true;
-        const league = match.event.name.split("·")[0].trim().toUpperCase();
-        return leagueKeys.some((key) => LEAGUE_GAMES[key] === "lol" && league === key);
-      }),
-    }));
+    .map((feed) => ({ ...feed, matches: lolSelection(feed.matches, leagueKeys) }));
+}
+
+const lolLeague = (match: EsportsMatch) => match.event.name.split("·")[0].trim().toUpperCase();
+
+/** Chosen splits narrow LoL, but a week with none of them playing must not empty the game. */
+function lolSelection(matches: EsportsMatch[], leagueKeys: readonly string[]): EsportsMatch[] {
+  const lol = matches.filter((match) => match.game === "lol");
+  if (!lol.length) return matches;
+  const splits = leagueKeys.filter((key) => LEAGUE_GAMES[key] === "lol");
+  const chosen = lol.filter((match) => splits.includes(lolLeague(match)));
+  const keep = new Set(chosen.length ? chosen : lol);
+  return matches.filter((match) => match.game !== "lol" || keep.has(match));
+}
+
+/**
+ * Titles whose provider answered cleanly with nothing scheduled, which is a season break
+ * rather than an outage. RLCS is the live case: its season ended and the next is unpublished.
+ */
+export function esportsOffseasonGames(feeds: EsportsFeed[]): EsportsGameId[] {
+  return feeds
+    .filter((feed) => feed.status === "ready" && !feed.partial && !feed.matches.length)
+    .map((feed) => feed.game);
 }

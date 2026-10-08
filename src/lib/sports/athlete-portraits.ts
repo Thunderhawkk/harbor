@@ -1,13 +1,17 @@
+import { commonsAthletePortrait } from "./athlete-commons-portraits";
+
 /** Published portraits only: ESPN identifiers are not interchangeable with tour or CDN identifiers. */
 export type AthletePortraitRequest = {
   path: string;
+  /** Catalog sport identity for providers whose paths are numeric or not ESPN routes. */
+  group?: string;
   id: string;
   name: string;
   image?: string;
 };
 export type AthletePortrait = {
   url: string;
-  source: "ESPN" | "TheSportsDB";
+  source: "ESPN" | "TheSportsDB" | "Wikipedia" | "Wikimedia Commons";
   sourceUrl: string;
 };
 function validAttribution(source: unknown, value: unknown): boolean {
@@ -17,7 +21,15 @@ function validAttribution(source: unknown, value: unknown): boolean {
     if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
     if (source === "TheSportsDB")
       return url.hostname === "www.thesportsdb.com" && /^\/player\/\d+$/.test(url.pathname);
-    return source === "ESPN" && ["www.espn.com", "site.web.api.espn.com"].includes(url.hostname);
+    if (source === "Wikipedia")
+      return url.hostname === "en.wikipedia.org" && url.pathname.startsWith("/wiki/");
+    if (source === "Wikimedia Commons")
+      return (
+        url.hostname === "commons.wikimedia.org" && /^\/wiki\/File(?::|%3A)/i.test(url.pathname)
+      );
+    return (
+      source === "ESPN" && ["www.espn.com", "site.web.api.espn.com"].includes(url.hostname)
+    );
   } catch {
     return false;
   }
@@ -46,10 +58,37 @@ const SPORT_NAMES: Record<string, string> = {
   hockey: "Ice Hockey",
   rugby: "Rugby",
   cricket: "Cricket",
+  combat: "Fighting",
+  motorsport: "Motorsport",
+  volleyball: "Volleyball",
+  handball: "Handball",
+  badminton: "Badminton",
+  tabletennis: "Table Tennis",
+  snooker: "Snooker",
+  darts: "Darts",
+  cycling: "Cycling",
+  athletics: "Athletics",
+  swimming: "Swimming",
+  softball: "Softball",
+  aussie: "Australian Football",
+  lacrosse: "Lacrosse",
+  fieldhockey: "Field Hockey",
+  netball: "Netball",
+  waterpolo: "Water Polo",
+  esports: "Esports",
+};
+const espnPath = (path: string) => /^[a-z]+\/[a-z0-9.-]{1,50}$/.test(path);
+const portraitSport = (request: AthletePortraitRequest) => {
+  if (request.group === "winter") {
+    if (request.path === "5342") return "Biathlon";
+    if (["5625", "5722", "5724"].includes(request.path)) return "Skiing";
+    return "Winter Sports";
+  }
+  return SPORT_NAMES[request.group ?? request.path.split("/")[0]];
 };
 const validRequest = (request: AthletePortraitRequest) =>
-  /^[a-z]+\/[a-z0-9.-]{1,50}$/.test(request.path) &&
-  !!SPORT_NAMES[request.path.split("/")[0]] &&
+  (espnPath(request.path) || /^(?:\d{1,8}|[a-z][a-z0-9-]{0,50})$/.test(request.path)) &&
+  !!portraitSport(request) &&
   request.name.trim().length > 1 &&
   request.name.length <= 160;
 
@@ -67,7 +106,15 @@ export function publishedPortraitUrl(value: unknown): string {
       return url.href;
     if (
       ["r2.thesportsdb.com", "www.thesportsdb.com"].includes(url.hostname) &&
-      /^\/images\/media\/player\/(?:thumb|cutout)\/[^/]+\.(?:png|jpe?g|webp)$/i.test(url.pathname)
+      /^\/images\/media\/player\/(?:thumb|cutout)\/[^/]+\.(?:png|jpe?g|webp)$/i.test(
+        url.pathname,
+      )
+    )
+      return url.href;
+    if (
+      ["thumb.wikimedia.org", "upload.wikimedia.org"].includes(url.hostname) &&
+      /^\/wikipedia\/(?:commons|en)\//.test(url.pathname) &&
+      /\.(?:png|jpe?g|webp)$/i.test(url.pathname)
     )
       return url.href;
   } catch {
@@ -116,7 +163,7 @@ export function sportsDbAthletePortrait(
 ): AthletePortrait | null {
   const players = record(data).player;
   if (!validRequest(request) || !Array.isArray(players)) return null;
-  const sport = normal(SPORT_NAMES[request.path.split("/")[0]]);
+  const sport = normal(portraitSport(request));
   const gender =
     request.path === "tennis/atp" ? "male" : request.path === "tennis/wta" ? "female" : "";
   const matches = players
@@ -141,7 +188,72 @@ export function sportsDbAthletePortrait(
     : null;
 }
 
-type Cached = { at: number; value: AthletePortrait | null };
+const SPORT_WORDS: Record<string, RegExp> = {
+  Golf: /\bgolfers?\b/i,
+  Tennis: /\btennis\b/i,
+  Cycling: /\b(?:cyclists?|cycling)\b/i,
+  Athletics:
+    /\b(?:athletes?|sprinters?|runners?|hurdlers?|jumpers?|throwers?|decathletes?|heptathletes?|race walkers?|marathon)\b/i,
+  Swimming: /\b(?:swimmers?|divers?|water polo)\b/i,
+  Skiing: /\b(?:skiers?|skiing|ski jumpers?)\b/i,
+  Biathlon: /\b(?:biathletes?|biathlon)\b/i,
+  "Winter Sports":
+    /\b(?:skiers?|skiing|snowboarders?|skaters?|curlers?|bobsledders?|lugers?|biathletes?|biathlon)\b/i,
+  Motorsport: /\b(?:racing drivers?|drivers?|riders?|motorcycle racers?)\b/i,
+  Boxing: /\bboxers?\b/i,
+  Fighting:
+    /\b(?:mixed martial artists?|fighters?|wrestlers?|judokas?|karatekas?|taekwondo)\b/i,
+  Snooker: /\bsnooker\b/i,
+  Darts: /\bdarts\b/i,
+  Badminton: /\bbadminton\b/i,
+  "Table Tennis": /\btable tennis\b/i,
+  Soccer: /\b(?:footballers?|soccer)\b/i,
+  Basketball: /\bbasketball\b/i,
+  Baseball: /\bbaseball\b/i,
+  "American Football": /\b(?:american football|football player)\b/i,
+  "Ice Hockey": /\bice hockey\b/i,
+  Rugby: /\brugby\b/i,
+  Cricket: /\bcricket(?:ers?)?\b/i,
+  Volleyball: /\bvolleyball\b/i,
+  Handball: /\bhandball\b/i,
+  Softball: /\bsoftball\b/i,
+  "Australian Football": /\bAustralian rules football(?:ers?)?\b/i,
+  Lacrosse: /\blacrosse\b/i,
+  "Field Hockey": /\bfield hockey\b/i,
+  Netball: /\bnetball\b/i,
+  "Water Polo": /\bwater polo\b/i,
+  Esports: /\b(?:esports|e-sports|professional gamers?)\b/i,
+};
+
+/**
+ * ESPN publishes no headshot outside its major leagues and TheSportsDB stops at the famous few, so
+ * a niche individual sport has no face anywhere else. The summary's own one-line description is
+ * what keeps a namesake out: the article must call this person the sport they compete in.
+ */
+export function wikipediaAthletePortrait(
+  data: unknown,
+  request: AthletePortraitRequest,
+): AthletePortrait | null {
+  const page = record(data);
+  if (!validRequest(request) || page.type !== "standard") return null;
+  if (normal(page.title) !== normal(request.name)) return null;
+  const sport = portraitSport(request);
+  const expected = sport ? SPORT_WORDS[sport] : undefined;
+  const said = `${text(page.description)} ${text(page.extract).slice(0, 400)}`;
+  if (!expected || !expected.test(said)) return null;
+  const url =
+    publishedPortraitUrl(record(page.thumbnail).source) ||
+    publishedPortraitUrl(record(page.originalimage).source);
+  if (!url) return null;
+  const sourceUrl = text(record(record(page.content_urls).desktop).page);
+  return {
+    url,
+    source: "Wikipedia",
+    sourceUrl: sourceUrl || `https://en.wikipedia.org/wiki/${encodeURIComponent(request.name)}`,
+  };
+}
+
+type Cached = { at: number; value: AthletePortrait | null; sourcesVersion?: number };
 type FetchJson = (url: string, signal: AbortSignal) => Promise<unknown>;
 type Job = {
   key: string;
@@ -153,6 +265,7 @@ type Job = {
   reject: (reason: unknown) => void;
 };
 const STORE_KEY = "harbor.sports.athlete-portraits.v1";
+const SOURCES_VERSION = 2;
 const POSITIVE_TTL = 7 * 86400000,
   NEGATIVE_TTL = 15 * 60000;
 const abortError = () => new DOMException("Portrait request cancelled", "AbortError");
@@ -177,7 +290,9 @@ export function createAthletePortraitResolver(options: {
     loaded = false,
     saveTimer: ReturnType<typeof setTimeout> | undefined;
   const fresh = (entry: Cached) =>
-    now() >= entry.at && now() - entry.at < (entry.value ? POSITIVE_TTL : NEGATIVE_TTL);
+    (entry.value !== null || entry.sourcesVersion === SOURCES_VERSION) &&
+    now() >= entry.at &&
+    now() - entry.at < (entry.value ? POSITIVE_TTL : NEGATIVE_TTL);
   const ingest = (stored: string | null | undefined) => {
     try {
       if (!stored || stored.length > 180000) return;
@@ -190,10 +305,11 @@ export function createAthletePortraitResolver(options: {
         if (
           typeof entry.at !== "number" ||
           (value &&
-            (!publishedPortraitUrl(value.url) || !validAttribution(value.source, value.sourceUrl)))
+            (!publishedPortraitUrl(value.url) ||
+              !validAttribution(value.source, value.sourceUrl)))
         )
           continue;
-        const hit = { at: entry.at, value } as Cached;
+        const hit = { at: entry.at, value, sourcesVersion: entry.sourcesVersion } as Cached;
         if (fresh(hit) && (!cache.has(row[0]) || cache.get(row[0])!.at < hit.at))
           cache.set(row[0], hit);
       }
@@ -255,7 +371,11 @@ export function createAthletePortraitResolver(options: {
     const { request, controller } = job;
     // ESPN does not publish headshot metadata for most ATP/WTA profiles. Start with
     // the existing free database there instead of paying for a redundant bio request.
-    if (!request.path.startsWith("tennis/") && /^\d{1,20}$/.test(request.id)) {
+    if (
+      espnPath(request.path) &&
+      !request.path.startsWith("tennis/") &&
+      /^\d{1,20}$/.test(request.id)
+    ) {
       try {
         const person = await read(
           `https://site.web.api.espn.com/apis/common/v3/sports/${request.path}/athletes/${request.id}`,
@@ -268,11 +388,32 @@ export function createAthletePortraitResolver(options: {
       }
     }
     controller.signal.throwIfAborted();
-    const data = await read(
-      `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${encodeURIComponent(request.name.trim())}`,
-      controller,
-    );
-    return sportsDbAthletePortrait(data, request);
+    try {
+      const data = await read(
+        `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${encodeURIComponent(request.name.trim())}`,
+        controller,
+      );
+      const portrait = sportsDbAthletePortrait(data, request);
+      if (portrait) return portrait;
+    } catch {
+      controller.signal.throwIfAborted();
+    }
+    controller.signal.throwIfAborted();
+    try {
+      const summary = await read(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(request.name.trim().replace(/ /g, "_"))}`,
+        controller,
+      );
+      const portrait = wikipediaAthletePortrait(summary, request);
+      if (portrait) return portrait;
+    } catch {
+      controller.signal.throwIfAborted();
+    }
+    controller.signal.throwIfAborted();
+    const sport = SPORT_WORDS[portraitSport(request)];
+    return sport
+      ? commonsAthletePortrait(request, sport, (url) => read(url, controller))
+      : null;
   };
   const pump = () => {
     while (active < concurrency && queue.length) {
@@ -287,7 +428,7 @@ export function createAthletePortraitResolver(options: {
         .then((value) => {
           job.controller.signal.throwIfAborted();
           cache.delete(job.key);
-          cache.set(job.key, { at: now(), value });
+          cache.set(job.key, { at: now(), value, sourcesVersion: SOURCES_VERSION });
           while (cache.size > 160) cache.delete(cache.keys().next().value!);
           save();
           job.resolve(value);
@@ -295,7 +436,7 @@ export function createAthletePortraitResolver(options: {
         .catch((error) => {
           if (job.controller.signal.aborted) job.reject(error);
           else {
-            cache.set(job.key, { at: now(), value: null });
+            cache.set(job.key, { at: now(), value: null, sourcesVersion: SOURCES_VERSION });
             while (cache.size > 160) cache.delete(cache.keys().next().value!);
             save();
             job.resolve(null);
@@ -308,8 +449,12 @@ export function createAthletePortraitResolver(options: {
         });
     }
   };
-  const keyOf = (request: AthletePortraitRequest) =>
-    `${request.path}:${request.id}:${normal(request.name)}`;
+  const keyOf = (request: AthletePortraitRequest) => {
+    const sport = portraitSport(request);
+    // Preserve existing ESPN cache hits; other providers must include their sport identity.
+    const scope = sport === SPORT_NAMES[request.path.split("/")[0]] ? "" : `:${normal(sport)}`;
+    return `${request.path}${scope}:${request.id}:${normal(request.name)}`;
+  };
   const peek = (request: AthletePortraitRequest): AthletePortrait | null | undefined => {
     restore();
     const hit = cache.get(keyOf(request));
@@ -403,7 +548,8 @@ export function athletePortraits() {
         typeof window === "undefined"
           ? undefined
           : {
-              getItem: async (key) => (await import("./artwork-storage")).readArtworkMetadata(key),
+              getItem: async (key) =>
+                (await import("./artwork-storage")).readArtworkMetadata(key),
               setItem: async (key, value) =>
                 (await import("./artwork-storage")).writeArtworkMetadata(key, value),
             },

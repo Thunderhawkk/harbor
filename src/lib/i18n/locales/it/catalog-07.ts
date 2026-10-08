@@ -976,6 +976,9 @@ const catalog07: Record<string, string> = {
   "Show off. [b]bold[/b], [color=gold]color[/color], [youtube]link[/youtube], [img]https://...[/img] and more.":
     "Mettiti in mostra. Puoi usare [b]grassetto[/b], [color=gold]colore[/color], [youtube]link[/youtube], [img]https://...[/img] e altro.",
   "Show on Discord": "Mostra su Discord",
+  "Show what you are listening to": "Mostra cosa stai ascoltando",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Condividi brano, artista e copertina dell'album mentre la musica è in riproduzione, con un pulsante «Listen in Harbor».",
   "Show on home": "Mostra nella Home",
   "Show or hide the playback stats overlay.":
     "Mostra o nascondi le statistiche di riproduzione in sovrimpressione.",

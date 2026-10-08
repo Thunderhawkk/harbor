@@ -17,6 +17,28 @@
   outline: 2px solid var(--color-ink, #fff);
   outline-offset: 3px;
 }
+.sh-athlete-link.is-inline {
+  display: inline;
+  padding: 2px 4px;
+  margin-inline: -4px;
+  background: transparent;
+  border-radius: 2px;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+}
+.sh-athlete-link.is-inline:focus-visible {
+  outline-offset: -2px;
+}
+.sh-athlete-link.is-inline:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sh-athlete-link.is-inline > svg {
+  display: inline-block;
+  margin-inline-start: 5px;
+  vertical-align: -2px;
+}
 .sh-athlete-profile {
   max-height: 85vh;
   overflow-y: auto;
@@ -84,6 +106,10 @@
   background: var(--color-elevated, #242827);
   padding: 18px;
   border-radius: 10px;
+}
+.sh-athlete-profile[data-sport="golf"] .sh-athlete-summary > div {
+  min-width: min(220px, 100%);
+  overflow-wrap: anywhere;
 }
 .sh-athlete-summary strong,
 .sh-athlete-summary span {

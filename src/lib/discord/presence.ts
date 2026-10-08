@@ -17,6 +17,20 @@ type DiscordConfig = {
   showPoster: boolean;
   showTimestamp: boolean;
   showPartyJoin: boolean;
+  showMusic: boolean;
+};
+
+export type MusicPresence = {
+  title: string;
+  artist: string;
+  album?: string;
+  artwork?: string;
+  paused: boolean;
+  positionSec: number;
+  durationSec: number;
+  trackUrl?: string;
+  artistUrl?: string;
+  albumUrl?: string;
 };
 
 export type PlaybackPresence = {
@@ -53,8 +67,10 @@ let config: DiscordConfig = {
   showPoster: true,
   showTimestamp: true,
   showPartyJoin: true,
+  showMusic: true,
 };
 let playback: PlaybackPresence | null = null;
+let music: MusicPresence | null = null;
 let reading: MangaReadingState = null;
 let browse: BrowsePresence | null = null;
 let party: PartyPresence | null = null;
@@ -108,6 +124,46 @@ function computeBase(): Base {
         paused: playback.paused,
       },
       key: `play:${playback.title}|${state ?? ""}|${playback.paused}|${playback.posterUrl ?? ""}|${live ? "ts" : "nots"}`,
+    };
+  }
+  if (music && config.showMusic && !party && !(music.paused && !config.showWhenPaused)) {
+    if (config.hideTitle) {
+      return {
+        payload: {
+          details: "Listening to something",
+          state: music.paused ? "Paused" : undefined,
+          posterUrl: HARBOR_LOGO,
+          activityType: "listening",
+          paused: music.paused,
+        },
+        key: `music:hide:${music.paused}`,
+      };
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    const remaining = music.durationSec - music.positionSec;
+    const live = !music.paused && music.durationSec > 0 && remaining > 0;
+    const credit = music.album ? `${music.artist} · ${music.album}` : music.artist;
+    const state = music.paused ? `Paused · ${music.artist}` : credit;
+    const buttons = music.trackUrl
+      ? [{ label: "Listen in Harbor", url: music.trackUrl }, ...STATIC_BUTTONS]
+      : STATIC_BUTTONS;
+    return {
+      payload: {
+        details: music.title,
+        detailsUrl: music.trackUrl,
+        state,
+        stateUrl: music.artistUrl ?? music.trackUrl,
+        posterUrl: (config.showPoster && music.artwork) || HARBOR_LOGO,
+        largeText: music.album ? `${music.album} by ${music.artist}` : music.artist,
+        largeUrl: music.albumUrl ?? music.trackUrl,
+        smallUrl: STATIC_BUTTONS[0].url,
+        startTs: live && config.showTimestamp ? nowSec - Math.floor(music.positionSec) : undefined,
+        endTs: live && config.showTimestamp ? nowSec + Math.floor(remaining) : undefined,
+        activityType: "listening",
+        paused: music.paused,
+        buttons,
+      },
+      key: `music:${music.title}|${state}|${music.artwork ?? ""}|${live ? "ts" : "nots"}`,
     };
   }
   if (reading) {
@@ -179,7 +235,7 @@ function compute(): Computed {
     };
   }
   if (!base) return { payload: null, key: "clear" };
-  return { payload: { ...base.payload, buttons: STATIC_BUTTONS }, key: base.key };
+  return { payload: { buttons: STATIC_BUTTONS, ...base.payload }, key: base.key };
 }
 
 function flush(): void {
@@ -238,6 +294,11 @@ export function setPlaybackPresence(p: PlaybackPresence | null): void {
   playback = p;
   schedule();
   emitActivity();
+}
+
+export function setMusicPresence(m: MusicPresence | null): void {
+  music = m;
+  schedule();
 }
 
 export function setReadingPresence(r: MangaReadingState): void {

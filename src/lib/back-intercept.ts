@@ -2,6 +2,10 @@ type BackHandler = () => boolean;
 
 const handlers: BackHandler[] = [];
 
+export function hasBackHandlers(): boolean {
+  return handlers.length > 0;
+}
+
 export function pushBackHandler(handler: BackHandler): () => void {
   handlers.push(handler);
   return () => {

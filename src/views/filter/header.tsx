@@ -5,15 +5,16 @@ import { MOVIE_GENRES } from "@/lib/feed/tags";
 import { useView, type MetaFilter } from "@/lib/view";
 import { runtimeRange } from "./rails-config";
 import { BrandHero, useBrandArt } from "./brand-hero";
+import { browsedId, isBrowsed } from "./browsed";
 
 export function Header({ filter }: { filter: MetaFilter }) {
   const t = useT();
   const { kicker, title, subtitle, Icon } = describe(filter, t);
-  const branded = filter.kind === "studio" || filter.kind === "network";
+  const branded = isBrowsed(filter);
   const art = useBrandArt(
-    branded ? filter.id : 0,
+    branded ? browsedId(filter) : 0,
     filter.mediaType,
-    filter.kind === "network" ? "network" : "studio",
+    branded ? filter.kind : "studio",
   );
   if (branded) {
     return (
@@ -40,7 +41,6 @@ export function Header({ filter }: { filter: MetaFilter }) {
         </h1>
       )}
       <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-muted">{subtitle}</p>
-      {filter.kind === "country" && <MediaTypeToggle filter={filter} />}
     </div>
   );
 }

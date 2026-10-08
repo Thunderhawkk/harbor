@@ -31,10 +31,9 @@ export function ScoreBreakdown({ game, sport }: { game: SportsGame; sport: strin
   const t = useT();
   if (!hasUsefulScoreBreakdown(game, sport)) return null;
   const showTotal = ["motorsport", "golf"].includes(sport);
+  const rows = showTotal && game.field?.length ? game.field : [game.home, game.away];
   const periods = [
-    ...new Set(
-      [...(game.home.periods || []), ...(game.away.periods || [])].map((row) => row.period),
-    ),
+    ...new Set(rows.flatMap((side) => (side.periods || []).map((row) => row.period))),
   ].sort((a, b) => a - b);
   const hasPoints =
     sport === "tennis" &&
@@ -90,7 +89,7 @@ export function ScoreBreakdown({ game, sport }: { game: SportsGame; sport: strin
             </tr>
           </thead>
           <tbody>
-            {[game.home, game.away].map((side, i) => (
+            {rows.map((side, i) => (
               <tr key={i}>
                 <th scope="row">
                   <span>{side.name}</span>

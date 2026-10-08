@@ -45,7 +45,7 @@ fn video_results(response: &Value, limit: usize) -> Vec<MusicTrack> {
     video_results_kind(response, limit, false)
 }
 
-fn video_results_kind(response: &Value, limit: usize, interviews: bool) -> Vec<MusicTrack> {
+pub(super) fn video_results_kind(response: &Value, limit: usize, interviews: bool) -> Vec<MusicTrack> {
     let mut found = Vec::new();
     parse::collect(response, LIST_ITEM, &mut found);
     let mut seen = std::collections::HashSet::new();
@@ -340,6 +340,7 @@ mod tests {
             artwork: "cover.jpg".to_string(),
             year: Some(2003),
             track_count: Some(14),
+            explicit: None,
         };
         let bare = items::track(
             "MdVBSHOMWSY",

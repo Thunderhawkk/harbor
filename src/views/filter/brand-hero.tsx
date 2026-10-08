@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { tmdbCompanyArt, type CompanyArt } from "@/lib/providers/tmdb";
+import type { BrowseId, BrowseKind } from "@/lib/providers/tmdb/tmdb-brands";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
 import { useLogoTone } from "@/lib/logo-tone";
@@ -7,9 +8,9 @@ import { useLogoTone } from "@/lib/logo-tone";
 const EMPTY: CompanyArt = { logo: null, backdrop: null, count: 0, span: "" };
 
 export function useBrandArt(
-  id: number,
+  id: BrowseId,
   mediaType: "movie" | "tv",
-  brand: "studio" | "network",
+  brand: BrowseKind,
 ): CompanyArt {
   const { settings } = useSettings();
   const [art, setArt] = useState<CompanyArt>(EMPTY);

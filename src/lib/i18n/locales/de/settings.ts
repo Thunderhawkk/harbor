@@ -311,6 +311,8 @@ const settings: Record<string, string> = {
   "Budget exhausted, resets at midnight UTC.":
     "Budget aufgebraucht. Es wird um Mitternacht (UTC) zurückgesetzt.",
   "Buffer fill": "Pufferfüllstand",
+  "Reveal the dot on hover": "Punkt beim Überfahren einblenden",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Der Punkt hält sich zurück und erscheint, sobald du auf die Leiste zeigst. Schalte das aus, damit er dauerhaft sichtbar bleibt.",
   "Buffer fill brightness": "Helligkeit der Pufferfüllung",
   "Buffer size": "Puffergröße",
   "Bug reporters get listed in the release notes when their report leads to a shipped fix. Leave blank to stay anonymous.":
@@ -1980,6 +1982,9 @@ const settings: Record<string, string> = {
   "Show full descriptions": "Vollständige Beschreibungen anzeigen",
   "Show my rating on movie posters": "Meine Bewertung auf Filmplakaten anzeigen",
   "Show on Discord": "Auf Discord anzeigen",
+  "Show what you are listening to": "Anzeigen, was du hörst",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Teile Titel, Interpret und Albumcover, während Musik läuft, samt einer Schaltfläche „Listen in Harbor“.",
   "Show or hide the playback stats overlay.": "Wiedergabestatistik ein- oder ausblenden.",
   "Show play button": "Wiedergabeschaltfläche anzeigen",
   "Show poster": "Poster anzeigen",

@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   artistPresenceIn,
+  artistPlaylistTracks,
   buildMusicPlaylistIndex,
   trackPlaylistsIn,
 } from "../src/lib/music/playlist-membership";
@@ -25,6 +26,16 @@ function playlist(id: string, name: string, tracks: MusicTrack[]): MusicPlaylist
 }
 
 describe("music playlist membership", () => {
+  it("opens exactly the counted artist songs, retaining explicit metadata and collaborations", () => {
+    const explicit = track({ id: "1", connectorId: "catalog", artist: "Kevin Gates", explicit: true });
+    const duet = track({ id: "2", connectorId: "catalog", artist: "Other feat. Kevin Gates" });
+    const playlists = [playlist("a", "Liked songs", [explicit, explicit, duet, track({ artist: "Unrelated" })]), playlist("b", "Driving", [explicit])];
+    const presence = artistPresenceIn(buildMusicPlaylistIndex(playlists), "Kevin Gates");
+    const songs = artistPlaylistTracks(presence.playlists, "Kevin Gates");
+    assert.equal(songs.length, presence.trackCount);
+    assert.deepEqual(songs, [explicit, duet, explicit]);
+    assert.equal(songs[0].explicit, true);
+  });
   it("matches the same recording across connectors", () => {
     const saved = track({
       id: "111",

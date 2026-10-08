@@ -3,6 +3,7 @@ import { Loader2, RefreshCw, Settings2, Trash2 } from "../icons";
 import { AddonLogo } from "@/components/addon-logo";
 import { relativeTime } from "@/lib/dates";
 import { useT, useUiLanguage } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
 import type { CheckResult, KindAdapter, PluginView } from "@/lib/plugins";
 import { Nested, ROW_ACTION_PRIMARY, SettingRow } from "../kit";
 import { RowControl, RowDesc, RowNote, RowText, RowTitle } from "../shared";
@@ -24,6 +25,7 @@ export function PluginRow({
 }) {
   const t = useT();
   const uiLang = useUiLanguage();
+  const { settings } = useSettings();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +99,19 @@ export function PluginRow({
         : t("No streams came back.")
     : t("Runs this plugin on a real title and shows what came back.");
 
+  // Harbor is holding this one down rather than the user having switched it off, so the way back
+  // belongs on the row itself. With every plugin paused there is nothing to try.
+  const retryable = plugin.state === "auto-paused" && !masterOff;
+  const note = error ?? (retryable && check ? checkText : copy.warn);
+  const runCheck = adapter.check;
+  const checkNow = async () => {
+    if (!runCheck) return;
+    // The same budget pressing Play would get. A check that answers with less than playback does
+    // reports a plugin as broken while it works on Play.
+    const waitMs = Math.max(8, Math.min(120, settings.addonTimeoutSec ?? 30)) * 1000;
+    setCheck(await runCheck(plugin.id, waitMs));
+  };
+
   const filesDesc = plugin.installedAt
     ? t("v{version} from {repo}, installed {when}.", {
         version: plugin.version,
@@ -117,14 +132,30 @@ export function PluginRow({
             <span className="min-w-0">{plugin.name}</span>
             {plugin.nsfw && <Chip>18+</Chip>}
             {plugin.format === "provider-script" && <Chip>{t("Script")}</Chip>}
+            {plugin.format === "android-extension" && <Chip>{t("Android")}</Chip>}
             {plugin.verified && <Chip accent>{t("Verified")}</Chip>}
           </RowTitle>
           <RowDesc accent={!!copy.lock}>{copy.lock ?? sub}</RowDesc>
           {copy.desc && <RowDesc accent>{copy.desc}</RowDesc>}
           {masterOff && !locked && <RowDesc>{t("Plugins are paused. Turn on Use plugins above to run them.")}</RowDesc>}
-          {(error ?? copy.warn) && <RowNote>{error ?? copy.warn}</RowNote>}
+          {note && <RowNote>{note}</RowNote>}
         </RowText>
         <RowControl>
+          {retryable && adapter.check && (
+            <SButton disabled={busy === "check"} onClick={() => void run("check", checkNow)}>
+              {busy === "check" ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {t("Checking…")}
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={16} />
+                  {t("Try again")}
+                </>
+              )}
+            </SButton>
+          )}
           {plugin.hasSettings && adapter.settingsFields && (
             <button
               type="button"
@@ -226,11 +257,7 @@ export function PluginRow({
             <SettingRow label={t("Check it works")} desc={checkText}>
               <SButton
                 disabled={busy === "check"}
-                onClick={() =>
-                  void run("check", async () => {
-                    setCheck(await adapter.check!(plugin.id));
-                  })
-                }
+                onClick={() => void run("check", checkNow)}
               >
                 {busy === "check" ? (
                   <>

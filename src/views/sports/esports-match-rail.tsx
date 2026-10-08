@@ -242,7 +242,10 @@ export function EsportsMatchRailContent({
             selection={selectedTeam}
             matches={matches}
             onClose={() => setSelectedTeam(null)}
-            onMatch={onOpen}
+            onMatch={(match) => {
+              setSelectedTeam(null);
+              onOpen(match);
+            }}
           />
         )}
       </Suspense>
@@ -348,7 +351,11 @@ export function EsportsMatchRail({
           />
         )}
         {teamId !== null && !stream && <Team teamId={teamId} onClose={() => setTeamId(null)} />}
-        {stream && <Broadcast key={stream.url} stream={stream} onClose={() => setStream(null)} />}
+        {stream && <Broadcast key={stream.url} stream={stream} onClose={() => {
+          setStream(null);
+          setMatch(null);
+          setTeamId(null);
+        }} />}
       </Suspense>
     </section>
   );

@@ -60,6 +60,7 @@ export function ModalShell({
   labelledBy,
   backdropClassName,
   portalTarget,
+  dismissOnBackdrop = true,
   children,
 }: {
   closing: boolean;
@@ -68,6 +69,11 @@ export function ModalShell({
   labelledBy?: string;
   backdropClassName?: string;
   portalTarget?: Element;
+  /**
+   * Off for a dialog holding state a stray click must not destroy. The backdrop then
+   * becomes a drag region instead, so the window can still be moved around the dialog.
+   */
+  dismissOnBackdrop?: boolean;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -78,8 +84,9 @@ export function ModalShell({
       className={`fixed inset-0 z-[240] grid place-items-center p-8 ${backdropClassName ?? ""} ${
         closing ? "animate-scrim-out" : "animate-scrim-in"
       }`}
+      data-tauri-drag-region={dismissOnBackdrop ? undefined : ""}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onDismiss();
+        if (dismissOnBackdrop && e.target === e.currentTarget) onDismiss();
       }}
     >
       <div

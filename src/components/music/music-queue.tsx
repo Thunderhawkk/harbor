@@ -1,8 +1,7 @@
-import { getMusicSourceCandidates } from "@/lib/music/sources";
+import { getMusicSourceCandidates, musicPlaybackSource } from "@/lib/music/sources";
 import { replaceQueueTrack, selectableSources } from "@/lib/music/queue-source";
-import { MusicQueueOrder } from "@/lib/music/queue-order";
 import { MusicTrackLabels } from "./music-track-labels";
-import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronDown,
@@ -15,90 +14,29 @@ import {
   Trash2,
   Volume2,
   X,
-} from "lucide-react";
+} from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 import { MusicServiceLogo } from "./music-service-logo";
 import "./music-queue.css";
 import { useT } from "@/lib/i18n";
 import {
   playMusic,
-  setMusicAdvance,
   setMusicQueue,
   toggleMusicPlayback,
   useMusicPlayer,
 } from "@/lib/music/player";
-import { readMusicPreference, writeMusicPreference } from "@/lib/music/preferences";
+import { musicPriorityNext, setMusicPriorityNext, useMusicTransport } from "@/lib/music/transport";
 import type { MusicSourceCandidate, MusicTrack } from "@/lib/music/types";
 
-export type MusicRepeatMode = "off" | "all" | "one";
-export type MusicTransport = { shuffle: boolean; repeat: MusicRepeatMode };
-
-const SHUFFLE_KEY = "harbor.music.shuffle.v1";
-const REPEAT_KEY = "harbor.music.repeat.v1";
-const REPEAT_ORDER: MusicRepeatMode[] = ["off", "all", "one"];
-
-function readTransport(): MusicTransport {
-  const stored = readMusicPreference(REPEAT_KEY);
-  return {
-    shuffle: readMusicPreference(SHUFFLE_KEY) === "1",
-    repeat: REPEAT_ORDER.find((mode) => mode === stored) ?? "off",
-  };
-}
-
-let transport = readTransport();
-const queueOrder = new MusicQueueOrder();
-let priorityNext: MusicTrack | null = null;
-const transportListeners = new Set<() => void>();
-
-function publishTransport(patch: Partial<MusicTransport>): void {
-  transport = { ...transport, ...patch };
-  writeMusicPreference(SHUFFLE_KEY, transport.shuffle ? "1" : "0");
-  writeMusicPreference(REPEAT_KEY, transport.repeat);
-  if (patch.shuffle !== undefined) queueOrder.reset();
-  for (const listener of transportListeners) listener();
-}
-
-function subscribeTransport(listener: () => void): () => void {
-  transportListeners.add(listener);
-  return () => {
-    transportListeners.delete(listener);
-  };
-}
-
-export function toggleMusicShuffle(): void {
-  publishTransport({ shuffle: !transport.shuffle });
-}
-
-export function cycleMusicRepeat(): void {
-  const at = REPEAT_ORDER.indexOf(transport.repeat);
-  publishTransport({ repeat: REPEAT_ORDER[(at + 1) % REPEAT_ORDER.length] ?? "off" });
-}
-
-/** What will actually play next, shuffle included, so a list never shows the stored order by mistake. */
-export function musicUpcoming(queue: MusicTrack[], index: number, count: number): MusicTrack[] {
-  return queueOrder.upcoming(queue, index, transport, count);
-}
-
-export function useMusicTransport(): MusicTransport {
-  return useSyncExternalStore(
-    subscribeTransport,
-    () => transport,
-    () => transport,
-  );
-}
-
-setMusicAdvance(
-  (queue, index, auto) => {
-    const next = queueOrder.next(queue, index, transport, auto, priorityNext);
-    if (!(auto && transport.repeat === "one")) priorityNext = null;
-    return next;
-  },
-  (queue, index) => queueOrder.previous(queue, index, transport.shuffle),
-  () => {
-    queueOrder.reset();
-    priorityNext = null;
-  },
-);
+export {
+  cycleMusicRepeat,
+  musicUpcoming,
+  toggleMusicShuffle,
+  useMusicTransport,
+  type MusicRepeatMode,
+  type MusicTransport,
+} from "@/lib/music/transport";
 
 function QueueTrack({
   track,
@@ -208,7 +146,7 @@ function QueueTrack({
               seed={`track:${track.connectorId ?? ""}:${track.sourceId ?? track.id}`}
               ratio="square"
               className="w-full [--poster-radius:4px]"
-            />
+            ><MusicTrackPlaybackMark track={track}/></Poster>
             <span className="music-queue-cover-play" aria-hidden>
               {playing ? (
                 <Pause size={18} fill="currentColor" />
@@ -234,7 +172,7 @@ function QueueTrack({
           </span>
         </div>
         <span className="music-queue-track-meta">
-          <MusicServiceLogo source={track.connectorId ?? ""} itemId={track.id} size={16} />
+          <MusicServiceLogo source={musicPlaybackSource(track.connectorId)} size={16} />
           {track.durationSeconds > 0 && <span>{track.durationLabel}</span>}
         </span>
         {!current && (
@@ -300,7 +238,7 @@ function QueueTrack({
             aria-label={t("music.source.another")}
             title={t("music.source.another")}
           >
-            <MusicServiceLogo source={track.connectorId ?? ""} itemId={track.id} size={17} />
+            <MusicServiceLogo source={musicPlaybackSource(track.connectorId)} size={17} />
           </button>
         </div>
       )}
@@ -402,7 +340,7 @@ export function MusicQueue({
     if (!track) return;
     const next = queue.filter((_, at) => at !== index);
     const currentIndex = playingAt >= 0 ? playingAt - Number(index < playingAt) : -1;
-    priorityNext = track;
+    setMusicPriorityNext(track);
     next.splice(currentIndex + 1, 0, track);
     setMusicQueue(next);
   };
@@ -486,14 +424,14 @@ export function MusicQueue({
               type="button"
               disabled={!upcoming.length}
               onClick={() => {
-                priorityNext = null;
+                setMusicPriorityNext(null);
                 setMusicQueue(playingAt >= 0 ? queue.slice(0, playingAt + 1) : []);
               }}
             >
               {t("music.transport.clearQueue")}
             </button>
           </div>
-          {shuffle && !priorityNext && (
+          {shuffle && !musicPriorityNext() && (
             <p className="music-queue-note">{t("music.queue.shuffleNote")}</p>
           )}
           {upcoming.length ? (

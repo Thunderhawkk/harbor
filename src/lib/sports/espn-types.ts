@@ -12,6 +12,13 @@ export type SportsSide = {
   record?: string;
   /** Published top25 poll ranking; absent for unranked competitors. */
   rank?: number;
+  /** Explicit individual identity, separate from team/roster or classification IDs. */
+  athleteId?: string;
+  athleteSource?: "espn" | "thesportsdb" | "api-sports";
+  athleteImage?: string;
+  /** A doubles pair or relay squad. ESPN ships these as ONE competitor carrying a roster rather
+   *  than a team, so a side is 1..N people and the pair label is pre-formatted upstream. */
+  members?: { id: string; name: string; flag: string }[];
 };
 
 export type EventContext = {
@@ -34,6 +41,11 @@ export type SportsGame = {
   detail: string;
   home: SportsSide;
   away: SportsSide;
+  /**
+   * Everyone in a race, heat or leaderboard. A two-sided board can only show the
+   * leading pair, which is the whole field for a match and a fraction of it here.
+   */
+  field?: SportsSide[];
   startMs: number;
   /** Published calendar date (YYYY-MM-DD) when no start time is available; startMs is a sort anchor. */
   dateOnly?: string;

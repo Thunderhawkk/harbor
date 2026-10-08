@@ -265,7 +265,8 @@ export function NascarHub({
   const headers =
     tab === "Standings"
       ? ["Position", "Driver", "Points", "Wins", "Top 5", "Top 10", "Starts"]
-      : ["Position", "Driver", "Starting grid", "Laps", "Laps led", "Points", "Status"];
+      : ["Position", "Driver", "Starting grid", "Laps", "Laps led", "Gap", "Points", "Status"];
+  const winner = race.results.find((row) => row.position === 1);
   return (
     <section className="sh-nascar">
       {venue?.(race)}
@@ -281,6 +282,20 @@ export function NascarHub({
             <small>{t(label as string)}</small>
           </div>
         ))}
+
+        {winner?.time && (
+          <div>
+            <strong>{winner.time}</strong>
+            <small>{t("Race time")}</small>
+          </div>
+        )}
+
+        {winner?.speed !== undefined && (
+          <div>
+            <strong>{winner.speed}</strong>
+            <small>{t("Average speed (mph)")}</small>
+          </div>
+        )}
       </div>
       <div className="sh-nascar-toolbar">
         <div className="sh-nascar-tabs">
@@ -336,6 +351,7 @@ export function NascarHub({
                             value(result.grid),
                             value(result.laps),
                             value(result.lapsLed),
+                            result.delta || (result.position === 1 ? t("Leader") : "—"),
                             value(result.points),
                             result.status || "—",
                           ];

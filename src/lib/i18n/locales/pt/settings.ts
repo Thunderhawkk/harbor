@@ -1830,6 +1830,9 @@ const settings: Record<string, string> = {
   "Update now": "Atualizar agora",
   "Check for updates": "Verificar atualizações",
   "Show on Discord": "Mostrar no Discord",
+  "Show what you are listening to": "Mostrar o que você está ouvindo",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Compartilhe a faixa, o artista e a capa do álbum enquanto a música toca, com um botão «Listen in Harbor».",
   "Display what you are watching on your Discord profile, with the show poster and a live progress bar. Requires the Discord desktop app to be running.":
     "Exibir o que você está assistindo no seu perfil do Discord, com o pôster do título e uma barra de progresso ao vivo. Requer que o aplicativo desktop do Discord esteja em execução.",
   "Hide the title": "Ocultar o título",

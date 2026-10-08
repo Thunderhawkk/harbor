@@ -1,6 +1,31 @@
+import { compatibleVocalVersion, shouldResolvePreferredSource } from "./source-version";
+import { cancelMusicQueueAutomation, markMusicQueueAutomationStarted, ownsMusicQueueAutomation } from "./queue-automation";
+import { activeProfileId, activeProfileIsPrimary } from "@/lib/active-profile-id";
+import { hydrateListeningAffinity, observeMusicListening } from "./listening-affinity";
+import { filterBlockedTracks, hydrateArtistBlockStore } from "./artist-blocks";
 import { isMusicLiked, likedIdsFor, withoutLiked } from "./liked";
+import { hydrateLikedArtistStore } from "./liked-artists";
+import { dedupeMusicTracks, sameMusicTrack } from "./track-identity";
+import {
+  answerDeckRequests,
+  broadcastDeckState,
+  isDeckWindow,
+  sendDeckAdopted,
+  sendDeckCommand,
+  serveDeckCommands,
+} from "./deck-sync";
+import { createDeckAdoption } from "./deck-primary";
 import { insertIntoQueue, markManuallyQueued, queueInsertIndex } from "./queue-insert";
 import { queueTrackKey } from "./queue-order";
+import { adoptRequestedIdentity } from "./queue-source";
+import { explicitnessOf, rankByExplicitness } from "./explicit-preference";
+import {
+  loadPinnedSources,
+  peekPinnedSource,
+  pinSourceFor,
+  unpinSourceFor,
+} from "./pinned-sources";
+import { musicAdvance, musicPrevious, musicWarmTargets, resetMusicOrder } from "./transport";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
@@ -17,7 +42,10 @@ import {
   writeCheckpointToDb,
   type MusicCheckpoint,
 } from "./session-checkpoint";
-import { getMusicPlaybackOrigin, restoreMusicPlaybackOrigin } from "./playback-origin";
+import { beginMusicQueue, getMusicPlaybackOrigin, restoreMusicPlaybackOrigin } from "./playback-origin";
+import { hydrateMusicContextTracks, hydrateMusicRecentContexts } from "./recent-context";
+import { hydrateMusicDestinations } from "./recent-destinations";
+import { hydrateMusicSourceConsent } from "./source-consent";
 import type {
   MusicAudioQuality,
   MusicPlayerState,
@@ -26,6 +54,7 @@ import type {
 } from "./types";
 import type { CastDeviceInfo } from "@/lib/cast";
 import { stopCastOwner } from "@/lib/cast-ownership";
+import { isWindowsDesktop } from "@/lib/platform";
 import {
   getMusicSpeakerState,
   loadMusicOnSpeaker,
@@ -50,6 +79,7 @@ let endHandledAt = 0;
 let enginePrimed = false;
 const autoSkipped = new Set<string>();
 let recoverPlayback: ((message?: string) => void) | null = null;
+let activeProfile = "";
 let audioReady: {
   request: number;
   id: string;
@@ -70,8 +100,16 @@ const queuedSources = new Map<
   string,
   { until: number; promise: Promise<MusicSourceCandidate[]> }
 >();
-function sourcesFor(track: MusicTrack): Promise<MusicSourceCandidate[]> {
+const SOURCE_TTL_MS = 120_000;
+const PRELOAD_TTL_MS = 1_200_000;
+const SOURCE_CACHE_MAX = 16;
+function sourcesFor(
+  track: MusicTrack,
+  ttlMs: number = SOURCE_TTL_MS,
+  fresh = false,
+): Promise<MusicSourceCandidate[]> {
   const key = `${track.connectorId}:${track.id}:${track.title}:${track.artist}`;
+  if (fresh) queuedSources.delete(key);
   const saved = queuedSources.get(key);
   if (saved && saved.until > Date.now()) return saved.promise;
   let timer: ReturnType<typeof setTimeout>;
@@ -82,33 +120,55 @@ function sourcesFor(track: MusicTrack): Promise<MusicSourceCandidate[]> {
     invoke<MusicSourceCandidate[]>("music_source_candidates", { track }),
     timeout,
   ])
-    .then((value) => (Array.isArray(value) ? value : []))
+    .then((value) => (Array.isArray(value) ? value.filter(candidate => compatibleVocalVersion(track, candidate.track)) : []))
     .catch((error) => {
       queuedSources.delete(key);
       throw error;
     })
     .finally(() => clearTimeout(timer));
-  queuedSources.set(key, { until: Date.now() + 120_000, promise });
-  while (queuedSources.size > 8) queuedSources.delete(queuedSources.keys().next().value!);
+  queuedSources.set(key, { until: Date.now() + ttlMs, promise });
+  while (queuedSources.size > SOURCE_CACHE_MAX)
+    queuedSources.delete(queuedSources.keys().next().value!);
   return promise;
 }
 
-export type MusicAdvance = (queue: MusicTrack[], index: number, auto: boolean) => MusicTrack | null;
+const warmed = new Map<string, number>();
+const WARM_AGAIN_MS = 600_000;
+const NEAR_END_MS = 45_000;
+let warmTimer: ReturnType<typeof setTimeout> | null = null;
+let nearEndKey: string | null = null;
 
-const sequentialAdvance: MusicAdvance = (queue, index) => queue[index + 1] ?? null;
-let advance: MusicAdvance = sequentialAdvance;
+function warmNeighbours(): void {
+  if (warmTimer) return;
+  warmTimer = setTimeout(() => {
+    warmTimer = null;
+    const around = musicWarmTargets(state.queue, state.queueIndex, 3);
+    const now = Date.now();
+    for (const track of around) {
+      if (!track) continue;
+      const key = `${track.connectorId ?? ""}:${track.id}`;
+      const last = warmed.get(key);
+      if (last !== undefined && now - last < WARM_AGAIN_MS) continue;
+      warmed.set(key, now);
+      if (warmed.size > 24) warmed.delete(warmed.keys().next().value!);
+      void invoke("music_prewarm_track", { track }).catch(() => {});
+      void sourcesFor(track, PRELOAD_TTL_MS).catch(() => {});
+    }
+  }, 400);
+}
 
-let goPrevious = (queue: MusicTrack[], index: number): MusicTrack | null =>
-  queue[index - 1] ?? null;
-let resetOrder = () => {};
-export function setMusicAdvance(
-  next: MusicAdvance | null,
-  previous?: typeof goPrevious,
-  reset?: () => void,
-): void {
-  advance = next ?? sequentialAdvance;
-  goPrevious = previous ?? ((queue, index) => queue[index - 1] ?? null);
-  resetOrder = reset ?? (() => {});
+function warmBeforeEnd(): void {
+  const total = state.duration;
+  if (!total || total <= 0 || !state.current) return;
+  if ((total - state.currentTime) * 1000 > NEAR_END_MS) return;
+  const key = `${state.current.connectorId ?? ""}:${state.current.id}`;
+  if (nearEndKey === key) return;
+  nearEndKey = key;
+  warmNeighbours();
+}
+
+export function musicSourceCandidates(track: MusicTrack): Promise<MusicSourceCandidate[]> {
+  return sourcesFor(track).catch(() => [] as MusicSourceCandidate[]);
 }
 
 type LegacyMusicMigration = {
@@ -168,6 +228,7 @@ let state: MusicPlayerState = {
   duration: 0,
   volume: readVolume(),
   error: null,
+  scrobbleError: null,
   likedIds: [],
   likedTracks: [],
   recents: [],
@@ -206,6 +267,9 @@ if (typeof window !== "undefined") {
 
 function publish(patch: Partial<MusicPlayerState>): void {
   state = { ...state, ...patch };
+  if (patch.currentTime !== undefined || patch.current !== undefined || patch.phase !== undefined) {
+    observeMusicListening(state, `${activeProfile}:${playRequest}`, activeProfile);
+  }
   if (
     patch.current !== undefined ||
     patch.phase === "paused" ||
@@ -214,6 +278,12 @@ function publish(patch: Partial<MusicPlayerState>): void {
     lastSessionWrite = Date.now();
     saveMusicCheckpoint();
   }
+  broadcastDeckState(state);
+  if (patch.current !== undefined || patch.queueIndex !== undefined || patch.queue !== undefined) {
+    nearEndKey = null;
+    warmNeighbours();
+  }
+  if (patch.currentTime !== undefined) warmBeforeEnd();
   for (const listener of listeners) listener();
 }
 
@@ -245,12 +315,48 @@ function clearLegacyMigration(migration: LegacyMusicMigration | null): void {
   }
 }
 
+export function resetMusicForProfile(): void {
+  if (!initialization && activeProfile === activeProfileId()) return;
+  cancelMusicQueueAutomation();
+  activeProfile = activeProfileId();
+  initialization = null;
+  enginePrimed = false;
+  audioReady = null;
+  recoverPlayback = null;
+  publish({
+    current: null,
+    queue: [],
+    queueIndex: -1,
+    currentTime: 0,
+    duration: 0,
+    phase: "idle",
+    error: null,
+    scrobbleError: null,
+    likedIds: [],
+    likedTracks: [],
+    recents: [],
+  });
+  void initializeMusic();
+}
+
 export function initializeMusic(): Promise<void> {
   void initializeMusicAudioSettings();
   if (initialization) return initialization;
+  activeProfile = activeProfileId();
   const migration = readLegacyMigration();
+  void hydrateListeningAffinity(activeProfile).catch(() => {});
+  void hydrateMusicContextTracks().catch(() => {});
+  void hydrateMusicRecentContexts().catch(() => {});
+  void hydrateMusicDestinations().catch(() => {});
+  void hydrateLikedArtistStore().catch(() => {});
+  void hydrateArtistBlockStore().catch(() => {});
+  void hydrateMusicSourceConsent().catch(() => {});
+  void loadPinnedSources();
   initialization = Promise.all([
-    invoke<NativeMusicBootstrap>("music_db_init", { migration }),
+    invoke<NativeMusicBootstrap>("music_db_init", {
+      migration,
+      profile: activeProfileIsPrimary() ? null : activeProfile,
+    }),
     readCheckpointFromDb().catch(() => null),
   ])
     .then(([bootstrap, stored]) => {
@@ -284,9 +390,9 @@ export function initializeMusic(): Promise<void> {
         currentTime: position,
         duration: current?.durationSeconds ?? 0,
         error: null,
-        likedIds: bootstrap.likedIds,
+        likedIds: completeLikedIds(bootstrap.likedIds, bootstrap.likedTracks),
         likedTracks: bootstrap.likedTracks,
-        recents: bootstrap.recents,
+        recents: dedupeMusicTracks(bootstrap.recents),
       });
     })
     .catch((error) => {
@@ -299,6 +405,8 @@ export function initializeMusic(): Promise<void> {
 }
 
 function updateMediaSession(track: MusicTrack): void {
+  // Windows uses the shared native session, including its focus/ownership rules.
+  if (isWindowsDesktop()) return;
   if (!("mediaSession" in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({
     title: track.title,
@@ -307,6 +415,17 @@ function updateMediaSession(track: MusicTrack): void {
     artwork: track.artwork ? [{ src: track.artwork, sizes: "544x544" }] : [],
   });
 }
+
+const deckAdoption = createDeckAdoption({
+  read: getMusicState,
+  publish,
+  announce: updateMediaSession,
+  ended: () => {
+    if (Date.now() - endHandledAt <= 1200) return;
+    endHandledAt = Date.now();
+    nextMusic(true);
+  },
+});
 
 function handlePlaybackEvent(payload: MpvEvent): void {
   if (
@@ -412,7 +531,7 @@ function ensureNativeEvents(): Promise<void> {
     try {
       await listen<LastFmEvent>("music://lastfm", ({ payload }) => {
         if (payload.status === "error") {
-          publish({ error: payload.message ?? "Last.fm scrobble failed." });
+          publish({ scrobbleError: payload.message ?? "Last.fm scrobble failed." });
         }
       });
     } catch (error) {
@@ -567,7 +686,7 @@ function skipUnavailableTrack(track: MusicTrack, queue: MusicTrack[]): boolean {
   autoSkipped.add(queueTrackKey(track));
   let index = queue.findIndex((item) => queueTrackKey(item) === queueTrackKey(track));
   for (let attempt = 0; attempt < queue.length; attempt++) {
-    const next = advance(queue, index, false);
+    const next = musicAdvance(queue, index, false);
     if (!next) return false;
     index = queue.findIndex((item) => queueTrackKey(item) === queueTrackKey(next));
     if (autoSkipped.has(queueTrackKey(next))) continue;
@@ -577,26 +696,69 @@ function skipUnavailableTrack(track: MusicTrack, queue: MusicTrack[]): boolean {
   return false;
 }
 
+const SOURCE_ATTEMPT_CEILING = 6;
+// A source the listener picked by hand is a decision, not a guess: if it fails, say so rather
+// than quietly playing something else under the same name.
+let explicitSource: string | null = null;
+
+async function recoverySources(track: MusicTrack): Promise<MusicSourceCandidate[]> {
+  const cached = await sourcesFor(track).catch(() => null);
+  if (cached && cached.length > 0) return cached;
+  return await sourcesFor(track, SOURCE_TTL_MS, true).catch(() => []);
+}
+
+async function nextPlayableSource(
+  attemptTrack: MusicTrack,
+  failedAttempts: Set<string>,
+): Promise<MusicTrack | null> {
+  if (attemptTrack.mediaKind === "video") return null;
+  if (failedAttempts.size >= SOURCE_ATTEMPT_CEILING) return null;
+  const candidates = await recoverySources(attemptTrack);
+  const usable = candidates.filter(
+    (candidate) =>
+      candidate.health !== "offline" &&
+      candidate.track.connectorId !== "catalog" &&
+      !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
+  );
+  const want = readMusicPreference("harbor.music.preferred-source.v1");
+  return (usable.find((candidate) => candidate.connectorId === want) ?? usable[0])?.track ?? null;
+}
+
 export async function playMusic(
   track: MusicTrack,
   queue = [track],
   failedAttempts = new Set<string>(),
   continuing = false,
   skipUnavailable = false,
+  explicit = false,
+  automationOwner?: symbol,
 ): Promise<void> {
+  if (automationOwner && !ownsMusicQueueAutomation(automationOwner)) return;
+  if (!continuing && !failedAttempts.size && !automationOwner) cancelMusicQueueAutomation();
   await initializeMusic();
+  if (automationOwner && !ownsMusicQueueAutomation(automationOwner)) return;
+  if (automationOwner) markMusicQueueAutomationStarted(automationOwner);
+  if (!continuing) explicitSource = explicit ? (track.connectorId ?? null) : null;
+  if (explicit) pinSourceFor(track);
+  const chosenByHand = explicitSource !== null && track.connectorId === explicitSource;
   const request = ++playRequest;
+  // Once admitted, this is the current song. Stopping recommendations leaves it playing;
+  // starting a different song still supersedes every asynchronous step via playRequest.
+  const ownsRequest = () => request === playRequest;
   observedPause = null;
   if (!continuing && !failedAttempts.size) {
-    resetOrder();
+    beginMusicQueue(queue, state.queue);
+    resetMusicOrder();
     resumeAt = null;
     autoSkipped.clear();
   }
   recoverPlayback = null;
   const catalog = track.connectorId === "catalog" && !track.playbackUrl;
+  const preferredSource = readMusicPreference("harbor.music.preferred-source.v1");
+  const resolvePreferred = shouldResolvePreferredSource(track, preferredSource, explicitSource !== null, failedAttempts.size > 0);
   const workingSource = state.current?.connectorId;
   let alternatives: MusicTrack[] = [];
-  let searchedAlternatives = catalog;
+  let searchedAlternatives = catalog || resolvePreferred;
   let finishAudio!: (ready: boolean) => void;
   audioReady = {
     request,
@@ -620,40 +782,44 @@ export async function playMusic(
     error: null,
   });
   try {
-    if (catalog) {
-      const candidates = await sourcesFor(track);
-      if (request !== playRequest) return;
+    if (catalog || resolvePreferred) {
+      const candidates = await sourcesFor(track).catch(error => {
+        if (catalog) throw error;
+        return [{ connectorId: track.connectorId ?? "", connectorName: "", health: "healthy" as const, track }];
+      });
+      if (!ownsRequest()) return;
       const playable = candidates.filter(
         (candidate) =>
           candidate.health !== "offline" &&
           candidate.track.connectorId !== "catalog" &&
           !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
       );
+      if (!catalog && !playable.some(candidate => candidate.track.connectorId === track.connectorId && candidate.track.id === track.id)) {
+        playable.push({ connectorId: track.connectorId ?? "", connectorName: "", health: "healthy", track });
+      }
       const preferred = readMusicPreference("harbor.music.preferred-source.v1");
+      const ranked = rankByExplicitness(playable, explicitnessOf(track));
+      const pinned = peekPinnedSource(track);
       const match =
-        playable.find((candidate) => candidate.connectorId === workingSource) ??
-        playable.find((candidate) => candidate.connectorId === preferred) ??
-        playable[0];
+        (pinned &&
+          (ranked.find(
+            (candidate) =>
+              candidate.connectorId === pinned.connectorId && candidate.track.id === pinned.id,
+          ) ??
+            ranked.find((candidate) => candidate.connectorId === pinned.connectorId))) ??
+        ranked.find((candidate) => candidate.connectorId === preferred) ??
+        ranked.find((candidate) => candidate.connectorId === workingSource) ??
+        ranked[0];
       if (!match) throw new Error("music.source.none");
       const original = track;
-      alternatives = playable
+      alternatives = ranked
         .filter((candidate) => candidate !== match)
         .slice(0, 2)
-        .map((candidate) => ({
-          ...candidate.track,
-          collectionOrigin: original.collectionOrigin ?? {
-            id: original.id,
-            connectorId: original.connectorId,
-          },
-        }));
-      track = {
-        ...match.track,
-        collectionOrigin: original.collectionOrigin ?? {
-          id: original.id,
-          connectorId: original.connectorId,
-        },
-      };
-      queue = queue.map((item) =>
+        .map((candidate) => adoptRequestedIdentity(candidate.track, original));
+      track = adoptRequestedIdentity(match.track, original);
+      // A manual queue edit or stopping a station can happen during source lookup.
+      // Resolve the current recording inside the live queue, preserving that edit.
+      queue = state.queue.map((item) =>
         item.id === original.id && item.connectorId === original.connectorId ? track : item,
       );
       if (audioReady?.request === request) {
@@ -668,48 +834,59 @@ export async function playMusic(
       });
     }
     await stopCastOwner("video");
-    if (request !== playRequest) return;
+    if (!ownsRequest()) return;
     await ensureNativeEvents();
-    if (request !== playRequest) return;
+    if (!ownsRequest()) return;
+    queue = state.queue;
     void invoke("music_set_queue", { tracks: queue }).catch(() => {});
     updateMediaSession(track);
-    const recents = [track, ...state.recents.filter((item) => item.id !== track.id)].slice(0, 50);
-    const likedTracks = state.likedIds.includes(track.id)
-      ? [track, ...state.likedTracks.filter((item) => item.id !== track.id)]
+    const recents = [track, ...state.recents.filter((item) => !sameMusicTrack(item, track))].slice(
+      0,
+      50,
+    );
+    // Playback refreshes metadata; only saving a song changes the Saved list's order.
+    const playedIds = new Set(likedIdsFor(track));
+    const likedTracks = isMusicLiked(state.likedIds, track)
+      ? state.likedTracks.map((item) =>
+          likedIdsFor(item).some((id) => playedIds.has(id)) ? track : item,
+        )
       : state.likedTracks;
+    void import("./hidden-recents").then(({ unhideMusicRecent }) => unhideMusicRecent(track.id));
     void invoke("music_add_recent", { track }).catch(() => {});
-    if (request !== playRequest) return;
+    if (!ownsRequest()) return;
     publish({ recents, likedTracks });
     const speaker = getMusicSpeakerState();
     const target = pendingSpeakerDevice ?? (speaker.active ? speaker.device : null);
     if (returningToComputer) {
       await stopMusicSpeaker();
-      if (request !== playRequest) return;
+      if (!ownsRequest()) return;
       speakerTransfer = false;
     }
     for (let attempt = 0; ; attempt++) {
-      if (request !== playRequest) return;
+      if (!ownsRequest()) return;
       const attemptTrack = track;
       let recovering = false;
       recoverPlayback = (message) => {
-        if (recovering || request !== playRequest) return;
+        if (recovering || !ownsRequest()) return;
         recovering = true;
         failedAttempts.add(`${attemptTrack.connectorId}:${attemptTrack.id}`);
         publish({ phase: "resolving", error: null });
         void (async () => {
           const candidates =
-            attemptTrack.mediaKind === "video"
+            chosenByHand || attemptTrack.mediaKind === "video"
               ? []
-              : await sourcesFor(attemptTrack).catch(() => []);
-          if (request !== playRequest) return;
+              : await recoverySources(attemptTrack);
+          if (!ownsRequest()) return;
+          const usable = candidates.filter(
+            (candidate) =>
+              candidate.health !== "offline" &&
+              candidate.track.connectorId !== "catalog" &&
+              !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
+          );
+          const want = readMusicPreference("harbor.music.preferred-source.v1");
           const replacement =
-            failedAttempts.size < 3
-              ? candidates.find(
-                  (candidate) =>
-                    candidate.health !== "offline" &&
-                    candidate.track.connectorId !== "catalog" &&
-                    !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
-                )?.track
+            !chosenByHand && failedAttempts.size < SOURCE_ATTEMPT_CEILING
+              ? (usable.find((candidate) => candidate.connectorId === want) ?? usable[0])?.track
               : undefined;
           if (!replacement) {
             enginePrimed = false;
@@ -720,16 +897,10 @@ export async function playMusic(
               window.dispatchEvent(new Event("harbor:music-playback-source-required"));
             return;
           }
-          const next = {
-            ...replacement,
-            collectionOrigin: attemptTrack.collectionOrigin ?? {
-              id: attemptTrack.id,
-              connectorId: attemptTrack.connectorId,
-            },
-          };
+          const next = adoptRequestedIdentity(replacement, attemptTrack);
           await playMusic(
             next,
-            queue.map((item) =>
+            state.queue.map((item) =>
               item.id === attemptTrack.id && item.connectorId === attemptTrack.connectorId
                 ? next
                 : item,
@@ -745,16 +916,16 @@ export async function playMusic(
         else await invoke("music_play_track", { track, volume: state.volume });
         break;
       } catch (error) {
-        if (request !== playRequest) return;
+        if (!ownsRequest()) return;
         failedAttempts.add(`${track.connectorId}:${track.id}`);
         const errorKey =
           error && typeof error === "object" && "key" in error ? String(error.key) : String(error);
-        if (/STOP_UNCONFIRMED|stopUnconfirmed/i.test(errorKey)) throw error;
+        if (chosenByHand || /STOP_UNCONFIRMED|stopUnconfirmed/i.test(errorKey)) throw error;
         if (!searchedAlternatives && track.mediaKind !== "video") {
           searchedAlternatives = true;
           const failedTrack = track;
           const candidates = await sourcesFor(track).catch(() => []);
-          if (request !== playRequest) return;
+          if (!ownsRequest()) return;
           alternatives = candidates
             .filter(
               (candidate) =>
@@ -767,19 +938,13 @@ export async function playMusic(
                 ),
             )
             .slice(0, 2)
-            .map((candidate) => ({
-              ...candidate.track,
-              collectionOrigin: failedTrack.collectionOrigin ?? {
-                id: failedTrack.id,
-                connectorId: failedTrack.connectorId,
-              },
-            }));
+            .map((candidate) => adoptRequestedIdentity(candidate.track, failedTrack));
         }
         const alternative = alternatives[attempt];
         if (!alternative) throw error;
         const previous = track;
         track = alternative;
-        queue = queue.map((item) =>
+        queue = state.queue.map((item) =>
           item.id === previous.id && item.connectorId === previous.connectorId ? track : item,
         );
         if (audioReady?.request === request) {
@@ -795,25 +960,29 @@ export async function playMusic(
           phase: "resolving",
         });
         await invoke("music_set_queue", { tracks: queue });
-        if (request !== playRequest) return;
+        if (!ownsRequest()) return;
         updateMediaSession(track);
         await invoke("music_add_recent", { track });
-        if (request !== playRequest) return;
+        if (!ownsRequest()) return;
         publish({
           recents: [
             track,
-            ...state.recents.filter((item) => item.id !== track.id && item.id !== previous.id),
+            ...state.recents.filter(
+              (item) => !sameMusicTrack(item, track) && !sameMusicTrack(item, previous),
+            ),
           ].slice(0, 50),
         });
       }
     }
-    if (request !== playRequest) return;
+    if (!ownsRequest()) return;
     enginePrimed = true;
+    if (deckAdoption.deck() !== 0 && !getMusicSpeakerState().active)
+      publish({ phase: "playing", error: null });
     const upcoming = queue[queueIndex + 1];
     if (upcoming?.connectorId === "catalog" && !upcoming.playbackUrl)
       void sourcesFor(upcoming).catch(() => {});
   } catch (error) {
-    if (request !== playRequest) return;
+    if (!ownsRequest()) return;
     enginePrimed = false;
     const message =
       error &&
@@ -831,12 +1000,41 @@ export async function playMusic(
       skipUnavailableTrack(track, queue)
     )
       return;
+    const attemptKey = `${track.connectorId}:${track.id}`;
+    if (!chosenByHand && !skipUnavailable && !failedAttempts.has(attemptKey)) {
+      failedAttempts.add(attemptKey);
+      publish({ phase: "resolving", error: null });
+      try {
+        await playMusic(track, queue, failedAttempts, true, skipUnavailable);
+        return;
+      } catch {
+        /* the retry failed too; fall through to another source */
+      }
+    }
+    if (!chosenByHand && !skipUnavailable) {
+      const next = await nextPlayableSource(track, failedAttempts);
+      if (next && ownsRequest()) {
+        publish({ phase: "resolving", error: null });
+        try {
+          await playMusic(
+            adoptRequestedIdentity(next, track),
+            queue,
+            failedAttempts,
+            true,
+            skipUnavailable,
+          );
+          return;
+        } catch {
+          /* exhausted; the picker below is the last resort */
+        }
+      }
+    }
     publish({ phase: "error", error: message });
     if (!skipUnavailable && searchedAlternatives && typeof window !== "undefined")
       window.dispatchEvent(new Event("harbor:music-playback-source-required"));
     throw error instanceof Error ? error : new Error(message);
   } finally {
-    finishAudio(request === playRequest && enginePrimed);
+    finishAudio(ownsRequest() && enginePrimed);
     if (request === playRequest) {
       speakerTransfer = false;
       pendingSpeakerDevice = null;
@@ -874,8 +1072,12 @@ export function toggleMusicPlayback(): void {
   void invoke("music_engine_pause", { paused: state.phase === "playing" }).catch(() => {});
 }
 
-export function setMusicQueue(tracks: MusicTrack[]): void {
+export function setMusicQueue(input: MusicTrack[], automationOwner?: symbol): void {
+  if (automationOwner && !ownsMusicQueueAutomation(automationOwner)) return;
+  if (!automationOwner) cancelMusicQueueAutomation();
   const current = state.current;
+  const kept = filterBlockedTracks(input, "play");
+  const tracks = kept.length > 0 ? kept : input;
   const queueIndex = current
     ? tracks.findIndex((item) => queueTrackKey(item) === queueTrackKey(current))
     : -1;
@@ -883,6 +1085,11 @@ export function setMusicQueue(tracks: MusicTrack[]): void {
   void invoke("music_set_queue", { tracks }).catch((error) =>
     publish({ error: error instanceof Error ? error.message : String(error) }),
   );
+}
+
+export function loopMusic(start: number | null, end: number | null): void {
+  if (getMusicSpeakerState().active || ownsMusicVideo()) return;
+  void invoke("music_deck_loop", { start, end }).catch(() => {});
 }
 
 export function seekMusic(position: number): void {
@@ -902,10 +1109,15 @@ export function seekMusic(position: number): void {
 
 /** Queues after what is playing, ahead of the rest of the collection, without disturbing playback. */
 export function enqueueMusic(track: MusicTrack): void {
-  if (state.queue.some((item) => queueTrackKey(item) === queueTrackKey(track))) return;
-  const at = queueInsertIndex(state.queue, state.queueIndex);
+  const automated = cancelMusicQueueAutomation();
+  const queue = automated ? state.queue.slice(0, state.queueIndex + 1) : state.queue;
+  if (queue.some((item) => queueTrackKey(item) === queueTrackKey(track))) {
+    if (automated) setMusicQueue(queue);
+    return;
+  }
+  const at = queueInsertIndex(queue, state.queueIndex);
   markManuallyQueued(track);
-  setMusicQueue(insertIntoQueue(state.queue, track, at));
+  setMusicQueue(insertIntoQueue(queue, track, at));
 }
 
 /**
@@ -917,19 +1129,28 @@ export function musicRadioTracks(track: MusicTrack): Promise<MusicTrack[]> {
   return import("./radio").then(({ loadTrackRadio }) => loadTrackRadio(track));
 }
 
+export function musicSimilarTracks(track: MusicTrack): Promise<MusicTrack[]> {
+  return import("./radio").then(({ loadSimilarTracks }) => loadSimilarTracks(track));
+}
+
 export function setMusicVolume(volume: number): void {
   if (getMusicSpeakerState().active) return;
   const next = clampMusicVolume(volume, state.current?.connectorId);
+  if (isDeckWindow()) {
+    sendDeckCommand({ kind: "volume", value: next });
+    return;
+  }
   writeMusicPreference(VOLUME_KEY, String(next));
   publish({ volume: next });
   if (ownsMusicVideo()) videoController?.setVolume(next);
   void invoke("music_engine_set_volume", { volume: next }).catch(() => {});
+  void invoke("music_deck_volume", { deck: 1, volume: next }).catch(() => {});
 }
 
 export function nextMusic(auto = false): void {
   if (!state.current) return;
   if (!auto) autoSkipped.clear();
-  const next = advance(state.queue, state.queueIndex, auto);
+  const next = musicAdvance(state.queue, state.queueIndex, auto);
   if (next) void playMusic(next, state.queue, new Set(), true, auto).catch(() => {});
   else {
     if (auto) enginePrimed = false;
@@ -947,8 +1168,16 @@ export function previousMusic(): void {
     seekMusic(0);
     return;
   }
-  const previous = goPrevious(state.queue, state.queueIndex);
+  const previous = musicPrevious(state.queue, state.queueIndex);
   if (previous) void playMusic(previous, state.queue, new Set(), true).catch(() => {});
+}
+
+/** Saved songs once recorded only the id they played under, so one saved before a substitute
+ *  was swapped in no longer matched itself. Re-add each saved track's full identity on load. */
+function completeLikedIds(likedIds: string[], likedTracks: MusicTrack[]): string[] {
+  const ids = new Set(likedIds);
+  for (const track of likedTracks) for (const id of likedIdsFor(track)) ids.add(id);
+  return ids.size === likedIds.length ? likedIds : [...ids];
 }
 
 export function toggleMusicLiked(track = state.current): void {
@@ -956,11 +1185,14 @@ export function toggleMusicLiked(track = state.current): void {
   const liked = !isMusicLiked(state.likedIds, track);
   const drop = new Set(likedIdsFor(track));
   const likedIds = liked
-    ? [...withoutLiked(state.likedIds, track), track.id]
+    ? [...withoutLiked(state.likedIds, track), ...likedIdsFor(track)]
     : withoutLiked(state.likedIds, track);
   const likedTracks = liked
     ? [track, ...state.likedTracks.filter((item) => !drop.has(item.id))]
     : state.likedTracks.filter((item) => !drop.has(item.id));
+  // Saving a song saves the source it was playing from, so opening it later is the same recording.
+  if (liked) pinSourceFor(track);
+  else unpinSourceFor(track);
   publish({ likedIds, likedTracks });
   void initializeMusic()
     .then(() => invoke("music_set_liked", { track, liked }))
@@ -976,6 +1208,7 @@ export function clearMusicError(): void {
 
 /** End playback before removing its controls, including an owned network receiver. */
 export async function closeMusicPlayer(): Promise<void> {
+  cancelMusicQueueAutomation();
   const request = ++playRequest;
   recoverPlayback = null;
   speakerTransfer = true;
@@ -988,12 +1221,13 @@ export async function closeMusicPlayer(): Promise<void> {
     }
     if (request !== playRequest) return;
     await invoke("music_engine_stop", { unpause: false });
+    void invoke("music_deck_primary", { deck: 0 }).catch(() => {});
     if (request !== playRequest) return;
     await invoke("music_set_queue", { tracks: [] });
     if (request !== playRequest) return;
     enginePrimed = false;
     audioReady = null;
-    resetOrder();
+    resetMusicOrder();
     publish({
       current: null,
       queue: [],
@@ -1031,6 +1265,7 @@ export function useMusicPlayer(): MusicPlayerState {
 }
 
 subscribeMusicAudioSettings(() => {
+  if (isDeckWindow()) return;
   const next = clampMusicVolume(state.volume, state.current?.connectorId);
   if (next !== state.volume) setMusicVolume(next);
 });
@@ -1154,7 +1389,7 @@ subscribeMusicSpeakerState(() => {
   }
 });
 
-if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+if (typeof navigator !== "undefined" && "mediaSession" in navigator && !isWindowsDesktop()) {
   navigator.mediaSession.setActionHandler("play", () => {
     if (state.phase !== "playing") toggleMusicPlayback();
   });
@@ -1167,3 +1402,25 @@ if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
     if (details.seekTime !== undefined) seekMusic(details.seekTime);
   });
 }
+
+answerDeckRequests(getMusicState);
+serveDeckCommands((command) => {
+  if (command.kind === "toggle") toggleMusicPlayback();
+  else if (command.kind === "next") void nextMusic();
+  else if (command.kind === "previous") void previousMusic();
+  else if (command.kind === "seek") seekMusic(command.seconds);
+  else if (command.kind === "loop") loopMusic(command.start, command.end);
+  else if (command.kind === "volume") setMusicVolume(command.value);
+  else if (command.kind === "like") toggleMusicLiked();
+  else if (command.kind === "dismissError") clearMusicError();
+  else if (command.kind === "adopt")
+    sendDeckAdopted({
+      nonce: command.nonce,
+      deck: command.deck,
+      landed: deckAdoption.adopt(command),
+    });
+  else if (command.kind === "retry") {
+    const track = state.current;
+    if (track) void playMusic(track, state.queue).catch(() => {});
+  }
+});

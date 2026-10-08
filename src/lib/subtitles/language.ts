@@ -248,6 +248,31 @@ const NAME_TO_CODE: Record<string, string> = (() => {
   m["cantonese"] = "zh";
   m["العربية"] = "ar";
   m["عربي"] = "ar";
+  // People search for their own language in their own script before they try English.
+  for (const [native, code] of [
+    ["русский", "ru"],
+    ["español", "es"],
+    ["castellano", "es"],
+    ["français", "fr"],
+    ["deutsch", "de"],
+    ["português", "pt"],
+    ["italiano", "it"],
+    ["türkçe", "tr"],
+    ["polski", "pl"],
+    ["日本語", "ja"],
+    ["한국어", "ko"],
+    ["中文", "zh"],
+    ["हिन्दी", "hi"],
+    ["bahasa", "id"],
+    ["tiếng việt", "vi"],
+    ["עברית", "he"],
+    ["فارسی", "fa"],
+    ["українська", "uk"],
+    ["nederlands", "nl"],
+    ["svenska", "sv"],
+  ] as const) {
+    m[native] = code;
+  }
   return m;
 })();
 
@@ -257,7 +282,7 @@ export function normalizeLang(input?: string | null): string {
   if (raw === "in") return "id";
   if (LATAM_ALIASES.has(raw)) return "es-419";
   if (BRAZIL_ALIASES.has(raw)) return "pt-br";
-  if (raw.length === 2) return raw;
+  if (/^[a-z]{2}$/.test(raw)) return raw;
   if (raw.length === 3 && ISO_3_TO_1[raw]) return ISO_3_TO_1[raw];
   if (NAME_TO_CODE[raw]) return NAME_TO_CODE[raw];
   if (raw.includes("-") || raw.includes("_")) {
@@ -277,6 +302,17 @@ export function languageName(code: string): string {
 
 export function isKnownLanguage(code?: string | null): boolean {
   return !!code && Object.hasOwn(NAMES, normalizeLang(code));
+}
+
+/**
+ * True when a "language" value is really a generated display label — a translating
+ * addon's on-demand variant such as "Make Hindi" — rather than a language code or name.
+ * Real codes and names never contain whitespace, and unknown single tokens (e.g. "spl")
+ * are excluded.
+ */
+export function isGeneratedLangLabel(raw?: string | null): boolean {
+  const lang = raw?.trim() ?? "";
+  return lang.length > 0 && !isKnownLanguage(lang) && /\s/.test(lang);
 }
 
 export function trackLanguageName(lang?: string | null, title?: string | null): string {

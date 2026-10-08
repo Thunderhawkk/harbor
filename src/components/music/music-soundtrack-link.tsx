@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Clapperboard } from "lucide-react";
+import { ArrowUpRight, Clapperboard } from "@/components/icons/music-icons";
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
 import { searchCinemeta } from "@/lib/search";

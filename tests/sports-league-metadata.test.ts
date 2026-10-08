@@ -7,6 +7,121 @@ import {
   parseSportsDbLeagueMetadata,
 } from "../src/lib/sports/league-metadata.ts";
 import type { LeagueDef } from "../src/lib/sports/espn-types.ts";
+import { espnPublishedAthleteId } from "../src/lib/sports/athlete-identity.ts";
+import { toSide } from "../src/lib/sports/espn-parse.ts";
+
+test("PGA scoreboard participants retain published athlete IDs without fetching a roster", () => {
+  const def: LeagueDef = {
+    key: "PGA",
+    tag: "PGA",
+    label: "PGA",
+    labelEn: "PGA",
+    path: "golf/pga",
+    group: "golf",
+  };
+  const player = {
+    id: "3980",
+    uid: "s:1100~l:1106~a:3980",
+    type: "athlete",
+    athlete: {
+      displayName: "Patton Kizzire",
+      flag: { href: "https://a.espncdn.com/i/teamlogos/countries/500/usa.png" },
+    },
+  };
+  const feed = {
+    leagues: [{ id: "1106", slug: "pga" }],
+    events: [
+      {
+        competitions: [
+          {
+            competitors: [
+              player,
+              player,
+              {
+                ...player,
+                id: "5692",
+                uid: "s:1100~l:1106~a:5692",
+                athlete: { fullName: "Peter Malnati" },
+              },
+              { ...player, id: "123", uid: "s:1100~l:999~a:123" },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const result = parseEspnLeagueMetadata(def, feed, {}, {});
+  assert.deepEqual(result.teams, []);
+  assert.deepEqual(
+    result.athletes?.map((person) => [person.name, person.id]),
+    [
+      ["Patton Kizzire", "3980"],
+      ["Peter Malnati", "5692"],
+    ],
+  );
+  assert.equal(
+    result.athletes?.[0].image,
+    undefined,
+    "A country flag never becomes a headshot",
+  );
+  assert.equal(toSide(player, "golf").athleteId, "3980");
+  assert.deepEqual(
+    parseEspnLeagueMetadata(def, { ...feed, leagues: [{ slug: "lpga" }] }, {}, {}).athletes,
+    [],
+  );
+});
+
+test("standings distinguish athletes from team IDs and preserve their actual portrait", () => {
+  const def: LeagueDef = {
+    key: "PGA",
+    tag: "PGA",
+    label: "PGA",
+    labelEn: "PGA",
+    path: "golf/pga",
+    group: "golf",
+  };
+  const image = "https://a.espncdn.com/i/headshots/golf/players/full/3980.png";
+  const result = parseEspnLeagueMetadata(
+    def,
+    {},
+    {},
+    {
+      standings: {
+        entries: [
+          {
+            athlete: { id: "3980", displayName: "Patton Kizzire", headshot: { href: image } },
+            stats: [{ name: "rank", value: 1 }],
+          },
+        ],
+      },
+    },
+  );
+  const athlete = result.standings?.groups[0].rows[0].athlete;
+  assert.deepEqual(athlete, { id: "3980", name: "Patton Kizzire", source: "espn", image });
+  assert.deepEqual(result.athletes, [athlete]);
+  assert.deepEqual(result.teams, []);
+});
+
+test("classification IDs alone are never guessed to be ESPN athlete IDs", () => {
+  assert.equal(
+    espnPublishedAthleteId({ id: "23", type: "athlete", athlete: { displayName: "Name" } }),
+    "",
+  );
+  assert.equal(
+    espnPublishedAthleteId({
+      id: "23",
+      uid: "s:1100~l:1106~a:3980",
+      type: "athlete",
+      athlete: {},
+    }),
+    "",
+  );
+  assert.equal(
+    espnPublishedAthleteId({ id: "3980", uid: "s:1100~l:1106~a:3980", type: "team" }),
+    "",
+  );
+  assert.equal(espnPublishedAthleteId({ athlete: { id: "3980" } }), "3980");
+});
 
 const nba: LeagueDef = {
   key: "NBA",
@@ -345,7 +460,9 @@ test("SportsDB only requests its explicitly published season and never guesses o
     json: async (target) => {
       calls.push(target);
       if (target.includes("lookupleague"))
-        return published ? league : { leagues: [{ ...league.leagues[0], strCurrentSeason: null }] };
+        return published
+          ? league
+          : { leagues: [{ ...league.leagues[0], strCurrentSeason: null }] };
       if (target.includes("search_all_teams")) return { teams: [arsenal] };
       return { table: [tableRow] };
     },
@@ -379,7 +496,10 @@ test("unsupported provider keys do not trigger guessed ESPN or SportsDB requests
 test("verified catalog official links survive empty and restricted provider metadata", async () => {
   const def = { ...nba, officialWebsite: "https://www.nba.com/" };
   assert.equal(leagueMetadataSeed(def).website, "https://www.nba.com/");
-  assert.equal(parseEspnLeagueMetadata(def, info, teams, table).website, "https://www.nba.com/");
+  assert.equal(
+    parseEspnLeagueMetadata(def, info, teams, table).website,
+    "https://www.nba.com/",
+  );
   const regional = {
     ...premier,
     officialWebsite: "https://www.premierleague.com/",

@@ -11,6 +11,7 @@ mod player;
 mod rows;
 mod ytdlp;
 mod ytdlp_update;
+mod video_page;
 
 use super::super::connector::{ConnectorHealth, HealthCell, MusicConnector};
 use super::super::{
@@ -70,6 +71,18 @@ impl MusicConnector for YouTubeMusicConnector {
         interviews: bool,
     ) -> Result<Vec<MusicTrack>, String> {
         let result = if interviews { ytdlp::search_interviews(app, query, limit).await } else { catalog::videos(&self.client, app, query, limit, false).await };
+        self.record(&result);
+        result
+    }
+
+    async fn search_video_page(
+        &self,
+        app: &tauri::AppHandle,
+        query: &str,
+        regular: bool,
+        cursor: Option<&str>,
+    ) -> Result<crate::music::MusicVideoPage, String> {
+        let result = video_page::search(&self.client, app, query, regular, cursor).await;
         self.record(&result);
         result
     }
@@ -213,6 +226,7 @@ impl MusicConnector for YouTubeMusicConnector {
             status,
             &["search", "browse", "play"],
         )
+        .anonymous()
     }
 }
 

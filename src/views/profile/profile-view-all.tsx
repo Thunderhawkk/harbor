@@ -3,12 +3,13 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";
-import type { FeaturedList } from "@/lib/social/featured-lists";
+import type { FeaturedItem, FeaturedList } from "@/lib/social/featured-lists";
 import { ListHeart } from "./list-heart";
 import { ListShareButton } from "./list-share-button";
 import { timeAgo } from "./profile-bits";
 import { ACTIVITY_VERB, ActivityGlyph } from "./recent-activity";
 import type { ActivityItem, Badge } from "./profile-types";
+import { useProfileTitle } from "./use-profile-title";
 
 type Section = "lists" | "badges" | "activity";
 
@@ -147,30 +148,42 @@ function ListsSection({
           )}
           <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-x-4 gap-y-5">
             {list.items.map((item) => (
-              <button
+              <ListItem
                 key={item.id}
-                onClick={() =>
-                  onOpenMeta?.(item.id, item.type, { name: item.name, poster: item.poster })
-                }
-                disabled={!onOpenMeta}
-                className="group text-start disabled:cursor-default"
-              >
-                <Poster
-                  src={item.poster || undefined}
-                  seed={item.name || item.id}
-                  ratio="portrait"
-                  className="rounded-md ring-1 ring-edge-soft transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0.24,1)] motion-safe:group-hover:will-change-transform motion-safe:group-hover:-translate-y-1"
-                  lazy
-                />
-                {item.name && (
-                  <div className="mt-1.5 line-clamp-2 text-[12px] text-ink-muted">{item.name}</div>
-                )}
-              </button>
+                item={item}
+                onOpenMeta={onOpenMeta}
+              />
             ))}
           </div>
         </div>
       ))}
     </div>
+  );
+}
+
+function ListItem({ item, onOpenMeta }: {
+  item: FeaturedItem;
+  onOpenMeta?: (id: string, kind?: string, hint?: { name?: string; poster?: string }) => void;
+}) {
+  const media = useProfileTitle(item.id, item.name, item.poster, item.type);
+  return (
+    <button
+      ref={media.ref}
+      onClick={() => onOpenMeta?.(item.id, item.type, { name: media.title, poster: media.poster })}
+      disabled={!onOpenMeta}
+      className="group text-start disabled:cursor-default"
+    >
+      <Poster
+        src={media.poster || undefined}
+        seed={item.name || item.id}
+        ratio="portrait"
+        className="rounded-md ring-1 ring-edge-soft transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0.24,1)] motion-safe:group-hover:will-change-transform motion-safe:group-hover:-translate-y-1"
+        lazy
+      />
+      {media.title && (
+        <div className="mt-1.5 line-clamp-2 text-[12px] text-ink-muted">{media.title}</div>
+      )}
+    </button>
   );
 }
 
@@ -222,35 +235,42 @@ function ActivitySection({
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-1">
       {activity.map((a) => (
-        <button
-          key={a.id}
-          onClick={() => a.metaId && onOpenMeta?.(a.metaId)}
-          disabled={!a.metaId}
-          className="group flex items-center gap-3 rounded-[12px] p-2.5 text-start transition-colors hover:bg-elevated disabled:cursor-default"
-        >
-          <div className="w-12 shrink-0">
-            <Poster
-              src={a.posterUrl}
-              seed={a.title}
-              ratio="portrait"
-              className="rounded-[8px] ring-1 ring-edge-soft"
-              lazy
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-ink-subtle">
-              <ActivityGlyph kind={a.kind} size={15} />
-              {ACTIVITY_VERB[a.kind]}
-              {a.kind === "rated" && a.rating !== undefined && (
-                <span className="text-accent">{a.rating}/10</span>
-              )}
-            </div>
-            <div className="mt-0.5 truncate text-[14px] font-medium text-ink">{a.title}</div>
-            {a.subtitle && <div className="truncate text-[12px] text-ink-muted">{a.subtitle}</div>}
-          </div>
-          <span className="shrink-0 text-[12px] tabular-nums text-ink-subtle">{timeAgo(a.at)}</span>
-        </button>
+        <ActivityRow key={a.id} a={a} onOpenMeta={onOpenMeta} />
       ))}
     </div>
+  );
+}
+
+function ActivityRow({ a, onOpenMeta }: { a: ActivityItem; onOpenMeta?: (id: string) => void }) {
+  const media = useProfileTitle(a.kind === "imported" ? undefined : a.metaId, a.title, a.posterUrl);
+  return (
+    <button
+      ref={media.ref}
+      onClick={() => a.metaId && onOpenMeta?.(a.metaId)}
+      disabled={!a.metaId}
+      className="group flex items-center gap-3 rounded-[12px] p-2.5 text-start transition-colors hover:bg-elevated disabled:cursor-default"
+    >
+      <div className="w-12 shrink-0">
+        <Poster
+          src={media.poster}
+          seed={a.title}
+          ratio="portrait"
+          className="rounded-[8px] ring-1 ring-edge-soft"
+          lazy
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-ink-subtle">
+          <ActivityGlyph kind={a.kind} size={15} />
+          {ACTIVITY_VERB[a.kind]}
+          {a.kind === "rated" && a.rating !== undefined && (
+            <span className="text-accent">{a.rating}/10</span>
+          )}
+        </div>
+        <div className="mt-0.5 truncate text-[14px] font-medium text-ink">{media.title}</div>
+        {a.subtitle && <div className="truncate text-[12px] text-ink-muted">{a.subtitle}</div>}
+      </div>
+      <span className="shrink-0 text-[12px] tabular-nums text-ink-subtle">{timeAgo(a.at)}</span>
+    </button>
   );
 }

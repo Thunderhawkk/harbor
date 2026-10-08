@@ -207,6 +207,7 @@ pub fn album(origin: &str, item: &Item) -> Option<MusicAlbumRef> {
         artwork: artwork(origin, item),
         year,
         track_count: item.count(),
+        explicit: None,
     })
 }
 

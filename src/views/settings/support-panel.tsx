@@ -132,7 +132,7 @@ export function SupportPanel() {
           wide
           label={t("ElfHosted plans")}
           desc={t(
-            "Month to month, cancel anytime, and you can try the whole thing for $1 for a week.",
+            "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.",
           )}
         >
           <div className="flex w-full flex-wrap items-end justify-between gap-x-6 gap-y-4">

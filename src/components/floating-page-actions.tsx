@@ -33,7 +33,7 @@ export function FloatingPageActions({ children }: { children: ReactNode }) {
         bottom: "calc(24px + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px))",
         visibility: "hidden",
       }}
-      className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 z-[130] flex justify-center px-4"
     >
       {children}
     </div>

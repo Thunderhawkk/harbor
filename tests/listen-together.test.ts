@@ -9,6 +9,7 @@ import {
   normalizeListenRoomCode,
 } from "../src/lib/listen-together/room";
 import {
+  listenMixFromState,
   listenStateFromTrack,
   listenStateMatchesTrack,
   listenTrackFromState,
@@ -17,6 +18,15 @@ import {
   unpackListenMediaId,
   unpackListenTitle,
 } from "../src/lib/listen-together/track-state";
+import {
+  DEFAULT_LISTEN_MIX,
+  listenMixMatches,
+  readListenMix,
+  writeListenMix,
+  type ListenMix,
+} from "../src/lib/listen-together/mix-state";
+import { createListenMixFollower } from "../src/lib/listen-together/mix-follow";
+import type { MusicAudioSettingsValue } from "../src/lib/music/audio-settings";
 import {
   LISTEN_DRIFT_SECONDS,
   listenActionFor,
@@ -228,4 +238,185 @@ test("a host publishes on real changes and stays quiet while a song simply plays
     2,
   );
   assert.equal(listenShouldPublish(first, other), true);
+});
+
+const MIX_BANDS = [4, 0, -2.5, 0, 0, 1.5, 0, 0, 0, -6];
+
+function makeSettings(over: Partial<MusicAudioSettingsValue> = {}): MusicAudioSettingsValue {
+  return {
+    device: "auto",
+    eqEnabled: false,
+    eqBands: Array(10).fill(0),
+    boostEnabled: false,
+    volumeLimit: 1,
+    balance: 0,
+    autoHeadroom: true,
+    equipmentLabel: "",
+    replayGain: "off",
+    eqMode: "graphic",
+    peqFilters: [],
+    eqStrength: 1,
+    preampDb: 0,
+    crossfeed: 0,
+    dspBypass: false,
+    exclusive: false,
+    sampleRate: 0,
+    speed: 1,
+    keepPitch: false,
+    reverb: 0,
+    pitch: 0,
+    broadcastEnabled: false,
+    broadcastDevice: "auto",
+    ...over,
+  } as MusicAudioSettingsValue;
+}
+
+const DJ_MIX: ListenMix = {
+  speed: 1.35,
+  pitch: -4.25,
+  reverb: 0.6,
+  keepPitch: true,
+  eqEnabled: true,
+  eqMode: "parametric",
+  eqBands: MIX_BANDS,
+};
+
+test("the whole DJ mix survives the round trip through one relay field", () => {
+  const state = listenStateFromTrack(HOST_TRACK as never, 12, true, "host", "host", 1, DJ_MIX);
+  assert.equal(state.speed, 1.35);
+  assert.deepEqual(unpackListenTitle(state.mediaTitle), { title: "A", artist: "B" });
+  assert.deepEqual(listenMixFromState(state), DJ_MIX);
+});
+
+test("a mix at its defaults adds nothing to the payload an older client already reads", () => {
+  const plain = packListenTitle("Song", "Artist", DEFAULT_LISTEN_MIX);
+  assert.equal(plain, packListenTitle("Song", "Artist"));
+  assert.equal(plain.includes('"d"'), false);
+});
+
+test("a disabled equaliser never ships its curve, and speed still travels", () => {
+  const quiet: ListenMix = { ...DEFAULT_LISTEN_MIX, speed: 0.9, eqEnabled: false, eqBands: MIX_BANDS };
+  const state = listenStateFromTrack(HOST_TRACK as never, 0, true, "host", "host", 1, quiet);
+  const read = listenMixFromState(state);
+  assert.equal(read?.speed, 0.9);
+  assert.equal(read?.eqEnabled, false);
+  assert.deepEqual(read?.eqBands, Array(10).fill(0));
+});
+
+test("a host that never sends a mix leaves every listener's own mix alone", () => {
+  const state = listenStateFromTrack(HOST_TRACK as never, 0, true, "host", "host", 1);
+  assert.equal(state.speed, undefined);
+  assert.equal(listenMixFromState(state), null);
+  assert.equal(listenMixFromState(null), null);
+});
+
+test("a host republishes when the mix moves and stays quiet when it repeats", () => {
+  const base = listenStateFromTrack(HOST_TRACK as never, 30, true, "host", "host", 1, DJ_MIX);
+  const same = listenStateFromTrack(HOST_TRACK as never, 30.4, true, "host", "host", 2, DJ_MIX);
+  assert.equal(listenShouldPublish(base, same), false);
+  for (const moved of [
+    { ...DJ_MIX, speed: 1.1 },
+    { ...DJ_MIX, pitch: 2 },
+    { ...DJ_MIX, reverb: 0 },
+    { ...DJ_MIX, keepPitch: false },
+    { ...DJ_MIX, eqMode: "graphic" as const },
+    { ...DJ_MIX, eqBands: Array(10).fill(0) },
+  ]) {
+    const next = listenStateFromTrack(HOST_TRACK as never, 30.4, true, "host", "host", 3, moved);
+    assert.equal(listenShouldPublish(base, next), true, JSON.stringify(moved));
+  }
+});
+
+test("a mix read off local settings writes back onto them unchanged", () => {
+  const settings = makeSettings({
+    speed: 1.2,
+    pitch: 3,
+    reverb: 0.25,
+    keepPitch: true,
+    eqEnabled: true,
+    eqBands: MIX_BANDS,
+  });
+  const mix = readListenMix(settings);
+  assert.equal(listenMixMatches(settings, mix), true);
+  assert.deepEqual(writeListenMix(settings, mix), settings);
+});
+
+function followerOn(start: MusicAudioSettingsValue) {
+  let live = start;
+  const writes: MusicAudioSettingsValue[] = [];
+  const follower = createListenMixFollower({
+    read: () => live,
+    write: (next) => {
+      live = next;
+      writes.push(next);
+      return Promise.resolve(next);
+    },
+  });
+  return { follower, writes, current: () => live };
+}
+
+test("a guest's own mix comes back the moment the room ends", async () => {
+  const own = makeSettings({
+    speed: 1.2,
+    pitch: 3,
+    reverb: 0.25,
+    keepPitch: true,
+    eqEnabled: true,
+    eqBands: MIX_BANDS,
+    equipmentLabel: "my cans",
+  });
+  const { follower, writes, current } = followerOn(own);
+  follower.begin();
+  await follower.apply(DJ_MIX);
+  assert.equal(listenMixMatches(current(), DJ_MIX), true);
+  await follower.end();
+  assert.deepEqual(current(), own);
+  assert.equal(writes.length, 2);
+});
+
+test("a redundant begin never lets the host's mix become what gets restored", async () => {
+  const own = makeSettings({ speed: 0.75, pitch: -2, eqEnabled: true, eqBands: MIX_BANDS });
+  const { follower, current } = followerOn(own);
+  follower.begin();
+  await follower.apply(DJ_MIX);
+  follower.begin();
+  await follower.apply({ ...DJ_MIX, speed: 1.6 });
+  follower.begin();
+  await follower.end();
+  assert.deepEqual(current(), own);
+});
+
+test("nothing is written to disk for a guest the host never mixed", async () => {
+  const own = makeSettings({ speed: 1.1, pitch: 5 });
+  const { follower, writes, current } = followerOn(own);
+  follower.begin();
+  await follower.apply(null);
+  await follower.apply(readListenMix(own));
+  await follower.end();
+  assert.equal(writes.length, 0);
+  assert.deepEqual(current(), own);
+});
+
+test("a mix arriving before the guest snapshot is taken is not applied", async () => {
+  const own = makeSettings({ speed: 1.1 });
+  const { follower, writes, current } = followerOn(own);
+  await follower.apply(DJ_MIX);
+  assert.equal(writes.length, 0);
+  assert.deepEqual(current(), own);
+  follower.begin();
+  await follower.apply(DJ_MIX);
+  assert.equal(listenMixMatches(current(), DJ_MIX), true);
+  await follower.end();
+  assert.deepEqual(current(), own);
+});
+
+test("leaving twice never writes the host's mix back over the guest's", async () => {
+  const own = makeSettings({ speed: 0.8, reverb: 0.5 });
+  const { follower, writes, current } = followerOn(own);
+  follower.begin();
+  await follower.apply(DJ_MIX);
+  await follower.end();
+  await follower.end();
+  assert.deepEqual(current(), own);
+  assert.equal(writes.length, 2);
 });

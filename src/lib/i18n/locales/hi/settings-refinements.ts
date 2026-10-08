@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "प्लेबैक कैश फ़ोल्डर",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "वीडियो की अस्थायी बफ़रिंग, डेब्रिड स्ट्रीम सहित। प्लेबैक फिर शुरू होने पर लागू होता है; मौजूदा फ़ाइलें अपने वर्तमान फ़ोल्डर में रहती हैं।",
   "1 option formatted correctly": "1 विकल्प का प्रारूप सही है",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. फ़िल्में खोलें\n2. कोई शीर्षक चुनें\n3. चलाएँ दबाएँ\n4. बताएँ कि क्या होता है",
   "3 to 24 letters, numbers, or underscores.": "3 से 24 अक्षर, अंक या अंडरस्कोर।",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "सहेजा हुआ {name} हटा दिया जाएगा और उसके बदलाव लागू नहीं होंगे।",
   "The server responded in {ms} ms.": "सर्वर ने {ms} मिलीसेकंड में जवाब दिया।",
   "The six largest local settings entries, including preferences and lookup data.": "स्थानीय सेटिंग की छह सबसे बड़ी प्रविष्टियाँ, जिनमें प्राथमिकताएँ और खोज डेटा शामिल हैं।",
+  "{count} entries": "{count} प्रविष्टियाँ",
   "The volume pop-up is hidden.": "वॉल्यूम पॉप-अप छिपा है।",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "थीम, प्लेयर का अपना लेआउट, चित्र और कार्ड पर Harbor क्या दिखाता है।",
   "This account has been suspended. Reach out to support if you think that's wrong.": "यह खाता निलंबित कर दिया गया है। अगर आपको लगता है कि यह गलती है, तो सहायता टीम से संपर्क करें।",

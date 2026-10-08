@@ -57,6 +57,7 @@ pub fn catalog_item(value: &Value) -> Option<MusicCatalogItem> {
             artwork: cover,
             year: year_from(&parts),
             track_count: count_from(&parts),
+            explicit: None,
         })),
         "artist" => Some(MusicCatalogItem::Artist(MusicArtistRef {
             id,
@@ -164,6 +165,7 @@ pub fn album_from_list_item(value: &Value) -> Option<MusicAlbumRef> {
         artwork: artwork_of(value).unwrap_or_default(),
         year: year_from(&parts),
         track_count: count_from(&parts),
+        explicit: None,
     })
 }
 

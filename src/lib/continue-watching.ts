@@ -37,6 +37,7 @@ export function localToLibraryItem(e: ReturnType<typeof listLocalCw>[number]): L
     name: e.name,
     poster: e.poster,
     background: e.background,
+    isAnime: e.isAnime,
     state: {
       timeOffset: e.positionMs,
       duration: e.durationMs,
@@ -104,12 +105,11 @@ export function useContinueWatching(excludeId?: string, limit = 12): CwCard[] {
   const { activeProfile, profiles } = useProfiles();
   const hideSharedCw =
     settings.cwPerProfile && anyProfileSharesStremioWith(activeProfile, profiles);
-  const cwPerProfile = settings.cwPerProfile;
   const cwSources = settings.cwSources;
   useEffect(() => {
     setExternalCwSources({ trakt: cwSources.trakt, simkl: cwSources.simkl });
   }, [cwSources.trakt, cwSources.simkl]);
-  const externalCw = useExternalCw(!cwPerProfile && (cwSources.trakt || cwSources.simkl));
+  const externalCw = useExternalCw(!hideSharedCw && (cwSources.trakt || cwSources.simkl));
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [localVersion, setLocalVersion] = useState(0);
 
@@ -173,7 +173,10 @@ export function useContinueWatching(excludeId?: string, limit = 12): CwCard[] {
           ...(cwSources.library ? items.filter((i) => !ANIME_CLOUD_ID.test(i._id)) : []),
           ...externalCw.filter((i) => !(i.external && disabledSources.has(i.external))),
         ];
-    const merged = [...base, ...(cwSources.local ? listLocalCw().map(localToLibraryItem) : [])]
+    const local = listLocalCw(hideSharedCw).filter((e) =>
+      e.source === "library" ? cwSources.library : cwSources.local,
+    );
+    const merged = [...base, ...local.map(localToLibraryItem)]
       .filter((i) => {
         if ((i.type as string) === "other" || i._id.startsWith("iptv:")) return false;
         if (!isCwMember(i)) return false;
@@ -196,5 +199,5 @@ export function useContinueWatching(excludeId?: string, limit = 12): CwCard[] {
       if (out.length >= limit) break;
     }
     return out;
-  }, [items, externalCw, localVersion, excludeId, limit, hideSharedCw, cwSources]);
+  }, [items, externalCw, localVersion, excludeId, limit, hideSharedCw, cwSources, activeProfile?.id]);
 }

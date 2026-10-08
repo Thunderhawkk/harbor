@@ -189,6 +189,8 @@ const extra: Record<string, string> = {
   Browsing: "閲覧時",
   Budget: "製作費",
   "Buffer fill": "バッファ部分",
+  "Reveal the dot on hover": "ホバーでドットを表示",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "ドットは普段は隠れていて、バーにポインターを合わせると現れます。オフにすると常に表示されます。",
   "Buffer fill brightness": "バッファ部分の明るさ",
   Buffering: "バッファリング中",
   Build: "ビルド",
@@ -245,8 +247,7 @@ const extra: Record<string, string> = {
     "デブリッドサービス（Real-Debrid、TorBox、AllDebrid）に接続すると、待ち時間なしですぐにHDで視聴できます。",
   "Connect MyAnimeList": "MyAnimeListに接続",
   "Connect your MyAnimeList account": "MyAnimeListアカウントに接続",
-  "Connect your Trakt account to see comments and reviews.":
-    "コメントやレビューを表示するには、Traktアカウントに接続してください。",
+  "Connect your Trakt account to leave comments and reviews.": "コメントやレビューを投稿するには Trakt アカウントを接続してください。",
   "Connected as {username}": "{username}として接続済み",
   "Connected as @{user}": "@{user}として接続済み",
   "Connected as @{username}": "@{username}として接続済み",

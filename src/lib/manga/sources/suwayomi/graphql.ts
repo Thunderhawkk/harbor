@@ -8,6 +8,7 @@ import {
   type SuwayomiSource,
 } from "./model";
 import type { RestChapter, RestPage } from "./rest";
+import { cleanServerMessage } from "./server-message";
 
 const GQL = "/api/graphql";
 
@@ -29,6 +30,36 @@ async function gqlData(
   const data = await gql(client, query, variables);
   if (data == null) throw new Error("suwayomi_graphql_error");
   return data;
+}
+
+/** A server-side failure whose message is worth showing to the user. */
+export class SuwayomiServerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SuwayomiServerError";
+  }
+}
+
+/**
+ * GraphQL for mutations: unlike `gql`, a server error is thrown (with its message)
+ * rather than collapsing to null, because read paths can fall back but a mutation
+ * the user triggered cannot.
+ */
+async function gqlMutation(
+  client: SuwayomiClient,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<any> {
+  const res = await client.postJson(GQL, { query, variables: variables ?? {} });
+  if (!res) throw new Error("suwayomi_graphql_unreachable");
+  const errors = (res as { errors?: Array<{ message?: unknown }> }).errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const message = cleanServerMessage(String(errors[0]?.message ?? ""));
+    if (message) throw new SuwayomiServerError(message);
+    throw new Error("suwayomi_graphql_error");
+  }
+  if (res.data == null) throw new Error("suwayomi_graphql_error");
+  return res.data;
 }
 
 export async function gqlAvailable(client: SuwayomiClient): Promise<boolean> {
@@ -190,6 +221,22 @@ export async function gqlLibrary(client: SuwayomiClient): Promise<any[]> {
   return Array.isArray(nodes) ? nodes : [];
 }
 
+export async function gqlCategories(client: SuwayomiClient): Promise<any[]> {
+  const data = await gqlData(client, "query { categories { nodes { id name order } } }");
+  if (!Array.isArray(data?.categories?.nodes)) throw new Error("suwayomi_categories_unavailable");
+  return data.categories.nodes;
+}
+
+export async function gqlCategoryManga(client: SuwayomiClient, id: string): Promise<any[]> {
+  const data = await gqlData(client, `query($id: Int!) {
+    category(id: $id) { mangas { nodes {
+      id title thumbnailUrl author artist status description sourceId
+    } } }
+  }`, { id: Number(id) });
+  if (!Array.isArray(data?.category?.mangas?.nodes)) throw new Error("suwayomi_category_unavailable");
+  return data.category.mangas.nodes;
+}
+
 export async function gqlSetMangaInLibrary(
   client: SuwayomiClient,
   mangaId: string,
@@ -247,7 +294,7 @@ async function updateExtension(
       extension { pkgName isInstalled }
     }
   }`;
-  const data = await gql(client, q, { id: pkgName });
+  const data = await gqlMutation(client, q, { id: pkgName });
   const extension = data?.updateExtension?.extension;
   if (!extension) return false;
   return patch === "uninstall" ? extension.isInstalled === false : extension.isInstalled === true;

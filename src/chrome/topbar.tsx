@@ -23,6 +23,7 @@ import { useT } from "@/lib/i18n";
 import { useActiveKid } from "@/lib/profiles";
 import { useSearch } from "@/lib/search-context";
 import { useSettings } from "@/lib/settings";
+import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { useTogether } from "@/lib/together/provider";
 import { useSelfIdentity } from "@/lib/together/use-self-identity";
 import { activeLayout } from "@/lib/theme";
@@ -71,6 +72,7 @@ function PresenceAvatar({ name, src, color }: { name: string; src: string | null
 
 export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   const { chromeHidden, canGoBack, view, setView, topKind } = useView();
+  const liveHasSources = usePlaylists().length > 0;
   const { settings } = useSettings();
   const kid = useActiveKid();
   const t = useT();
@@ -95,11 +97,11 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   }, []);
   if (chromeHidden && !connecting) return null;
   const layout = kid ? "sidebar" : preview ? preview.layout : activeLayout(settings.theme);
-  const onLiveRoot = topKind === "live";
+  const onLiveRoot = topKind === "live" && liveHasSources;
   const sidebarHidden = connecting || view === "settings" || onLiveRoot || topKind === "picker";
   const inSettings = view === "settings";
   const hideSearch =
-    view === "music" || view === "addons" || connecting || topKind === "picker" || inSettings;
+    view === "music" || view === "games" || view === "addons" || connecting || topKind === "picker" || inSettings;
   const sidebarOffset =
     layout === "stremio"
       ? "ps-[80px]"

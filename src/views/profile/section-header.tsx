@@ -13,7 +13,7 @@ export function SectionHeader({
 }) {
   const t = useT();
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="relative z-20 mb-4 flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
         {icon} {label}
       </div>

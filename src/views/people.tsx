@@ -7,9 +7,11 @@ import {
   type HarborRankExplanation,
   type PeopleDept,
   type PersonRankEntry,
+  type RankManifest,
   type RankSource,
 } from "@/lib/harbor-rank";
 import { isHarborExplanation, usePeopleRankings } from "@/lib/people-rankings";
+import { BornToday } from "./people/born-today";
 import { PeopleSourceSwitch } from "./people/people-source-switch";
 import { PeopleFilterBar } from "./people/people-filter-bar";
 import { PeopleRankList } from "./people/people-rank-list";
@@ -54,6 +56,7 @@ export function PeopleView({ init }: { init: PeopleInit }) {
   const [explainOpen, setExplainOpen] = useState(false);
   const [countries, setCountries] = useState<Country[]>([]);
   const [sources, setSources] = useState<RankSource[] | null>(null);
+  const [manifest, setManifest] = useState<RankManifest | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [solid, setSolid] = useState(false);
 
@@ -63,6 +66,7 @@ export function PeopleView({ init }: { init: PeopleInit }) {
     let cancelled = false;
     fetchRankManifest().then((m) => {
       if (cancelled || !m) return;
+      setManifest(m);
       if (m.countries) setCountries(m.countries);
       if (Array.isArray(m.sources) && m.sources.length > 0) setSources(m.sources);
     });
@@ -175,6 +179,10 @@ export function PeopleView({ init }: { init: PeopleInit }) {
             onExplain={() => setExplainOpen(true)}
           />
           <PeopleJumpIndex bands={bands} scrollRef={scrollRef} />
+        </div>
+
+        <div className="px-12">
+          <BornToday manifest={manifest} onOpenPerson={openPerson} />
         </div>
 
         <div className="px-12 pb-6 pt-6">

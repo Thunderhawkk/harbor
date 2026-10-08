@@ -1,4 +1,7 @@
 import type { LeagueDef, SportsGame } from "./espn-types";
+import { isFinishedStatus } from "./event-status";
+import { espnPublishedAthleteId, type AthleteIdentityRequest } from "./athlete-identity";
+import { publishedPortraitUrl } from "./athlete-portraits";
 
 type RecordData = Record<string, unknown>;
 type JsonLoader = (url: string, signal: AbortSignal) => Promise<RecordData>;
@@ -9,12 +12,56 @@ export type CompetitionSession = {
   status: string;
 };
 export type CompetitionEntrant = {
+  /** Classification row identity; never an athlete-provider identifier. */
   id: string;
   name: string;
   position?: number;
   result: string;
   team?: string;
+  athletes?: AthleteIdentityRequest[];
 };
+
+export const isIndividualCompetition = (group: string) =>
+  [
+    "motorsport",
+    "golf",
+    "tennis",
+    "boxing",
+    "combat",
+    "cycling",
+    "athletics",
+    "swimming",
+    "winter",
+    "snooker",
+    "darts",
+    "badminton",
+    "tabletennis",
+  ].includes(group);
+
+const personName = (name: string) =>
+  name
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Published reports can be longer; only named provider athlete records make their rows interactive. */
+export function mergeCompetitionEntrants(
+  published: CompetitionEntrant[],
+  structured: CompetitionEntrant[],
+): CompetitionEntrant[] {
+  if (published.length <= structured.length) return structured;
+  const people = structured.flatMap((entry) => entry.athletes ?? []);
+  return published.map((entry) => {
+    const athletes = entry.name.split(" / ").flatMap((name) => {
+      const matches = people.filter((person) => personName(person.name) === personName(name));
+      const identities = new Set(matches.map((person) => `${person.source}:${person.id}`));
+      return identities.size === 1 ? matches.slice(0, 1) : [];
+    });
+    return athletes.length ? { ...entry, athletes } : entry;
+  });
+}
 export type CompetitionMetadata = {
   source: "thesportsdb" | "espn" | "schedule";
   sessions: CompetitionSession[];
@@ -36,7 +83,10 @@ const rows = (value: unknown): RecordData[] =>
   Array.isArray(value) ? value.slice(0, 200).map(record) : [];
 const str = (value: unknown, max = 500): string =>
   typeof value === "string" ? value.trim().slice(0, max) : "";
-const numericId = (value: unknown) => (/^\d+$/.test(str(value)) ? str(value) : "");
+const numericId = (value: unknown) => {
+  const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : str(value);
+  return /^\d{1,16}$/.test(text) ? text : "";
+};
 
 export function publicCompetitionUrl(value: unknown): string | undefined {
   const text = str(value, 2000);
@@ -99,16 +149,26 @@ export function parseCompetitionResults(value: unknown, eventId: string): Compet
     // Some co-driver records repeat their name in strDetail rather than a race time.
     const detail = str(item.strDetail) === name ? "" : str(item.strDetail);
     const result = detail || str(item.strResult);
+    const athlete: AthleteIdentityRequest = {
+      id: numericId(item.idPlayer),
+      name,
+      source: "thesportsdb",
+      image:
+        publishedPortraitUrl(item.strCutout) || publishedPortraitUrl(item.strThumb) || undefined,
+    };
     const prior = groups.get(key);
     if (prior) {
       if (!prior.name.split(" / ").includes(name)) prior.name += ` / ${name}`;
       if (!prior.result) prior.result = result;
+      if (!prior.athletes?.some((person) => person.id === athlete.id && person.name === name))
+        prior.athletes?.push(athlete);
     } else
       groups.set(key, {
         id: key,
         name,
         position: placed ? position : undefined,
         result,
+        athletes: [athlete],
       });
   }
   return [...groups.values()].sort((a, b) => (a.position ?? 999) - (b.position ?? 999));
@@ -160,8 +220,7 @@ export function parseDbCompetition(
   const publishedResults = parseCompetitionResultText(event.strResult);
   // The public structured endpoint can return only five athletes. Do not truncate
   // the full race classification already included in the event's published report.
-  const entrants =
-    publishedResults.length > structuredResults.length ? publishedResults : structuredResults;
+  const entrants = mergeCompetitionEntrants(publishedResults, structuredResults);
   return {
     ...detail,
     source: "thesportsdb",
@@ -217,7 +276,8 @@ export function parseEspnCompetition(game: SportsGame, data: RecordData): Compet
     })),
     entrants: competitors
       .flatMap((item) => {
-        const name = str(record(item.athlete).displayName) || str(record(item.team).displayName);
+        const athlete = record(item.athlete);
+        const name = str(athlete.displayName) || str(record(item.team).displayName);
         if (!name) return [];
         return [
           {
@@ -225,6 +285,20 @@ export function parseEspnCompetition(game: SportsGame, data: RecordData): Compet
             name,
             result: str(item.score),
             position: Number(item.order) || undefined,
+            ...(str(athlete.displayName) && item.type !== "team"
+              ? {
+                  athletes: [
+                    {
+                      id: espnPublishedAthleteId(item),
+                      name: str(athlete.displayName),
+                      source: "espn" as const,
+                      image:
+                        publishedPortraitUrl(record(athlete.headshot).href || athlete.headshot) ||
+                        undefined,
+                    },
+                  ],
+                }
+              : {}),
           },
         ];
       })
@@ -291,7 +365,7 @@ async function requestMetadata(
     if (!event) return competitionSeed(game, def);
     const venueId = numericId(event.idVenue);
     const finished =
-      /^(FT|Finished|Match Finished)$/i.test(str(event.strStatus)) || !!str(event.strResult);
+      isFinishedStatus(str(event.strStatus)) || !!str(event.strResult);
     // These supplements are independent; losing a venue request must not erase the race result.
     const supplements = await Promise.allSettled<RecordData>([
       venueId

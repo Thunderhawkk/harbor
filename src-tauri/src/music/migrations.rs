@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const LATEST_VERSION: i64 = 5;
+pub const LATEST_VERSION: i64 = 6;
 
 const CREATE_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS music_tracks (
@@ -98,12 +98,20 @@ const STREAM_METADATA: &str = "ALTER TABLE music_tracks ADD COLUMN resolved_meta
 const MEDIA_KIND: &str = "ALTER TABLE music_tracks ADD COLUMN media_kind TEXT CHECK(media_kind IN ('audio', 'video'));";
 
 const TRACK_LABELS: &str = "ALTER TABLE music_tracks ADD COLUMN explicit INTEGER; ALTER TABLE music_tracks ADD COLUMN version TEXT;";
-const STEPS: [(i64, &str); 5] = [
+// Separate membership dates survive playlist reordering (which rebuilds positions).
+const PLAYLIST_DATES: &str = "CREATE TABLE playlist_track_dates (
+  playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+  track_id TEXT NOT NULL REFERENCES music_tracks(id) ON DELETE CASCADE,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (playlist_id, track_id)
+);";
+const STEPS: [(i64, &str); 6] = [
     (1, CREATE_SCHEMA),
     (2, CREATE_CATALOG),
     (3, STREAM_METADATA),
     (4, MEDIA_KIND),
     (5, TRACK_LABELS),
+    (6, PLAYLIST_DATES),
 ];
 
 pub fn run(connection: &mut Connection) -> Result<(), String> {

@@ -1,4 +1,5 @@
 import { Poster } from "@/components/poster";
+import { ArrowedScrollRow } from "@/components/arrowed-scroll-row";
 import type { AnilistRelatedNode } from "@/lib/anilist/media-details";
 import { CollectionBadges } from "@/views/manga/collection-badge";
 
@@ -17,11 +18,11 @@ export function AnimeRelatedRail({
   return (
     <section className="flex min-w-0 flex-col">
       <h3 className="mb-3 text-[15px] font-semibold text-ink">{title}</h3>
-      <div className="flex gap-3 overflow-x-auto pb-1 [scroll-snap-type:x_proximity] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&>*]:[scroll-snap-align:start]">
+      <ArrowedScrollRow className="-mx-1 pb-1">
         {nodes.map((node) => (
           <RelatedCard key={node.anilistId} node={node} onOpen={onOpen} badgeCollections={badgeCollections} />
         ))}
-      </div>
+      </ArrowedScrollRow>
     </section>
   );
 }

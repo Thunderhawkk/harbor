@@ -31,6 +31,8 @@ import { DayModal } from "./calendar/day-modal";
 import { EmptyState, ErrorState, NoKeyState, NotSignedInState } from "./calendar/empty-states";
 import { MonthGrid } from "./calendar/month-grid";
 import { SourceSwitcher } from "./calendar/source-switcher";
+import { GameCalendarPanel } from "./calendar/game-release-calendar";
+import { NavChevron } from "@/components/nav-arrow";
 import {
   buildLibraryNameSet,
   buildMonthCells,
@@ -42,7 +44,7 @@ import {
   normalizeName,
 } from "./calendar/utils";
 
-export function CalendarView() {
+export function CalendarView({ active = true, gamesAllowed = true }: { active?: boolean; gamesAllowed?: boolean }) {
   const t = useT();
   const { settings, update } = useSettings();
   const { authKey } = useAuth();
@@ -93,7 +95,7 @@ export function CalendarView() {
     clearUnseenReminders();
   }, []);
 
-  const source = settings.calendarSource;
+  const source = settings.calendarSource === "games" && !gamesAllowed ? "library" : settings.calendarSource;
   const { isConnected: traktConnected } = useTrakt();
   const { isConnected: simklConnected } = useSimkl();
 
@@ -190,7 +192,9 @@ export function CalendarView() {
       : FILTERS;
 
   let body: React.ReactNode;
-  if (source === "library" && !authKey) {
+  if (source === "games") {
+    body = <GameCalendarPanel year={year} month={month} weekStartsMonday={settings.weekStartsMonday} active={active}/>;
+  } else if (source === "library" && !authKey) {
     body = <NotSignedInState onSignIn={() => setShowAuth(true)} />;
   } else if (source === "all" && !settings.tmdbKey) {
     body = <NoKeyState onSetup={() => openSettings("library")} />;
@@ -222,7 +226,7 @@ export function CalendarView() {
   }
 
   return (
-    <main data-tv-chrome-offset className="flex h-full flex-col overflow-hidden">
+    <main data-tv-chrome-offset className={`flex h-full flex-col overflow-hidden${source === "games" ? " calendar-games-view" : ""}`}>
       <header className="shrink-0 border-b border-edge-soft px-12 pb-5 pt-24">
         <div className="flex items-end justify-between gap-6">
           <div className="flex flex-col gap-1.5">
@@ -239,7 +243,7 @@ export function CalendarView() {
               className="flex h-10 w-10 items-center justify-center rounded-full border border-edge-soft text-ink-muted transition-colors hover:border-edge hover:text-ink"
               aria-label={t("Previous month")}
             >
-              <ChevronLeft size={16} strokeWidth={2.2} className="dir-icon" />
+              {source === "games" ? <span className="dir-icon"><NavChevron dir="left" size={16}/></span> : <ChevronLeft size={16} strokeWidth={2.2} className="dir-icon" />}
             </button>
             <button
               onClick={goToday}
@@ -256,14 +260,14 @@ export function CalendarView() {
               className="flex h-10 w-10 items-center justify-center rounded-full border border-edge-soft text-ink-muted transition-colors hover:border-edge hover:text-ink"
               aria-label={t("Next month")}
             >
-              <ChevronRight size={16} strokeWidth={2.2} className="dir-icon" />
+              {source === "games" ? <span className="dir-icon"><NavChevron dir="right" size={16}/></span> : <ChevronRight size={16} strokeWidth={2.2} className="dir-icon" />}
             </button>
-            <span className="mx-1 h-5 w-px bg-edge-soft" />
+            {source !== "games" && <><span className="mx-1 h-5 w-px bg-edge-soft" />
             <RemindersManagerButton
               onOpenItem={(r) =>
                 openMeta({ id: r.id, type: "series", name: r.name, poster: r.poster })
               }
-            />
+            /></>}
           </div>
         </div>
         <nav className="mt-6 flex flex-wrap items-center gap-3">
@@ -272,6 +276,7 @@ export function CalendarView() {
             onChange={(s) => update({ calendarSource: s })}
             traktConnected={traktConnected}
             simklConnected={simklConnected}
+            gamesAllowed={gamesAllowed}
           />
           {source === "anime" && (
             <div className="flex items-center gap-1 rounded-full border border-edge-soft bg-elevated/30 p-1">
@@ -304,7 +309,7 @@ export function CalendarView() {
           >
             {t("Start week on Monday")}
           </button>
-          <div className="flex items-center gap-1 rounded-full border border-edge-soft bg-elevated/30 p-1">
+          {source !== "games" && <div className="flex items-center gap-1 rounded-full border border-edge-soft bg-elevated/30 p-1">
             {CALENDAR_POSTER_SIZES.map(({ value, label }) => {
               const active = settings.calendarPosterSize === value;
               return (
@@ -322,7 +327,7 @@ export function CalendarView() {
                 </button>
               );
             })}
-          </div>
+          </div>}
           {source === "custom" && railOverlay && (
             <button
               type="button"
@@ -432,7 +437,7 @@ export function CalendarView() {
       </header>
 
       <div ref={railHostRef} className="relative flex min-h-0 flex-1">
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto px-12 py-8">
+        <div ref={scrollRef} className="calendar-body-scroll min-w-0 flex-1 overflow-y-auto px-12 py-8">
           {body}
         </div>
         {source === "custom" && (

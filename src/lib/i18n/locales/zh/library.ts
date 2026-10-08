@@ -496,8 +496,7 @@ const library: Record<string, string> = {
   "Clear history": "清除历史记录",
   "Community comments from Trakt that appear on movie and show pages.":
     "来自 Trakt 社区的评论，会显示在电影和剧集页面上。",
-  "Connect your Trakt account to see comments and reviews.":
-    "连接你的 Trakt 账号以查看评论和影评。",
+  "Connect your Trakt account to leave comments and reviews.": "连接 Trakt 账号即可发表评论和评价。",
   "Connected to Simkl": "已连接到 Simkl",
   "Connected to Trakt": "已连接到 Trakt",
   "Copy your Harbor watchlist over to Trakt, or pull your Trakt watchlist into Harbor. Safe to run again, Trakt skips anything it already has.":

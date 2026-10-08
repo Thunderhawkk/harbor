@@ -10,7 +10,10 @@ import {
   type PersonDetail,
 } from "@/lib/providers/tmdb/tmdb-people";
 import { dedupe, isCameoOrGuest, notableScore } from "@/views/person/person-utils";
-import { PosterRail, RailSection, RailSkeleton } from "./rails";
+import { MusicRail, PosterRail, RailSection, RailSkeleton } from "./rails";
+import { searchTyped } from "@/lib/music/catalog";
+import { personMusicHits } from "@/lib/search-music-hits";
+import type { MusicSearchHit } from "@/lib/search";
 
 function fmtYear(d: string | null): string {
   return d?.slice(0, 4) ?? "";
@@ -21,11 +24,13 @@ export function PersonPanel({
   name,
   tmdbKey,
   onOpenTitle,
+  onOpenMusic,
 }: {
   personId: number;
   name: string;
   tmdbKey: string | null;
   onOpenTitle: (m: Meta) => void;
+  onOpenMusic?: (query: string) => void;
 }) {
   const t = useT();
   const [person, setPerson] = useState<PersonDetail | null>(
@@ -35,6 +40,7 @@ export function PersonPanel({
   const [expanded, setExpanded] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
   const [bioClamped, setBioClamped] = useState(false);
+  const [music, setMusic] = useState<MusicSearchHit[]>([]);
 
   useEffect(() => {
     if (!tmdbKey || person) {
@@ -59,6 +65,21 @@ export function PersonPanel({
   }, [tmdbKey, personId, person]);
 
   const displayName = person?.name || name;
+  // The handler is an inline arrow upstream, so the effect keys off a stable boolean instead.
+  const wantsMusic = !!onOpenMusic;
+  useEffect(() => {
+    const query = displayName.trim();
+    if (!wantsMusic || query.length < 2) return;
+    let active = true;
+    void searchTyped(query, 24)
+      .then((results) => {
+        if (active) setMusic(personMusicHits(results, query));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [displayName, wantsMusic]);
   const photo = person?.profilePath ? `${IMG}/w342${person.profilePath}` : null;
   const facts = [
     person?.knownForDepartment,
@@ -164,6 +185,16 @@ export function PersonPanel({
           {shows.length > 0 && (
             <RailSection label={t("Shows")} count={shows.length}>
               <PosterRail items={shows} onOpen={onOpenTitle} />
+            </RailSection>
+          )}
+          {onOpenMusic && music.length > 0 && (
+            <RailSection label={t("Music")} count={music.length}>
+              <MusicRail
+                items={music}
+                onOpen={(item) =>
+                  onOpenMusic(item.kind === "album" ? `${item.title} ${item.subtitle}` : item.title)
+                }
+              />
             </RailSection>
           )}
           {!loading &&

@@ -16,6 +16,7 @@ import { requestTracker } from "./settings/tracker-request";
 import { SubTabsProvider, type SubTabReg } from "./settings/sub-tabs";
 import { SettingsSidebar } from "./settings/settings-sidebar";
 import { tabsFor } from "./settings/tab-registry";
+import { glideSettingsToTop, useSettingsAnchor, type SettingsAnchorRequest } from "./settings/anchor-navigation";
 import { PageActionsProvider, type PageActionReg } from "./settings/page-actions";
 import { SettingsFooter } from "./settings/settings-footer";
 import { SettingsActiveContext, type SectionId } from "./settings/shared";
@@ -33,25 +34,6 @@ import { useMediaQuery } from "@/lib/use-media-query";
 import { isBackKey } from "@/lib/keyboard-navigation/geometry";
 
 const IS_WEB = typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window);
-
-const SCROLL_TOP_MS = 420;
-
-function glideToTop(el: HTMLElement): void {
-  const from = el.scrollTop;
-  if (from <= 0) return;
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-    el.scrollTo({ top: 0 });
-    return;
-  }
-  const started = performance.now();
-  const step = (now: number) => {
-    const p = Math.min(1, (now - started) / SCROLL_TOP_MS);
-    const eased = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
-    el.scrollTop = from * (1 - eased);
-    if (p < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
 
 const BasicsPanel = lazy(() =>
   import("./settings/basics-panel").then((m) => ({ default: m.BasicsPanel })),
@@ -373,18 +355,18 @@ export function Settings({ visible = true }: { visible?: boolean }) {
   const [savedKey, setSavedKey] = useState<SavedKey | null>(null);
   const { settingsSectionRequest, topKind, chromeHidden: viewChromeHidden } = useView();
   const TRACKER_IDS = ["trakt", "anilist", "mal", "simkl", "letterboxd"];
-  const resolveSection = (id: string | null | undefined): SectionId => {
+  const resolveSection = (id: SectionId | null | undefined): SectionId => {
     if (!id) return "account";
     if (TRACKER_IDS.includes(id)) {
       requestTracker(id);
       return "trackers";
     }
-    return id as SectionId;
+    return id;
   };
   const [landing, setLanding] = useState<string | null>(null);
   const [active, setActive] = useState<SectionId>(resolveSection(settingsSectionRequest.section));
   const [relayMode, setRelayMode] = useState<RelayMode>("panel");
-  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  const [pendingAnchor, setPendingAnchor] = useState<SettingsAnchorRequest | null>(null);
   const [pendingPage, setPendingPage] = useState<{ section: SectionId; tab?: string } | null>(null);
   const [query, setQuery] = useState("");
   const compact = useMediaQuery("(max-width: 899px)");
@@ -461,14 +443,19 @@ export function Settings({ visible = true }: { visible?: boolean }) {
     closeBrowse();
     setLanding(null);
     setPendingPage(null);
-    pendingTab.current = tab ?? null;
-    if (tab && id === active) {
-      subRegRef.current?.onChange(tab);
+    // The five trackers are tabs of one panel rather than sections of their own, so a jump
+    // to any of them opens Trackers on that tab instead of an id nothing renders.
+    const isTracker = (TRACKER_IDS as string[]).includes(id);
+    const target = isTracker ? ("trackers" as SectionId) : id;
+    const wantTab = isTracker ? (tab ?? id) : tab;
+    pendingTab.current = wantTab ?? null;
+    if (wantTab && target === active) {
+      subRegRef.current?.onChange(wantTab);
       pendingTab.current = null;
     }
     startTransition(() => {
-      setActive(id);
-      setPendingAnchor(anchor ?? null);
+      setActive(target);
+      setPendingAnchor(anchor ? { anchor, tab: wantTab } : null);
     });
   };
 
@@ -532,9 +519,7 @@ export function Settings({ visible = true }: { visible?: boolean }) {
     setPendingPage(null);
   }, [active, pendingPage, subReg?.value]);
 
-  const triedTabs = useRef<Set<string>>(new Set());
-  const restoreTab = useRef<string | null>(null);
-  const pendingAnchorRef = useRef<string | null>(null);
+  const pendingAnchorRef = useRef<SettingsAnchorRequest | null>(null);
   pendingAnchorRef.current = pendingAnchor;
 
   useEffect(() => {
@@ -550,8 +535,8 @@ export function Settings({ visible = true }: { visible?: boolean }) {
     if (prev === null || next === null || next === prev) return;
     if (pendingAnchorRef.current) return;
     const el = scrollRef.current;
-    if (el) glideToTop(el);
-  }, [subReg?.value]);
+    if (el) return glideSettingsToTop(el);
+  }, [subReg?.value, pendingAnchor]);
 
   const wasVisible = useRef(visible);
   useEffect(() => {
@@ -561,72 +546,7 @@ export function Settings({ visible = true }: { visible?: boolean }) {
     wasVisible.current = visible;
   }, [visible]);
 
-  useEffect(() => {
-    if (!pendingAnchor) return;
-    const target = pendingAnchor;
-    let tries = 0;
-    let timer = 0;
-    const findTarget = (): HTMLElement | null => {
-      const exact = document.getElementById(target);
-      if (exact) return exact;
-      const root = scrollRef.current;
-      if (!root) return null;
-      const sections = Array.from(root.querySelectorAll<HTMLElement>('section[id^="set-"]'));
-      let best: HTMLElement | null = null;
-      for (const s of sections) {
-        if (!(s.id.startsWith(target) || target.startsWith(s.id))) continue;
-        if (
-          best == null ||
-          Math.abs(s.id.length - target.length) < Math.abs(best.id.length - target.length)
-        ) {
-          best = s;
-        }
-      }
-      return best;
-    };
-    const tryScroll = () => {
-      const el = findTarget();
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        el.classList.remove("hset-jumped");
-        void el.offsetWidth;
-        el.classList.add("hset-jumped");
-        window.setTimeout(() => el.classList.remove("hset-jumped"), 1400);
-        setPendingAnchor(null);
-        return;
-      }
-      const reg = subRegRef.current;
-      const want = pendingTab.current;
-      if (want && reg && !reg.tabs.some((tab) => tab.id === want)) pendingTab.current = null;
-      else if (want) {
-        if (tries++ < 30) timer = window.setTimeout(tryScroll, 50);
-        else setPendingAnchor(null);
-        return;
-      }
-      if (reg && triedTabs.current.size < reg.tabs.length) {
-        const next = reg.tabs.find((tab) => !triedTabs.current.has(tab.id));
-        if (next) {
-          triedTabs.current.add(next.id);
-          if (next.id !== reg.value) {
-            reg.onChange(next.id);
-            tries = 0;
-            timer = window.setTimeout(tryScroll, 50);
-            return;
-          }
-        }
-      }
-      if (tries++ < 30) timer = window.setTimeout(tryScroll, 50);
-      else {
-        if (restoreTab.current && subRegRef.current) subRegRef.current.onChange(restoreTab.current);
-        setPendingAnchor(null);
-      }
-    };
-    triedTabs.current = new Set();
-    restoreTab.current = pendingTab.current ?? subRegRef.current?.value ?? null;
-    if (subRegRef.current) triedTabs.current.add(subRegRef.current.value);
-    timer = window.setTimeout(tryScroll, 60);
-    return () => window.clearTimeout(timer);
-  }, [active, pendingAnchor]);
+  useSettingsAnchor(scrollRef, subRegRef, pendingAnchor, active, setPendingAnchor);
 
   const saveKey = (which: SavedKey, value: string) => {
     const trimmed = value.trim();

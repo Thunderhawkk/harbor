@@ -4,6 +4,7 @@ mod auth;
 mod browse;
 pub mod connector;
 mod control;
+pub mod devices;
 mod keystore;
 pub(super) mod library;
 mod parse;
@@ -18,7 +19,7 @@ use parking_lot::RwLock;
 use serde::Serialize;
 use session::AccountTier;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::sync::Mutex;
@@ -73,6 +74,9 @@ pub struct SpotifyState {
     http: reqwest::Client,
     web_token: RwLock<Option<keystore::WebToken>>,
     last_error: RwLock<Option<String>>,
+    linked: AtomicBool,
+    remote: RwLock<Option<String>>,
+    pub(super) remote_watch: AtomicU64,
     paused: AtomicBool,
     paused_for_video: AtomicBool,
 }
@@ -87,6 +91,9 @@ impl SpotifyState {
             http: http_client(),
             web_token: RwLock::new(None),
             last_error: RwLock::new(None),
+            linked: AtomicBool::new(false),
+            remote: RwLock::new(None),
+            remote_watch: AtomicU64::new(0),
             paused: AtomicBool::new(true),
             paused_for_video: AtomicBool::new(false),
         }
@@ -95,6 +102,7 @@ impl SpotifyState {
     pub fn initialize(self: &Arc<Self>, app: &AppHandle, cache_dir: PathBuf) {
         *self.cache_dir.write() = Some(cache_dir.clone());
         *self.app.write() = Some(app.clone());
+        *self.remote.write() = keystore::read(app, keystore::PLAY_TARGET_KEY);
         let cache = match session::make_cache(&cache_dir) {
             Ok(cache) => cache,
             Err(error) => {
@@ -105,6 +113,7 @@ impl SpotifyState {
         let Some(credentials) = keystore::load(app, &cache_dir) else {
             return;
         };
+        self.linked.store(true, Ordering::SeqCst);
         let state = self.clone();
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -132,6 +141,37 @@ impl SpotifyState {
         }
         self.adopt_web_token(&app, granted, None);
         self.status().await
+    }
+
+    // librespot is authorised with an access token that expires within the hour, and nothing
+    // else renews it: the web token has its own refresh path, which is why browsing keeps
+    // working while playback dies. Rebuild an expired session from the cached credentials.
+    pub(super) async fn ensure_session(&self) -> Result<(), String> {
+        {
+            let slot = self.runtime.lock().await;
+            if slot
+                .as_ref()
+                .is_some_and(|runtime| !runtime.session.is_invalid())
+            {
+                return Ok(());
+            }
+        }
+        let app = self
+            .app
+            .read()
+            .clone()
+            .ok_or_else(|| NOT_INITIALIZED.to_string())?;
+        let cache_dir = self.cache_path()?;
+        let Some(credentials) = keystore::load(&app, &cache_dir) else {
+            self.linked.store(false, Ordering::SeqCst);
+            return Err(tokens::CONNECT_FIRST.to_string());
+        };
+        let cache = session::make_cache(&cache_dir)?;
+        if let Err(error) = self.connect_with(app, cache, credentials).await {
+            self.record_failure(error.clone());
+            return Err(error);
+        }
+        Ok(())
     }
 
     async fn connect_with(
@@ -171,6 +211,7 @@ impl SpotifyState {
             tier,
         };
         *self.last_error.write() = None;
+        self.linked.store(true, Ordering::SeqCst);
         self.paused.store(true, Ordering::SeqCst);
         Ok(())
     }
@@ -186,6 +227,9 @@ impl SpotifyState {
         *self.account.write() = Account::empty();
         *self.web_token.write() = None;
         *self.last_error.write() = None;
+        self.linked.store(false, Ordering::SeqCst);
+        *self.remote.write() = None;
+        devices::stop_watching(self);
         self.paused.store(true, Ordering::SeqCst);
         self.paused_for_video.store(false, Ordering::SeqCst);
         let cache_dir = self.cache_path()?;
@@ -239,13 +283,42 @@ impl SpotifyState {
         connection
     }
 
+    /// A librespot socket dies on any network blip, but the stored sign in outlives it and the
+    /// web token refreshes on its own, so browsing and status follow the link, not the socket.
+    pub(super) fn remote_device(&self) -> Option<String> {
+        self.remote.read().clone()
+    }
+
+    pub async fn set_remote_device(&self, device: Option<String>) -> Result<(), String> {
+        let chosen = device.map(|id| id.trim().to_string()).filter(|id| !id.is_empty());
+        let app = self
+            .app
+            .read()
+            .clone()
+            .ok_or_else(|| NOT_INITIALIZED.to_string())?;
+        keystore::write(&app, keystore::PLAY_TARGET_KEY, chosen.as_deref())?;
+        devices::stop_watching(self);
+        let previous = self.remote.read().clone();
+        *self.remote.write() = chosen.clone();
+        // Handing playback somewhere else has to silence where it was, or the old device keeps
+        // playing to an empty room while Harbor shows the song running somewhere new.
+        if let Some(old) = previous.filter(|old| Some(old) != chosen.as_ref()) {
+            let _ = devices::set_paused(self, &old, true).await;
+        }
+        Ok(())
+    }
+
+    pub async fn devices(&self) -> Result<Vec<devices::SpotifyDevice>, String> {
+        devices::list(self).await
+    }
+
     pub(super) fn connected(&self) -> bool {
-        self.account.read().connected()
+        self.account.read().connected() || self.linked.load(Ordering::SeqCst)
     }
 
     fn snapshot(&self) -> SpotifyStatus {
         let account = self.account.read();
-        if !account.connected() {
+        if !account.connected() && !self.linked.load(Ordering::SeqCst) {
             return SpotifyStatus {
                 connected: false,
                 username: None,
@@ -273,6 +346,9 @@ impl SpotifyState {
     }
 
     fn record_failure(&self, error: String) {
+        if error == session::SIGN_IN_AGAIN || error == session::FREE_ACCOUNT {
+            self.linked.store(false, Ordering::SeqCst);
+        }
         *self.last_error.write() = Some(error);
     }
 }

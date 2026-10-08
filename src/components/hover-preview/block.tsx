@@ -5,6 +5,7 @@ import { useT } from "@/lib/i18n";
 import type { PreviewData } from "@/lib/hover-preview/preview-data";
 import { tmdbImdbCached } from "@/lib/providers/tmdb";
 import { toggleWatchlist, useInWatchlist } from "@/lib/watchlist";
+import { useLocalizedOverview } from "@/lib/use-localized-overview";
 import { ImdbIcon } from "../icons/imdb-icon";
 import { MalLogo } from "../icons/mal-logo";
 
@@ -83,6 +84,10 @@ function WatchlistToggle({ data }: { data: PreviewData }) {
 
 export function PreviewBlock({ data, onDetails }: { data: PreviewData; onDetails: () => void }) {
   const t = useT();
+  const synopsis = useLocalizedOverview(
+    { ...data.meta, description: data.synopsis ?? data.meta.description },
+    true,
+  );
   const resume = data.resume;
   const inProgress = !!resume && !resume.external;
   const verb = inProgress
@@ -93,9 +98,9 @@ export function PreviewBlock({ data, onDetails }: { data: PreviewData; onDetails
   return (
     <div className="flex flex-col gap-3 px-5 pb-4 pt-4">
       <DecisionLine data={data} />
-      {data.synopsis && (
+      {synopsis && (
         <p data-stagger="2" className="line-clamp-3 text-[13.5px] leading-[1.5] text-ink-muted">
-          {data.synopsis}
+          {synopsis}
         </p>
       )}
       <div data-stagger="2" className="flex h-6 items-center justify-between">

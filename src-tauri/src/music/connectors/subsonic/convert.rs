@@ -37,6 +37,7 @@ pub fn album_ref(client: &SubsonicClient, album: model::AlbumId3) -> MusicAlbumR
         artwork: artwork(client, album.cover_art),
         year: album.year,
         track_count: album.song_count,
+        explicit: None,
     }
 }
 

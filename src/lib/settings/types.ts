@@ -9,6 +9,7 @@ import type { FullscreenClockFormat, FullscreenClockStyle } from "@/lib/local-ti
 import type { SubtitleOffsetPosition, SubtitleOffsetSize } from "@/lib/player/subtitle-offset";
 import type { BufferSizeId } from "@/lib/player/buffer-profile";
 import type { UiLanguage } from "@/lib/i18n/languages";
+import type { DisplaySelection } from "@/lib/monitors";
 
 export type StreamingService =
   | "netflix"
@@ -92,6 +93,15 @@ export type ScreensaverMedia = {
   name: string;
   path: string;
   kind: ScreensaverMediaKind;
+};
+
+export type MusicSpeedPreset = {
+  id: string;
+  name: string;
+  speed: number;
+  pitch: number;
+  reverb: number;
+  keepPitch: boolean;
 };
 
 export type Settings = {
@@ -194,7 +204,7 @@ export type Settings = {
   navIconAnimations: boolean;
   bigPicturePlayerUi: "tenFoot" | "desktop";
   screensaver: boolean;
-  screensaverStyle: "ambient" | "catBoat" | "custom";
+  screensaverStyle: "ambient" | "catBoat" | "halloween" | "custom";
   screensaverMedia: ScreensaverMedia[];
   screensaverMediaId: string | null;
   screensaverDelayMin: number;
@@ -266,7 +276,10 @@ export type Settings = {
   discordShowPoster: boolean;
   discordShowTimestamp: boolean;
   discordShowPartyJoin: boolean;
+  discordMusicPresence: boolean;
   playerEngine: "auto" | "html5" | "mpv";
+  /** resize shrinks the Harbor window; native floats the video in its own window. */
+  pipBehavior: "resize" | "native";
   playerShellId: string;
   playerChromeTheme: "auto" | "default" | "stremio";
   playerMenuBlack: boolean;
@@ -290,6 +303,10 @@ export type Settings = {
   playerAnime4kAnimeOnly: boolean;
   playerAnime4kIndicator: boolean;
   playerMpvEmbed: boolean;
+  /** Where the separate mpv window opens. Windows only; see src/lib/monitors.ts. */
+  playerSeparateDisplay: DisplaySelection;
+  /** Fill the whole monitor (cover the taskbar) for the separate mpv window. */
+  playerSeparateCoverTaskbar: boolean;
   playerP2pChip: boolean;
   showQualityInfo: boolean;
   stremioServerTranscode: boolean;
@@ -305,6 +322,7 @@ export type Settings = {
   streamCacheMaxGb: number;
   deleteWatchedDownloads: boolean;
   streamCacheDir: string;
+  playbackCacheDir: string;
   remoteStreamServerUrl: string;
   remoteStreamServerStrict: boolean;
   castAlwaysTranscode: boolean;
@@ -386,6 +404,11 @@ export type Settings = {
   playbackSourcePreference: "ask" | "local" | "online" | "home-server";
   preferredMediaServerId: string | null;
   localMinFileSizeMb: number;
+  /** Re-scan the folders already in the local library on open, adding only files it has not seen.
+   * Existing entries are never rebuilt, so anything corrected with Identify stays corrected. */
+  localAutoScan: boolean;
+  /** How an auto-scan identifies a new file, remembered from the last manual scan. */
+  localScanMode: "tmdb" | "nfo" | null;
   catalogsPinned: string[];
   catalogsHidden: string[];
   posterBaseUrl: string;
@@ -412,6 +435,11 @@ export type Settings = {
   songIdAiKey: string;
   songIdAiModel: string;
   aiSearchKey: string;
+  steamSearchShortcut: boolean;
+  gameAgeRatingAgency: "ESRB" | "PEGI";
+  gameArtworkSelection: "first" | "random" | "manual";
+  gameArtworkScreenshots: boolean;
+  gameArtworkCoverIcon: boolean;
   aiSearchModel: string;
   aiSearchProvider: "openrouter" | "groq";
   aiGroqKey: string;
@@ -432,6 +460,7 @@ export type Settings = {
   playerSvp: boolean;
   svpVpyPath: string;
   svpScope: "all" | "anime" | "non-anime";
+  svpTargetFps: "double" | "48" | "60" | "display";
   seekBackStepSec: number;
   seekForwardStepSec: number;
   seekBackStepShortSec: number;
@@ -444,8 +473,12 @@ export type Settings = {
   playerTvNavigation: boolean;
   bigPictureButton: boolean;
   bigPictureAutoStart: boolean;
+  /** Which monitor Big Picture opens on at startup. Windows only. */
+  bigPictureDisplay: DisplaySelection;
   bigPictureSound: "none" | "glass" | "modern" | "retro" | "cinematic";
   bigPictureMosaic: boolean;
+  bigPictureBackdropZoom: boolean;
+  tabHotkeys: boolean;
   /**
    * Fraction of each edge a television is assumed to crop, 0 to 0.1. Read at
    * import time by bp-safe-area straight out of localStorage, which is why it
@@ -477,6 +510,8 @@ export type Settings = {
   hideWatchedInHero: boolean;
   hideUnreleased: boolean;
   localEpisodeSortDesc: boolean;
+  /** Review count when the banner was last dismissed; it returns only if more turn up. */
+  localReviewDismissedCount: number;
   smoothScroll: boolean;
   showSimklCard: boolean;
   showLetterboxdCard: boolean;
@@ -488,6 +523,8 @@ export type Settings = {
   defaultProfileId: string;
   sportsLeagues: string[];
   sportsShowOdds: boolean;
+  /** Scores and schedules need no provider; streams do. Off until asked for. */
+  sportsWithoutProvider: boolean;
   hideSpoilers: boolean;
   spoilerHideThumbnails: boolean;
   spoilerHideTitles: boolean;
@@ -503,6 +540,10 @@ export type Settings = {
   customLogoWordmark: string;
   customAppIcon: string;
   customAppIconPreset: string;
+  musicArtworkAppIcon: boolean;
+  musicSeekThumb: boolean;
+  musicSeekThumbHover: boolean;
+  musicSpeedPresets: MusicSpeedPreset[];
   homeMode: "harbor" | "classic";
   homeShowAllAddonRows: boolean;
   homeNewEpisodes: boolean;
@@ -529,9 +570,18 @@ export type Settings = {
   dragAnywhere: boolean;
   resumeDetailScroll: boolean;
   pluginsEnabled: boolean;
+  /** Whether anything outside the Plugins page may ask a plugin that stands up rows of its own.
+   * Off by default, so those extensions are asked on their own page only. A plugin with no rows of
+   * its own is asked either way, because nothing else would ever reach it. */
+  pluginsOutsideTab: boolean;
   pluginsGroupByRepo: boolean;
   pluginsAutoCheck: boolean;
   pluginsBackground: boolean;
+  /** Badges on the Plugins tab's posters, read out of the listing titles a provider sends. Off by
+   * default: a provider's title carries whatever it wants to say, and not everyone wants a poster
+   * with a language strip on it. */
+  pluginsPosterLanguages: boolean;
+  pluginsPosterQuality: boolean;
   cwPerProfile: boolean;
   closeToTray: boolean;
   trayAlwaysOnTop: boolean;
@@ -595,6 +645,7 @@ export type Settings = {
   seekBarFill: boolean;
   seekBarFillOpacity: number;
   seekDotShape: "circle" | "square" | "image" | "hidden";
+  seekDotHover: boolean;
   seekDotSize: number;
   seekDotImage: string;
   customCss: string;
@@ -623,7 +674,8 @@ export type Settings = {
     | "custom"
     | "simkl"
     | "simkl-anticipated"
-    | "anime";
+    | "anime"
+    | "games";
   simklHomeRailsEnabled: boolean;
   simklUpNextRailEnabled: boolean;
   simklTrendingRailEnabled: boolean;
@@ -676,6 +728,8 @@ export type Settings = {
   iptvForceProxy: boolean;
   iptvEpgOffsetHours: number;
   sidebarCollapsed: boolean;
+  showQuickGameLibrary: boolean;
+  gamesOpenInLibrary: boolean;
   wrappedButton: boolean;
   libraryHero: boolean;
   mangaEnabled: boolean;

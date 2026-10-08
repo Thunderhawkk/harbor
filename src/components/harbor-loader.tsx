@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import whiteBoat from "@/assets/lottie/addons-boat-white.json";
 import darkBoat from "@/assets/lottie/addons-boat-dark.json";
 import harborBoat from "@/assets/lottie/harbor-loader.json";
+import { CustomArtwork } from "./custom-artwork";
 import { prefetchTopAddonLogos, prefetchedTopAddonLogos } from "@/lib/providers/addon-logo-prefetch";
 
 type Size = "xs" | "sm" | "md" | "lg" | "xl";
@@ -50,13 +51,24 @@ export function HarborLoader({
   className = "",
   keyed = false,
   logos,
+  original = false,
 }: {
   size?: Size;
   caption?: string;
   className?: string;
   keyed?: boolean;
   logos?: string[];
+  original?: boolean;
 }) {
+  return (
+    <div className={`flex flex-col items-center justify-center gap-2 ${className}`}>
+      {original ? <Boat size={size} keyed={keyed} logos={logos} /> : <CustomArtwork role="loading" className={`harbor-loader-art ${SIZE_CLASS[size]}`} fallback={<Boat size={size} keyed={keyed} logos={logos} />} />}
+      {caption && <p className="harbor-loader-cap mt-1 text-[12.5px] font-medium uppercase tracking-[0.18em] text-white/70">{caption}</p>}
+    </div>
+  );
+}
+
+function Boat({size, keyed, logos}: {size:Size;keyed:boolean;logos?:string[]}) {
   const ref = useRef<HTMLDivElement | null>(null);
   const cargo = keyed || logos !== undefined;
   const fetched = useTopAddonLogos(keyed && logos === undefined);
@@ -118,13 +130,6 @@ export function HarborLoader({
   }, [effective, paint]);
 
   return (
-    <div className={`flex flex-col items-center justify-center gap-2 ${className}`}>
-      <div ref={ref} className={`harbor-loader-art ${SIZE_CLASS[size]}`} aria-hidden />
-      {caption && (
-        <p className="harbor-loader-cap mt-1 text-[12.5px] font-medium uppercase tracking-[0.18em] text-white/70">
-          {caption}
-        </p>
-      )}
-    </div>
+    <div ref={ref} className={`harbor-loader-art ${SIZE_CLASS[size]}`} aria-hidden />
   );
 }

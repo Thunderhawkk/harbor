@@ -127,6 +127,15 @@ export async function resolveAnimeSourceManga(
   return details ? pickSourceManga(details, animeName) : null;
 }
 
+async function mangaBehindNovel(
+  novel: AnilistRelatedNode,
+  animeName: string,
+): Promise<AnilistRelatedNode | null> {
+  const details = await fetchAnilistMediaDetails(novel.anilistId).catch(() => null);
+  if (!details) return null;
+  return pickSourceManga(details, animeName);
+}
+
 export async function resolveAnimeSourceReading(
   id: string,
   malId: number | null | undefined,
@@ -135,5 +144,9 @@ export async function resolveAnimeSourceReading(
   const anilistId = await resolveAnilistId(id, malId);
   if (anilistId == null) return null;
   const details = await fetchAnilistMediaDetails(anilistId).catch(() => null);
-  return details ? pickSourceReading(details, animeName) : null;
+  if (!details) return null;
+  const reading = pickSourceReading(details, animeName);
+  if (!reading || reading.kind === "manga") return reading;
+  const manga = await mangaBehindNovel(reading.node, animeName);
+  return manga ? { kind: "manga", node: manga } : reading;
 }

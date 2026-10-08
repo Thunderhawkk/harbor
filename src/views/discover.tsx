@@ -1,5 +1,4 @@
 import {
-  Fragment,
   startTransition,
   useCallback,
   useEffect,
@@ -17,6 +16,7 @@ import { FeaturedBanner } from "@/components/featured-banner";
 import { AwardTiles } from "@/components/award-tiles";
 import { GenreTiles } from "@/components/genre-tiles";
 import { LanguageTiles } from "@/components/language-tiles";
+import { CountryTiles } from "@/components/country-tiles";
 import { Row, ScrollRootContext } from "@/components/row";
 import { PickCard } from "@/components/pick-card";
 import type { Meta } from "@/lib/cinemeta";
@@ -44,6 +44,9 @@ import { useContentDrag } from "@/lib/window-drag";
 import { useScrollMemory } from "@/lib/view";
 import { useLetterboxd } from "@/lib/stremboxd/provider";
 import { buildLetterboxdHomeRows } from "@/lib/stremboxd/home-rails";
+import { CuratedListRow } from "@/components/curated-list-row";
+import { CuratedListTiles } from "@/components/curated-list-tiles";
+import { REGISTRY_LATEST_LIST_ID } from "@/lib/film-registry/inductions";
 import { LetterboxdRowMenu } from "@/components/letterboxd/letterboxd-row-menu";
 import { Rail } from "./discover/discover-rail";
 import { useDedupedRows } from "./discover/use-deduped-rows";
@@ -77,11 +80,15 @@ type RowItem = { key: string; title: string };
 const SPECIAL_ROWS: Array<RowItem & { after: number }> = [
   { key: "special:genres", title: "Browse by Genre", after: 0 },
   { key: "special:queue", title: "Your Discovery Queue", after: 1 },
+  { key: "special:nyt-tv", title: "The 100 Best TV Shows of the 21st Century", after: 2 },
   { key: "special:languages", title: "Browse by Language", after: 2 },
   { key: "special:collections", title: "Collections", after: 2 },
   { key: "special:critics", title: "Critics' Pick", after: 3 },
   { key: "special:studios", title: "Top studios", after: 3 },
   { key: "special:awards", title: "Browse by Award", after: 4 },
+  { key: "special:countries", title: "Browse by Country", after: 5 },
+  { key: "special:canon", title: "The canon", after: 4 },
+  { key: "special:film-registry", title: "New to the National Film Registry", after: 5 },
   { key: "special:networks", title: "Top networks", after: 4 },
   { key: "special:people", title: "Top People", after: -1 },
 ];
@@ -486,6 +493,12 @@ export function Discover({ active = true }: { active?: boolean }) {
         return shownQueue.length > 0 ? (
           <DiscoveryQueueCta items={shownQueue} title={renamed} />
         ) : null;
+      case "special:nyt-tv":
+        return <CuratedListRow listId="nyt-tv-100" title={renamed} />;
+      case "special:canon":
+        return <CuratedListTiles title={renamed} />;
+      case "special:film-registry":
+        return <CuratedListRow listId={REGISTRY_LATEST_LIST_ID} title={renamed} />;
       case "special:languages":
         return <LanguageTiles title={renamed} />;
       case "special:collections":
@@ -498,6 +511,8 @@ export function Discover({ active = true }: { active?: boolean }) {
         return settings.tmdbKey ? <BrandTiles kind="studio" title={renamed} /> : null;
       case "special:awards":
         return <AwardTiles title={renamed} />;
+      case "special:countries":
+        return settings.tmdbKey ? <CountryTiles title={renamed} /> : null;
       case "special:networks":
         return settings.tmdbKey ? <BrandTiles kind="network" title={renamed} /> : null;
       case "special:people":
@@ -505,6 +520,7 @@ export function Discover({ active = true }: { active?: boolean }) {
       default:
         return (
           <Rail
+            key={item.key}
             active={active}
             railId={item.key}
             allRails={dailyRows}
@@ -622,7 +638,7 @@ export function Discover({ active = true }: { active?: boolean }) {
                 const hidden = pageRows.custom.hidden.includes(item.key);
                 const idx = orderKeys.indexOf(item.key);
                 return (
-                  <div key={item.key}>
+                  <div key={item.key} data-scroll-anchor={`discover:${item.key}`}>
                     <RowControls
                       name={item.key in pageRows.custom.renamed ? item.title : t(item.title)}
                       hidden={hidden}
@@ -649,7 +665,15 @@ export function Discover({ active = true }: { active?: boolean }) {
                   </div>
                 );
               })
-            : visibleRails.map((item) => <Fragment key={item.key}>{renderRow(item)}</Fragment>)}
+            : visibleRails.map((item) => {
+              const row = renderRow(item);
+              if (!isSpecialRow(item.key)) return row;
+              return row ? (
+                <div key={item.key} data-scroll-anchor={`discover:${item.key}`} className="empty:hidden">
+                  {row}
+                </div>
+              ) : null;
+            })}
         </div>
       </ScrollRootContext.Provider>
       <BackToTop scrollRef={scrollRef} />

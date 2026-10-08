@@ -1067,8 +1067,8 @@ main.absolute.inset-0 .rounded-xl.border.bg-elevated\\/70 {
 [data-scroll-anchor="hero"] .overflow-hidden {
   border-radius: 0 !important;
 }
-[data-scroll-anchor="hero"]:not(.harbor-anime-hero) img.object-cover,
-[data-scroll-anchor="hero"]:not(.harbor-anime-hero) .pointer-events-none.overflow-hidden {
+[data-scroll-anchor="hero"]:not(.harbor-anime-hero) .harbor-hero-stage > img.object-cover,
+[data-scroll-anchor="hero"]:not(.harbor-anime-hero) .harbor-hero-stage > .pointer-events-none.overflow-hidden {
   inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
@@ -1974,6 +1974,9 @@ export function applyTheme(theme: ThemeSettings): void {
     root.style.setProperty(k, v);
   }
   root.dataset.themeMode = isLightColor(tokens["--color-canvas"]) ? "light" : "dark";
+  // light-dark() is how album-art colours pick a readable lightness. Without a real
+  // color-scheme it always resolves dark, so light themes got an invisible tint.
+  root.style.colorScheme = root.dataset.themeMode;
   const preset = theme.preset !== "custom" ? getThemeById(theme.preset) : null;
   const fontPairId = preset?.fontPair ?? theme.fontPair;
   const pair = FONT_PAIRS[fontPairId] ?? FONT_PAIRS["sentient-switzer"];

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Check, Loader2, Play, Plus, Search, X } from "lucide-react";
+import { Check, Loader2, Play, Plus, Search, X } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 import { useT } from "@/lib/i18n";
 import { searchTyped } from "@/lib/music/catalog";
 import { enqueueMusic, playMusic } from "@/lib/music/player";
 import { rankMusicSearch } from "@/lib/music/search-ranking";
-import { searchMusicVideos } from "@/lib/music/video-discovery";
+import { searchMusicVideoPage } from "@/lib/music/video-pages";
 import {
   dedupeSearchTracks,
   filterSearchMode,
@@ -24,10 +25,8 @@ const MODES: NowSearchMode[] = ["songs", "videos"];
 
 async function fetchSearchMode(
   value: string,
-  mode: NowSearchMode,
   limit: number,
 ): Promise<MusicTrack[]> {
-  if (mode === "videos") return searchMusicVideos(value, false, false, limit);
   const found = await searchTyped(value, limit);
   const ranked = rankMusicSearch(found, value);
   return (ranked?.tracks ?? found.tracks) as MusicTrack[];
@@ -49,12 +48,14 @@ export function MusicNowSearch({ onClose }: { onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const sentinelRef = useRef<HTMLLIElement>(null);
+  const videoCursors = useRef(new Map<number, string | null>());
 
   useEffect(() => {
     inputRef.current?.focus({ preventScroll: true });
   }, []);
 
   const restart = useCallback(() => {
+    videoCursors.current.clear();
     setLimit(NOW_SEARCH_PAGE);
     setCursor(-1);
     setNextLimit(null);
@@ -77,14 +78,22 @@ export function MusicNowSearch({ onClose }: { onClose: () => void }) {
     } else setMore(true);
     let live = true;
     const run = () => {
-      void fetchSearchMode(value, mode, limit)
-        .then((found) => {
+      const request = mode === "videos"
+        ? searchMusicVideoPage(value, false, videoCursors.current.get(limit) ?? null)
+        : fetchSearchMode(value, limit).then(tracks => ({ tracks, next: null }));
+      void request
+        .then(({ tracks: found, next }) => {
           if (!live) return;
           const page = filterSearchMode(found, mode);
           setResults((prev) =>
             initial || !prev ? dedupeSearchTracks(page) : mergeSearchTracks(prev, page),
           );
-          setNextLimit(nextSearchLimit(limit, found.length));
+          if (mode === "videos") {
+            const following = next ? limit + NOW_SEARCH_PAGE : null;
+            if (following !== null) videoCursors.current.set(following, next);
+            setNextLimit(following);
+          } else setNextLimit(nextSearchLimit(limit, found.length));
+          setFailed(false);
           setBusy(false);
           setMore(false);
         })
@@ -214,7 +223,7 @@ export function MusicNowSearch({ onClose }: { onClose: () => void }) {
       </div>
       {results === null ? (
         <p className="music-now-search-hint">{t("music.searchPlaceholder")}</p>
-      ) : results.length === 0 ? (
+      ) : results.length === 0 && nextLimit === null ? (
         <div className="music-now-search-hint">
           {busy ? (
             <span className="music-now-search-loading">
@@ -263,7 +272,7 @@ export function MusicNowSearch({ onClose }: { onClose: () => void }) {
                     ratio="square"
                     className="w-full [--poster-radius:0px]"
                     lazy
-                  />
+                  ><MusicTrackPlaybackMark track={track}/></Poster>
                   <span className="music-now-search-meta">
                     <strong>{track.title}</strong>
                     <span className="music-now-search-sub">

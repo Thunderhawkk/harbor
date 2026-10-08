@@ -66,6 +66,10 @@ export function MusicQualityBadge({
       : quality.tier === "unverified"
         ? (quality.format ?? quality.label)
         : tier;
+  const evidence = quality.detail
+    .split(" · ")
+    .filter((part) => part !== label && !label.split(" · ").includes(part))
+    .join(" · ");
   return (
     <span
       className={`music-quality-badge ${className}`}
@@ -75,7 +79,7 @@ export function MusicQualityBadge({
     >
       <MusicQualityGlyph tier={quality.tier} />
       <span>{label}</span>
-      {showEvidence && <span className="music-quality-evidence">{quality.detail}</span>}
+      {showEvidence && evidence && <span className="music-quality-evidence"> · {evidence}</span>}
     </span>
   );
 }

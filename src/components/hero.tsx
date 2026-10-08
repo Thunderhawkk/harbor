@@ -37,7 +37,11 @@ import {
 } from "@/lib/hero-mute";
 import { getHeroEnded, setHeroEnded } from "@/lib/hero-ended";
 import { usePageVisible } from "@/lib/visibility";
+import { useTrailerVideo } from "@/lib/use-trailer-video";
 import { toggleWatchlist, useInWatchlist } from "@/lib/watchlist";
+
+const HERO_VIDEO_CLASS =
+  "absolute left-1/2 top-1/2 h-[110%] w-[110%] -translate-x-1/2 -translate-y-1/2 object-cover";
 
 export const Hero = memo(function Hero({
   meta,
@@ -76,7 +80,6 @@ export const Hero = memo(function Hero({
     : (meta.background ?? (bgResolved ? meta.poster : undefined));
   const [trailerCandidates, setTrailerCandidates] = useState<string[]>([]);
   const [trailerInfo, setTrailerInfo] = useState<TrailerInfo | null>(null);
-  const [videoReady, setVideoReady] = useState(false);
   const [overControls, setOverControls] = useState(false);
   const audioHero = settings.heroTrailerAudio && playTrailer;
   const muted = useSyncExternalStore(subscribeHeroMuted, getHeroMuted);
@@ -86,7 +89,6 @@ export const Hero = memo(function Hero({
   const logo = pinnedLogo ?? logoState;
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [logoResolved, setLogoResolved] = useState<boolean>(!!meta.logo);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [visibleRatio, setVisibleRatio] = useState(1);
   const [lingered, setLingered] = useState(false);
@@ -97,11 +99,21 @@ export const Hero = memo(function Hero({
   const onScreen = pageVisible && !overlayed && visibleRatio > 0.12;
   const wantsPlayback =
     !!playTrailer && !!trailerInfo && !overControls && onScreen && lingered && !ended;
+  const { slot, video: videoRef, ready: videoReady } = useTrailerVideo({
+    src: trailerInfo ? trailerSrc(trailerInfo) : null,
+    active: !!playTrailer && !!trailerInfo && onScreen,
+    className: HERO_VIDEO_CLASS,
+    loop: !audioHero,
+    onEnded: () => {
+      if (!audioHero) return;
+      setEnded(true);
+      setHeroEnded(meta.id, true);
+    },
+  });
 
   useEffect(() => {
     setTrailerCandidates([]);
     setTrailerInfo(null);
-    setVideoReady(false);
     setEnded(getHeroEnded(meta.id));
   }, [meta.id]);
 
@@ -267,21 +279,6 @@ export const Hero = memo(function Hero({
     };
   }, [wantsPlayback, muted, audioHero]);
 
-  useEffect(() => {
-    if (!trailerInfo) return;
-    const v = videoRef.current;
-    return () => {
-      if (!v) return;
-      try {
-        v.pause();
-        v.removeAttribute("src");
-        v.load();
-      } catch {
-        void 0;
-      }
-    };
-  }, [trailerInfo]);
-
   const actionRadius = playSquare ? "rounded-md" : "rounded-full";
 
   return (
@@ -306,21 +303,7 @@ export const Hero = memo(function Hero({
           className={`pointer-events-none absolute overflow-hidden transition-opacity duration-500 ${full ? "inset-0 rounded-none" : "inset-[2px] rounded-[26px]"}`}
           style={{ opacity: wantsPlayback && videoReady ? 1 : 0 }}
         >
-          <video
-            ref={videoRef}
-            src={trailerSrc(trailerInfo)}
-            loop={!audioHero}
-            playsInline
-            preload="none"
-            onCanPlay={() => setVideoReady(true)}
-            onEnded={() => {
-              if (audioHero) {
-                setEnded(true);
-                setHeroEnded(meta.id, true);
-              }
-            }}
-            className="absolute left-1/2 top-1/2 h-[110%] w-[110%] -translate-x-1/2 -translate-y-1/2 object-cover"
-          />
+          <div ref={slot} className="absolute inset-0" />
         </div>
       )}
       {audioHero && trailerInfo && videoReady && (wantsPlayback || ended) && (
@@ -370,15 +353,15 @@ export const Hero = memo(function Hero({
                 </span>
               </div>
               {rank.sources && rank.sources.length > 0 && (
-                <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-max min-w-[232px] translate-y-1 rounded-md bg-elevated p-2.5 opacity-0 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] ring-1 ring-edge transition-[opacity,transform] duration-150 ease-out group-hover/rank:translate-y-0 group-hover/rank:opacity-100 motion-reduce:transition-none">
-                  <div className="px-1 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-subtle">
+                <div className="pointer-events-none absolute start-0 top-full z-30 mt-2.5 w-[248px] max-w-[calc(100vw-48px)] translate-y-1 rounded-xl bg-elevated px-3.5 py-3 opacity-0 shadow-[0_6px_18px_-10px_rgba(0,0,0,0.45)] transition-[opacity,transform] duration-150 ease-out before:absolute before:-top-1 before:start-5 before:h-2 before:w-2 before:rotate-45 before:rounded-tl-[2px] before:bg-elevated group-hover/rank:translate-y-0 group-hover/rank:opacity-100 motion-reduce:transition-none">
+                  <div className="pb-2 text-[12px] font-semibold leading-4 text-ink-muted">
                     {t("Consensus ranking")}
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-0.5">
                     {rank.sources.map((s) => (
                       <div
                         key={s.label}
-                        className="flex items-center justify-between gap-6 px-1 py-1.5"
+                        className="flex items-center justify-between gap-4 py-1.5"
                       >
                         <span className="inline-flex items-center gap-2 text-[12.5px] font-medium text-ink">
                           {SOURCE_ICON[s.label] && (
@@ -399,9 +382,6 @@ export const Hero = memo(function Hero({
                         </span>
                       </div>
                     ))}
-                  </div>
-                  <div className="px-1 pt-2.5 text-[11px] leading-snug text-ink-subtle">
-                    {t("Blended across TMDB, Trakt, Simkl and Cinemeta.")}
                   </div>
                 </div>
               )}
@@ -559,10 +539,6 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function upsizeTmdb(url?: string, full = false): string | undefined {
   if (!url) return url;
-  const hi =
-    full &&
-    typeof window !== "undefined" &&
-    (window.screen?.height ?? 0) * (window.devicePixelRatio || 1) >= 2000;
-  const size = hi ? "original" : "w1280";
+  const size = full ? "original" : "w1280";
   return url.replace(/\/t\/p\/(w\d+|original)\//, `/t/p/${size}/`);
 }

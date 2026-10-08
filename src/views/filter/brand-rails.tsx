@@ -3,12 +3,11 @@ import { CollectionCard } from "@/components/collection-card";
 import { PickCard } from "@/components/pick-card";
 import { Row, usePosterRow } from "@/components/row";
 import { useT, useUiLanguage } from "@/lib/i18n";
+import { browseDiscoverKey } from "@/lib/providers/tmdb/browse-kind";
 import type { BrandStats, BrandTitle } from "@/lib/providers/tmdb/tmdb-brands";
-import type { MetaFilter } from "@/lib/view";
+import { browsedId, type Browsed } from "./browsed";
 import { RailSection } from "./rail-section";
 import type { StandardRail } from "./rails-config";
-
-type Branded = MetaFilter & { kind: "studio" | "network"; id: number; name: string };
 
 export function compactMoney(n: number, lang: string): string {
   try {
@@ -79,7 +78,7 @@ export function LongestRunningRail({ stats, name }: { stats: BrandStats; name: s
   );
 }
 
-export function DecadesSection({ filter, stats }: { filter: Branded; stats: BrandStats }) {
+export function DecadesSection({ filter, stats }: { filter: Browsed; stats: BrandStats }) {
   const t = useT();
   const firstYear = stats.first?.year ?? null;
   const decades = useMemo(() => {
@@ -92,6 +91,7 @@ export function DecadesSection({ filter, stats }: { filter: Branded; stats: Bran
   }, [firstYear]);
   const [picked, setPicked] = useState<number | null>(null);
   const active = picked ?? decades[0] ?? null;
+  const browseId = browsedId(filter);
   const rail = useMemo<StandardRail | null>(() => {
     if (active === null) return null;
     const dateKey = filter.mediaType === "movie" ? "primary_release_date" : "first_air_date";
@@ -101,7 +101,7 @@ export function DecadesSection({ filter, stats }: { filter: Branded; stats: Bran
       title: `${active}s`,
       kicker: "Through the decades",
       params: {
-        [filter.kind === "network" ? "with_networks" : "with_companies"]: String(filter.id),
+        [browseDiscoverKey(filter.kind)]: String(browseId),
         [`${dateKey}.gte`]: `${active}-01-01`,
         [`${dateKey}.lte`]: `${active + 9}-12-31`,
         sort_by: "popularity.desc",
@@ -109,7 +109,7 @@ export function DecadesSection({ filter, stats }: { filter: Branded; stats: Bran
       },
       noDedup: true,
     };
-  }, [active, filter.kind, filter.id, filter.mediaType]);
+  }, [active, filter.kind, browseId, filter.mediaType]);
   if (decades.length < 2 || !rail) return null;
   return (
     <section className="flex flex-col gap-4">

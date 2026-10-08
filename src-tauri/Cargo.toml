@@ -1,6 +1,6 @@
 [package]
 name = "harbor"
-version = "0.9.127"
+version = "0.9.132"
 description = "A Stremio client built for adventure"
 edition = "2021"
 
@@ -18,7 +18,8 @@ asr-whisper = ["dep:whisper-rs"]
 chromaprint = []
 
 [dependencies]
-tauri = { version = "2.11.1", features = ["protocol-asset", "tray-icon", "image-png", "image-ico"] }
+anyhow = "1"
+tauri = { version = "2.12.0", features = ["protocol-asset", "tray-icon", "image-png", "image-ico"] }
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-os = "2"
@@ -29,8 +30,10 @@ tauri-plugin-fs = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-notification = "2"
 walkdir = "2"
+dunce = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+httpdate = "1"
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["io", "rt"] }
 axum = { version = "0.8", features = ["ws"] }
@@ -41,9 +44,18 @@ reqwest = { version = "0.12", default-features = false, features = [
   "gzip",
 ] }
 flate2 = "1"
-zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+tar = "0.4"
+plist = "1.9"
+zip = { version = "4", default-features = false, features = ["deflate-flate2", "aes-crypto"] }
+zeroize = "1"
+sevenz-rust2 = { version = "=0.20.2", default-features = false, features = ["aes256", "bzip2", "ppmd", "deflate"] }
+unrar_sys = { path = "vendor/unrar_sys" }
+hadris-iso = { version = "=2.5.0", default-features = false, features = ["std", "sync", "joliet"] }
+harbor-udfread = { path = "vendor/harbor-udfread" }
 regex = "1"
 encoding_rs = "0.8"
+quick-xml = { version = "=0.38.4", features = ["serialize"] }
+yaml-rust2 = { version = "0.13", default-features = false }
 uuid = { version = "1", features = ["v4"] }
 futures-util = "0.3"
 gilrs = { version = "0.11", default-features = false, features = ["xinput"] }
@@ -51,6 +63,7 @@ libc = "0.2"
 socket2 = "0.5"
 base64 = "0.22"
 sha2 = "0.10"
+sha1 = "0.10"
 png = "0.17"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 hound = "3.5"
@@ -84,6 +97,8 @@ whisper-rs = { version = "0.14", optional = true }
 #   root: on Android they compile to an empty crate and every path into them is
 #   unresolved. updater and process declare Android support level "none".
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+leveldb-sys = { path = "vendor/leveldb-sys", features = ["snappy"] }
+trash = "=5.2.9"
 libmpv2 = "4"
 libmpv2-sys = "4"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
@@ -112,9 +127,10 @@ librespot-oauth = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_Security_Cryptography",
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Shell",
   "Win32_Graphics_Gdi",
@@ -122,25 +138,43 @@ windows = { version = "0.61", features = [
   "Win32_Graphics_Dxgi_Common",
   "Win32_Devices_Display",
   "Win32_System_Threading",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
+  "Win32_Media_Audio",
+  "Win32_System_Registry",
+  "Win32_Storage_FileSystem",
   "Win32_System_Power",
   "Win32_System_JobObjects",
   "Win32_System_ProcessStatus",
   "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Diagnostics_Debug",
   "Win32_System_SystemInformation",
   "Win32_System_LibraryLoader",
   "Win32_System_WinRT",
+  "Win32_System_WinRT_Direct3D11",
+  "Win32_System_WinRT_Graphics_Capture",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Graphics_Capture",
+  "Graphics_DirectX_Direct3D11",
+  "Graphics_Imaging",
   "Media",
   "Foundation",
   "Storage_Streams",
 ] }
 window-vibrancy = "0.6"
 wasapi = "0.15"
-webview2-com = "0.38"
+webview2-com = "0.39"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", features = ["v3_24"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 
+
+[dev-dependencies]
+sevenz-rust2 = { version = "=0.20.2", default-features = false, features = ["compress"] }
+crc32fast = "1"
 
 [profile.dev]
 debug = "line-tables-only"
@@ -190,3 +224,5 @@ core-video = "0.4"
 # the same fix. Cargo.lock also pins vergen 9.0.6 for librespot's build script.
 [patch.crates-io]
 librespot-core = { path = "vendor/librespot-core" }
+# Expose cached connected-seeder counts until librqbit provides them upstream.
+librqbit = { path = "vendor/librqbit" }

@@ -1,5 +1,13 @@
 import type { LeagueDef, MatchTeamStatRow, SportsGame, SportsSide } from "./espn-types";
-import { publicCompetitionUrl } from "./competition-metadata.ts";
+import { isFinishedStatus } from "./event-status";
+import {
+  publicCompetitionUrl,
+  isIndividualCompetition,
+  mergeCompetitionEntrants,
+  parseCompetitionResults,
+  parseCompetitionResultText,
+  type CompetitionEntrant,
+} from "./competition-metadata.ts";
 import { sportsDbTimestamp } from "./slice-calendar.ts";
 
 type Raw = Record<string, unknown>;
@@ -9,6 +17,8 @@ export type PublishedEvent = {
   sourceUrl: string;
   description?: string;
   resultText?: string;
+  entrants?: CompetitionEntrant[];
+  partial?: boolean;
   venue?: { id?: string; name: string; location?: string };
   season?: string;
   round?: string;
@@ -88,9 +98,7 @@ export function parsePublishedEvent(
   const event = record(raw);
   if (id(event.idEvent) !== game.id || id(event.idLeague) !== def.path) return null;
   const status = text(event.strStatus, 100) || game.detail;
-  const finished = /^(?:FT|AET|Finished|Match Finished|Final|After Extra Time|Match Ended)$/i.test(
-    status,
-  );
+  const finished = isFinishedStatus(status) || !!text(event.strResult, 400).trim();
   const state = finished ? "post" : "pre";
   const home = participant(event, "Home", game.home);
   const away = participant(event, "Away", game.away);
@@ -223,13 +231,29 @@ export function loadPublishedEvent(
       users: 0,
       promise: Promise.resolve(null),
     };
-    const request = json(`${DB}/lookupevent.php?id=${game.id}`, controller.signal).then((raw) => {
+    const request = json(`${DB}/lookupevent.php?id=${game.id}`, controller.signal).then(async (raw) => {
       const events = record(raw).events;
       if (events !== null && !Array.isArray(events)) throw new Error("Event details unavailable");
       const event = (Array.isArray(events) ? events.slice(0, 20).map(record) : []).find(
         (item) => id(item.idEvent) === game.id && id(item.idLeague) === def.path,
       );
-      return event ? parsePublishedEvent(game, def, event) : null;
+      const published = event ? parsePublishedEvent(game, def, event) : null;
+      if (!published || !isIndividualCompetition(def.group) || published.game.state !== "post")
+        return published;
+      try {
+        const results = await json(`${DB}/eventresults.php?id=${game.id}`, controller.signal);
+        controller.signal.throwIfAborted();
+        return {
+          ...published,
+          entrants: mergeCompetitionEntrants(
+            parseCompetitionResultText(published.resultText),
+            parseCompetitionResults(record(results).results, game.id),
+          ),
+        };
+      } catch {
+        controller.signal.throwIfAborted();
+        return { ...published, partial: true };
+      }
     });
     const aborted = new Promise<never>((_, reject) => {
       controller.signal.addEventListener(
@@ -243,7 +267,7 @@ export function loadPublishedEvent(
         controller.signal.throwIfAborted();
         cache.set(key, {
           value,
-          expires: Date.now() + (value ? 600_000 : 30_000),
+          expires: Date.now() + (value && !value.partial ? 600_000 : 30_000),
         });
         while (cache.size > 40) cache.delete(cache.keys().next().value!);
         return value;

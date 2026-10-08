@@ -1,10 +1,13 @@
 import { useSyncExternalStore } from "react";
 import type { StreamHints } from "@/lib/subtitles/search";
+import type { GeneratedSubtitleGroup } from "@/lib/subtitles/types";
 
 export type SubtitleSearchHandle = {
   status: "idle" | "searching";
   lastAdded: number | null;
   hints: StreamHints | null;
+  /** Generated translation offers (e.g. "Make Hindi") discovered by the search. */
+  generated: GeneratedSubtitleGroup[];
   refresh: () => void;
   dismiss: () => void;
 };

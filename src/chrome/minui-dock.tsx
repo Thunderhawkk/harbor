@@ -92,7 +92,11 @@ export function MinUIDock() {
       <div
         aria-hidden={chromeHidden}
         data-tv-focus-scope={editing || undefined}
-        className={`pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex items-end justify-center pb-6 transition-opacity duration-300 ${chromeHidden ? "opacity-0" : "opacity-100"}`}
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex items-end justify-center transition-opacity duration-300 ${chromeHidden ? "opacity-0" : "opacity-100"}`}
+        style={{
+          paddingBottom:
+            "calc(1.5rem + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px))",
+        }}
       >
         <div
           className="harbor-minui-shell pointer-events-auto rounded-2xl border border-edge p-1.5 shadow-[0_30px_60px_-22px_rgba(15,15,18,0.32),0_4px_18px_-6px_rgba(15,15,18,0.16)] backdrop-blur-xl"

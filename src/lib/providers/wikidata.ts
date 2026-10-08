@@ -101,7 +101,7 @@ const QUERY = `SELECT DISTINCT ?award ?awardLabel ?category ?categoryLabel ?reci
     BIND(?film AS ?work)
     OPTIONAL { ?film wdt:P345 ?workImdb. }
   }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }
 }
 LIMIT 400`;
 
@@ -124,7 +124,7 @@ const NOMINATION_QUERY = `SELECT DISTINCT ?award ?awardLabel ?category ?category
     BIND(?film AS ?work)
     OPTIONAL { ?film wdt:P345 ?workImdb. }
   }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }
 }
 LIMIT 400`;
 

@@ -1,4 +1,4 @@
-import { cachedCatalogRow } from "@/lib/addon-catalog-cache";
+import { cachedCatalogRow, type CatalogLoad } from "@/lib/addon-catalog-cache";
 import { runLanes } from "@/lib/run-lanes";
 import { allowDirectHost, safeFetch as fetch } from "@/lib/safe-fetch";
 import type { AddonOrigin, Meta } from "./cinemeta";
@@ -367,22 +367,28 @@ export function contentCatalogs(addon: Addon): CatalogDef[] {
   );
 }
 
-export function fetchCatalogRow(addon: Addon, cat: CatalogDef): Promise<AddonRow | null> {
+export function fetchCatalogRow(
+  addon: Addon,
+  cat: CatalogDef,
+): Promise<CatalogLoad<AddonRow | null>> {
   return cachedCatalogRow(`${addon.transportUrl}|${cat.type}|${cat.id}`, () =>
     loadCatalogRow(addon, cat),
   );
 }
 
-async function loadCatalogRow(addon: Addon, cat: CatalogDef): Promise<AddonRow | null> {
+async function loadCatalogRow(
+  addon: Addon,
+  cat: CatalogDef,
+): Promise<CatalogLoad<AddonRow | null>> {
   const base = addon.transportUrl.replace(/\/manifest\.json$/, "");
   const url = catalogRequestUrl(base, cat);
-  if (!url) return null;
+  if (!url) return { value: null, ok: true };
   const res = await fetchWithTimeout(url);
-  if (!res || !res.ok) return null;
+  if (!res || !res.ok) return { value: null, ok: false };
   try {
     const json = await res.json();
     const raw: Meta[] = json.metas ?? [];
-    if (raw.length === 0) return null;
+    if (raw.length === 0) return { value: null, ok: true };
     const origin = {
       id: addon.manifest.id,
       name: addon.manifest.name,
@@ -396,14 +402,17 @@ async function loadCatalogRow(addon: Addon, cat: CatalogDef): Promise<AddonRow |
       ...(collection ? { isCollection: true } : null),
     }));
     return {
-      key: `${addon.manifest.id}-${cat.type}-${cat.id}`,
-      type: cat.type,
-      name: cat.name,
-      metas,
-      more: { base, type: cat.type, id: cat.id, extras: requiredCatalogExtras(cat) ?? undefined },
+      value: {
+        key: `${addon.manifest.id}-${cat.type}-${cat.id}`,
+        type: cat.type,
+        name: cat.name,
+        metas,
+        more: { base, type: cat.type, id: cat.id, extras: requiredCatalogExtras(cat) ?? undefined },
+      },
+      ok: true,
     };
   } catch {
-    return null;
+    return { value: null, ok: false };
   }
 }
 
@@ -421,7 +430,7 @@ export function dedupeAddonRows(rows: AddonRow[], cap: number): AddonRow[] {
 
 export async function loadAddonRows(
   authKey: string | null,
-  opts: { dedup?: boolean; cap?: number } = {},
+  opts: { dedup?: boolean; cap?: number; onFailed?: (failed: number) => void } = {},
 ): Promise<AddonRow[]> {
   const dedup = opts.dedup ?? true;
   const cap = opts.cap ?? (dedup ? MAX_ROWS : 200);
@@ -429,10 +438,20 @@ export async function loadAddonRows(
   const tasks = addons.flatMap((addon) =>
     contentCatalogs(addon).map((cat) => ({ addon, cat })),
   );
+  const failure: CatalogLoad<AddonRow | null> = { value: null, ok: false };
   const results = await runLanes(tasks, CATALOG_LANES, (t) =>
-    fetchCatalogRow(t.addon, t.cat).catch(() => null),
+    fetchCatalogRow(t.addon, t.cat).catch(() => failure),
   );
-  const rows = results.filter((r): r is AddonRow => r != null);
+  let failed = 0;
+  const rows: AddonRow[] = [];
+  for (const result of results) {
+    if (!result || !result.ok) {
+      failed += 1;
+      continue;
+    }
+    if (result.value) rows.push(result.value);
+  }
+  opts.onFailed?.(failed);
   return dedup ? dedupeAddonRows(rows, cap) : rows.slice(0, cap);
 }
 

@@ -1,4 +1,5 @@
-import { ArrowDownToLine, BookOpen, ChevronLeft, ChevronRight, Layers } from "lucide-react";
+import { MediaStartPage } from "@/components/media-start-page";
+import { ArrowDownToLine, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import { CoverImg } from "@/components/cover-img";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
@@ -223,34 +224,7 @@ export function MangaView() {
         />
       );
     }
-    return (
-      <main className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24">
-        <div className="animate-fade-in mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center gap-6 text-center">
-          <img
-            src="/nosources.png"
-            alt=""
-            className="w-full max-w-[380px] object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
-          />
-          <div className="flex flex-col gap-3">
-            <h1 className="font-display text-[32px] font-medium leading-tight text-ink">
-              {t("Add a manga source")}
-            </h1>
-            <p className="mx-auto max-w-md text-balance text-[14px] leading-relaxed text-ink-muted">
-              {t(
-                "Harbor does not host any manga or any sources. Connect a self-hosted server you run, install a source plugin from a repository you trust, or open a folder you already have.",
-              )}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMode({ screen: "sources" })}
-            className="mt-1 flex h-11 items-center gap-2 rounded-xl bg-ink px-6 text-[14px] font-semibold text-canvas transition-transform hover:scale-[1.02] active:scale-[0.97]"
-          >
-            {t("Set up a source")}
-          </button>
-        </div>
-      </main>
-    );
+    return <main className="media-start-scroll pt-24"><MediaStartPage kind="manga" onSetup={() => setMode({ screen: "sources" })}/></main>;
   }
 
   const resume = async (entry: MangaProgressEntry) => {
@@ -508,30 +482,7 @@ export function MangaView() {
 
 function EnableGate({ onEnable }: { onEnable: () => void }) {
   const t = useT();
-  return (
-    <main className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24">
-      <div className="mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center gap-5 text-center">
-        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-elevated/50 text-ink ring-1 ring-edge-soft">
-          <BookOpen size={28} strokeWidth={1.8} />
-        </span>
-        <h1 className="font-display text-[34px] font-medium leading-tight text-ink">
-          {t("Read manga in Harbor")}
-        </h1>
-        <p className="max-w-md text-[14px] leading-relaxed text-ink-muted">
-          {t(
-            "Harbor does not host any manga. Add a source plugin from a repository you trust, connect your own server, or open a local folder. You can turn this off anytime in Settings.",
-          )}
-        </p>
-        <button
-          type="button"
-          onClick={onEnable}
-          className="mt-1 flex h-11 items-center gap-2 rounded-xl bg-ink px-6 text-[14px] font-semibold text-canvas transition-transform hover:scale-[1.02] active:scale-[0.97]"
-        >
-          {t("Enable manga sources")}
-        </button>
-      </div>
-    </main>
-  );
+  return <main className="media-start-scroll pt-24"><MediaStartPage kind="manga" onSetup={onEnable} actionLabel={t("Enable manga sources")}/></main>;
 }
 
 function LibraryCta({ onClick }: { onClick: () => void }) {

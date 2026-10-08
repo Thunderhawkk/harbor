@@ -242,7 +242,7 @@ export function ErrorView() {
             {report.kind === "sent" ? (
               <CheckIcon className="h-[15px] w-[15px]" />
             ) : (
-              <BugIcon className="h-[15px] w-[15px]" />
+              <BugIcon className="h-[17px] w-[17px]" />
             )}
             {report.kind === "sending"
               ? t("Sending…")
@@ -400,13 +400,9 @@ function BugIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <ellipse cx="12" cy="13.5" rx="5.5" ry="6.5" />
-      <path d="M9 6.8c0-1.7 1.4-3 3-3s3 1.3 3 3" />
-      <line x1="9" y1="6.8" x2="5" y2="2.5" />
-      <line x1="15" y1="6.8" x2="19" y2="2.5" />
-      <path d="M3 11h3.5M17.5 11h3.5" />
-      <path d="M3 17.5l3.5-1M17.5 16.5l3.5 1" />
-      <path d="M12 8.5v11" opacity="0.4" />
+      <path d="M9 7V6a3 3 0 0 1 6 0v1" />
+      <rect x="6.5" y="7" width="11" height="14" rx="5.5" />
+      <path d="M12 8v12M3 7l3.5 3M3 14h3.5M3 21l3.5-3M21 7l-3.5 3M21 14h-3.5M21 21l-3.5-3" />
     </svg>
   );
 }

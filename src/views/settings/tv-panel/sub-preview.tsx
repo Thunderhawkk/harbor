@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { readNumber, readRow, type TvDoc } from "./model";
 import { SUB_FAMILY_CSS, SUB_LOOK_ROWS, tintCss } from "./model-look";
-import subtitleStill from "@/assets/settings-preview/steamboat-willie.webp";
+import subtitleStill from "@/assets/godfather-offer.svg";
 
 const TV_BASE_PX = 32;
 const TV_WIDTH = 1920;

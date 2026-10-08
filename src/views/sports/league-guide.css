@@ -1,5 +1,7 @@
 .sh-league-guide {
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   min-height: 0;
   color: var(--color-ink);
 }
@@ -9,12 +11,14 @@
   align-items: center;
   padding: 20px 24px;
   gap: 16px;
-  position: sticky;
-  top: 0;
+  flex: none;
   background: var(--color-surface);
   z-index: 1;
 }
 .sh-league-guide-body {
+  min-height: 0;
+  overflow: auto;
+  isolation: isolate;
   padding: 0 28px 28px;
 }
 .sh-league-guide-banner {
@@ -121,6 +125,34 @@
 .sh-league-guide-team strong {
   font-size: 13px;
   display: block;
+}
+.sh-league-guide-person > .sh-league-guide-athlete {
+  display: flex;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  gap: 14px;
+}
+.sh-league-guide-athlete {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sh-league-guide-athlete .sh-competition-portrait {
+  width: 44px;
+  height: 48px;
+}
+.sh-league-guide-athlete .sh-competition-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sh-league-guide-athlete .sh-athlete-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 600;
 }
 .sh-league-guide-team small {
   display: block;

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { AwardLogo, laurelColorFor } from "@/components/icons/award-logo";
 import { Laurel } from "@/components/icons/laurel";
 import { awardSourceMeta, findAnyAwardWins, parseAwardYear } from "@/lib/anime-awards";
@@ -48,45 +48,55 @@ export function MetaAwardsCorner({ meta, imdbId }: { meta: Meta; imdbId?: string
 type CornerTier = "full" | "compact" | "hidden";
 
 function useHostTier() {
-  const ref = useRef<HTMLDivElement | null>(null);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
   const [tier, setTier] = useState<CornerTier>("full");
   useLayoutEffect(() => {
-    let host = ref.current?.offsetParent as HTMLElement | null;
-    while (host && host.clientWidth < 340 && host.offsetParent) {
-      host = host.offsetParent as HTMLElement;
-    }
-    if (!host) return;
+    if (!node) return;
+    let host: HTMLElement | null = null;
     const check = () => {
-      const w = host.clientWidth;
-      setTier(w >= 820 ? "full" : w >= 520 ? "compact" : "hidden");
+      let next = node.offsetParent as HTMLElement | null;
+      while (next && next.clientWidth < 340 && next.offsetParent) {
+        next = next.offsetParent as HTMLElement;
+      }
+      if (next !== host) {
+        if (host) ro.unobserve(host);
+        host = next;
+        if (host) ro.observe(host);
+      }
+      const w = host?.clientWidth ?? 0;
+      if (w > 0) setTier(w >= 820 ? "full" : w >= 520 ? "compact" : "hidden");
     };
-    check();
     const ro = new ResizeObserver(check);
-    ro.observe(host);
+    ro.observe(node);
+    check();
     return () => ro.disconnect();
-  }, []);
-  return { ref, tier };
+  }, [node]);
+  return { ref: setNode, tier };
 }
 
 function AnimeCorner({ name, year }: { name: string; year?: number }) {
   const { ref, tier } = useHostTier();
   useAwardPacks();
   const wins = findAnyAwardWins(name, year);
-  if (wins.length === 0 || tier === "hidden") return null;
   const top = wins[0];
-  const src = awardSourceMeta(top.source);
-  const custom = resolveAwardIcon(top.source);
+  const show = !!top && tier !== "hidden";
+  const src = top ? awardSourceMeta(top.source) : null;
+  const custom = top ? resolveAwardIcon(top.source) : null;
   const compact = tier === "compact";
-  const subline = top.isAOTY
+  const subline = !top
+    ? ""
+    : top.isAOTY
     ? `${top.year} Anime of the Year`
     : `${top.year} ${top.categoryName.replace(/^Best\s+/i, "Best ")}`;
   const otherWins = wins.length - 1;
   return (
     <div
       ref={ref}
-      className="harbor-awards-corner pointer-events-none absolute bottom-10 end-10 z-10 flex max-w-[44%] items-center justify-end gap-3 text-end"
-      title={wins.map((w) => `${awardSourceMeta(w.source).shortName} ${w.year} ${w.categoryName}`).join("\n")}
+      className="harbor-awards-corner pointer-events-none absolute bottom-10 end-10 z-10 flex max-w-[38%] items-center justify-end gap-3 text-end"
+      title={show ? wins.map((w) => `${awardSourceMeta(w.source).shortName} ${w.year} ${w.categoryName}`).join("\n") : undefined}
     >
+      {show && top && src && (
+      <>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span
           className={`truncate font-bold uppercase tracking-[0.18em] text-ink/55 ${compact ? "text-[9.5px]" : "text-[10.5px]"}`}
@@ -110,6 +120,8 @@ function AnimeCorner({ name, year }: { name: string; year?: number }) {
           />
         </Laurel>
       </span>
+      </>
+      )}
     </div>
   );
 }
@@ -133,9 +145,9 @@ function ClassicCorner({
     [awardsV, live, name, year],
   );
   const summary = useMemo(() => pickHeroAwards(awardSummary(awards)), [awards]);
-  if (summary.length === 0 || tier === "hidden") return null;
   const top = summary[0];
-  const won = top.wins > 0;
+  const show = !!top && tier !== "hidden";
+  const won = !!top && top.wins > 0;
   const compact = tier === "compact";
   const lines: string[] = [];
   for (const item of summary) {
@@ -147,16 +159,20 @@ function ClassicCorner({
       );
     }
   }
-  const headline = compact
-    ? `Award ${won ? "Winner" : "Nominee"}`
-    : `${HEADLINE_FOR[top.type] ?? "Award"} ${won ? "Winner" : "Nominee"}`;
-  const laurelTint = laurelColorFor(top.type);
+  const headline = !top
+    ? ""
+    : compact
+      ? `Award ${won ? "Winner" : "Nominee"}`
+      : `${HEADLINE_FOR[top.type] ?? "Award"} ${won ? "Winner" : "Nominee"}`;
+  const laurelTint = top ? laurelColorFor(top.type) : null;
   return (
     <div
       ref={ref}
-      className="harbor-awards-corner pointer-events-none absolute bottom-10 end-10 z-10 flex max-w-[44%] items-center justify-end gap-3 text-end"
-      title={lines.join(" · ")}
+      className="harbor-awards-corner pointer-events-none absolute bottom-10 end-10 z-10 flex max-w-[38%] items-center justify-end gap-3 text-end"
+      title={show ? lines.join(" · ") : undefined}
     >
+      {show && top && (
+      <>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span
           className={`truncate font-bold uppercase tracking-[0.18em] text-ink/55 ${compact ? "text-[9.5px]" : "text-[10.5px]"}`}
@@ -186,6 +202,8 @@ function ClassicCorner({
           </span>
         )}
       </span>
+      </>
+      )}
     </div>
   );
 }

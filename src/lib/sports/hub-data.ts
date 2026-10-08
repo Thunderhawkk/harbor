@@ -1,10 +1,12 @@
 import { allowDirectHost, safeFetch } from "@/lib/safe-fetch";
+import { isFinishedStatus, publishedDateOnly } from "./event-status";
 import { LEAGUES, LEAGUE_GROUPS, SITE_BASE } from "./espn-leagues";
 import { parseEvents } from "./espn-parse";
 import { isGameOnLocalDay, sportsDbTimestamp } from "./slice-calendar";
 import type { LeagueDef, SportsGame } from "./espn-types";
 export { readSportsSlice, saveSportsSlice } from "./slice-storage";
 import { parseDotaMatches } from "./opendota";
+import { ESPORTS_GAMES } from "./esports-catalog";
 import { fetchOneSchedule, ONE_LOGO } from "./providers/one-schedule";
 import { boxingOnDay, fetchBoxingCalendars, mergeBoxingGames } from "./providers/boxing-schedule";
 import { REGIONAL_DB_LEAGUES, REGIONAL_SOCCER_ALIASES } from "./regional-sports-catalog";
@@ -36,6 +38,7 @@ const dbLeague = (
   group,
   logo: badge ? `https://r2.thesportsdb.com/images/media/league/badge/${badge}.png` : "",
 });
+const esportsLogo = (id: string) => ESPORTS_GAMES.find((game) => game.id === id)!.logo;
 export const HUB_LEAGUES = [
   ...LEAGUES,
   ...MOTORSPORT_LEAGUES,
@@ -43,11 +46,17 @@ export const HUB_LEAGUES = [
   ...EXPANDED_SPORTS_LEAGUES,
   ...AUSTRALIAN_DB_LEAGUES,
   ...ADDITIONAL_LEAGUES.filter((league) => /^\d+$/.test(league.path)),
-  dbLeague("DOTA2", "Dota 2", "opendota", "esports"),
+  {
+    ...dbLeague("DOTA2", "Dota 2", "opendota", "esports"),
+    logo: ESPORTS_GAMES.find((game) => game.id === "dota2")!.logo,
+  },
   dbLeague("LCK", "League of Legends · LCK", "4529", "esports", "llpp2i1705953103"),
   dbLeague("LEC", "League of Legends · LEC", "4530", "esports", "djubyo1705150930"),
   dbLeague("LPL", "League of Legends · LPL", "4528", "esports", "fqgzgl1706041210"),
   dbLeague("RLCS", "Rocket League", "5421", "esports", "q9qgwg1705154603"),
+  // The esports rail fetches these two titles itself; there is no day-schedule feed for them.
+  { ...dbLeague("CS2", "Counter-Strike 2", "esports-feed", "esports"), logo: esportsLogo("cs2") },
+  { ...dbLeague("VALORANT", "VALORANT", "esports-feed", "esports"), logo: esportsLogo("valorant") },
   dbLeague("BOXING", "Boxing", "4445", "boxing", "j14hx41784791003"),
   // Schedule-only free feeds, requested only for the selected sports/leagues.
   dbLeague("OKTAGON", "Oktagon MMA", "5702", "combat", "4fqdkd1759141220"),
@@ -123,6 +132,8 @@ export const HUB_DEFAULTS = [
   "BOXING",
   "DOTA2",
   "LCK",
+  "CS2",
+  "VALORANT",
 ];
 export const hubLeague = (tag: string) => HUB_LEAGUES.find((l) => l.tag === tag);
 export const dayStamp = (d: Date) =>
@@ -162,7 +173,8 @@ export function parseDbEvents(events: DbEvent[], def: LeagueDef): SportsGame[] {
     if (e.idLeague && /^\d+$/.test(def.path) && e.idLeague !== def.path) return [];
     const ms = sportsDbTimestamp(e.strTimestamp, e.dateEvent, e.strTime);
     if (!e.idEvent || !Number.isFinite(ms)) return [];
-    const finished = /finished|match finished|ft/i.test(e.strStatus || "");
+    const dateOnly = publishedDateOnly(e.strTimestamp, e.dateEvent, e.strTime);
+    const finished = isFinishedStatus(e.strStatus) || !!(e.strResult || "").trim();
     // The free schedule feed is not a live score service. Never infer LIVE from the clock.
     return [
       {
@@ -171,6 +183,7 @@ export function parseDbEvents(events: DbEvent[], def: LeagueDef): SportsGame[] {
         league: def.tag,
         state: finished ? ("post" as const) : ("pre" as const),
         startMs: ms,
+        ...(dateOnly ? { dateOnly } : {}),
         artwork: e.strThumb || undefined,
         poster: e.strPoster || undefined,
         detail: e.strStatus || "",
@@ -252,6 +265,8 @@ export async function fetchHubSlice(key: string, signal: AbortSignal): Promise<S
   }
   const def = HUB_LEAGUES.find((l) => l.key === leagueKey);
   if (!def) return [];
+  // Esports rail titles: the match feeds carry their schedule, so a day slice has no source.
+  if (def.path === "esports-feed") return [];
   const paidLeague = apiLeagueForHub(leagueKey);
   if (paidLeague && mode !== "upcoming" && readSportsApiKey()) {
     const { fetchApiSportsScoreboard } = await import("./providers/api-sports");

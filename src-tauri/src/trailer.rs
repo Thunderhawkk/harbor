@@ -127,6 +127,91 @@ impl KillProcess for CommandChild {
     }
 }
 
+fn ytdlp_temp_dir() -> PathBuf {
+    std::env::temp_dir().join("harbor-ytdlp")
+}
+
+fn ytdlp_sidecar(app: &tauri::AppHandle, label: &str) -> Result<Command, String> {
+    let command = app
+        .shell()
+        .sidecar("yt-dlp")
+        .map_err(|error| format!("bundled yt-dlp {label} unavailable: {error}"))?;
+    let dir = ytdlp_temp_dir();
+    if std::fs::create_dir_all(&dir).is_err() {
+        return Ok(command);
+    }
+    let path = dir.to_string_lossy().to_string();
+    Ok(command
+        .env("TMPDIR", &path)
+        .env("TMP", &path)
+        .env("TEMP", &path))
+}
+
+fn is_ytdlp_extraction(dir: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| name.starts_with("yt_dlp"))
+    })
+}
+
+fn purge_extractions(dir: &Path, min_age: Duration, attribute: bool, now: SystemTime) -> u32 {
+    if std::fs::symlink_metadata(dir).is_ok_and(|meta| meta.is_symlink()) {
+        return 0;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        if !entry.file_name().to_str().is_some_and(|n| n.starts_with("_MEI")) {
+            continue;
+        }
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        if !meta.is_dir() {
+            continue;
+        }
+        let age = meta
+            .modified()
+            .ok()
+            .and_then(|at| now.duration_since(at).ok())
+            .unwrap_or_default();
+        if age < min_age {
+            continue;
+        }
+        let path = entry.path();
+        if attribute && !is_ytdlp_extraction(&path) {
+            continue;
+        }
+        if std::fs::remove_dir_all(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
+}
+
+fn is_darwin_user_temp(dir: &Path) -> bool {
+    dir.starts_with("/var/folders") || dir.starts_with("/private/var/folders")
+}
+
+pub(crate) fn sweep_ytdlp_extractions() {
+    let now = SystemTime::now();
+    let mut removed = purge_extractions(&ytdlp_temp_dir(), Duration::from_secs(3600), false, now);
+    let shared = std::env::temp_dir();
+    if cfg!(target_os = "macos") && is_darwin_user_temp(&shared) {
+        removed += purge_extractions(&shared, Duration::from_secs(6 * 3600), true, now);
+    }
+    if removed > 0 {
+        eprintln!("[harbor::trailer] removed {removed} orphaned yt-dlp extraction directories");
+    }
+}
+
 #[cfg(test)]
 impl KillProcess for std::process::Child {
     fn terminate(mut self) {
@@ -222,9 +307,9 @@ pub(crate) async fn run_yt_dlp(
             };
             eprintln!("[harbor::trailer] {system_failure}; trying bundled yt-dlp");
 
-            let bundled = match app.shell().sidecar("yt-dlp") {
+            let bundled = match ytdlp_sidecar(app, label) {
                 Ok(command) => collect_sidecar_output(command, args, label).await,
-                Err(error) => Err(format!("bundled yt-dlp {label} unavailable: {error}")),
+                Err(error) => Err(error),
             };
             match bundled {
                 Ok(output) => {
@@ -248,10 +333,7 @@ pub(crate) async fn run_yt_dlp(
 
     #[cfg(not(target_os = "linux"))]
     {
-        let command = app
-            .shell()
-            .sidecar("yt-dlp")
-            .map_err(|error| format!("sidecar init: {error}"))?;
+        let command = ytdlp_sidecar(app, label)?;
         let output = tokio::time::timeout(timeout, collect_sidecar_output(command, args, label))
             .await
             .map_err(|_| format!("yt-dlp {label} timed out"))??;
@@ -486,40 +568,6 @@ async fn trailer_stream_url(
     Ok(None)
 }
 
-#[cfg(all(test, windows))]
-mod tests {
-    use super::*;
-
-    fn process_count(name: &str) -> usize {
-        let output = std::process::Command::new("tasklist")
-            .args(["/FI", &format!("IMAGENAME eq {name}"), "/FO", "CSV", "/NH"])
-            .output()
-            .expect("query process list");
-        String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .filter(|line| {
-                line.to_ascii_lowercase()
-                    .contains(&format!("\"{}\"", name.to_ascii_lowercase()))
-            })
-            .count()
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn timed_out_process_guard_kills_child() {
-        let baseline = process_count("ping.exe");
-        let process = std::process::Command::new("ping")
-            .args(["-n", "30", "127.0.0.1"])
-            .spawn()
-            .expect("start timeout probe");
-        let guard = KillProcessOnDrop(Some(process));
-        let run = async move {
-            let _guard = guard;
-            std::future::pending::<()>().await;
-        };
-        assert!(tokio::time::timeout(Duration::from_millis(150), run)
-            .await
-            .is_err());
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        assert_eq!(process_count("ping.exe"), baseline);
-    }
-}
+#[cfg(test)]
+#[path = "trailer_tests.rs"]
+mod tests;

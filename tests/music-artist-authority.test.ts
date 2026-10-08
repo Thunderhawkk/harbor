@@ -43,7 +43,7 @@ function build(modules: Record<string, any>, key: string, file: string) {
   return module.exports;
 }
 
-function harness(payloads: (url: string) => unknown) {
+function harness(payloads: (url: string) => unknown, top?: (ref: any) => Promise<any[]>) {
   const calls: string[] = [];
   const modules: Record<string, any> = {
     "@/lib/debug": { dwarn: () => {} },
@@ -56,6 +56,9 @@ function harness(payloads: (url: string) => unknown) {
   };
   build(modules, "@/lib/cache", "lib/cache.ts");
   build(modules, "./search-normalize", "lib/music/search-normalize.ts");
+  build(modules, "./artist-recording-match", "lib/music/artist-recording-match.ts");
+  modules["./catalog"] = { artistTop: top ?? (async () => []) };
+  modules["@/lib/progressive-rows"] = { withTimeout: (promise: Promise<unknown>) => promise };
   const popularity = build(
     modules,
     "./artist-popularity",
@@ -100,6 +103,17 @@ function jump(minutes: number) {
 }
 
 const kingVon = () => harness(() => DEEZER_KING_VON_SEARCH);
+
+test("a later search ref joins the dock's canonical artist only with shared recordings", async () => {
+  const tracks = [{ title: "2 Phones", artist: "Kevin Gates", durationSeconds: 240 }, { title: "Really Really", artist: "Kevin Gates", durationSeconds: 233 }];
+  const { authority } = harness(() => ({ data: [{ id: 123, name: "Kevin Gates", nb_fan: 697654 }] }),
+    async (ref) => ref.id === "other-person" ? [{ title: "Unrelated", artist: "Kevin Gates", durationSeconds: 100 }] : tracks);
+  const dock = await authority.resolveArtist("Kevin Gates");
+  const search = await authority.identityForRef({ id: "youtube-kevin", connectorId: "youtube", name: "Kevin Gates" });
+  assert.equal(search.id, dock.canonical?.id);
+  const namesake = await authority.identityForRef({ id: "other-person", connectorId: "youtube", name: "Kevin Gates" });
+  assert.equal(namesake.id, "other-person");
+});
 
 const ytm = (subtitle: string) => ({
   id: "UCkingvonchannel00000001",

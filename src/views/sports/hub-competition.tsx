@@ -15,6 +15,7 @@ import { nascarSeriesForLeague } from "@/lib/sports/nascar-data";
 import { NascarHub } from "./nascar-hub";
 import { RacingVenue } from "./racing-venue";
 import { motorsportOfficialWebsite } from "@/lib/sports/motorsport-catalog";
+import { CompetitionAthletes } from "./competition-athletes";
 
 export function HubCompetition({ game }: { game: SportsGame }) {
   return nascarSeriesForLeague(game.league) ? (
@@ -150,14 +151,19 @@ function GenericCompetition({ game }: { game: SportsGame }) {
 
       <h3 className="sh-field-title">{t(detail.results ? "Results" : "The field")}</h3>
       {detail.entrants.length > 0 ? (
-        <div className="sh-race-sessions">
+        <div className="sh-race-sessions sh-competition-field">
           {detail.entrants.map((entrant) => (
             <div key={entrant.id}>
               {entrant.position != null && (
                 <span className="w-6 shrink-0 tabular-nums">{entrant.position}</span>
               )}
               <strong className="min-w-0 break-words">
-                {entrant.name}
+                <CompetitionAthletes
+                  name={entrant.name}
+                  athletes={entrant.athletes}
+                  league={game.league}
+                  group={def?.group ?? ""}
+                />
                 {entrant.team && <small className="mt-1 block font-normal">{entrant.team}</small>}
               </strong>
               <span className="tabular-nums">{entrant.result}</span>

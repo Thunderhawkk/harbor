@@ -1,4 +1,7 @@
+import { cwProfileScope, privateCwProfileId } from "./cw-profile";
+
 const KEY_PREFIX = "harbor.localcw.v1.";
+const PRIVATE_PREFIX = "harbor.localcw.private.v1.";
 const LEGACY_KEY = "harbor.localcw.v1";
 const PROFILES_KEY = "harbor.profiles.v1";
 const MAX = 60;
@@ -10,6 +13,8 @@ export type LocalCwEntry = {
   name: string;
   poster?: string;
   background?: string;
+  isAnime?: boolean;
+  source?: "library" | "local";
   season?: number;
   episode?: number;
   videoId?: string;
@@ -20,30 +25,7 @@ export type LocalCwEntry = {
 
 const subs = new Set<() => void>();
 let version = 0;
-let cache: Record<string, LocalCwEntry> | null = null;
-let cacheProfile: string | null = null;
-
-function activeProfileId(): string {
-  try {
-    const raw = localStorage.getItem(PROFILES_KEY);
-    if (!raw) return "";
-    const s = JSON.parse(raw) as {
-      activeId?: string;
-      profiles?: Array<{ id?: string; isPrimary?: boolean; shareStremioWith?: string | null }>;
-    };
-    const profiles = Array.isArray(s.profiles) ? s.profiles : [];
-    const active = profiles.find((p) => p.id === s.activeId) ?? null;
-    const own = active?.id ?? profiles.find((p) => p?.isPrimary)?.id ?? "";
-    if (!own) return "";
-    if (active && typeof active.shareStremioWith === "string" && active.shareStremioWith) {
-      const shared = profiles.find((p) => p.id === active.shareStremioWith);
-      if (shared?.id) return shared.id;
-    }
-    return own;
-  } catch {
-    return "";
-  }
-}
+const cache = new Map<string, Record<string, LocalCwEntry>>();
 
 function primaryProfileId(): string {
   try {
@@ -52,14 +34,16 @@ function primaryProfileId(): string {
       ? (JSON.parse(raw) as { profiles?: Array<{ id?: string; isPrimary?: boolean }> })
       : null;
     const primary = s?.profiles?.find((p) => p?.isPrimary);
-    return (primary && typeof primary.id === "string" && primary.id) || activeProfileId();
+    return (primary && typeof primary.id === "string" && primary.id) || cwProfileScope().sharedId;
   } catch {
-    return activeProfileId();
+    return cwProfileScope().sharedId;
   }
 }
 
-function storeKey(): string {
-  const id = activeProfileId();
+function storeKey(privateOnly = false, ownerId?: string): string {
+  const scope = cwProfileScope(ownerId);
+  if (privateOnly) return PRIVATE_PREFIX + scope.profileId;
+  const id = scope.sharedId;
   return id ? KEY_PREFIX + id : LEGACY_KEY;
 }
 
@@ -77,37 +61,37 @@ function migrateLegacy(): void {
   }
 }
 
-function readAll(): Record<string, LocalCwEntry> {
-  const p = activeProfileId();
-  if (cache && cacheProfile === p) return cache;
+function readAll(key: string): Record<string, LocalCwEntry> {
+  const cached = cache.get(key);
+  if (cached) return cached;
   migrateLegacy();
   let next: Record<string, LocalCwEntry>;
   try {
-    const raw = localStorage.getItem(storeKey());
+    const raw = localStorage.getItem(key);
     next = raw ? (JSON.parse(raw) as Record<string, LocalCwEntry>) : {};
   } catch {
     next = {};
   }
-  cache = next;
-  cacheProfile = p;
+  cache.set(key, next);
   return next;
 }
 
-function writeAll(all: Record<string, LocalCwEntry>): void {
-  cache = all;
-  cacheProfile = activeProfileId();
+function writeAll(key: string, all: Record<string, LocalCwEntry>): void {
+  cache.set(key, all);
   try {
-    localStorage.setItem(storeKey(), JSON.stringify(all));
+    localStorage.setItem(key, JSON.stringify(all));
   } catch {
     /* noop */
   }
+}
+
+function emit(): void {
   version += 1;
   for (const fn of subs) fn();
 }
 
-export function saveLocalCw(entry: LocalCwEntry): void {
-  if (!entry.id || (entry.type !== "movie" && entry.type !== "series")) return;
-  const all = { ...readAll() };
+function saveEntry(key: string, entry: LocalCwEntry): void {
+  const all = { ...readAll(key) };
   const finished = entry.durationMs > 0 && entry.positionMs / entry.durationMs >= FINISHED_RATIO;
   if (finished && entry.type === "movie") {
     if (!(entry.id in all)) return;
@@ -120,23 +104,44 @@ export function saveLocalCw(entry: LocalCwEntry): void {
       for (const id of ids.slice(0, ids.length - MAX)) delete all[id];
     }
   }
-  writeAll(all);
+  writeAll(key, all);
 }
 
-export function listLocalCw(): LocalCwEntry[] {
-  return Object.values(readAll()).sort((a, b) => b.t - a.t);
+// Only an actual playback session may assign ownership. Cloud absorption keeps
+// writing the shared store; its history cannot establish who watched a title.
+export function saveLocalCw(entry: LocalCwEntry, ownerId?: string, shared = true): void {
+  if (!entry.id || (entry.type !== "movie" && entry.type !== "series")) return;
+  if (ownerId) saveEntry(storeKey(true, ownerId), entry);
+  if (shared) saveEntry(storeKey(false, ownerId), entry);
+  emit();
 }
 
-export function localCwEntry(id: string): LocalCwEntry | null {
-  return readAll()[id] ?? null;
+export function listLocalCw(privateOnly = !!privateCwProfileId()): LocalCwEntry[] {
+  return Object.values(readAll(storeKey(privateOnly))).sort((a, b) => b.t - a.t);
 }
 
-export function clearLocalCw(id: string): void {
-  const all = readAll();
-  if (!(id in all)) return;
-  const next = { ...all };
-  delete next[id];
-  writeAll(next);
+export function localCwEntry(
+  id: string,
+  privateOnly = !!privateCwProfileId(),
+  ownerId?: string,
+): LocalCwEntry | null {
+  return readAll(storeKey(privateOnly, ownerId))[id] ?? null;
+}
+
+export function clearLocalCw(id: string, ownerId?: string): void {
+  const keys = ownerId
+    ? [storeKey(true, ownerId), storeKey(false, ownerId)]
+    : [storeKey(!!privateCwProfileId())];
+  let changed = false;
+  for (const key of keys) {
+    const all = readAll(key);
+    if (!(id in all)) continue;
+    const next = { ...all };
+    delete next[id];
+    writeAll(key, next);
+    changed = true;
+  }
+  if (changed) emit();
 }
 
 export function subscribeLocalCw(fn: () => void): () => void {
@@ -151,15 +156,17 @@ export function localCwVersion(): number {
 }
 
 if (typeof window !== "undefined") {
-  let lastProfile = activeProfileId();
+  const identity = () => {
+    const s = cwProfileScope();
+    return `${s.profileId}|${s.sharedId}`;
+  };
+  let lastProfile = identity();
   const onProfileChange = () => {
-    const p = activeProfileId();
+    const p = identity();
     if (p === lastProfile) return;
     lastProfile = p;
-    cache = null;
-    cacheProfile = null;
-    version += 1;
-    for (const fn of subs) fn();
+    cache.clear();
+    emit();
   };
   window.addEventListener("harbor:active-profile-changed", onProfileChange);
   window.addEventListener("harbor:profiles-updated", onProfileChange);

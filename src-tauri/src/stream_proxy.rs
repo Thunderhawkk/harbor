@@ -1,9 +1,9 @@
-use axum::body::Body;
+use axum::body::{to_bytes, Body};
 use axum::extract::{Path, State};
 #[cfg(target_os = "linux")]
 use axum::http::{header, Method};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::get;
 use axum::Router;
 use futures_util::StreamExt;
@@ -575,6 +575,104 @@ fn split_playlist_url(url: &str) -> Option<(String, String, Option<String>)> {
     Some((base, last_seg.to_string(), query))
 }
 
+/** A manifest is a few kB, and only a text answer is ever buffered. */
+const MANIFEST_PROBE_MAX: usize = 4 * 1024 * 1024;
+
+/** Where a url's references are relative to, and the segment it names. Unlike [split_playlist_url]
+ * this asks nothing of that segment: it is only used on an answer already known to be a manifest. */
+fn playlist_parts(url: &str) -> Option<(String, String, Option<String>)> {
+    let (path_part, query) = match url.split_once('?') {
+        Some((p, q)) => (p, Some(q.to_string())),
+        None => (url, None),
+    };
+    let scheme_end = path_part.find("://")? + 3;
+    let host_end = scheme_end + path_part[scheme_end..].find('/')?;
+    let last_slash = path_part[host_end..].rfind('/').map(|i| i + host_end)?;
+    let last_seg = &path_part[last_slash + 1..];
+    if last_seg.is_empty() {
+        return None;
+    }
+    Some((path_part[..last_slash].to_string(), last_seg.to_string(), query))
+}
+
+/** True when a request names the manifest itself rather than something it refers to.
+ *
+ * A manifest whose url does not end in `.m3u8` is still served through the playlist route, and a
+ * playlist is only read as HLS when its url or its content type says so. Everything else the
+ * manifest names is left alone: segments are not manifests. */
+fn names_the_manifest(session_url: &str, rest: &str) -> bool {
+    playlist_parts(session_url)
+        .map(|(_, last, _)| last == rest)
+        .unwrap_or(false)
+}
+
+/** Serves a manifest from the playlist route when its url did not say it was one.
+ *
+ * Such a session was registered as a plain stream, and served as it stands its references resolve
+ * against this proxy rather than the upstream, so playback stops at the first entry. */
+async fn manifest_route(
+    state: &ProxyState,
+    session: &Session,
+    id: &str,
+    response: Response,
+) -> Response {
+    let Some((base, last, query)) = playlist_parts(&session.url) else {
+        return response;
+    };
+    let qs = query.map(|q| format!("?{}", q)).unwrap_or_default();
+    let route = || Redirect::temporary(&format!("/p/{}/{}{}", id, last, qs)).into_response();
+
+    // Known to be a manifest already, so send it on rather than hand back the raw body.
+    if session.base_url.is_some() {
+        return route();
+    }
+    if response.status() != StatusCode::OK {
+        return response;
+    }
+    let kind = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_lowercase();
+    let declared = kind.contains("mpegurl");
+    if !declared && !kind.starts_with("text/plain") {
+        return response;
+    }
+
+    let (mut parts, body) = response.into_parts();
+    let stated = parts
+        .headers
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<usize>().ok());
+    if stated.map(|n| n > MANIFEST_PROBE_MAX).unwrap_or(false) {
+        return Response::from_parts(parts, body);
+    }
+    let bytes = match to_bytes(body, MANIFEST_PROBE_MAX).await {
+        Ok(bytes) => bytes,
+        Err(_) => return (StatusCode::BAD_GATEWAY, "answer could not be read").into_response(),
+    };
+    // A manifest and an ordinary text answer both arrive as `text/plain`; the first line tells.
+    if !declared {
+        let head = String::from_utf8_lossy(&bytes[..bytes.len().min(1024)]);
+        if !head.trim_start().starts_with("#EXTM3U") {
+            // The read bytes are the body, so the stated length is replaced: it came from an
+            // upstream that may have been compressed, and this is the decoded length.
+            if let Ok(len) = HeaderValue::from_str(&bytes.len().to_string()) {
+                parts.headers.insert("content-length", len);
+            }
+            return Response::from_parts(parts, Body::from(bytes));
+        }
+    }
+
+    // Give the session the base its references are relative to, then send the client there.
+    if let Some(held) = state.sessions.write().await.get_mut(id) {
+        held.base_url = Some(base);
+    }
+    route()
+}
+
 fn guess_ct_from_url(url: &str) -> &'static str {
     let lower = url.split('?').next().unwrap_or(url).to_lowercase();
     if lower.ends_with(".mp4") || lower.ends_with(".m4v") {
@@ -804,7 +902,8 @@ async fn handle_stream(
         return response;
     }
 
-    forward_upstream(&state, &session, &session.url, &headers).await
+    let response = forward_upstream(&state, &session, &session.url, &headers, false).await;
+    manifest_route(&state, &session, &id, response).await
 }
 
 async fn handle_playlist(
@@ -835,7 +934,8 @@ async fn handle_playlist(
     };
     let qs = uri.query().map(|q| format!("?{}", q)).unwrap_or_default();
     let upstream_url = format!("{}/{}{}", base, rest, qs);
-    forward_upstream(&state, &session, &upstream_url, &headers).await
+    let is_manifest = names_the_manifest(&session.url, &rest);
+    forward_upstream(&state, &session, &upstream_url, &headers, is_manifest).await
 }
 
 async fn forward_upstream(
@@ -843,6 +943,7 @@ async fn forward_upstream(
     session: &Session,
     upstream_url: &str,
     headers: &HeaderMap,
+    is_manifest: bool,
 ) -> Response {
     let mut req = state.client.get(upstream_url);
     let session_keys: std::collections::HashSet<String> =
@@ -963,7 +1064,8 @@ async fn forward_upstream(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_lowercase();
-    let is_m3u8 = body_ct.contains("mpegurl")
+    let is_m3u8 = is_manifest
+        || body_ct.contains("mpegurl")
         || upstream_url
             .split('?')
             .next()
@@ -1089,5 +1191,19 @@ mod tests {
         assert_eq!(requested_prefix_len(&headers, 1024, 4096), None);
         headers.insert("range", HeaderValue::from_static("bytes=20-40"));
         assert_eq!(requested_prefix_len(&headers, 1024, 4096), None);
+    }
+
+    #[test]
+    fn serves_the_manifest_itself_as_a_manifest() {
+        let hidden = "https://pervl9.xtremestream.xyz/cdn/xs1.php?token=abc";
+        assert!(names_the_manifest(hidden, "xs1.php"));
+        assert!(!names_the_manifest(hidden, "1080243.html"));
+        assert!(!names_the_manifest(hidden, "other.php"));
+
+        let declared = "https://host.tld/a/master.m3u8";
+        assert!(names_the_manifest(declared, "master.m3u8"));
+        assert!(!names_the_manifest(declared, "seg1.ts"));
+
+        assert!(!names_the_manifest("https://host.tld", "anything"));
     }
 }

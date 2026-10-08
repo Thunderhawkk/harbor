@@ -63,8 +63,8 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
       { url: meta?.background, portrait: false },
       { url: meta?.poster, portrait: true },
     ];
-    return bpHeroCandidates(meta ? own : fallback ? [fallback] : []);
-  }, [detail?.backdrop, detail?.gallery.backdrops[0], meta, fallback]);
+    return bpHeroCandidates(meta ? own : fallback ? [fallback] : [], settings.heroFullQuality);
+  }, [detail?.backdrop, detail?.gallery.backdrops[0], meta, fallback, settings.heroFullQuality]);
 
   const { src: trailerSrc } = useBpTrailer(ownsTitle ? meta : null);
   const [trailerReady, setTrailerReady] = useState(false);
@@ -89,6 +89,7 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
   const [layers, setLayers] = useState<BpLayer[]>([]);
   const seq = useRef(0);
   const committedFor = useRef("");
+  const committedQuality = useRef(settings.heroFullQuality);
   const committedTier = useRef(9);
   const committedList = useRef<BpHeroCandidate[] | null>(null);
 
@@ -117,7 +118,7 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
     // effect lists tier, so the identical list used to be walked twice: a second
     // Image, request and decode for a src already committed and on screen. List
     // identity is the honest question, so an unchanged one only records the tier.
-    const walked = committedFor.current === metaId;
+    const walked = committedFor.current === metaId && committedQuality.current === settings.heroFullQuality;
     if (walked && committedList.current === candidates) {
       if (tier < committedTier.current) committedTier.current = tier;
       return;
@@ -155,6 +156,7 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
           return;
         }
         committedFor.current = metaId;
+        committedQuality.current = settings.heroFullQuality;
         committedTier.current = tier;
         committedList.current = candidates;
         seq.current += 1;
@@ -194,7 +196,7 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
       pending.src = "";
       pending = null;
     };
-  }, [candidates, tier, metaId, ownsTitle]);
+  }, [candidates, tier, metaId, ownsTitle, settings.heroFullQuality]);
 
   useBpPrune(layers, setLayers);
 

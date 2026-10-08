@@ -63,6 +63,7 @@ export function Rail({
   return (
     <div
       ref={element}
+      data-scroll-anchor={`discover:${railId}`}
       className={items?.length === 0 ? "hidden" : undefined}
       onFocusCapture={() => setNear(true)}
     >

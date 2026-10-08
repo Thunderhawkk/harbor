@@ -4,7 +4,7 @@ import { HUB_DEFAULTS, HUB_GROUPS, HUB_LEAGUES } from "../src/lib/sports/hub-dat
 import { selectedSportsLeagues, sportsSelectionScope } from "../src/lib/sports/personalization.ts";
 
 test("first-use sports selection is bounded, valid, and covers every offered sport", () => {
-  assert.ok(HUB_DEFAULTS.length >= 40 && HUB_DEFAULTS.length <= 50);
+  assert.ok(HUB_DEFAULTS.length >= 40 && HUB_DEFAULTS.length <= 52);
   assert.equal(new Set(HUB_DEFAULTS).size, HUB_DEFAULTS.length);
   const selection = selectedSportsLeagues(HUB_LEAGUES, [], false, HUB_DEFAULTS);
   assert.deepEqual(

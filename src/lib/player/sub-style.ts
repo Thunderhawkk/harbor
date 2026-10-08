@@ -38,6 +38,32 @@ function customFontName(s: Settings): string | undefined {
   return f?.family || f?.name;
 }
 
+let secondaryStyleRevision = 0;
+let secondaryStyleQueue: Promise<void> = Promise.resolve();
+
+/** HDR surfaces need mpv to draw the second subtitle instead of the HTML overlay. */
+export function applySecondarySubNative(
+  on: boolean,
+  placement: Settings["subSecondaryPlacement"],
+  marginY: number,
+): Promise<void> {
+  const revision = ++secondaryStyleRevision;
+  // Serialize native writes so a delayed enable cannot overtake a later disable.
+  secondaryStyleQueue = secondaryStyleQueue.then(async () => {
+    if (revision !== secondaryStyleRevision) return;
+    if (on) {
+      const pos = placement === "top" ? 0 : clamp(100 - (Number(marginY) || 0) - 8, 0, 100);
+      await invoke("mpv_set_property", { name: "secondary-sub-pos", value: pos }).catch(() => {});
+      if (revision !== secondaryStyleRevision) return;
+    }
+    await invoke("mpv_set_property", {
+      name: "secondary-sub-visibility",
+      value: on,
+    }).catch(() => {});
+  });
+  return secondaryStyleQueue;
+}
+
 export type SubRenderContext = {
   assNativeActive: boolean;
   imageNativeActive: boolean;

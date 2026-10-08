@@ -1,10 +1,15 @@
 import { MusicCollectionControls } from "./music-collection-controls";
+import { MusicLibraryEmptyState } from "./music-library-empty-state";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "@/components/icons/music-icons";
 import { MusicArtistCard } from "./music-artist-card";
 import { MusicCoverCard } from "./music-cover-card";
+import { useMusicItemMenu } from "./music-item-menu";
 import { MusicTrackRow } from "./music-track-row";
+import { MusicTrackRowsSkeleton } from "./music-skeletons";
 import { useMusicPlaylistPicker } from "./music-playlist-picker";
+import { useMusicSourcePicker } from "./music-source-picker";
+import { useMusicCatalogPlayback } from "./use-music-catalog-playback";
 import { enqueueMusic } from "@/lib/music/player";
 import { localCollection } from "@/lib/music/catalog";
 import type { MusicCatalogItem } from "@/lib/music/types";
@@ -16,20 +21,25 @@ export function MusicLocalCollection({
   query,
   onOpen,
   onConnect,
+  onTastes,
 }: {
   kind: Kind;
   query: string;
   onOpen: (item: MusicCatalogItem, siblings: MusicCatalogItem[]) => void;
   onConnect: () => void;
+  onTastes: () => void;
 }) {
   const t = useT();
   const { openPlaylistPicker } = useMusicPlaylistPicker();
+  const { openSourcePicker } = useMusicSourcePicker();
+  const playback = useMusicCatalogPlayback();
   const [items, setItems] = useState<MusicCatalogItem[]>([]);
   const [next, setNext] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const generation = useRef(0);
+  const itemMenu = useMusicItemMenu({ onOpen: (item) => onOpen(item, items) });
   const load = useCallback(
     (offset: number) => {
       const request = ++generation.current;
@@ -77,20 +87,17 @@ export function MusicLocalCollection({
     return () => window.removeEventListener("harbor:music-library-changed", changed);
   }, []);
   return (
-    <section className="music-library-local" aria-label={t("music.connections.local")}>
+    <section className="music-library-local" aria-label={t("music.connections.local")} aria-busy={loading}>
       {kind === "tracks" && items.length > 0 && (
         <div className="mb-5">
           <MusicCollectionControls
             tracks={items.filter((item) => item.kind === "track")}
-            onPlay={(track) => onOpen({ ...track, kind: "track" }, items)}
+            onPlay={(track, queue) => openSourcePicker(track, queue)}
           />
         </div>
       )}
       {loading && items.length === 0 ? (
-        <p role="status" className="music-library-empty">
-          <LoaderCircle size={18} className="animate-spin motion-reduce:animate-none" />
-          {t("music.loading")}
-        </p>
+        <LocalCollectionLoading kind={kind} />
       ) : items.length > 0 ? (
         <div
           className={kind === "tracks" ? "music-library-local-tracks" : "music-library-cover-grid"}
@@ -102,27 +109,29 @@ export function MusicLocalCollection({
                 track={item}
                 showDuration
                 index={index + 1}
-                onPlay={() => onOpen(item, items)}
+                onPlay={() => openSourcePicker(item, items.filter((entry) => entry.kind === "track"))}
+                onOpen={() => onOpen(item, items)}
                 onAddToQueue={() => enqueueMusic(item)}
                 onAddToPlaylist={() => openPlaylistPicker(item)}
               />
             ) : item.kind === "artist" ? (
               <MusicArtistCard key={item.id} artist={item} onOpen={() => onOpen(item, items)} />
             ) : (
-              <MusicCoverCard key={item.id} item={item} onOpen={() => onOpen(item, items)} />
+              <MusicCoverCard
+                key={item.id}
+                item={item}
+                onOpen={() => onOpen(item, items)}
+                onPlay={() => { void playback.play(item, items); }}
+                playing={playback.pending === item}
+                onMenu={itemMenu.openFor(item, index)}
+              />
             ),
           )}
         </div>
       ) : (
         !error && (
-          <div className="music-library-empty">
-            <p>{t(query ? "music.library.noMatches" : "music.library.localEmpty")}</p>
-            {!query && (
-              <button type="button" className="music-library-text" onClick={onConnect}>
-                {t("music.home.addFolder")}
-              </button>
-            )}
-          </div>
+          query ? <p className="music-library-empty">{t("music.library.noMatches")}</p> :
+            <MusicLibraryEmptyState kind={kind} onConnect={onConnect} onTastes={onTastes} />
         )
       )}
       {error && (
@@ -133,6 +142,7 @@ export function MusicLocalCollection({
           </button>
         </div>
       )}
+      {playback.error && <p role="alert" className="text-[13px] text-ink-muted">{playback.error}</p>}
       {next !== null && !error && (
         <button
           type="button"
@@ -146,6 +156,33 @@ export function MusicLocalCollection({
           {t("music.library.loadMore")}
         </button>
       )}
+      {itemMenu.menu}
     </section>
+  );
+}
+
+function LocalCollectionLoading({ kind }: { kind: Kind }) {
+  const t = useT();
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    // Fast local reads should never flash a loading indicator between tabs.
+    const timer = setTimeout(() => setVisible(true), 250);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="min-h-64">
+      {visible && (kind === "tracks" ? <MusicTrackRowsSkeleton rows={5} /> : (
+        <div className="music-library-cover-grid" role="status" aria-label={t("music.loading")}>
+          {Array.from({ length: 5 }, (_, index) => (
+            <div key={index} className={`music-skeleton-card${kind === "artists" ? " is-round" : ""}`} aria-hidden="true">
+              <span className="music-skeleton-fill music-skeleton-art" />
+              <span className="music-skeleton-fill music-skeleton-title" />
+              <span className="music-skeleton-fill music-skeleton-subtitle" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

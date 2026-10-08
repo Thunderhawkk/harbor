@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
 export function BackToTop({
   scrollRef,
   threshold = 600,
+  icon,
+  onReturnToTop,
 }: {
   scrollRef: React.RefObject<HTMLElement | null>;
   threshold?: number;
+  icon?: ReactNode;
+  onReturnToTop?: () => void;
 }) {
   const t = useT();
   const [show, setShow] = useState(false);
@@ -23,15 +27,18 @@ export function BackToTop({
 
   return (
     <button
-      onClick={() =>
+      onClick={() => {
+        onReturnToTop?.();
         scrollRef.current?.scrollTo({
           top: 0,
           behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
             ? "auto"
             : "smooth",
-        })
-      }
+        });
+      }}
       aria-label={t("Back to top")}
+      aria-hidden={!show}
+      tabIndex={show ? 0 : -1}
       style={{
         bottom: "calc(20px + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px))",
       }}
@@ -39,7 +46,7 @@ export function BackToTop({
         show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
       }`}
     >
-      <ArrowUp size={14} strokeWidth={2.2} />
+      {icon ?? <ArrowUp size={14} strokeWidth={2.2} />}
     </button>
   );
 }

@@ -22,6 +22,11 @@ function load(file, mocks = {}, globals = {}) {
 }
 const nav = load("src/chrome/nav-items.tsx", {
   "@/lib/sports/enabled": { useSportsEnabled: () => false },
+  "@/lib/streams/plugins/available": { usePluginCataloguesAvailable: () => false },
+});
+const navWithPlugins = load("src/chrome/nav-items.tsx", {
+  "@/lib/sports/enabled": { useSportsEnabled: () => false },
+  "@/lib/streams/plugins/available": { usePluginCataloguesAvailable: () => true },
 });
 const cfg = () => ({ order: [], hidden: [], renamed: {} });
 
@@ -29,6 +34,11 @@ test("customization retains Music and the Sports availability gate", () => {
   assert.ok(nav.NAV_ITEMS.some((item) => item.id === "music"));
   assert.ok(nav.NAV_ITEMS.some((item) => item.id === "sports"));
   assert.ok(!nav.useAvailableNavItems().some((item) => item.id === "sports"));
+});
+test("the Plugins tab appears only once a plugin can stand up rows of its own", () => {
+  assert.ok(nav.NAV_ITEMS.some((item) => item.id === "plugins"));
+  assert.ok(!nav.useAvailableNavItems().some((item) => item.id === "plugins"));
+  assert.ok(navWithPlugins.useAvailableNavItems().some((item) => item.id === "plugins"));
 });
 test("hide and restore do not discard order or renamed labels", () => {
   const original = { order: ["music", "home"], hidden: [], renamed: { music: "My music" } };

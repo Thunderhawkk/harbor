@@ -1,6 +1,9 @@
 import { MusicHeroMedia } from "./music-hero-media";
 import { useHeroLayers } from "./use-hero-layers";
 import { MusicArtistLink } from "@/components/music/music-artist-link";
+import { MusicTasteIcon } from "@/components/music/music-taste-icon";
+import { MusicBillboardRank } from "@/components/music/music-billboard-rank";
+import { useMusicItemMenu } from "@/components/music/music-item-menu";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { classifyHomeRow } from "./music-home-rows";
@@ -14,9 +17,13 @@ import {
   Pause,
   Play,
   Plus,
-  SlidersHorizontal,
-} from "lucide-react";
+} from "@/components/icons/music-icons";
+import { MusicNowPlayingMark } from "@/components/music/music-now-playing-mark";
+import { useMusicSourcePicker } from "@/components/music/music-source-picker";
+import { nowPlayingMatches } from "@/lib/music/now-playing-key";
+import { useMusicNowPlaying } from "@/lib/music/use-now-playing";
 import { MusicServiceLogo } from "@/components/music/music-service-logo";
+import { MusicHomeHeroSkeleton } from "@/components/music/music-skeletons";
 import { useT } from "@/lib/i18n";
 import type { MusicCatalogItem, MusicCatalogRow, MusicTrack } from "@/lib/music/types";
 import "./music-home.css";
@@ -24,7 +31,7 @@ import "./music-home.css";
 export function MusicHomeHero({
   rows,
   recent: _recent,
-  loading: _loading,
+  loading,
   active = true,
   onOpen,
   onLibrary,
@@ -45,6 +52,8 @@ export function MusicHomeHero({
   onTastes: () => void;
 }) {
   const t = useT();
+  const { openSourcePicker } = useMusicSourcePicker();
+  const now = useMusicNowPlaying();
   const root = useRef<HTMLDivElement>(null);
   const selector = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(1);
@@ -86,6 +95,7 @@ export function MusicHomeHero({
     Math.max(0, candidates.length - visibleCount),
   );
   const visibleCandidates = candidates.slice(firstVisible, firstVisible + visibleCount);
+  const itemMenu = useMusicItemMenu({ onOpen: (item) => onOpen(item, candidates) });
   const move = (step: number) =>
     setSelectedId(candidates[(selected + step + candidates.length) % candidates.length]?.id ?? "");
   useEffect(() => {
@@ -137,6 +147,7 @@ export function MusicHomeHero({
   const title = feature?.title;
   const artist = feature?.artist;
   const imported = local.length > 0;
+  if (loading && rows.length === 0) return <MusicHomeHeroSkeleton />;
   return (
     <div
       ref={root}
@@ -181,13 +192,31 @@ export function MusicHomeHero({
               )}
             </p>
             <div className="music-home-feature-actions">
-              {feature ? (
+              {feature?.kind === "track" ? (
+                <button
+                  type="button"
+                  className="music-collection-play"
+                  aria-label={t("music.playTrack", {
+                    title: feature.title,
+                    artist: feature.artist,
+                  })}
+                  title={t("music.play")}
+                  onClick={() =>
+                    openSourcePicker(
+                      feature,
+                      candidates.flatMap((item) => (item.kind === "track" ? [item] : [])),
+                    )
+                  }
+                >
+                  <Play size={24} fill="currentColor" aria-hidden />
+                </button>
+              ) : feature ? (
                 <button
                   type="button"
                   className="music-home-primary"
                   onClick={() => onOpen(feature, candidates)}
                 >
-                  {t(feature.kind === "track" ? "music.discover" : "music.home.exploreRelease")}
+                  {t("music.home.exploreRelease")}
                   <ArrowUpRight size={18} />
                 </button>
               ) : (
@@ -200,12 +229,22 @@ export function MusicHomeHero({
                   {t("music.home.addFolder")}
                 </button>
               )}
+              {feature?.kind === "track" && (
+                <button
+                  type="button"
+                  className="music-home-text"
+                  onClick={() => onOpen(feature, candidates)}
+                >
+                  <ArrowUpRight size={17} />
+                  {t("music.discover")}
+                </button>
+              )}
               <button type="button" className="music-home-text" onClick={onPlaylists}>
                 <ListMusic size={17} />
                 {t("music.taste.playlists")}
               </button>
               <button type="button" className="music-home-text" onClick={onTastes}>
-                <SlidersHorizontal size={17} />
+                <MusicTasteIcon size={17} />
                 {t("music.taste.choose")}
               </button>
             </div>
@@ -214,7 +253,16 @@ export function MusicHomeHero({
         <MusicHeroMedia
           item={feature}
           hovering={active && pageVisible && visible && (heroHover || heroFocus)}
+          onMenu={feature ? itemMenu.openFor(feature, selected) : undefined}
         />
+        {feature?.kind === "track" && (
+          <MusicBillboardRank
+            title={feature.title}
+            artist={feature.artist}
+            logoSize={11}
+            className="pointer-events-none absolute bottom-3.5 end-3.5 z-[2] inline-flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-md bg-canvas/95 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink ring-1 ring-edge-soft/60"
+          />
+        )}
       </section>
       {candidates.length > 1 && (
         <div className="music-feature-browse">
@@ -223,12 +271,16 @@ export function MusicHomeHero({
             className="music-feature-selector"
             style={{ gridTemplateColumns: `repeat(${visibleCandidates.length}, minmax(0, 1fr))` }}
           >
-            {visibleCandidates.map((item) => (
+            {visibleCandidates.map((item, index) => (
               <div
                 key={item.id}
                 className="music-feature-choice"
                 data-selected={item.id === feature?.id}
+                onContextMenu={itemMenu.openFor(item, firstVisible + index)}
               >
+                {item.kind === "track" && nowPlayingMatches(now, item) && (
+                  <MusicNowPlayingMark loading={now.phase === "resolving"} />
+                )}
                 <button
                   type="button"
                   aria-pressed={item.id === feature?.id}
@@ -303,6 +355,7 @@ export function MusicHomeHero({
           {t("music.hero.startCta")}
         </button>
       </nav>
+      {itemMenu.menu}
     </div>
   );
 }

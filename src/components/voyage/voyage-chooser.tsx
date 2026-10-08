@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useEffect, useState, type CSSProperties } from "react";
 import { Spinner } from "@/components/spinner";
 import { VOYAGE_THEMES, THEME_PALETTE } from "@/lib/voyage/themes";
 import { startVoyage } from "@/lib/voyage/store";
@@ -6,17 +6,21 @@ import type { VoyageTheme } from "@/lib/voyage/types";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
 
-export function VoyageChooser() {
+export function VoyageChooser({ inline = false }: { inline?: boolean }) {
   const t = useT();
   const { settings } = useSettings();
   const [busy, setBusy] = useState<string | null>(null);
   const [len, setLen] = useState(5);
   const [error, setError] = useState<string | null>(null);
 
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const start = async (theme: VoyageTheme) => {
     setBusy(theme.id);
     setError(null);
-    const ok = await startVoyage(theme, len, settings.tmdbKey ?? "");
+    let ok = false;
+    try { ok = await startVoyage(theme, len, settings.tmdbKey ?? ""); } catch { /* Show the same recoverable route error. */ }
+    if (!alive.current) return;
     if (!ok) {
       setError(t("That route wouldn't chart. Try a different direction."));
       setBusy(null);
@@ -24,26 +28,26 @@ export function VoyageChooser() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className={inline ? "voyage-inline-chooser" : "flex flex-col gap-6"}>
+      <div className={inline ? "voyage-inline-summary" : "flex flex-wrap items-end justify-between gap-4"}>
         <div className="flex flex-col gap-1">
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">{t("New voyage")}</span>
           <h2 className="font-display text-[26px] font-medium tracking-tight text-ink">{t("Where to today?")}</h2>
           <p className="text-[13.5px] text-ink-muted">{t("Pick a direction. You steer from there, one film at a time.")}</p>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className={`flex flex-col gap-2 ${inline ? "items-start" : "items-end"}`}>
           <span className="text-[11px] text-ink-subtle">{t("How many films?")}</span>
-          <LengthPicker value={len} onChange={setLen} />
+          <LengthPicker value={len} onChange={setLen} disabled={!!busy} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className={inline ? "voyage-inline-themes" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
         {VOYAGE_THEMES.map((theme) => (
           <ThemeTile key={theme.id} theme={theme} busy={busy === theme.id} disabled={!!busy} onPick={() => start(theme)} />
         ))}
       </div>
 
-      {error && <p className="text-[12.5px] text-danger">{error}</p>}
+      {error && <p role="alert" className="text-[12.5px] text-danger">{error}</p>}
     </div>
   );
 }
@@ -52,11 +56,12 @@ const LENGTHS = [3, 5, 7];
 const SEG_W = 36;
 const SEG_GAP = 4;
 
-function LengthPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function LengthPicker({ value, onChange, disabled }: { value: number; onChange: (n: number) => void; disabled: boolean }) {
+  const t = useT();
   const [flip, setFlip] = useState(false);
   const index = Math.max(0, LENGTHS.indexOf(value));
   return (
-    <div className="relative flex items-center rounded-md bg-canvas p-1" style={{ gap: SEG_GAP }}>
+    <div role="group" aria-label={t("How many films?")} className="relative flex items-center rounded-md bg-canvas p-1" style={{ gap: SEG_GAP }}>
       <span
         aria-hidden
         className="harbor-seg-thumb absolute bottom-1 top-1 rounded-[6px] bg-ink"
@@ -69,6 +74,8 @@ function LengthPicker({ value, onChange }: { value: number; onChange: (n: number
       {LENGTHS.map((n) => (
         <button
           key={n}
+          aria-pressed={value === n}
+          disabled={disabled}
           type="button"
           onClick={() => {
             if (n === value) return;
@@ -105,7 +112,7 @@ function ThemeTile({
       type="button"
       disabled={disabled}
       onClick={onPick}
-      className="harbor-tile group relative h-[132px] w-full overflow-hidden rounded-md text-start ring-1 ring-edge-soft hover:shadow-[0_26px_50px_-24px_rgba(0,0,0,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60 disabled:pointer-events-none disabled:opacity-70"
+      className="voyage-theme-tile harbor-tile group relative h-[132px] w-full overflow-hidden rounded-md text-start ring-1 ring-edge-soft hover:shadow-[0_26px_50px_-24px_rgba(0,0,0,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60 disabled:pointer-events-none disabled:opacity-70"
       style={{ background: `linear-gradient(150deg, ${pal.from}, ${pal.to})` }}
     >
       {theme.backdrop && (

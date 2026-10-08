@@ -1,23 +1,54 @@
-import { useState } from "react";
-import { FolderOpen, Trash2, X, Plus, RotateCcw, Play } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FolderOpen, Trash2, X, Plus, RotateCcw, Play } from "@/components/icons/music-icons";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useT } from "@/lib/i18n";
 import {
   deleteMusicDownload,
   downloadMusic,
   downloadedMusicTrack,
+  musicDownloadDir,
+  musicDownloadFolder,
   revealMusicDownload,
+  setMusicDownloadDir,
   useMusicDownloads,
   type MusicDownload,
 } from "@/lib/music/downloads";
 import { playMusic, closeMusicPlayer, getMusicState } from "@/lib/music/player";
 import { useMusicPlaylistPicker } from "./music-playlist-picker";
 import { Poster } from "@/components/poster";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 export function MusicDownloads({ query = "" }: { query?: string }) {
   const t = useT(),
     entries = useMusicDownloads(),
     { openPlaylistPicker } = useMusicPlaylistPicker();
   const [error, setError] = useState(false);
   const [working, setWorking] = useState<string | null>(null);
+  const [folder, setFolder] = useState("");
+  const [folderTick, setFolderTick] = useState(0);
+  const custom = musicDownloadDir() !== "";
+
+  useEffect(() => {
+    let alive = true;
+    void musicDownloadFolder().then((path) => {
+      if (alive) setFolder(path);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [folderTick]);
+
+  const pickFolder = async () => {
+    setError(false);
+    try {
+      const picked = await openDialog({ directory: true, multiple: false, defaultPath: folder });
+      if (typeof picked === "string") {
+        setMusicDownloadDir(picked);
+        setFolderTick((n) => n + 1);
+      }
+    } catch {
+      setError(true);
+    }
+  };
   const shown = entries
     .filter((entry) =>
       `${entry.track.title} ${entry.track.artist} ${entry.track.album ?? ""}`
@@ -52,6 +83,26 @@ export function MusicDownloads({ query = "" }: { query?: string }) {
   };
   return (
     <section className="music-downloads">
+      <div className="music-download-folder">
+        <span className="music-download-folder-label">{t("music.download.folder")}</span>
+        <span className="music-download-folder-path" title={folder}>
+          {folder}
+        </span>
+        <button type="button" onClick={() => void pickFolder()}>
+          {t("music.download.changeFolder")}
+        </button>
+        {custom && (
+          <button
+            type="button"
+            onClick={() => {
+              setMusicDownloadDir("");
+              setFolderTick((n) => n + 1);
+            }}
+          >
+            {t("music.download.defaultFolder")}
+          </button>
+        )}
+      </div>
       {error && <p role="alert">{t("music.download.failed")}</p>}
       {!shown.length && <p className="music-library-empty">{t("music.download.empty")}</p>}
       {shown.map((entry) => (
@@ -62,7 +113,7 @@ export function MusicDownloads({ query = "" }: { query?: string }) {
             onClick={() => void run(entry.id, () => play(entry))}
             aria-label={`${t("music.play")} · ${entry.track.title}`}
           >
-            <Poster src={entry.track.artwork} seed={entry.id} ratio="square" className="size-12" />
+            <Poster src={entry.track.artwork} seed={entry.id} ratio="square" className="size-12"><MusicTrackPlaybackMark track={{...entry.track,id:`download:${entry.id}`,connectorId:"local"}}/></Poster>
           </button>
           <div className="min-w-0 flex-1">
             <strong className="block truncate">{entry.track.title}</strong>

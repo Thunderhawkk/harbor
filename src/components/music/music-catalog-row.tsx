@@ -1,6 +1,9 @@
+import { MusicNowPlayingMark } from "./music-now-playing-mark";
 import { Fragment, type MouseEvent, type ReactNode } from "react";
-import { Play } from "lucide-react";
+import { Play } from "@/components/icons/music-icons";
 import { MusicArtistCard } from "@/components/music/music-artist-card";
+import { useMusicItemMenu } from "@/components/music/music-item-menu";
+import { useMusicCatalogPlayback } from "./use-music-catalog-playback";
 import {
   coverCardSeed,
   coverCardSubtitle,
@@ -10,6 +13,7 @@ import {
   type MusicCardBadge,
 } from "@/components/music/music-cover-card";
 import { MusicPlaylistCover } from "@/components/music/music-playlist-cover";
+import { albumExplicitMarks } from "@/lib/music/album-explicit";
 import {
   MusicSectionConnectCard,
   MusicSectionEmpty,
@@ -30,42 +34,15 @@ import type {
 
 export const MUSIC_SHELF_MIN = 160;
 
-const SOURCE_LABEL: Record<string, string> = {
-  spotify: "Spotify",
-  soundcloud: "SoundCloud",
-  youtube: "YouTube Music",
-  youtubemusic: "YouTube Music",
-  "youtube-music": "YouTube Music",
-  youtube_music: "YouTube Music",
-  local: "Local files",
-  direct: "Local files",
-  plex: "Plex",
-  jellyfin: "Jellyfin",
-  navidrome: "Navidrome",
-  subsonic: "Subsonic",
-  lastfm: "Last.fm",
-  "last-fm": "Last.fm",
-  listenbrainz: "ListenBrainz",
-  bandcamp: "Bandcamp",
-  harbor: "Harbor",
-};
-
-export function sourceLabel(id: string, override?: string): string {
-  if (override && override.trim()) return override.trim();
-  const key = id.trim().toLowerCase();
-  if (!key) return "";
-  const known = SOURCE_LABEL[key];
-  if (known) return known;
-  const words = key.replace(/[_-]+/g, " ").trim();
-  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
-}
+import { sourceLabel } from "@/lib/music/source-label";
+export { sourceLabel } from "@/lib/music/source-label";
 
 type TrackItem = Extract<MusicCatalogItem, { kind: "track" }>;
 type ArtistItem = Extract<MusicCatalogItem, { kind: "artist" }>;
 
 function defaultBadge(item: MusicCatalogItem): MusicCardBadge | undefined {
   if (item.kind === "track" && item.connectorId) {
-    return { kind: "connector", connectorId: item.connectorId };
+    return { kind: "connector", connectorId: item.connectorId, itemId: item.id };
   }
   return undefined;
 }
@@ -103,22 +80,20 @@ function WideFeature({
   const heading = coverCardTitle(item);
   const caption = subtitle ?? coverCardSubtitle(item);
   const seed = coverCardSeed(item);
-  const activate = onPlay ?? onOpen;
-  const label = onPlay
+  const activate = onOpen ?? onPlay;
+  const label = !onOpen && onPlay
     ? item.kind === "track"
       ? t("music.playTrack", { title: heading, artist: caption })
       : t("music.card.playItem", { title: heading })
     : t("music.card.openItem", { title: heading });
 
   return (
-    <button
-      type="button"
-      onClick={activate}
+    <div
       onContextMenu={onMenu}
-      aria-label={label}
-      className="music-top-result group flex w-full min-w-0 items-center gap-6 rounded-xl border border-edge-soft bg-surface p-5 text-start"
+      className="music-top-result group relative flex w-full min-w-0 items-center gap-6 rounded-xl border border-edge-soft bg-surface p-5 text-start"
     >
-      <span className="relative block w-[168px] shrink-0 overflow-hidden rounded-md">
+      <button type="button" onClick={activate} aria-label={label} className="absolute inset-0 rounded-xl" />
+      <span className="pointer-events-none relative block w-[168px] shrink-0 overflow-hidden rounded-md">
         {item.kind === "playlist" ? (
           <MusicPlaylistCover artwork={item.artwork} seed={seed} className="rounded-md" />
         ) : (
@@ -130,7 +105,7 @@ function WideFeature({
           />
         )}
       </span>
-      <span className="flex min-w-0 flex-1 flex-col">
+      <span className="pointer-events-none relative flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-center gap-[5px]">
           <span
             className="truncate font-semibold text-[22px] leading-tight tracking-tight text-ink"
@@ -145,19 +120,22 @@ function WideFeature({
             {caption}
           </span>
         )}
-        {activate && (
-          <span
-            aria-hidden="true"
-            className="mt-5 inline-flex h-11 w-fit items-center gap-2 rounded-full bg-ink px-5 text-[12px] font-semibold text-canvas transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+        {onPlay && (
+          <button
+            type="button"
+            onClick={onPlay}
+            aria-label={t("music.card.playItem", { title: heading })}
+            className="pointer-events-auto mt-5 inline-flex h-11 w-fit items-center gap-2 rounded-full bg-ink px-5 text-[12px] font-semibold text-canvas transition-transform duration-200 ease-out hover:scale-[1.02] motion-reduce:transform-none"
           >
             <Play size={14} fill="currentColor" />
             {t("music.play")}
-          </span>
+          </button>
         )}
       </span>
-    </button>
+    </div>
   );
 }
+
 
 export function MusicCatalogRow({
   row,
@@ -179,7 +157,12 @@ export function MusicCatalogRow({
   onOpen,
   onMenu,
   onViewAll,
+  playable = true,
+  playingItemId,
+  liveItemId,
   viewAllLabel,
+  titleLogo,
+  grid = false,
   onEndReached,
   className = "",
 }: {
@@ -202,11 +185,29 @@ export function MusicCatalogRow({
   onOpen?: (item: MusicCatalogItem, index: number) => void;
   onMenu?: (item: MusicCatalogItem, event: MouseEvent<HTMLElement>) => void;
   onViewAll?: () => void;
+  playable?: boolean;
+  playingItemId?: string | null;
+  liveItemId?: string | null;
   viewAllLabel?: string;
+  titleLogo?: ReactNode;
+  grid?: boolean;
   onEndReached?: () => void;
   className?: string;
 }) {
   const t = useT();
+  const playback = useMusicCatalogPlayback();
+  const play = onPlay ?? ((item: MusicCatalogItem) => { void playback.play(item, row.items, row.id); });
+  const itemMenu = useMusicItemMenu({
+    onPlay: onPlay || playable || row.layout === "trackGrid" || row.layout === "wide" ? play : undefined,
+    onOpen,
+  });
+  const openMenu = (item: MusicCatalogItem, index: number, event: MouseEvent<HTMLElement>) => {
+    if (onMenu) {
+      onMenu(item, event);
+      return;
+    }
+    itemMenu.open(item, index, event);
+  };
   const heading = row.titleLiteral ? row.title : t(row.title, titleVars);
   const rawSubtitle = row.subtitle
     ? row.titleLiteral
@@ -239,7 +240,8 @@ export function MusicCatalogRow({
         count={count ?? 9}
         emptyLabel={emptyLabel}
         badgeFor={(_track, index) => badgeAt(tracks[index], index)}
-        onPlay={(_track, index) => onPlay?.(tracks[index], index)}
+        onPlay={(_track, index) => play(tracks[index], index)}
+        onOpen={onOpen && ((_track, index) => onOpen(tracks[index], index))}
         onViewAll={onViewAll}
         viewAllLabel={viewAllLabel}
         className={className}
@@ -292,21 +294,26 @@ export function MusicCatalogRow({
           <WideFeature
             item={feature}
             badge={badgeAt(feature, 0)}
-            onPlay={onPlay && (() => onPlay(feature, 0))}
+            onPlay={() => play(feature, 0)}
             onOpen={onOpen && (() => onOpen(feature, 0))}
-            onMenu={onMenu && ((event) => onMenu(feature, event))}
+            onMenu={(event) => openMenu(feature, 0, event)}
           />
         )}
+        {playback.error && <p role="alert" className="text-[13px] text-ink-muted">{playback.error}</p>}
+        {itemMenu.menu}
       </section>
     );
   }
 
   const head = (
-    <span className="flex min-w-0 flex-col gap-0.5">
-      <span className="truncate text-[17px] font-medium tracking-tight text-ink">{heading}</span>
-      {caption && (
-        <span className="truncate text-[12px] font-medium text-ink-subtle">{caption}</span>
-      )}
+    <span className="flex min-w-0 items-center gap-2.5">
+      {titleLogo && <span className="grid shrink-0 place-items-center">{titleLogo}</span>}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-[17px] font-medium tracking-tight text-ink">{heading}</span>
+        {caption && (
+          <span className="truncate text-[12px] font-medium text-ink-subtle">{caption}</span>
+        )}
+      </span>
     </span>
   );
 
@@ -327,6 +334,9 @@ export function MusicCatalogRow({
     );
   }
 
+  // Over every loaded item, not the visible slice: a clean/explicit pair split by the
+  // cut would otherwise leave the clean one unlabelled.
+  const explicitMarks = albumExplicitMarks(items);
   const cards: ReactNode[] = visible.map((item, index) =>
     item.kind === "artist" ? (
       <MusicArtistCard
@@ -334,23 +344,43 @@ export function MusicCatalogRow({
         artist={item}
         albumArtwork={artistArtwork?.(item)}
         subtitle={artistSubtitle?.(item)}
-        onPlay={onPlay && (() => onPlay(item, index))}
+        onPlay={onPlay && (() => play(item, index))}
         onOpen={onOpen && (() => onOpen(item, index))}
-        onMenu={onMenu && ((event) => onMenu(item, event))}
+        onMenu={(event) => openMenu(item, index, event)}
       />
     ) : (
       <MusicCoverCard
         key={`${coverCardSeed(item)}:${index}`}
         item={item}
         badge={badgeAt(item, index)}
-        onPlay={onPlay && (() => onPlay(item, index))}
+        explicitMark={explicitMarks.get(item.id) ?? null}
+        onPlay={onPlay || playable ? () => play(item, index) : undefined}
+        playing={playingItemId === item.id || (playback.pending?.id === item.id && playback.pending?.connectorId === item.connectorId)}
         onOpen={onOpen && (() => onOpen(item, index))}
-        onMenu={onMenu && ((event) => onMenu(item, event))}
+        onMenu={(event) => openMenu(item, index, event)}
+        overlay={(() => {
+          if (item.kind === "track") return undefined;
+          const pending =
+            playback.pending?.id === item.id &&
+            playback.pending?.connectorId === item.connectorId;
+          if (!pending && liveItemId !== item.id) return undefined;
+          return <MusicNowPlayingMark loading={pending} />;
+        })()}
       />
     ),
   );
 
-  return (
+  const body = grid ? (
+    <section className={`flex min-w-0 flex-col gap-4 ${className}`}>
+      {head}
+      <div
+        className="grid gap-x-5 gap-y-7"
+        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cellMin}px, 1fr))` }}
+      >
+        {leadingCard ? [<Fragment key="music-row-lead">{leadingCard}</Fragment>, ...cards] : cards}
+      </div>
+    </section>
+  ) : (
     <Row
       title={head}
       shape="square"
@@ -363,5 +393,13 @@ export function MusicCatalogRow({
     >
       {leadingCard ? [<Fragment key="music-row-lead">{leadingCard}</Fragment>, ...cards] : cards}
     </Row>
+  );
+
+  return (
+    <>
+      {body}
+      {playback.error && <p role="alert" className="px-[9px] text-[13px] text-ink-muted">{playback.error}</p>}
+      {itemMenu.menu}
+    </>
   );
 }

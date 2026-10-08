@@ -42,6 +42,6 @@ test("sensitive requests cannot use the browser direct-host fast path", () => {
   const safeFetch = read("src/lib/safe-fetch.ts");
   assert.match(
     safeFetch,
-    /const directHost = hasSensitiveRequestHeaders\(init\?\.headers\) \? null : tauriDirectHost\(input\)/,
+    /const directHost = hasSensitiveRequestHeaders\(init\?\.headers\) \? null : directHostFor\(input\)/,
   );
 });

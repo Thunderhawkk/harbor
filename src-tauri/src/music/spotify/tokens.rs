@@ -91,6 +91,7 @@ impl SpotifyState {
     }
 
     async fn session_token(&self) -> Result<String, String> {
+        self.ensure_session().await?;
         let session = self.account.read().session.clone();
         let session = session
             .filter(|session| !session.is_invalid())

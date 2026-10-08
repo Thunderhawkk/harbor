@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::db::{now_millis, track_from_row, upsert_track_in_transaction, MusicDb};
 use super::MusicTrack;
 use rusqlite::{params, OptionalExtension};
@@ -34,6 +35,7 @@ pub struct MusicPlaylist {
     created_at: String,
     updated_at: String,
     tracks: Vec<MusicTrack>,
+    track_added_at: HashMap<String, String>,
 }
 
 pub fn list_albums(database: &MusicDb) -> Result<Vec<MusicAlbum>, String> {
@@ -122,7 +124,9 @@ pub fn list_playlists(database: &MusicDb) -> Result<Vec<MusicPlaylist>, String> 
         rows.into_iter()
             .map(|(id, name, created_at, updated_at)| {
                 let tracks = playlist_tracks(connection, &id)?;
+                let track_added_at = playlist_dates(connection, &id)?;
                 Ok(MusicPlaylist {
+                    track_added_at,
                     id,
                     name,
                     created_at,
@@ -162,6 +166,7 @@ pub fn create_playlist(database: &MusicDb, name: &str) -> Result<MusicPlaylist, 
             created_at: timestamp.clone(),
             updated_at: timestamp,
             tracks: Vec::new(),
+            track_added_at: HashMap::new(),
         })
     })
 }
@@ -243,6 +248,10 @@ pub fn add_tracks_to_playlist(
                 )
                 .map_err(|error| error.to_string())?;
             if inserted > 0 {
+                transaction.execute(
+                    "INSERT INTO playlist_track_dates (playlist_id, track_id, added_at) VALUES (?1, ?2, ?3)",
+                    params![playlist_id, track.id, now_millis().to_string()],
+                ).map_err(|error| error.to_string())?;
                 position = position.saturating_add(1);
             }
         }
@@ -325,6 +334,10 @@ pub fn remove_from_playlist(
     database.with_connection(|connection| {
         let transaction = connection.transaction().map_err(|error| error.to_string())?;
         require_playlist(&transaction, playlist_id)?;
+        transaction.execute(
+            "DELETE FROM playlist_track_dates WHERE playlist_id = ?1 AND track_id = ?2",
+            params![playlist_id, track_id],
+        ).map_err(|error| error.to_string())?;
         let track_ids = {
             let mut statement = transaction
                 .prepare(
@@ -389,7 +402,16 @@ fn get_playlist(
         created_at: row.2,
         updated_at: row.3,
         tracks: playlist_tracks(connection, playlist_id)?,
+        track_added_at: playlist_dates(connection, playlist_id)?,
     })
+}
+
+fn playlist_dates(connection: &rusqlite::Connection, playlist_id: &str) -> Result<HashMap<String, String>, String> {
+    let mut statement = connection.prepare("SELECT track_id, added_at FROM playlist_track_dates WHERE playlist_id = ?1")
+        .map_err(|error| error.to_string())?;
+    let rows = statement.query_map(params![playlist_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(|error| error.to_string())?;
+    rows.collect::<rusqlite::Result<HashMap<_, _>>>().map_err(|error| error.to_string())
 }
 
 fn playlist_tracks(
@@ -449,6 +471,29 @@ mod tests {
             duration_seconds: 180,
             duration_label: "3:00".to_string(),
         }
+    }
+
+    #[test]
+    fn membership_dates_survive_reordering_and_remove_only_with_membership() {
+        let database = MusicDb::in_memory();
+        let songs = [track("one", "One", None), track("two", "Two", None)];
+        let playlist = create_playlist(&database, "Dates").unwrap();
+        let added = add_tracks_to_playlist(&database, &playlist.id, &songs).unwrap();
+        assert_eq!(added.track_added_at.len(), 2);
+        let duplicate = add_to_playlist(&database, &playlist.id, &songs[0]).unwrap();
+        assert_eq!(duplicate.track_added_at, added.track_added_at);
+        let moved = reorder_playlist(&database, &playlist.id, "two", 0).unwrap();
+        assert_eq!(moved.track_added_at, added.track_added_at);
+        let removed = remove_from_playlist(&database, &playlist.id, "one").unwrap();
+        assert_eq!(removed.track_added_at.len(), 1);
+        assert_eq!(removed.track_added_at.get("two"), added.track_added_at.get("two"));
+        let reread = list_playlists(&database).unwrap();
+        assert_eq!(reread[0].track_added_at, removed.track_added_at);
+        delete_playlist(&database, &playlist.id).unwrap();
+        database.with_connection(|connection| {
+            assert!(playlist_dates(connection, &playlist.id)?.is_empty());
+            Ok(())
+        }).unwrap();
     }
 
     #[test]

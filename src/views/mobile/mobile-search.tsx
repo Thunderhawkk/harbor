@@ -805,6 +805,7 @@ function CollectionsBrowser({
   onOpenDetail: (m: Meta) => void;
 }) {
   const t = useT();
+  const { settings } = useSettings();
   const [list, setList] = useState<Meta[] | null>(null);
   const [active, setActive] = useState<Meta | null>(null);
   const [members, setMembers] = useState<Meta[] | null>(null);
@@ -814,7 +815,9 @@ function CollectionsBrowser({
     setList(null);
     (async () => {
       try {
-        const cats = await listBrowseCatalogs(authKey);
+        const cats = await listBrowseCatalogs(authKey, {
+          pluginRows: settings.pluginsOutsideTab,
+        });
         const wanted = cats.filter((c) =>
           isCollectionCatalog({ type: c.type, id: c.id, name: c.name }),
         );
@@ -839,7 +842,7 @@ function CollectionsBrowser({
     return () => {
       alive = false;
     };
-  }, [authKey]);
+  }, [authKey, settings.pluginsOutsideTab]);
 
   const openCollection = async (meta: Meta) => {
     setActive(meta);

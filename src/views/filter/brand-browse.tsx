@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PickCard } from "@/components/pick-card";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/feed/tags";
 import type { Meta } from "@/lib/cinemeta";
+import { browseDiscoverKey } from "@/lib/providers/tmdb/browse-kind";
 import { tmdbDiscover } from "@/lib/providers/tmdb";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { type MetaFilter } from "@/lib/view";
+import { browsedId, type Browsed } from "./browsed";
 
 type Sort = "popular" | "rated" | "newest" | "oldest";
 
@@ -40,7 +41,7 @@ function Chip({
   );
 }
 
-export function BrandBrowse({ filter }: { filter: MetaFilter & { id: number; name: string } }) {
+export function BrandBrowse({ filter }: { filter: Browsed }) {
   const t = useT();
   const { settings } = useSettings();
   const mediaType = filter.mediaType;
@@ -54,13 +55,14 @@ export function BrandBrowse({ filter }: { filter: MetaFilter & { id: number; nam
   const busy = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
 
-  const key = filter.kind === "network" ? "with_networks" : "with_companies";
+  const key = browseDiscoverKey(filter.kind);
+  const browseId = browsedId(filter);
   const params = useMemo(() => {
     const spec = SORTS.find((s) => s.id === sort) ?? SORTS[0];
     const d = dateKeys(mediaType);
     const by = sort === "newest" || sort === "oldest" ? `${d.sortDate}.${sort === "newest" ? "desc" : "asc"}` : spec.by;
     const p: Record<string, string> = {
-      [key]: String(filter.id),
+      [key]: String(browseId),
       sort_by: by,
       "vote_count.gte": spec.floor,
     };
@@ -70,7 +72,7 @@ export function BrandBrowse({ filter }: { filter: MetaFilter & { id: number; nam
       p[d.lte] = `${decade + 9}-12-31`;
     }
     return p;
-  }, [key, filter.id, sort, genre, decade, mediaType]);
+  }, [key, browseId, sort, genre, decade, mediaType]);
 
   useEffect(() => {
     setItems(null);

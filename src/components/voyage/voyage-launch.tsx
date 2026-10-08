@@ -1,5 +1,5 @@
 import lottie, { type AnimationItem } from "lottie-web";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import boatData from "@/assets/lottie/voyage-boat.json";
 import { useT } from "@/lib/i18n";
@@ -82,33 +82,33 @@ function paintPosters(svg: SVGSVGElement, sources: string[]): void {
   svg.insertBefore(style, svg.firstChild);
 }
 
-export function VoyageLaunch({
-  thumbs,
-  onDone,
-}: {
-  thumbs: LaunchThumb[];
-  onDone: () => void;
-}) {
+export function VoyageLaunch({ thumbs, onDone }: { thumbs: LaunchThumb[]; onDone: () => void }) {
   const t = useT();
   const stageRef = useRef<HTMLDivElement>(null);
+  const skipRef = useRef<HTMLButtonElement>(null);
   const cloneRefs = useRef<(HTMLDivElement | null)[]>([]);
   const animRef = useRef<AnimationItem | null>(null);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  const completed = useRef(false);
   const [targets, setTargets] = useState<DOMRect[] | null>(null);
-  const [sailing, setSailing] = useState(false);
-  const startedRef = useRef(false);
+  const [phase, setPhase] = useState<"gathering" | "boarding" | "sailing">("gathering");
   const contentRef = useRef<{ svg: SVGSVGElement; content: ContentBox } | null>(null);
-
-  const castRef = useRef<LaunchThumb[]>([]);
-  if (castRef.current.length === 0) castRef.current = thumbs.slice(0, 3);
-  const cast = castRef.current;
+  const cast = useRef(thumbs).current;
+  const three = useRef(thumbs.slice(0, 3)).current;
+  const finish = useCallback(() => {
+    if (completed.current) return;
+    completed.current = true;
+    doneRef.current();
+  }, []);
 
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
+    if (reduced()) { finish(); return; }
     let cancelled = false;
-
+    // Let the app's pointer-down cleanup finish before moving focus into the launch.
+    const focusFrame = requestAnimationFrame(() => skipRef.current?.focus({ preventScroll: true }));
     const anim = lottie.loadAnimation({
       container: stage,
       renderer: "svg",
@@ -118,100 +118,99 @@ export function VoyageLaunch({
       rendererSettings: { preserveAspectRatio: "xMidYMid meet" },
     });
     animRef.current = anim;
-
     const onReady = () => {
-      if (cancelled) return;
+      if (cancelled || completed.current) return;
       const svg = stage.querySelector("svg");
-      if (!svg) return;
-      paintPosters(svg, cast.map((c) => c.src));
+      if (!svg) { finish(); return; }
+      paintPosters(svg, three.map(c => c.src));
       const content = measureContent(svg, anim);
       if (content) {
         contentRef.current = { svg, content };
         frameStage(svg, stage, content);
       }
       anim.goToAndStop(0, true);
-      const found = cast.map((_, i) => {
-        const slots = svg.querySelectorAll<SVGGElement>(`.vy-poster-${i}`);
-        for (const slot of slots) {
+      const found = three.map((_, i) => {
+        for (const slot of svg.querySelectorAll<SVGGElement>(`.vy-poster-${i}`)) {
           const box = slot.getBoundingClientRect();
           if (box.width > 1 && box.height > 1) return box;
         }
         return null;
       });
-      if (found.some((r) => !r)) {
-        console.warn("[voyage] could not measure the boat poster slots; skipping the launch");
-        doneRef.current();
-        return;
-      }
+      if (found.some(r => !r)) { finish(); return; }
       setTargets(found as DOMRect[]);
     };
-
     anim.addEventListener("DOMLoaded", onReady);
-    anim.addEventListener("complete", () => doneRef.current());
-
-    const bail = window.setTimeout(() => {
-      if (!cancelled && !startedRef.current) doneRef.current();
-    }, 4000);
-
+    anim.addEventListener("complete", finish);
+    anim.addEventListener("data_failed", finish);
+    // A failed renderer must never strand the user on the launch screen.
+    const bail = window.setTimeout(finish, 12000);
     return () => {
       cancelled = true;
+      cancelAnimationFrame(focusFrame);
       window.clearTimeout(bail);
       anim.destroy();
       animRef.current = null;
     };
-  }, [cast]);
+  }, [three, finish]);
 
   useEffect(() => {
-    if (!targets) return;
+    if (!targets || !animRef.current) return;
     const anim = animRef.current;
-    if (!anim) return;
-
-    if (reduced()) {
-      startedRef.current = true;
-      setSailing(true);
-      anim.play();
-      return;
-    }
-
-    const flights = cloneRefs.current.slice(0, targets.length).map((el, i) => {
-      const to = targets[i];
-      const from = cast[i].rect;
-      if (!el) return null;
-      const dx = from.left - to.left;
-      const dy = from.top - to.top;
-      const sx = from.width / to.width;
-      const sy = from.height / to.height;
-      return el.animate(
-        [
-          { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
-          {
-            transform: `translate(${dx * 0.12}px, ${dy * 0.12 - 14}px) scale(${sx + (1 - sx) * 1.06}, ${sy + (1 - sy) * 1.06})`,
-            offset: 0.62,
-          },
-          {
-            transform: `translate(${dx * -0.015}px, ${dy * -0.015 + 4}px) scale(${1.012}, ${0.99})`,
-            offset: 0.83,
-          },
-          { transform: "translate(0px, 0px) scale(1, 1)" },
-        ],
-        { duration: FLIGHT_MS, delay: i * 70, easing: "ease-in-out", fill: "both" },
-      );
-    });
-
-    const last = flights.filter(Boolean).pop();
-    let timer = 0;
-    const handoff = () => {
-      timer = window.setTimeout(() => {
-        startedRef.current = true;
-        setSailing(true);
+    let cancelled = false;
+    let settle = 0;
+    const animations: Animation[] = [];
+    const width = Math.min(128, window.innerWidth * .16);
+    const height = width * RECT_H / RECT_W;
+    const gap = Math.min(18, window.innerWidth * .02);
+    const startX = (window.innerWidth - three.length * width - (three.length - 1) * gap) / 2;
+    const gathered = three.map((_, i) => new DOMRect(startX + i * (width + gap), (window.innerHeight - height) / 2, width, height));
+    const transformTo = (from: DOMRect, to: DOMRect) =>
+      `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${to.width / from.width}, ${to.height / from.height})`;
+    const run = async () => {
+      // Every visible confirmation poster participates; only the visual cast reduces to three.
+      const collecting = cast.map((thumb, i) => {
+        const el = cloneRefs.current[i];
+        if (!el) return Promise.resolve();
+        const to = gathered[i % gathered.length];
+        const frames: Keyframe[] = i < three.length
+          ? [{ transform: "none" }, { transform: transformTo(thumb.rect, to) }]
+          : [{ transform: "none", opacity: 1 }, { opacity: .65, offset: .45 }, { transform: transformTo(thumb.rect, to), opacity: 0 }];
+        const animation = el.animate(frames, { duration: 520, delay: i * 18, easing: "ease-in-out", fill: "forwards" });
+        animations.push(animation);
+        return animation.finished;
+      });
+      await Promise.allSettled(collecting);
+      if (cancelled || completed.current) return;
+      setPhase("boarding");
+      const flights = three.map((thumb, i) => {
+        const el = cloneRefs.current[i];
+        if (!el) return Promise.resolve();
+        const from = gathered[i];
+        const to = targets[i];
+        const near = new DOMRect(to.left + (from.left - to.left) * .08, to.top - 10, to.width * 1.025, to.height * 1.015);
+        const animation = el.animate([
+          { transform: transformTo(thumb.rect, from) },
+          { transform: transformTo(thumb.rect, near), offset: .72 },
+          { transform: transformTo(thumb.rect, to) },
+        ], { duration: FLIGHT_MS, delay: i * 70, easing: "ease-in-out", fill: "forwards" });
+        animations.push(animation);
+        return animation.finished;
+      });
+      await Promise.allSettled(flights);
+      if (cancelled || completed.current) return;
+      settle = window.setTimeout(() => {
+        if (cancelled || completed.current) return;
+        setPhase("sailing");
         anim.play();
       }, SETTLE_MS);
     };
-    if (last) last.addEventListener("finish", handoff);
-    else handoff();
-
-    return () => window.clearTimeout(timer);
-  }, [targets]);
+    void run();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(settle);
+      animations.forEach(animation => animation.cancel());
+    };
+  }, [targets, cast, three]);
 
   useEffect(() => {
     const onResize = () => {
@@ -223,59 +222,23 @@ export function VoyageLaunch({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const skip = () => doneRef.current();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") skip();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
   return createPortal(
-    <div
-      className="animate-voyage-launch-in fixed inset-0 z-[1200] cursor-pointer bg-canvas"
-      onClick={skip}
-      role="button"
-      tabIndex={0}
-      aria-label={t("Skip the launch")}
-    >
-      <div
-        ref={stageRef}
-        aria-hidden
-        className="absolute inset-0 transition-opacity ease-in-out"
-        style={{ opacity: sailing ? 1 : 0, transitionDuration: `${CROSSFADE_MS}ms` }}
-      />
-
-      {targets &&
-        cast.map((thumb, i) => (
-          <div
-            key={i}
-            ref={(el) => {
-              cloneRefs.current[i] = el;
-            }}
-            aria-hidden
-            className="pointer-events-none absolute overflow-hidden transition-opacity ease-in-out"
-            style={{
-              left: targets[i].left,
-              top: targets[i].top,
-              width: targets[i].width,
-              height: targets[i].height,
-              transformOrigin: "top left",
-              borderRadius: Math.max(4, targets[i].width * 0.06),
-              opacity: sailing ? 0 : 1,
-              transitionDuration: `${CROSSFADE_MS}ms`,
-            }}
-          >
-            <img src={thumb.src} alt="" draggable={false} className="h-full w-full object-cover" />
-          </div>
-        ))}
-
-      <span className="pointer-events-none absolute inset-x-0 bottom-8 text-center text-[12px] font-medium text-ink-subtle">
-        {t("Click anywhere to skip")}
-      </span>
-    </div>,
-    document.body,
+    <div className="animate-voyage-launch-in fixed inset-0 z-[1200] bg-canvas" data-voyage-launch data-phase={phase} data-tv-focus-scope>
+      <div ref={stageRef} aria-hidden data-voyage-boat className="pointer-events-none absolute inset-0 transition-opacity ease-in-out" style={{ opacity: phase === "sailing" ? 1 : 0, transitionDuration: `${CROSSFADE_MS}ms` }} />
+      {cast.map((thumb, i) => (
+        <div key={i} ref={el => { cloneRefs.current[i] = el; }} aria-hidden data-voyage-flying-poster
+          className="pointer-events-none absolute overflow-hidden transition-opacity ease-in-out"
+          style={{ left: thumb.rect.left, top: thumb.rect.top, width: thumb.rect.width, height: thumb.rect.height,
+            transformOrigin: "top left", borderRadius: Math.max(4, thumb.rect.width * .06),
+            opacity: phase === "sailing" ? 0 : 1, transitionDuration: `${CROSSFADE_MS}ms`, zIndex: i < 3 ? 2 : 1 }}>
+          <img src={thumb.src} alt="" draggable={false} className="h-full w-full object-cover" />
+        </div>
+      ))}
+      <button ref={skipRef} type="button" data-tv-modal-close onClick={finish} aria-label={t("Skip the launch")}
+        onKeyDown={e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(); } }}
+        className="absolute inset-0 z-10 cursor-pointer focus-visible:outline-none">
+        <span className="absolute inset-x-0 bottom-8 text-center text-[12px] font-medium text-ink-subtle">{t("Click anywhere to skip")}</span>
+      </button>
+    </div>, document.body,
   );
 }

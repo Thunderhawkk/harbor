@@ -19,7 +19,7 @@ import { downloadText } from "@/lib/download-text";
 import { CARD } from "./shared";
 
 const FIELD =
-  "h-12 w-full rounded-xl border border-edge bg-canvas pe-4 text-[14.5px] text-ink outline-none transition-all duration-200 placeholder:text-ink-subtle hover:border-edge focus:border-accent/55 focus:ring-2 focus:ring-accent/15";
+  "h-12 w-full rounded-xl border border-edge bg-canvas pe-4 text-[14.5px] text-ink outline-none transition-all duration-200 placeholder:text-ink-subtle hover:border-edge focus:border-ink-subtle focus:ring-1 focus:ring-inset focus:ring-ink-subtle";
 import { CustomSourceHelp } from "./custom-source-help";
 import { EXAMPLE, GUIDE_TXT, AI_PROMPT } from "./custom-source-content";
 import { useT } from "@/lib/i18n";
@@ -202,7 +202,7 @@ export function CustomSource() {
               placeholder={t("Paste your scraping config as JSON here, or grab the template above to start.")}
               spellCheck={false}
               autoCapitalize="off"
-              className="h-60 w-full resize-y rounded-xl border border-edge bg-canvas px-4 pb-3.5 pt-3.5 font-mono text-[12.5px] leading-[1.7] text-ink shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)] outline-none transition-all duration-200 placeholder:text-ink-subtle/80 focus:border-accent/55 focus:ring-2 focus:ring-accent/15"
+              className="h-60 w-full resize-y rounded-xl border border-edge bg-canvas px-4 pb-3.5 pt-3.5 font-mono text-[12.5px] leading-[1.7] text-ink shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)] outline-none transition-all duration-200 placeholder:text-ink-subtle/80 focus:border-ink-subtle focus:ring-1 focus:ring-inset focus:ring-ink-subtle"
             />
             {help && <CustomSourceHelp />}
           </section>

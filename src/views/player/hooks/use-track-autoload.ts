@@ -9,6 +9,7 @@ import { publishSubtitleContext } from "@/components/player/subtitle-menu/subtit
 import { readPlayerPrefs, type PerShowPrefs } from "@/lib/player-prefs";
 import { tmdbImdbId } from "@/lib/providers/tmdb";
 import type { Addon } from "@/lib/addons";
+import type { GeneratedSubtitleGroup } from "@/lib/subtitles/types";
 import { gatherSubtitleAddons } from "@/lib/subtitles/addon-source";
 import { buildStreamIds } from "@/lib/streams/stream-ids";
 import type { PlayerSrc } from "@/lib/view";
@@ -132,6 +133,7 @@ export function useTrackAutoload(params: {
   });
   const [refreshReady, setRefreshReady] = useState(false);
   const [lastAdded, setLastAdded] = useState<number | null>(null);
+  const [generated, setGenerated] = useState<GeneratedSubtitleGroup[]>([]);
   const lastAddedTimer = useRef<number | null>(null);
   const clearLastAddedTimer = () => {
     if (lastAddedTimer.current != null) {
@@ -145,6 +147,7 @@ export function useTrackAutoload(params: {
     setLastAdded(null);
     setRefreshing(false);
     setInitialSearches(0);
+    setGenerated([]);
     setInitialPreflight({ mediaUrl: src.url, settled: false });
     clearLastAddedTimer();
   }, [src.url]);
@@ -158,6 +161,7 @@ export function useTrackAutoload(params: {
       status: refreshing || initialSearches > 0 ? "searching" : "idle",
       lastAdded,
       hints: streamHintsOf(src),
+      generated,
       refresh: () => {
         if (!refetchRef.current || refreshing) return;
         setRefreshing(true);
@@ -179,7 +183,7 @@ export function useTrackAutoload(params: {
       },
     });
     return () => publishSubtitleSearch(null);
-  }, [refreshReady, refreshing, initialSearches, lastAdded, src]);
+  }, [refreshReady, refreshing, initialSearches, lastAdded, generated, src]);
 
   useEffect(() => {
     if (!resolutionSettled) return;
@@ -371,6 +375,7 @@ export function useTrackAutoload(params: {
           isActive,
         });
         console.info(`[subs/refresh] found ${r.found}, added ${r.added} new tracks`);
+        setGenerated(r.generated);
         return r.added;
       };
       setRefreshReady(true);
@@ -383,6 +388,7 @@ export function useTrackAutoload(params: {
           isActive,
         });
         if (isActive() && res.selected) autoSubSourceRef.current = res.selected.url;
+        if (isActive()) setGenerated(res.generated);
         console.info(`[subs/autoload] unified stage found ${res.found}, added ${res.added} tracks`);
       } finally {
         if (autoSubLoadKeyRef.current === key) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "@/components/icons/music-icons";
 import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 import { resolveArtist } from "@/lib/music/artist-authority";

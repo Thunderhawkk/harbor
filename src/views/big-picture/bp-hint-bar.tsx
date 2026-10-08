@@ -1,4 +1,6 @@
 import { useGamepads } from "@/lib/gamepad/store";
+import { detectLayout } from "@/lib/gamepad/layout";
+import { ButtonGlyph, type GlyphKind } from "@/components/gamepad-button-glyph";
 import { isAndroid } from "@/lib/platform";
 import { BP_NAV_JUMP } from "./bp-logic";
 import { useBpT } from "./bp-i18n";
@@ -8,6 +10,7 @@ export type BpAction =
   | "back"
   | "exit"
   | "search"
+  | "quick"
   | "type"
   | "clear"
   | "toggle"
@@ -27,10 +30,23 @@ const PAD_GLYPH: Partial<Record<BpAction, string>> = {
   back: "B",
   exit: "B",
   search: "Y",
+  quick: "Y",
   phone: "Y",
   tabs: "LB / RB",
   actions: "▼",
   advance: "▼",
+};
+
+const PS_GLYPH: Partial<Record<BpAction, { kind: GlyphKind; label: string }>> = {
+  select: { kind: "south", label: "×" },
+  toggle: { kind: "south", label: "×" },
+  type: { kind: "south", label: "×" },
+  back: { kind: "east", label: "○" },
+  exit: { kind: "east", label: "○" },
+  search: { kind: "north", label: "△" },
+  quick: { kind: "north", label: "△" },
+  phone: { kind: "north", label: "△" },
+  tabs: { kind: "bumpers", label: "L1 / R1" },
 };
 
 // A hint with no entry here is dropped on a remote without a pad, so anything
@@ -54,6 +70,7 @@ const KEY_GLYPH: Record<BpAction, string> = {
   back: "Esc",
   exit: "Esc",
   search: "Tab",
+  quick: "Tab",
   phone: "Tab",
   clear: "Del",
   tabs: "PgUp / PgDn",
@@ -72,6 +89,7 @@ function useActionLabels(): Record<BpAction, string> {
     back: t("Back"),
     exit: t("Exit"),
     search: t("Search"),
+    quick: t("Quick panel"),
     clear: t("Clear"),
     tabs: t("Switch tab"),
     nav: t("Nav"),
@@ -99,6 +117,7 @@ export function BpHintBar({
   const label = useActionLabels();
   const pads = useGamepads();
   const usingPad = pads.length > 0;
+  const layout = detectLayout(pads.map((pad) => pad.name));
   const onTv = isAndroid();
 
   // First because the bar is right aligned: a narrow window sheds the leftmost
@@ -114,7 +133,12 @@ export function BpHintBar({
   const hints = usable.map((a) => {
     const preferred = usingPad ? PAD_GLYPH[a] : onTv ? REMOTE_GLYPH[a] : undefined;
     const glyph = preferred ?? KEY_GLYPH[a];
-    return { action: a, glyph, wide: glyph.length > 1 };
+    return {
+      action: a,
+      glyph,
+      wide: glyph.length > 1,
+      art: layout === "ps" ? PS_GLYPH[a] : undefined,
+    };
   });
 
   return (
@@ -132,16 +156,26 @@ export function BpHintBar({
       <div className="relative flex items-center gap-[clamp(14px,1.6vw,30px)]">
         {hints.map((h) => (
           <span key={h.action} className="flex items-center gap-2.5">
-            <span
-              data-bp-hint-chip
-              className={`flex h-[clamp(22px,2.5vh,28px)] items-center justify-center bg-[var(--bp-edge-2)] font-semibold text-ink ${
-                h.wide
-                  ? "rounded-[var(--bp-r-xs)] px-2.5 text-[clamp(12.5px,1.3vh,16px)]"
-                  : "w-[clamp(22px,2.5vh,28px)] rounded-full text-[clamp(13.4px,1.5vh,18px)]"
-              }`}
-            >
-              {h.glyph}
-            </span>
+            {h.art ? (
+              <span data-bp-hint-chip role="img" aria-label={h.art.label}>
+                <ButtonGlyph
+                  kind={h.art.kind}
+                  pad="ps"
+                  imageClassName="h-[clamp(28px,3.2vh,36px)] w-[clamp(28px,3.2vh,36px)]"
+                />
+              </span>
+            ) : (
+              <span
+                data-bp-hint-chip
+                className={`flex h-[clamp(22px,2.5vh,28px)] items-center justify-center bg-[var(--bp-edge-2)] font-semibold text-ink ${
+                  h.wide
+                    ? "rounded-[var(--bp-r-xs)] px-2.5 text-[clamp(12.5px,1.3vh,16px)]"
+                    : "w-[clamp(22px,2.5vh,28px)] rounded-full text-[clamp(13.4px,1.5vh,18px)]"
+                }`}
+              >
+                {h.glyph}
+              </span>
+            )}
             <span data-bp-hint-label className="text-[clamp(13.4px,1.5vh,18px)] font-medium text-ink-muted">
               {label[h.action]}
             </span>

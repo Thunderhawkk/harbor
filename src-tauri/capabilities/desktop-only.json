@@ -12,8 +12,7 @@
     "harbor-pip",
     "harbor-browser",
     "harbor-modal-overlay",
-    "harbor-cf-solver"
-  ],
+    "harbor-cf-solver", "harbor-dj"],
   "permissions": [
     "updater:default",
     "process:default"

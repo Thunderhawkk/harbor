@@ -1,6 +1,10 @@
 import { meta as fetchMeta, narrowMediaType, type Meta } from "@/lib/cinemeta";
 import { savePlayback } from "@/lib/playback-history";
 import { pushWatched } from "@/lib/trakt/history";
+import { markEpisodeWatched } from "@/lib/trakt/resolve";
+import { stremioIdToTraktTarget } from "@/lib/trakt/ids";
+import { getSession as getTraktSession } from "@/lib/trakt/session";
+import { activeProfileId } from "@/lib/active-profile-id";
 import { addToHistory as simklAddToHistory } from "@/lib/simkl/history";
 import { setMovieWatchedLocal } from "@/lib/movie-watched";
 import { recordManualWatchedMeta, setManualWatchedMany } from "@/lib/manual-watched";
@@ -20,9 +24,15 @@ export async function markMovieWatched(
 ): Promise<void> {
   setMovieWatchedLocal(meta.id, true);
   savePlayback(meta.id, { title: meta.name, parsedTitle: meta.name });
-  recordWatchEvent({ id: meta.id, type: "movie", name: meta.name, poster: meta.poster, at: Date.now() });
+  recordWatchEvent({
+    id: meta.id,
+    type: "movie",
+    name: meta.name,
+    poster: meta.poster,
+    at: Date.now(),
+  });
   const imdb = imdbId ?? (meta.id.startsWith("tt") ? meta.id : undefined);
-  const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : tmdbId ?? undefined;
+  const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : (tmdbId ?? undefined);
   const authKey = readActiveStremioAuthKey();
   const cid = authKey ? cloudWriteId(meta.id, imdb ?? null, !!imdb) : null;
   const writes: Promise<unknown>[] = [];
@@ -55,7 +65,9 @@ async function releasedEpisodes(
   imdbId?: string | null,
 ): Promise<Array<{ season: number; episode: number }>> {
   const fetchId = resolveSeriesImdb(meta, imdbId) ?? meta.id;
-  const source = meta.videos?.length ? meta : (await fetchMeta("series", fetchId).catch(() => null)) ?? meta;
+  const source = meta.videos?.length
+    ? meta
+    : ((await fetchMeta("series", fetchId).catch(() => null)) ?? meta);
   const ordered: Array<{ season: number; episode: number; rel: string | null }> = [];
   for (const v of source.videos ?? []) {
     const season = v.season ?? 0;
@@ -84,20 +96,33 @@ export async function markMetaWatched(
     background: meta.background,
     markedAt: new Date().toISOString(),
   });
-  recordWatchEvent({ id: meta.id, type: "series", name: meta.name, poster: meta.poster, at: Date.now() });
+  recordWatchEvent({
+    id: meta.id,
+    type: "series",
+    name: meta.name,
+    poster: meta.poster,
+    at: Date.now(),
+  });
+  const ownerProfile = activeProfileId();
+  const ownerSession = getTraktSession();
   const resolvedImdb = resolveSeriesImdb(meta, imdbId);
   const eps = await releasedEpisodes(meta, resolvedImdb);
+  if (activeProfileId() !== ownerProfile) return;
   if (eps.length > 0) setManualWatchedMany(meta.id, eps, true);
   void syncSeriesWatchedToStremio(meta, resolvedImdb);
   const isAnime = /^(kitsu|mal|anilist|anidb):/.test(meta.id);
   const imdb = resolvedImdb ?? (meta.id.startsWith("tt") ? meta.id : undefined);
-  const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : tmdbId ?? undefined;
-  if (!isAnime && (imdb || tmdb)) {
+  const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : (tmdbId ?? undefined);
+  if (!isAnime && eps.length > 0) {
+    for (const episode of eps) {
+      if (activeProfileId() !== ownerProfile || getTraktSession() !== ownerSession) break;
+      const resolved = stremioIdToTraktTarget(imdb ?? meta.id, episode);
+      if (resolved.ok) await markEpisodeWatched(resolved.target, imdb ?? meta.id);
+    }
+  }
+  if (activeProfileId() === ownerProfile && !isAnime && (imdb || tmdb)) {
     const ids = { ...(imdb ? { imdb } : {}), ...(tmdb ? { tmdb } : {}) };
-    await Promise.allSettled([
-      pushWatched({ kind: "show", ids }),
-      simklAddToHistory({ kind: "show", ids }),
-    ]);
+    await simklAddToHistory({ kind: "show", ids }, meta.id);
   }
 }
 

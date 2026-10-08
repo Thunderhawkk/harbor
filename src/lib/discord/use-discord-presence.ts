@@ -9,6 +9,7 @@ import { awardSourceMeta } from "@/lib/anime-awards";
 import { tmdbPerson, tmdbPersonCached } from "@/lib/providers/tmdb/tmdb-people";
 import type { Meta } from "@/lib/cinemeta";
 import { getMangaReading, subscribeMangaReading } from "@/lib/manga-reading-state";
+import { startMusicPresence } from "@/lib/music/presence";
 import {
   configureDiscord,
   setBrowsePresence,
@@ -105,6 +106,7 @@ export function useDiscordPresence(): void {
       showPoster: settings.discordShowPoster,
       showTimestamp: settings.discordShowTimestamp,
       showPartyJoin: settings.discordShowPartyJoin,
+      showMusic: settings.discordMusicPresence,
     });
   }, [
     settings.discordRichPresence,
@@ -114,7 +116,10 @@ export function useDiscordPresence(): void {
     settings.discordShowPoster,
     settings.discordShowTimestamp,
     settings.discordShowPartyJoin,
+    settings.discordMusicPresence,
   ]);
+
+  useEffect(() => startMusicPresence(), []);
 
   useEffect(() => {
     setReadingPresence(manga);

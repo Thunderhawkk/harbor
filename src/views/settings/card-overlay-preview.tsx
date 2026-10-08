@@ -8,7 +8,7 @@ import { TopTenRibbon } from "@/components/top-ten-ribbon";
 export function CardOverlayPreview() {
   const { settings } = useSettings();
   const t = useT();
-  const art = useSampleArtwork();
+  const art = useSampleArtwork(9);
   const ribbonSide = settings.top10RibbonSide;
   const watchlist = settings.watchlistBadge;
   const sharesRibbonCorner = settings.top10Ribbon &&

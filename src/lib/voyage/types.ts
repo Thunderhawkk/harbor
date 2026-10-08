@@ -29,6 +29,8 @@ export type Voyage = {
   seen: string[];
   recVotes?: Record<string, number>;
   enrichedPicks?: string[];
+  poolRound?: number;
+  poolFilling?: boolean;
 };
 
 export type StoredVoyage = Omit<Voyage, "phase" | "playedIds"> & {

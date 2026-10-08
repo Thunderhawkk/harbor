@@ -122,6 +122,18 @@ export async function restLibrary(client: SuwayomiClient): Promise<any[]> {
   return merged;
 }
 
+export async function restCategories(client: SuwayomiClient): Promise<any[]> {
+  const list = await client.getJson("/api/v1/category");
+  if (!Array.isArray(list)) throw new Error("suwayomi_categories_unavailable");
+  return list;
+}
+
+export async function restCategoryManga(client: SuwayomiClient, id: string): Promise<any[]> {
+  const list = await client.getJson(`/api/v1/category/${encodeURIComponent(id)}`);
+  if (!Array.isArray(list)) throw new Error("suwayomi_category_unavailable");
+  return list;
+}
+
 export function restSetMangaInLibrary(
   client: SuwayomiClient,
   mangaId: string,

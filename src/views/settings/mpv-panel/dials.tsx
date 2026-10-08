@@ -5,7 +5,7 @@ import { advanceFocus } from "@/lib/keyboard-navigation";
 import { isRtl, navOwnsFocus } from "@/lib/keyboard-navigation/geometry";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import pictureStill from "@/assets/settings-preview/the-toll-of-the-sea.webp";
+import { useSampleArtwork } from "@/lib/sample-artwork";
 import { Section, ToggleRow } from "../shared";
 import { ROW_ACTION, ROW_ACTION_PRIMARY, SettingRow } from "../kit";
 
@@ -236,6 +236,7 @@ function matchesLook(tweaks: Record<string, string>, patch: Record<string, strin
 }
 
 function PicturePreview({ tweaks }: { tweaks: Record<string, string> }) {
+  const { background: pictureStill } = useSampleArtwork(6);
   const t = useT();
   const rawId = useId();
   const filterId = `harbor-mpv-eq-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;

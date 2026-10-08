@@ -32,7 +32,14 @@ const EAGER_COUNT = 6;
 const NEAR_MARGIN = "300px";
 const FAR_RELEASE_MS = 15000;
 
-export type RowShape = "portrait" | "landscape" | "service" | "rank" | "tile" | "square";
+export type RowShape =
+  | "portrait"
+  | "landscape"
+  | "service"
+  | "rank"
+  | "tile"
+  | "square"
+  | "cta";
 
 export const TV_CARD_MIN = 318;
 
@@ -191,6 +198,9 @@ function Skeleton({ shape }: { shape: RowShape }) {
   }
   if (shape === "tile") {
     return <div className="aspect-[5/4] w-full rounded-2xl bg-elevated/30" />;
+  }
+  if (shape === "cta") {
+    return <div className="h-[108px] w-full rounded-[14px] bg-elevated/40" />;
   }
   const aspect =
     shape === "landscape" ? "aspect-[16/9]" : shape === "square" ? "aspect-square" : "aspect-[2/3]";
@@ -702,10 +712,14 @@ export function Row({
   };
 
   const trackPad = dockEnabled ? "pb-8 pt-14 -mb-8 -mt-14" : "py-5 -my-5 px-2 -mx-2 scroll-px-2";
+  const hasHeader = !!(title || onViewAll || headerRight);
+  const shellRoom = hasHeader ? "" : dockEnabled ? "py-14 -my-14" : "py-5 -my-5";
 
   return (
-    <div className={`flex min-w-0 flex-col gap-5 ps-[9px] ${className}`}>
-      {(title || onViewAll || headerRight) && (
+    <div
+      className={`harbor-row-shell flex min-w-0 flex-col gap-5 ps-[9px] ${shellRoom} ${className}`}
+    >
+      {hasHeader && (
         <div
           className="relative z-20 flex items-baseline justify-between gap-4 pe-1"
           onPointerEnter={() => {

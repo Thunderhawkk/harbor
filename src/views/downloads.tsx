@@ -103,7 +103,7 @@ export function DownloadsView({ active = false }: { active?: boolean }) {
   );
 
   return (
-    <main className="flex-1 overflow-y-auto bg-canvas px-5 pb-24 pt-24 sm:px-8 lg:px-12 lg:pt-28">
+    <main className="flex-1 overflow-y-auto bg-canvas px-5 pb-24 pt-[max(6rem,var(--harbor-floating-back-space,0px))] sm:px-8 lg:px-12 lg:pt-[max(7rem,var(--harbor-floating-back-space,0px))]">
       <div className="mx-auto w-full max-w-4xl">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div className="min-w-0">

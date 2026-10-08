@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { HeroCarousel, type Slide } from "@/components/hero-carousel";
@@ -73,6 +74,7 @@ import {
 import { useTrakt } from "@/lib/trakt/provider";
 import { buildTraktHomeRows } from "@/lib/trakt/home-rails";
 import { fetchWatchedKeySet } from "@/lib/trakt/history";
+import { peekTraktWatched } from "@/lib/trakt/watched-keys";
 import { recentlyPlayed, subscribePlayback, type WatchedSet } from "@/lib/playback-history";
 import { collapseWatchedKeys, isTitleWatched } from "@/lib/watched-title";
 import { useWatchedFlagIds } from "@/lib/watched-flag";
@@ -84,6 +86,7 @@ import {
   loadSimklStatusMap,
   simklWatchedForId,
   statusForId,
+  peekSimklWatchedMap,
   type WatchlistStatus,
 } from "@/lib/simkl/list-status";
 import { useExternalCw } from "@/lib/feed/external-cw";
@@ -111,11 +114,20 @@ import {
   mergeRows,
 } from "./home/home-rows";
 import type { HomeRow } from "./home/home-types";
+import { mergeLoadedHomeRows } from "./home/merge-loaded-rows";
 import { RowSkeleton } from "./home/row-skeleton";
 import { AddSourceModal } from "@/components/add-source-modal";
 import type { SourceRow } from "@/lib/custom-sources";
 
-export function Home({ active = true, onReady }: { active?: boolean; onReady?: () => void }) {
+export function Home({
+  active = true,
+  onReady,
+  seasonalInvitation,
+}: {
+  active?: boolean;
+  onReady?: () => void;
+  seasonalInvitation?: ReactNode;
+}) {
   const { authKey, user } = useAuth();
   const { activeProfile, profiles } = useProfiles();
   const { settings, update } = useSettings();
@@ -137,8 +149,10 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
   const externalCw = useExternalCw(
     !hideSharedCw && (settings.cwSources.trakt || settings.cwSources.simkl),
   );
-  const [traktWatched, setTraktWatched] = useState<Set<string>>(() => new Set());
-  const [simklWatchedMap, setSimklWatchedMap] = useState<Map<string, Set<string>>>(() => new Map());
+  const [traktWatched, setTraktWatched] = useState<Set<string>>(() => peekTraktWatched());
+  const [simklWatchedMap, setSimklWatchedMap] = useState<Map<string, Set<string>>>(() =>
+    peekSimklWatchedMap(),
+  );
   const [simklStatusMap, setSimklStatusMap] = useState<Map<string, WatchlistStatus>>(
     () => new Map(),
   );
@@ -160,29 +174,29 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
   const [tmdbProvidedByAddon, setTmdbProvidedByAddon] = useState(false);
   const [addonsTick, setAddonsTick] = useState(0);
   const [buildTick, setBuildTick] = useState(0);
-  const { isConnected: traktConnected } = useTrakt();
+  const { isConnected: traktConnected, session: traktSession } = useTrakt();
   const { isConnected: simklConnected } = useSimkl();
   const { isConnected: anilistConnected } = useAnilist();
   const letterboxd = useLetterboxd();
   const rowsRef = useRef<HomeRow[]>([]);
-  const loadingRef = useRef<Set<string>>(new Set());
+  const loadingRef = useRef(new Map<string, NonNullable<HomeRow["fetcher"]>>());
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
 
   const loadMore = useCallback((rowKey: string) => {
-    if (loadingRef.current.has(rowKey)) return;
     const row = rowsRef.current.find((r) => r.key === rowKey);
     if (!row || !row.fetcher || !row.hasMore || row.metas.length === 0) return;
+    if (loadingRef.current.get(rowKey) === row.fetcher) return;
     if (row.metas.length >= MAX_PER_ROW) return;
-    loadingRef.current.add(rowKey);
+    loadingRef.current.set(rowKey, row.fetcher);
     const next = row.page + 1;
     row
       .fetcher(next)
       .then((more) => {
         setRows((rs) =>
           rs.map((r) => {
-            if (r.key !== rowKey) return r;
+            if (r.key !== rowKey || r.fetcher !== row.fetcher) return r;
             const ids = new Set(r.metas.map((m) => m.id));
             const fresh = more.filter((m) => !ids.has(m.id));
             const combined = [...r.metas, ...fresh];
@@ -198,7 +212,7 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
       })
       .catch(() => {})
       .finally(() => {
-        loadingRef.current.delete(rowKey);
+        if (loadingRef.current.get(rowKey) === row.fetcher) loadingRef.current.delete(rowKey);
       });
   }, []);
 
@@ -246,7 +260,9 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
       if (cancelled) return;
       let degraded = (built.failed ?? 0) > 0;
       const commitRows = (next: HomeRow[]) =>
-        setRows((prev) => (degraded && next.length === 0 && prev.length > 0 ? prev : next));
+        setRows((prev) =>
+          degraded && next.length === 0 && prev.length > 0 ? prev : mergeLoadedHomeRows(prev, next),
+        );
       commitRows(mergeRows(built.rows, []));
       if (!degraded || built.hero.length > 0) {
         setHeroPool(built.hero);
@@ -262,22 +278,27 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
       }
 
       const dedupRows = isClassic ? false : !settings.homeShowAllAddonRows;
-      const addons = await loadAddonRows(authKey, { dedup: dedupRows }).catch(() => {
+      const addons = await loadAddonRows(authKey, {
+        dedup: dedupRows,
+        onFailed: (n) => {
+          if (n > 0) degraded = true;
+        },
+      }).catch(() => {
         degraded = true;
         return [] as AddonRow[];
       });
       if (cancelled) return;
-      const filtered = isClassic
+      const usable = isClassic
         ? addons
         : addons.filter((a) => !isAnimeRow(a) && !isStreamingServiceRow(a.name));
-      const nextRows = mergeRows(built.rows, filtered, { dedup: dedupRows });
+      const nextRows = mergeRows(built.rows, usable, { dedup: dedupRows });
       startTransition(() => {
         commitRows(nextRows);
       });
       const halfMissing = nextRows.length === 0 || (!isClassic && built.rows.length === 0);
-      if (!degraded) {
+      if (!degraded || !halfMissing) {
         buildRetryRef.current = 0;
-      } else if (halfMissing && buildRetryRef.current < 3) {
+      } else if (buildRetryRef.current < 3) {
         const attempt = buildRetryRef.current;
         buildRetryRef.current = attempt + 1;
         retryTimer = window.setTimeout(() => setBuildTick((n) => n + 1), 1500 * 2 ** attempt);
@@ -385,13 +406,15 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
       .catch(() => {});
     fetchWatchedKeySet()
       .then((set) => {
-        if (!cancelled) setTraktWatched(set);
+        if (!cancelled) {
+          setTraktWatched(set);
+        }
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [traktConnected, settings.tmdbKey]);
+  }, [traktConnected, traktSession, activeProfile?.id, settings.tmdbKey]);
 
   useEffect(() => {
     if (!simklConnected) {
@@ -585,12 +608,13 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
   }, [items]);
   const localCwItems = useMemo<LibraryItem[]>(() => {
     void localCwVer;
-    return listLocalCw().map((e) => ({
+    return listLocalCw(hideSharedCw).map((e) => ({
       _id: e.id,
       type: e.type,
       name: e.name,
       poster: e.poster,
       background: e.background,
+      isAnime: e.isAnime,
       state: {
         timeOffset: e.positionMs,
         duration: e.durationMs,
@@ -608,7 +632,7 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
       _mtime: new Date(e.t).toISOString(),
       local: true,
     }));
-  }, [localCwVer]);
+  }, [localCwVer, hideSharedCw, activeProfile?.id]);
   const continueWatching = useMemo(() => {
     const cwBase = hideSharedCw
       ? []
@@ -1277,6 +1301,14 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
                     />
                   </div>
                 )}
+                {seasonalInvitation && (
+                  <div
+                    data-hero-overlay-slot="seasonal"
+                    className="pointer-events-none absolute end-5 top-5 z-20 flex w-[min(360px,42%)] justify-end [&>*]:pointer-events-auto"
+                  >
+                    {seasonalInvitation}
+                  </div>
+                )}
               </div>
             )}
           {editMode && homeRowsCustom.hidden.includes("hero") && (
@@ -1298,6 +1330,10 @@ export function Home({ active = true, onReady }: { active?: boolean; onReady?: (
                 />
               </div>
             )}
+          {(settings.homeMode === "classic" ||
+            homeRowsCustom.hidden.includes("hero") ||
+            !showHero) &&
+            seasonalInvitation}
           {!cwTop && cwBlock}
           {settings.homeMode !== "classic" && (
             <div data-scroll-anchor="streaming">

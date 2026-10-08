@@ -1,8 +1,10 @@
+import { compatibleVocalVersion } from "./source-version";
 import { invoke } from "@tauri-apps/api/core";
 import { withTimeout } from "@/lib/progressive-rows";
 import { loadArtistFreshTracks } from "./artist-releases";
-import { readMusicPreference } from "./preferences";
+import { readMusicPreference, writeMusicPreference } from "./preferences";
 import { artistCreditParts } from "./search-artists";
+import { musicTrackCredit } from "./track-identity";
 import { normalizeName, normalizeTitle } from "./search-normalize";
 import type {
   MusicAlbumRef,
@@ -41,45 +43,42 @@ export function favoriteArtists(tracks: MusicTrack[]): string[] {
 export async function loadFreshFromArtists(
   recents: MusicTrack[],
   limit = 9,
+  onUpdate?: (tracks: MusicTrack[]) => void,
 ): Promise<MusicTrack[]> {
-  const artists = favoriteArtists(recents).slice(0, 3);
+  const names = new Map<string, string>();
+  for (const track of recents) {
+    for (const name of artistCreditParts(musicTrackCredit(track).artist, true)) {
+      const key = normalize(name);
+      if (key && key !== "unknown artist" && !names.has(key)) names.set(key, name);
+    }
+  }
+  const artists = [...names.values()].slice(0, 24);
   if (artists.length === 0) return [];
   const heard = new Set(recents.map(heardKey));
-  const settled = await Promise.allSettled(
-    artists.map((artist) => loadArtistFreshTracks(artist, limit)),
-  );
-  const lanes = settled.map((result) =>
-    result.status === "fulfilled"
-      ? result.value.filter((track) => !heard.has(heardKey(track)))
-      : [],
-  );
-  const picked = interleave(lanes, limit);
-  return picked.length > 0 ? picked : searchFromArtists(artists, recents, limit);
+  const lanes: MusicTrack[][] = artists.map(() => []);
+  let cursor = 0, failures = 0;
+  // Check beyond the three most-played artists, with bounded catalog concurrency.
+  await Promise.all(Array.from({ length: Math.min(3, artists.length) }, async () => {
+    while (cursor < artists.length) {
+      const index = cursor++;
+      try {
+        const tracks = await loadArtistFreshTracks(artists[index], limit);
+        lanes[index] = tracks.filter((track) => !heard.has(heardKey(track)));
+        if (lanes[index].length) onUpdate?.(interleave(lanes, limit));
+      } catch { failures++; }
+    }
+  }));
+  if (failures && !lanes.some(lane => lane.length)) {
+    throw new Error("Artist releases are unavailable");
+  }
+  // An empty recent-release catalog is valid. Ordinary search hits are not new releases.
+  return interleave(lanes, limit);
 }
 
 function heardKey(track: MusicTrack): string {
-  const credit = artistCreditParts(track.artist)[0] ?? track.artist;
-  return `${normalizeTitle(track.title)}|${normalize(credit)}`;
-}
-
-async function searchFromArtists(
-  artists: string[],
-  recents: MusicTrack[],
-  limit: number,
-): Promise<MusicTrack[]> {
-  const seen = new Set(recents.map((track) => track.id));
-  const settled = await Promise.allSettled(
-    artists.map(async (artist) =>
-      (await searchMusic(`${artist} songs`, 14)).filter(
-        (track) => !seen.has(track.id) && artistMatches(artist, track.artist),
-      ),
-    ),
-  );
-  if (settled.every((result) => result.status === "rejected")) {
-    throw settled[0]?.status === "rejected" ? settled[0].reason : new Error("Search failed.");
-  }
-  const lanes = settled.map((result) => (result.status === "fulfilled" ? result.value : []));
-  return interleave(lanes, limit);
+  const source = musicTrackCredit(track);
+  const credit = artistCreditParts(source.artist)[0] ?? source.artist;
+  return `${normalizeTitle(source.title)}|${normalize(credit)}`;
 }
 
 function interleave(lanes: MusicTrack[][], limit: number): MusicTrack[] {
@@ -89,8 +88,10 @@ function interleave(lanes: MusicTrack[][], limit: number): MusicTrack[] {
   for (let depth = 0; depth < deepest && picked.length < limit; depth += 1) {
     for (const lane of lanes) {
       const track = lane[depth];
-      if (!track || taken.has(track.id) || picked.length >= limit) continue;
-      taken.add(track.id);
+      if (!track || picked.length >= limit) continue;
+      const key = heardKey(track);
+      if (taken.has(key)) continue;
+      taken.add(key);
       picked.push(track);
     }
   }
@@ -102,7 +103,7 @@ export function getMusicHealth(): Promise<MusicConnectorHealth[]> {
 }
 
 export function getMusicSourceCandidates(track: MusicTrack): Promise<MusicSourceCandidate[]> {
-  return invoke<MusicSourceCandidate[]>("music_source_candidates", { track });
+  return invoke<MusicSourceCandidate[]>("music_source_candidates", { track }).then(candidates => candidates.filter(candidate => compatibleVocalVersion(track, candidate.track)));
 }
 
 export function getSpotifyStatus(): Promise<SpotifyStatus> {
@@ -115,12 +116,6 @@ export function connectSpotify(): Promise<SpotifyStatus> {
 
 export function disconnectSpotify(): Promise<void> {
   return invoke("music_spotify_disconnect");
-}
-
-function artistMatches(target: string, candidate: string): boolean {
-  const left = normalize(target);
-  const right = normalize(candidate);
-  return left === right || right.includes(left) || left.includes(right);
 }
 
 function normalize(value: string): string {
@@ -152,6 +147,32 @@ export function musicSourcePriority(connectorId: string | null | undefined): num
   if (connectorId === readMusicPreference(PREFERRED_SOURCE_KEY)) return -1;
   const index = MUSIC_SOURCE_ORDER.indexOf(connectorId);
   return index < 0 ? MUSIC_SOURCE_ORDER.length : index;
+}
+
+const DEFAULT_PLAYBACK_SOURCE = "youtube";
+
+export function preferredMusicSource(): string {
+  const stored = readMusicPreference(PREFERRED_SOURCE_KEY)?.trim();
+  return stored || DEFAULT_PLAYBACK_SOURCE;
+}
+
+export const PLAYABLE_MUSIC_SOURCES: readonly string[] = [
+  "youtube",
+  "soundcloud",
+  "spotify",
+  "local",
+  "jellyfin",
+  "plex",
+  "subsonic",
+];
+
+export function setPreferredMusicSource(connectorId: string): void {
+  writeMusicPreference(PREFERRED_SOURCE_KEY, connectorId.trim());
+}
+
+/** Catalog rows carry listing provenance, never a bound player, so they answer with the preference. */
+export function musicPlaybackSource(connectorId: string | null | undefined): string {
+  return !connectorId || connectorId === "catalog" ? preferredMusicSource() : connectorId;
 }
 
 let healthCache: { at: number; value: Promise<MusicConnectorHealth[]> } | null = null;
@@ -309,15 +330,19 @@ export function mergeMusicSearchLanes(
  * abandoned at the deadline and the others still answer. The abandoned request cannot be cancelled
  * across the bridge, it is only stopped from holding the result.
  */
+export const LANE_POOL = 40;
+export const lanePool = (limit: number) => Math.max(limit, LANE_POOL);
+
 export async function searchAcrossMusicSources(
   query: string,
   limit: number,
 ): Promise<RankedMusicSearchResults> {
+  const pool = lanePool(limit);
   const ids = await searchableMusicSources().catch(() => [] as string[]);
   if (ids.length === 0) {
     // Health is unreadable, so fall back to the Rust fan-out under one deadline for all of it.
     const results = await withTimeout(
-      invoke<MusicSearchResults>("music_search_typed", { query, limit, connector: undefined }),
+      invoke<MusicSearchResults>("music_search_typed", { query, limit: pool, connector: undefined }),
       FALLBACK_FANOUT_TIMEOUT_MS,
     );
     return {
@@ -329,7 +354,7 @@ export async function searchAcrossMusicSources(
     ids.map(async (id) => {
       try {
         const results = await withTimeout(
-          invoke<MusicSearchResults>("music_search_typed", { query, limit, connector: id }),
+          invoke<MusicSearchResults>("music_search_typed", { query, limit: pool, connector: id }),
           SEARCH_LANE_TIMEOUT_MS,
         );
         return { id, results, error: null as string | null };

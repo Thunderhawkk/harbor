@@ -8,8 +8,8 @@ import {
 
 /** Flags remain caller-owned; photo lookup never delays scores or resets an existing picture. */
 export function useAthletePortrait(request: AthletePortraitRequest, enabled = true) {
-  const { path, id, name, image = "" } = request;
-  const key = `${path}:${id}:${name}`;
+  const { path, group, id, name, image = "" } = request;
+  const key = `${path}:${group ?? ""}:${id}:${name}`;
   const primary = publishedPortraitUrl(image);
   const resolver = athletePortraits();
   const [state, setState] = useState<{
@@ -24,7 +24,7 @@ export function useAthletePortrait(request: AthletePortraitRequest, enabled = tr
   useEffect(() => {
     if (!enabled || primary) return;
     const controller = new AbortController();
-    const hit = resolver.peek({ path, id, name });
+    const hit = resolver.peek({ path, group, id, name });
     setState((prior) => ({
       key,
       portrait: hit ?? (prior.key === key ? prior.portrait : null),
@@ -32,7 +32,7 @@ export function useAthletePortrait(request: AthletePortraitRequest, enabled = tr
     }));
     if (hit !== undefined) return;
     void resolver
-      .resolve({ path, id, name }, controller.signal)
+      .resolve({ path, group, id, name }, controller.signal)
       .then((portrait) => {
         if (!controller.signal.aborted) setState({ key, portrait, loading: false });
       })
@@ -40,7 +40,7 @@ export function useAthletePortrait(request: AthletePortraitRequest, enabled = tr
         if (!controller.signal.aborted) setState({ key, portrait: null, loading: false });
       });
     return () => controller.abort();
-  }, [path, id, name, key, enabled, primary, resolver]);
+  }, [path, group, id, name, key, enabled, primary, resolver]);
   const cached = resolver.peek(request);
   const current = state.key === key ? state : cached ? { portrait: cached, loading: false } : null;
   return {

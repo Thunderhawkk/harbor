@@ -42,7 +42,9 @@ function whenIdle(run: () => void): () => void {
 
 async function fetchAnimeRows(tasks: CatalogTask[]): Promise<AddonRow[]> {
   const rows = await runLanes(tasks, CATALOG_LANES, (t) =>
-    fetchCatalogRow(t.addon, t.cat).catch(() => null),
+    fetchCatalogRow(t.addon, t.cat)
+      .then((r) => r.value)
+      .catch(() => null),
   );
   return rows.filter((r): r is AddonRow => r != null).filter(isAnimeRow);
 }

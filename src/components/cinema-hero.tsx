@@ -14,6 +14,7 @@ import { fetchTrailer, prefetchTrailer, trailerSrc, type TrailerInfo } from "@/l
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
 import { observe, usePageVisible } from "@/lib/visibility";
+import { useTrailerVideo } from "@/lib/use-trailer-video";
 
 const ROTATE_MS = 11000;
 const EASE_OUT = "cubic-bezier(0.32, 0.72, 0.24, 1)";
@@ -24,6 +25,9 @@ const FLICK_VELOCITY = 0.45;
 function rubberBand(distance: number, dim: number, c = 0.55): number {
   return (1 - 1 / (distance / dim / c + 1)) * dim * c;
 }
+
+const CINEMA_VIDEO_CLASS =
+  "absolute left-1/2 top-1/2 h-[110%] w-[110%] -translate-x-1/2 -translate-y-1/2 object-cover";
 
 export function CinemaHero({
   slides,
@@ -221,10 +225,14 @@ function CinemaSlide({
   const [logoResolved, setLogoResolved] = useState<boolean>(!!meta.logo);
   const [trailerCandidates, setTrailerCandidates] = useState<string[]>([]);
   const [trailerInfo, setTrailerInfo] = useState<TrailerInfo | null>(null);
-  const [videoReady, setVideoReady] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const pageVisible = usePageVisible();
   const wantsPlayback = active && !!trailerInfo && pageVisible && inViewport && settings.heroTrailers;
+  const { slot, video: videoRef, ready: videoReady } = useTrailerVideo({
+    src: trailerInfo ? trailerSrc(trailerInfo) : null,
+    active: !!wantsPlayback,
+    className: CINEMA_VIDEO_CLASS,
+    loop: true,
+  });
   const bg = upsizeTmdb(meta.background || meta.poster);
 
   useEffect(() => {
@@ -255,7 +263,6 @@ function CinemaSlide({
     if (!active || !settings.heroTrailers) return;
     setTrailerCandidates([]);
     setTrailerInfo(null);
-    setVideoReady(false);
     let cancelled = false;
     const isTmdb = meta.id.startsWith("tmdb:");
     const lookup: Promise<string[]> = isTmdb
@@ -294,27 +301,12 @@ function CinemaSlide({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (wantsPlayback) {
+    if (wantsPlayback && videoReady) {
       v.play().catch(() => {});
-    } else {
+    } else if (!wantsPlayback) {
       v.pause();
     }
-  }, [wantsPlayback]);
-
-  useEffect(() => {
-    if (!trailerInfo) return;
-    const v = videoRef.current;
-    return () => {
-      if (!v) return;
-      try {
-        v.pause();
-        v.removeAttribute("src");
-        v.load();
-      } catch {
-        void 0;
-      }
-    };
-  }, [trailerInfo]);
+  }, [wantsPlayback, videoReady, videoRef]);
 
   return (
     <div
@@ -336,16 +328,7 @@ function CinemaSlide({
           className="pointer-events-none absolute inset-0 overflow-hidden transition-opacity duration-700"
           style={{ opacity: wantsPlayback && videoReady ? 1 : 0 }}
         >
-          <video
-            ref={videoRef}
-            src={trailerSrc(trailerInfo)}
-            muted
-            loop
-            playsInline
-            preload="none"
-            onCanPlay={() => setVideoReady(true)}
-            className="absolute left-1/2 top-1/2 h-[110%] w-[110%] -translate-x-1/2 -translate-y-1/2 object-cover"
-          />
+          <div ref={slot} className="absolute inset-0" />
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/70 via-30% to-transparent" />

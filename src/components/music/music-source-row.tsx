@@ -1,4 +1,5 @@
-import { Check, LoaderCircle, Music2, Play } from "lucide-react";
+import { MusicSourceSearchMotion } from "./music-source-search-motion";
+import { Check, Music2, Play } from "@/components/icons/music-icons";
 import type { MusicSourceCandidate } from "@/lib/music/types";
 import { useT } from "@/lib/i18n";
 import { MusicServiceLogo } from "./music-service-logo";
@@ -57,7 +58,7 @@ export function MusicSourceRow({
       </span>
       <span className="grid size-9 place-items-center rounded-full bg-ink text-canvas transition-transform group-hover:scale-105">
         {pending ? (
-          <LoaderCircle size={15} className="animate-spin" />
+          <MusicSourceSearchMotion source={candidate.connectorId} />
         ) : (
           <Play size={14} fill="currentColor" />
         )}

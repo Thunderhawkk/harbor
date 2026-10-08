@@ -3,6 +3,8 @@ import { LogOut, Volume2, VolumeX, Images, Plus, Check, Info, EyeOff } from "luc
 import { Play } from "@/components/icons/play-filled";
 import { Search } from "@/components/icons/search-icon";
 import { useGamepads } from "@/lib/gamepad/store";
+import { detectLayout } from "@/lib/gamepad/layout";
+import { ButtonGlyph, type GlyphKind } from "@/components/gamepad-button-glyph";
 import { useSettings } from "@/lib/settings";
 import { SFX } from "@/lib/sfx";
 import { exitBigPicture, pushBigPicture } from "@/lib/big-picture";
@@ -17,6 +19,13 @@ import { bpSoundLabel } from "./bp-settings-catalog";
 import { setBpFocus } from "./use-bp-focus";
 
 type Binding = { id: string; pad: string; key: string; label: string };
+
+const PS_BINDING: Record<string, { kind: GlyphKind; label: string }> = {
+  select: { kind: "south", label: "×" },
+  back: { kind: "east", label: "○" },
+  quick: { kind: "north", label: "△" },
+  tabs: { kind: "bumpers", label: "L1 / R1" },
+};
 
 function useBindings(): Binding[] {
   const t = useBpT();
@@ -52,15 +61,17 @@ function BpQuickAction({
         SFX.click();
         onPress();
       }}
-      className="flex w-full items-center gap-3.5 rounded-[var(--bp-r-md)] border border-[var(--bp-edge)] bg-[var(--bp-panel)] px-[clamp(13px,1.2vw,20px)] py-[clamp(11px,1.3vh,18px)] text-start transition-colors duration-[var(--bp-dur-fast)]"
+      className="group/quick flex w-full items-center gap-3.5 rounded-[var(--bp-r-md)] border border-[var(--bp-edge)] bg-[var(--bp-panel)] px-[clamp(13px,1.2vw,20px)] py-[clamp(11px,1.3vh,18px)] text-start transition-colors duration-[var(--bp-dur-fast)]"
     >
-      <span className="flex h-[clamp(30px,3.6vh,42px)] w-[clamp(30px,3.6vh,42px)] shrink-0 items-center justify-center rounded-full bg-[var(--bp-panel-2)] text-ink-muted">
+      <span className="flex h-[clamp(30px,3.6vh,42px)] w-[clamp(30px,3.6vh,42px)] shrink-0 items-center justify-center rounded-full bg-[var(--bp-panel-2)] text-ink-muted group-data-[bp-focus=true]/quick:bg-[var(--color-canvas)]/10 group-data-[bp-focus=true]/quick:text-[var(--color-canvas)]">
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[clamp(13.5px,1.9vh,21px)] font-bold text-ink">{label}</span>
+        <span className="truncate text-[clamp(13.5px,1.9vh,21px)] font-bold text-ink group-data-[bp-focus=true]/quick:text-[var(--color-canvas)]">
+          {label}
+        </span>
         {detail && (
-          <span className="truncate text-[clamp(11px,1.5vh,17px)] font-medium text-ink-subtle">
+          <span className="truncate text-[clamp(11px,1.5vh,17px)] font-medium text-ink-subtle group-data-[bp-focus=true]/quick:text-[var(--color-canvas)]/70">
             {detail}
           </span>
         )}
@@ -75,6 +86,7 @@ export function BpQuickPanel({ onClose }: { onClose: () => void }) {
   const { settings, update } = useSettings();
   const pads = useGamepads();
   const usingPad = pads.length > 0;
+  const layout = detectLayout(pads.map((pad) => pad.name));
   const focused = useBpFocusedMeta();
   const saved = useInWatchlist(focused?.id ?? "");
   const { authKey } = useAuth();
@@ -230,9 +242,19 @@ export function BpQuickPanel({ onClose }: { onClose: () => void }) {
               <span className="text-[clamp(12px,1.65vh,19px)] font-medium text-ink-muted">
                 {b.label}
               </span>
-              <span className="shrink-0 rounded-full border border-[var(--bp-edge-2)] px-2.5 py-1 text-[clamp(10px,1.3vh,14.5px)] font-bold text-ink">
-                {usingPad ? b.pad : b.key}
-              </span>
+              {layout === "ps" && PS_BINDING[b.id] ? (
+                <span role="img" aria-label={PS_BINDING[b.id].label}>
+                  <ButtonGlyph
+                    kind={PS_BINDING[b.id].kind}
+                    pad="ps"
+                    imageClassName="h-[clamp(26px,3vh,34px)] w-[clamp(26px,3vh,34px)]"
+                  />
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full border border-[var(--bp-edge-2)] px-2.5 py-1 text-[clamp(10px,1.3vh,14.5px)] font-bold text-ink">
+                  {usingPad ? b.pad : b.key}
+                </span>
+              )}
             </div>
           ))}
         </div>

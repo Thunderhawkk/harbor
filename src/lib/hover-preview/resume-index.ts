@@ -1,5 +1,6 @@
 import type { Meta } from "../cinemeta";
 import { lastPlayedEpisode, readResumeEntry } from "../resume";
+import { isMovieWatchedLocal } from "../movie-watched";
 import { tmdbImdbCached } from "../providers/tmdb";
 import { episodeFromVideoId, type LibraryItem } from "../stremio";
 import { FRESH_FRACTION, RESUME_MEMO_TTL_MS } from "./timing";
@@ -68,7 +69,7 @@ function fallbackLookup(meta: Meta): PreviewResume | null {
       const hasPct = typeof pct === "number" && Number.isFinite(pct);
       const clampedPct = hasPct ? Math.min(1, Math.max(0, pct)) : null;
       const fraction =
-        clampedPct != null && minutes != null
+        clampedPct != null
           ? clampedPct
           : minutes
             ? Math.min(1, last.ms / (minutes * 60000))
@@ -98,7 +99,7 @@ function fallbackLookup(meta: Meta): PreviewResume | null {
     const hasPct = typeof pct === "number" && Number.isFinite(pct);
     const clampedPct = hasPct ? Math.min(1, Math.max(0, pct)) : null;
     const fraction =
-      clampedPct != null && minutes != null
+      clampedPct != null
         ? clampedPct
         : minutes
           ? Math.min(1, entry.ms / (minutes * 60000))
@@ -121,6 +122,18 @@ function fallbackLookup(meta: Meta): PreviewResume | null {
 }
 
 export function resolveResume(meta: Meta): PreviewResume | null {
+  if (meta.type === "movie") {
+    const alt = tmdbImdbCached(meta.id);
+    if (isMovieWatchedLocal(meta.id) || (alt && isMovieWatchedLocal(alt))) {
+      // Completion can happen after this card was indexed or its fallback was memoized.
+      // Retire both entries so a later rewatch starts from its new playback position.
+      for (const id of alt ? [meta.id, alt] : [meta.id]) {
+        index.delete(id);
+        fallbackMemo.delete(id);
+      }
+      return null;
+    }
+  }
   const hit = index.get(meta.id);
   if (hit) return hit;
   const cached = fallbackMemo.get(meta.id);

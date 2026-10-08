@@ -1,4 +1,5 @@
 import { ArrowUpRight, Music } from "@/views/settings/icons";
+import { SongIdSave } from "./song-id-save";
 import { useT } from "@/lib/i18n";
 import type { SongIdToastMsg } from "@/lib/song-id";
 
@@ -55,9 +56,12 @@ export function SongIdCard({
         </span>
         {body && <span className={isError ? "text-[13px] leading-snug text-white/70" : "max-w-full truncate text-sm text-white/65"}>{body}</span>}
         {isResult && (
-          <span className={`inline-flex w-fit items-center rounded-full bg-white/10 font-semibold text-white/85 transition-colors group-hover:bg-white/16 group-hover:text-white ${compact ? "mt-1 gap-1 px-3 py-1 text-[12px]" : "mt-2 gap-1.5 px-4 py-2 text-[13px]"}`}>
-            {t("Open on YouTube")}
-            <ArrowUpRight size={compact ? 13 : 15} strokeWidth={2.4} />
+          <span className={`inline-flex items-center gap-2 ${compact ? "mt-1" : "mt-2"}`}>
+            <span className={`inline-flex w-fit items-center rounded-full bg-white/10 font-semibold text-white/85 transition-colors group-hover:bg-white/16 group-hover:text-white ${compact ? "gap-1 px-3 py-1 text-[12px]" : "gap-1.5 px-4 py-2 text-[13px]"}`}>
+              {t("Open on YouTube")}
+              <ArrowUpRight size={compact ? 13 : 15} strokeWidth={2.4} />
+            </span>
+            {message.song && <SongIdSave song={message.song} compact={compact} />}
           </span>
         )}
       </div>

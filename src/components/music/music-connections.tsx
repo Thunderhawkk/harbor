@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ChevronLeft, Search } from "lucide-react";
+import { ChevronLeft } from "@/components/icons/music-icons";
 import {
   errorText,
   MusicConnectionRow,
@@ -53,13 +53,17 @@ export function requestMusicConnection(focusId: string) {
   window.dispatchEvent(new Event("harbor:music-connect"));
 }
 
-export function MusicConnectionsProvider({ children }: { children: ReactNode }) {
+export function MusicConnectionsProvider({ children, active = true }: { children: ReactNode; active?: boolean }) {
   const [request, setRequest] = useState<ConnectionsRequest | null>(null);
   const [connections, setConnections] = useState<MusicConnection[] | null>(null);
   const [error, setError] = useState("");
   const closeConnections = useCallback(() => setRequest(null), []);
   const generation = useRef(0);
   useEffect(() => {
+    if (!active) {
+      setRequest(null);
+      return;
+    }
     const consume = () => {
       if (pendingConnection) {
         setRequest({ focusId: pendingConnection });
@@ -69,7 +73,7 @@ export function MusicConnectionsProvider({ children }: { children: ReactNode }) 
     consume();
     window.addEventListener("harbor:music-connect", consume);
     return () => window.removeEventListener("harbor:music-connect", consume);
-  }, []);
+  }, [active]);
 
   const reload = useCallback(() => {
     const run = ++generation.current;
@@ -86,11 +90,12 @@ export function MusicConnectionsProvider({ children }: { children: ReactNode }) 
   }, []);
 
   useEffect(() => {
+    if (!active) return;
     reload();
     return () => {
       generation.current += 1;
     };
-  }, [reload]);
+  }, [active, reload]);
 
   const apply = useCallback((next: MusicConnection) => {
     setConnections((current) =>
@@ -100,6 +105,7 @@ export function MusicConnectionsProvider({ children }: { children: ReactNode }) 
 
   const openConnections = useCallback(
     (focusId?: string) => {
+      if (!active) return;
       const trigger = document.activeElement;
       setRequest({
         focusId,
@@ -108,7 +114,7 @@ export function MusicConnectionsProvider({ children }: { children: ReactNode }) 
       });
       reload();
     },
-    [reload],
+    [active, reload],
   );
 
   const value = useMemo<MusicConnectionsContextValue>(() => {
@@ -118,7 +124,7 @@ export function MusicConnectionsProvider({ children }: { children: ReactNode }) 
       connections: list,
       status: error ? "error" : connections ? "ready" : "loading",
       error,
-      connected: list.filter((item) => item.status === "connected").length,
+      connected: list.filter((item) => item.status === "connected" && !item.anonymous).length,
       reload,
       apply,
       request,
@@ -129,7 +135,7 @@ export function MusicConnectionsProvider({ children }: { children: ReactNode }) 
   return (
     <MusicConnectionsContext.Provider value={value}>
       {children}
-      <MusicSourceConsent />
+      {active && <MusicSourceConsent />}
     </MusicConnectionsContext.Provider>
   );
 }
@@ -143,7 +149,6 @@ export function useMusicConnections(): MusicConnectionsContextValue {
 export function MusicConnections({ focusId, onClose }: { focusId?: string; onClose: () => void }) {
   const t = useT();
   const { connections, status, error, connected, reload, apply } = useMusicConnections();
-  const [query, setQuery] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -151,11 +156,7 @@ export function MusicConnections({ focusId, onClose }: { focusId?: string; onClo
 
   const groups = GROUPS.map((group) => ({
     ...group,
-    items: connections.filter(
-      (item) =>
-        item.kind === group.kind &&
-        `${item.name} ${item.detail ?? ""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-    ),
+    items: connections.filter((item) => item.kind === group.kind),
   })).filter((group) => group.items.length > 0);
 
   return (
@@ -187,23 +188,13 @@ export function MusicConnections({ focusId, onClose }: { focusId?: string; onClo
             </p>
           )}
         </div>
-        <label className="flex w-full max-w-sm items-center gap-3 rounded-md bg-elevated px-4 py-3">
-          <Search size={17} className="text-ink-muted" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            aria-label={t("music.connections.capability.search")}
-            placeholder={t("music.connections.capability.search")}
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-          />
-        </label>
       </header>
 
       <div className="flex min-h-40 flex-col gap-7 pb-5">
         <details className="text-[13px] leading-relaxed text-ink-muted">
           <summary className="w-fit cursor-pointer text-ink">{t("music.legal.title")}</summary>
           <p className="mt-3">{t("music.legal.services")}</p>
+          <p className="mt-3">{t("music.legal.saving")}</p>
           <p className="mt-3">{t("music.legal.data")}</p>
         </details>
         {status === "loading" && (

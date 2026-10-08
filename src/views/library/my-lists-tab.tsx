@@ -119,6 +119,7 @@ export function MyListsTab({
                 else rowRefs.current.delete(l.id);
               }}
               onPointerDown={(e) => onDown(e, l.id)}
+              data-tauri-drag-region="false"
               onPointerMove={onMove}
               onPointerUp={onUp}
               onPointerCancel={onUp}

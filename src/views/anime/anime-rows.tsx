@@ -74,7 +74,7 @@ export const TOP_PICKS_KEY = "top-airing";
 export const ROW_MIN_VISIBLE = 12;
 export const ROW_MAX_PAGES = 5;
 
-export type RowState = { metas: Meta[]; page: number; hasMore: boolean; ready: boolean };
+export type RowState = { metas: Meta[]; page: number; hasMore: boolean; ready: boolean; failed?: boolean };
 
 export const EMPTY_ROW: RowState = { metas: [], page: 1, hasMore: false, ready: false };
 

@@ -60,7 +60,9 @@ export function listenActionFor(state: SyncState | null, local: ListenLocal): Li
 export function listenShouldPublish(previous: SyncState | null, next: SyncState): boolean {
   if (!previous) return true;
   if (previous.mediaId !== next.mediaId) return true;
+  if (previous.mediaTitle !== next.mediaTitle) return true;
   if (previous.playing !== next.playing) return true;
+  if ((previous.speed ?? 1) !== (next.speed ?? 1)) return true;
   return Math.abs(previous.positionSeconds - next.positionSeconds) > LISTEN_DRIFT_SECONDS;
 }
 

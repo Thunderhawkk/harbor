@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "@/components/icons/music-icons";
 import { ModalShell } from "@/components/modal-shell";
 import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
@@ -30,7 +30,6 @@ export function MusicSourceConsent() {
     getMusicSourceConsentServer,
   );
   const [open, setOpen] = useState(false);
-  const [read, setRead] = useState(false);
   const [picked, setPicked] = useState<GatedMusicSource[]>([]);
   const body = useRef<HTMLDivElement>(null);
 
@@ -39,24 +38,12 @@ export function MusicSourceConsent() {
       const focus = peekMusicSourceConsentFocus();
       const already = GATED_MUSIC_SOURCES.filter((source) => consent.sources[source]);
       setPicked(focus && !already.includes(focus) ? [...already, focus] : already);
-      setRead(false);
       setOpen(true);
     };
     window.addEventListener(MUSIC_SOURCE_CONSENT_EVENT, show);
     return () => window.removeEventListener(MUSIC_SOURCE_CONSENT_EVENT, show);
   }, [consent]);
 
-  useEffect(() => {
-    if (!open) return;
-    const node = body.current;
-    if (!node) return;
-    const check = () => {
-      if (node.scrollTop + node.clientHeight >= node.scrollHeight - 12) setRead(true);
-    };
-    check();
-    node.addEventListener("scroll", check, { passive: true });
-    return () => node.removeEventListener("scroll", check);
-  }, [open]);
 
   if (!open) return null;
   const toggle = (source: GatedMusicSource) =>
@@ -98,11 +85,6 @@ export function MusicSourceConsent() {
           ))}
         </fieldset>
         <footer>
-          {!read && (
-            <span className="music-consent-hint" role="status">
-              {t("music.consent.scroll")}
-            </span>
-          )}
           <button
             type="button"
             className="music-consent-cancel"
@@ -116,7 +98,7 @@ export function MusicSourceConsent() {
           <button
             type="button"
             className="music-consent-accept"
-            disabled={!read || picked.length === 0}
+            disabled={picked.length === 0}
             onClick={() => {
               acceptMusicSources(picked);
               setOpen(false);

@@ -327,12 +327,14 @@ export async function saveStremioBookmark(
 }
 
 export async function removeStremioBookmark(authKey: string, id: string): Promise<void> {
-  const existing = await libraryGetOne(authKey, id).catch(() => null);
-  if (!existing) return;
+  const existing = await libraryGetOneStrict(authKey, id);
+  if (!existing || existing.removed) return;
   await libraryPut(authKey, {
     ...existing,
     removed: true,
-    temp: false,
+    // Removing a bookmark keeps playback/history, like a title watched without saving it.
+    // Explicit History removal still uses removeStremioLibraryItem's full tombstone.
+    temp: true,
     _mtime: new Date().toISOString(),
   });
 }

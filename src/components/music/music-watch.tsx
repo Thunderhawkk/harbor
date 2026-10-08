@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ExternalLink, Heart, Play, RotateCcw, VideoOff } from "lucide-react";
+import { ChevronLeft, ExternalLink, Heart, Play, RotateCcw, VideoOff } from "@/components/icons/music-icons";
 import { MusicServiceLogo } from "@/components/music/music-service-logo";
 import { MusicArtistLink } from "./music-artist-link";
 import { MusicWhereToBuy } from "./music-artist-overview";
@@ -10,7 +10,7 @@ import { MusicMediaBadge } from "./music-media-badge";
 import { musicUpcoming, useMusicTransport } from "./music-queue";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";
-import { searchMusicVideos } from "@/lib/music/video-discovery";
+import { appendMusicVideos, searchMusicVideoPage } from "@/lib/music/video-pages";
 import { searchTrackKey } from "@/lib/music/now-search";
 import { prefetchMusicVideoStreams } from "@/lib/music/video";
 import {
@@ -57,6 +57,10 @@ export function MusicWatch({
   const [retry, setRetry] = useState(0);
   const [similar, setSimilar] = useState<MusicTrack[]>([]);
   const [similarBusy, setSimilarBusy] = useState(true);
+  const [similarNext, setSimilarNext] = useState<string | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false), [moreError, setMoreError] = useState(false);
+  const similarGeneration = useRef(0), moreLoading = useRef(false), moreButton = useRef<HTMLButtonElement>(null);
+  const seenPages = useRef(new Set<string>());
   const [readySelection, setReadySelection] = useState("");
   const [videoShowing, setVideoShowing] = useState(false);
   const replay = useRef(false);
@@ -142,12 +146,15 @@ export function MusicWatch({
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
+    const generation = ++similarGeneration.current;
+    moreLoading.current = false; seenPages.current.clear();
+    setSimilarNext(null); setMoreBusy(false); setMoreError(false);
     setSimilarBusy(true);
-    searchMusicVideos(`${playing.artist} music videos`)
-      .then((tracks) => {
+    searchMusicVideoPage(`${playing.artist} music videos`, false)
+      .then(({ tracks, next: cursor }) => {
         if (cancelled) return;
         const next = tracks.filter((item) => item.id !== playingId);
-        setSimilar(next.slice(0, 12));
+        setSimilar(next); setSimilarNext(cursor);
         // Warmed against the same predicate the surface resolves by, because video.ts cannot
         // import it back from video-session without a cycle.
         prefetchMusicVideoStreams(
@@ -165,8 +172,30 @@ export function MusicWatch({
       });
     return () => {
       cancelled = true;
+      if (similarGeneration.current === generation) similarGeneration.current++;
     };
   }, [playingId, playing.artist, active]);
+
+  const loadMoreVideos = useCallback(async () => {
+    if (!active || !similarNext || moreLoading.current) return;
+    const generation = similarGeneration.current, cursor = similarNext;
+    moreLoading.current = true; setMoreBusy(true); setMoreError(false);
+    try {
+      const page = await searchMusicVideoPage(`${playing.artist} music videos`, false, cursor);
+      if (similarGeneration.current !== generation) return;
+      seenPages.current.add(cursor);
+      setSimilar(previous => appendMusicVideos(previous, page.tracks.filter(item => item.id !== playingId)));
+      setSimilarNext(page.next && !seenPages.current.has(page.next) ? page.next : null);
+    } catch { if (similarGeneration.current === generation) setMoreError(true); }
+    finally { if (similarGeneration.current === generation) { moreLoading.current = false; setMoreBusy(false); } }
+  }, [active, similarNext, playing.artist, playingId]);
+  useEffect(() => {
+    const button = moreButton.current;
+    if (!button || similarBusy || moreBusy || moreError || !active) return;
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void loadMoreVideos(); }, { rootMargin: "160px" });
+    observer.observe(button);
+    return () => observer.disconnect();
+  }, [active, similarBusy, moreBusy, moreError, loadMoreVideos]);
 
   const liked = player.likedIds.includes(playingId);
   const queueUpNext = musicUpcoming(player.queue, player.queueIndex, 1)[0] ?? null;
@@ -282,7 +311,7 @@ export function MusicWatch({
       <div className="relative z-10 mt-5">
         <MusicWhereToBuy item={{ ...playing, kind: "track" }} />
       </div>
-      {(similarBusy || moreVideos.length > 0) && (
+      {(similarBusy || moreVideos.length > 0 || similarNext) && (
         <section className="music-watch-more relative z-10">
           <h3>{t("music.videos.more")}</h3>
           {similarBusy ? (
@@ -298,6 +327,10 @@ export function MusicWatch({
               ))}
             </div>
           )}
+          {moreError && <p role="alert" className="text-sm text-ink-muted">{t("music.videos.error")}</p>}
+          {similarNext && <button ref={moreButton} type="button" className="music-watch-retry" disabled={moreBusy} onClick={() => { void loadMoreVideos(); }}>
+            {t(moreError ? "common.retry" : moreBusy ? "common.loading" : "music.library.loadMore")}
+          </button>}
         </section>
       )}
     </>

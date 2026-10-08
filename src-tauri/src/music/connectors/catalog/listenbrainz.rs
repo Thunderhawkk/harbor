@@ -135,6 +135,7 @@ fn album(release: FreshRelease) -> Option<MusicAlbumRef> {
         artwork: release_artwork(&art_mbid, caa_id),
         year: release.release_date.as_deref().and_then(release_year),
         track_count: None,
+        explicit: None,
     })
 }
 

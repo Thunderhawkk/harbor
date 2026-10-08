@@ -1,6 +1,7 @@
 import { fillStyle, SliderReset } from "@/components/slider";
 import { DEFAULT } from "@/lib/settings/defaults";
 import { Dropdown } from "@/components/dropdown";
+import { GamesIcon } from "@/components/icons/games-icon";
 import {
   Droplet,
   Hourglass,
@@ -22,7 +23,8 @@ import type { ReactNode } from "react";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
 import { Section, ToggleRow } from "../shared";
-import { SettingGroup, SettingRow, Nested } from "../kit";
+import { ROW_ACTION, SettingGroup, SettingRow, Nested } from "../kit";
+import { previewScreensaver } from "@/lib/screensaver/media";
 import { PosterCardSection } from "./display/poster-card-section";
 import { ScreensaverMediaManager } from "./screensaver-media";
 import { SFX } from "@/lib/sfx";
@@ -68,15 +70,23 @@ export function AmbienceSection() {
             )}
             icon={<Sailboat size={18} strokeWidth={2} />}
           >
-            <Dropdown
-              value={settings.screensaverStyle}
-              onChange={(v) => update({ screensaverStyle: v as typeof settings.screensaverStyle })}
-              options={[
-                { value: "ambient", label: t("Default") },
-                { value: "catBoat", label: t("Boat") },
-                { value: "custom", label: t("Custom") },
-              ]}
-            />
+            <div className="flex items-center gap-2">
+              <Dropdown
+                value={settings.screensaverStyle}
+                onChange={(v) =>
+                  update({ screensaverStyle: v as typeof settings.screensaverStyle })
+                }
+                options={[
+                  { value: "ambient", label: t("Default") },
+                  { value: "catBoat", label: t("Boat") },
+                  { value: "halloween", label: t("Halloween") },
+                  { value: "custom", label: t("Custom") },
+                ]}
+              />
+              <button type="button" className={ROW_ACTION} onClick={previewScreensaver}>
+                {t("Preview")}
+              </button>
+            </div>
           </SettingRow>
           {settings.screensaverStyle === "custom" && (
             <Nested>
@@ -168,6 +178,8 @@ export function AmbienceSection() {
   );
 }
 
+const GAMES_SETTINGS_VISIBLE = true;
+
 export function DisplaySection() {
   const t = useT();
   const { settings, update } = useSettings();
@@ -182,6 +194,26 @@ export function DisplaySection() {
     : 25;
   return (
     <>
+      {GAMES_SETTINGS_VISIBLE && (
+        <Section title={t("Games")}>
+          <SettingGroup>
+            <ToggleRow
+              label={t("games.dock.settingTitle")}
+              sub={t("games.dock.settingNote")}
+              value={settings.showQuickGameLibrary}
+              onChange={(value) => update({ showQuickGameLibrary: value })}
+              leading={<GamesIcon size={18} />}
+            />
+            <ToggleRow
+              label={t("games.home.libraryFirstTitle")}
+              sub={t("games.home.libraryFirstNote")}
+              value={settings.gamesOpenInLibrary}
+              onChange={(value) => update({ gamesOpenInLibrary: value })}
+              leading={<GamesIcon size={18} />}
+            />
+          </SettingGroup>
+        </Section>
+      )}
       <PosterCardSection />
       <Section
         title={t("Title text")}

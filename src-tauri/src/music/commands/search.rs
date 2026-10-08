@@ -34,7 +34,7 @@ pub async fn music_search(
     if query.len() > 200 {
         return Err("Music search is too long".to_string());
     }
-    let limit = limit.unwrap_or(24).clamp(1, 40);
+    let limit = limit.unwrap_or(24).clamp(1, 100);
     let tracks = state
         .registry
         .search(&app, query, limit, connector.as_deref())
@@ -363,4 +363,13 @@ mod tests {
             StreamHealth::Usable
         );
     }
+}
+
+#[tauri::command]
+pub async fn music_prewarm_track(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, MusicState>,
+    track: MusicTrack,
+) -> Result<bool, String> {
+    Ok(resolve_track(&app, state.inner(), &track).await.is_ok())
 }

@@ -19,6 +19,8 @@ import {
 } from "./model";
 import {
   restBrowse,
+  restCategories,
+  restCategoryManga,
   restChapters,
   restLibrary,
   restMangaFull,
@@ -29,6 +31,8 @@ import {
 } from "./rest";
 import {
   gqlBrowse,
+  gqlCategories,
+  gqlCategoryManga,
   gqlChapters,
   gqlLibrary,
   gqlManga,
@@ -41,6 +45,7 @@ import { langFilterMatches, loadMangaLangFilter } from "@/lib/manga/lang-filter"
 import { subscribeSuwayomiSourcesChanged } from "./source-events";
 
 const SEARCH_ALL_CONCURRENCY = 4;
+const CATEGORY_TAG = "category:";
 
 function normalizedTitle(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -189,12 +194,34 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
 
   async function popular(offset: number, tagId?: string): Promise<MangaSummary[]> {
     if (!tagId) return offset > 0 ? [] : mergedPopular();
+    if (tagId.startsWith(CATEGORY_TAG)) return categoryManga(tagId, offset);
     return browse(tagId, "popular", offset, "");
+  }
+
+  async function categoryManga(tagId: string, offset: number, query = ""): Promise<MangaSummary[]> {
+    // Both category endpoints return the complete saved list, without source-page cursors.
+    if (offset > 0) return [];
+    const id = tagId.slice(CATEGORY_TAG.length);
+    if (!/^\d+$/.test(id)) return [];
+    const list = await withTransportFallback(client, (t) =>
+      t === "rest" ? restCategoryManga(client, id) : gqlCategoryManga(client, id),
+    );
+    const lower = query.toLowerCase();
+    const seen = new Set<string>();
+    return list
+      .map((m) => mapManga(server, String(m?.sourceId ?? m?.source?.id ?? ""), m))
+      .filter((m): m is MangaSummary => !!m)
+      .filter((m) => {
+        if (seen.has(m.id) || !m.title.toLowerCase().includes(lower)) return false;
+        seen.add(m.id);
+        return true;
+      });
   }
 
   async function search(query: string, offset: number, tagId?: string): Promise<MangaSummary[]> {
     const q = query.trim();
     if (!q) return popular(offset, tagId);
+    if (tagId?.startsWith(CATEGORY_TAG)) return categoryManga(tagId, offset, q);
     if (tagId) return browse(tagId, "search", offset, q);
     if (offset > 0) return [];
     const lower = q.toLowerCase();
@@ -296,7 +323,18 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
   async function tags(): Promise<MangaTag[]> {
     const t = await pickTransport(client);
     const filter = loadMangaLangFilter(server.base);
-    return (await loadSources(client, t))
+    const [categories, sources] = await Promise.allSettled([
+      withTransportFallback(client, (transport) =>
+        transport === "rest" ? restCategories(client) : gqlCategories(client),
+      ),
+      loadSources(client, t),
+    ]);
+    if (categories.status === "rejected" && sources.status === "rejected") throw categories.reason;
+    const categoryTags: MangaTag[] = (categories.status === "fulfilled" ? categories.value : [])
+      .filter((c) => c?.id != null && /^\d+$/.test(String(c.id)) && typeof c.name === "string")
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+      .map((c) => ({ id: `${CATEGORY_TAG}${c.id}`, name: c.name, group: "Categories" }));
+    const sourceTags = (sources.status === "fulfilled" ? sources.value : [])
       .filter((s) => langFilterMatches(filter, s.lang))
       .map((s) => ({
         id: s.id,
@@ -308,6 +346,7 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
               : s.name,
         group: "Sources",
       }));
+    return [...categoryTags, ...sourceTags];
   }
 
   async function setLibrary(id: string, inLibrary: boolean): Promise<void> {

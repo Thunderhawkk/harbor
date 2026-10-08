@@ -34,7 +34,7 @@ export function absorbCloudAnimeCw(items: LibraryItem[]): void {
     const t = mtimeMs(i);
     if (t <= 0 || Date.now() - t > ABSORB_RECENT_MS) continue;
     if (isCwDismissed(i)) continue;
-    const existing = localCwEntry(i._id);
+    const existing = localCwEntry(i._id, false);
     if (existing && existing.t >= t) continue;
     const ep = episodeOf(i);
     saveLocalCw({

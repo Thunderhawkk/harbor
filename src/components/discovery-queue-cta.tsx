@@ -6,6 +6,7 @@ import { rpdbPoster } from "@/lib/providers/rpdb";
 import { useSettings } from "@/lib/settings";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { useView } from "@/lib/view";
+import { artAtWidth } from "@/lib/image-rung";
 
 const DEPTH = [12, 21, 9, 23, 14, 17];
 
@@ -66,7 +67,7 @@ export function DiscoveryQueueCta({ items, title }: { items: FeedItem[]; title?:
               style={{ transform: `translate3d(calc(var(--px,0) * ${DEPTH[i]}px), calc(var(--py,0) * ${DEPTH[i] * 0.5}px), 0)` }}
             >
               <img
-                src={rpdbPoster(settings.rpdbKey, item.meta.id, item.meta.background ?? item.meta.poster)}
+                src={artAtWidth(rpdbPoster(settings.rpdbKey, item.meta.id, item.meta.background ?? item.meta.poster), 200)}
                 alt=""
                 draggable={false}
                 loading="lazy"

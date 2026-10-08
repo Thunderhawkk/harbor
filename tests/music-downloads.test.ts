@@ -120,7 +120,8 @@ test("download persists only after completion, keeps headers, and opens a local 
   const calls = f.calls.length;
   const local = await f.api.downloadedMusicTrack(entry);
   assert.equal(local.connectorId, "local");
-  assert.ok(local.playbackUrl?.endsWith(".audio"));
+  assert.ok(local.playbackUrl?.endsWith(".m4a"));
+  assert.ok(!local.playbackUrl?.includes(entry.id));
   assert.equal(f.calls.length, calls);
   await f.api.downloadMusic(track);
   assert.equal(f.calls.length, calls);

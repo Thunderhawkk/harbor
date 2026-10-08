@@ -87,26 +87,6 @@
   display: grid;
   place-items: center;
 }
-.ea-image {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  min-width: 0;
-  overflow: hidden;
-}
-.ea-image > img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  min-width: 0;
-  min-height: 0;
-  max-width: 100%;
-  max-height: 100%;
-  user-select: none;
-}
 .ea-game-logo-cs2 img,
 .ea-game-logo-cs2 image,
 .ea-game-logo-lol img,
@@ -121,24 +101,6 @@
 .ea-game-rail .ea-game-logo {
   width: 78px;
   height: 38px;
-}
-.ea-image-fallback {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  color: var(--color-ink-muted);
-}
-.ea-image-fallback > svg {
-  width: 90%;
-  height: 90%;
-  opacity: 0.3;
-}
-.ea-image-fallback > b {
-  position: absolute;
-  font-size: 11px;
-  font-weight: 750;
 }
 .ea-feature {
   position: relative;

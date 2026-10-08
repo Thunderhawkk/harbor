@@ -1,6 +1,21 @@
 .music-dock-track {
   container: music-dock-track / inline-size;
 }
+@container music-dock-track (max-width: 220px) {
+  [data-music-dock-like] {
+    display: none;
+  }
+}
+@container music-dock-track (max-width: 148px) {
+  [data-music-dock-art] {
+    display: none;
+  }
+}
+@container music-dock-track (max-width: 76px) {
+  .music-dock-track > * {
+    display: none;
+  }
+}
 
 [data-music-dock]:not([data-music-dock-tab]) {
   container-name: music-dock;

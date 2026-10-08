@@ -199,6 +199,11 @@ export function matchSportsDbTeam(
   });
   return candidates.length === 1 ? candidates[0] : undefined;
 }
+/** Before a season opens every ESPN record reads 0-0 and standingSummary is an arbitrary tiebreak
+ *  between teams that have all played nothing, so publishing them is rows of noise that read as
+ *  broken data rather than as "no games yet". */
+const blankRecord = (summary: string): boolean => /^0(?:\s*-\s*0)+$/.test(summary.trim());
+
 const addFact = (profile: TeamProfileData, label: string, value: unknown) => {
   const result = text(value);
   if (result && !profile.facts.some((f) => f.label === label))
@@ -219,12 +224,19 @@ export function parseEspnTeamProfile(
   p.name = text(team.displayName);
   p.logo = publicUrl(rows(team.logos)[0]?.href) ?? p.logo;
   addFact(p, "Location", team.location);
-  addFact(p, "Standing", team.standingSummary);
+  const records = rows(obj(team.record).items);
+  const played = records.some((record) => {
+    const summary = text(record.summary);
+    return summary.length > 0 && !blankRecord(summary);
+  });
+  if (played) addFact(p, "Standing", team.standingSummary);
   const venue = obj(obj(team.franchise).venue ?? team.venue);
   addFact(p, "Venue", venue.fullName);
   addFact(p, "Capacity", venue.capacity);
-  for (const record of rows(obj(team.record).items)) {
-    addFact(p, text(record.description) || text(record.name) || "Record", record.summary);
+  for (const record of records) {
+    const summary = text(record.summary);
+    if (summary && !blankRecord(summary))
+      addFact(p, text(record.description) || text(record.name) || "Record", summary);
     if (text(record.type) === "total" || text(record.name).toLowerCase().includes("overall")) {
       p.statistics = rows(record.stats)
         .map((stat) => ({

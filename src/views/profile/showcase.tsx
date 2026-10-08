@@ -6,6 +6,7 @@ import { emitListToast } from "@/components/lists/list-toast";
 import { clearShowcase, seedShowcaseMetaId, setThemeShowcase } from "@/lib/social/showcase";
 import { myThemes, type StoreTheme } from "@/lib/theme-store";
 import type { ProfileSummary, ShowcaseItem } from "./profile-types";
+import { useProfileTitle } from "./use-profile-title";
 
 const KIND_LABEL: Record<ShowcaseItem["kind"], string> = {
   favorite: "All-time favorite",
@@ -164,6 +165,7 @@ export function Showcase({
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
+  const media = useProfileTitle(item?.kind === "theme" ? undefined : item?.metaId, item?.title, item?.posterUrl);
 
   useEffect(() => {
     if (isOwner) seedShowcaseMetaId(item?.metaId);
@@ -218,16 +220,17 @@ export function Showcase({
             <ThemeCard item={item} />
           ) : (
             <button
+              ref={media.ref}
               onClick={() =>
                 item.metaId &&
-                onOpen?.(item.metaId, undefined, { name: item.title, poster: item.posterUrl })
+                onOpen?.(item.metaId, undefined, { name: media.title, poster: media.poster })
               }
               disabled={!item.metaId}
               className="group flex w-full items-center gap-4 rounded-md p-2 text-start transition-colors hover:bg-elevated disabled:cursor-default"
             >
               <div className="w-24 shrink-0">
                 <Poster
-                  src={item.posterUrl}
+                  src={media.poster}
                   seed={item.title}
                   ratio="portrait"
                   className="rounded-md"
@@ -237,7 +240,7 @@ export function Showcase({
                 <div className="text-[11px] uppercase tracking-[0.1em] text-accent">
                   {t(KIND_LABEL[item.kind])}
                 </div>
-                <div className="mt-1 truncate font-display text-[19px] text-ink">{item.title}</div>
+                <div className="mt-1 truncate font-display text-[19px] text-ink">{media.title}</div>
                 {item.caption && (
                   <div className="mt-1 line-clamp-2 text-[13px] text-ink-muted">{item.caption}</div>
                 )}

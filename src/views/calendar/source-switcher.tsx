@@ -4,6 +4,7 @@ import traktLogo from "@/assets/trakt.svg";
 import simklLogo from "@/assets/simkl.png";
 import type { Settings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
+import { GamesIcon } from "@/components/icons/games-icon";
 
 type Source = Settings["calendarSource"];
 
@@ -29,6 +30,7 @@ const OPTIONS: Option[] = [
     icon: () => <Library size={13} strokeWidth={2.2} />,
     hint: "Upcoming episodes and movies from your saved shows",
   },
+  { id: "games", label: "games.calendar.source", icon: () => <GamesIcon size={17}/>, hint: "games.calendar.hint" },
   {
     id: "all",
     label: "All upcoming",
@@ -78,15 +80,18 @@ export function SourceSwitcher({
   onChange,
   traktConnected,
   simklConnected,
+  gamesAllowed = true,
 }: {
   value: Source;
   onChange: (s: Source) => void;
   traktConnected: boolean;
   simklConnected: boolean;
+  gamesAllowed?: boolean;
 }) {
   const t = useT();
   const visible = OPTIONS.filter(
     (o) =>
+      (o.id !== "games" || gamesAllowed) &&
       (o.id !== "trakt" || traktConnected) &&
       (o.id !== "simkl" || simklConnected) &&
       (o.id !== "simkl-anticipated" || simklConnected),
@@ -99,6 +104,7 @@ export function SourceSwitcher({
           <button
             key={opt.id}
             onClick={() => onChange(opt.id)}
+            aria-pressed={active}
             title={t(opt.hint)}
             className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
               active

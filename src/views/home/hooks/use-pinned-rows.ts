@@ -6,6 +6,7 @@ import { useMalAnimeRails } from "@/lib/use-mal-anime-rails";
 import { useAnilistTrending, useAnilistTop } from "@/lib/use-anilist-top";
 import type { HomeRow } from "../home-types";
 import { useT } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -17,6 +18,7 @@ function pinnedTitle(desc: PinnedCatalog, t: Translate): string {
 
 export function usePinnedRows(): HomeRow[] {
   const t = useT();
+  const { settings } = useSettings();
   const pinned = usePinnedCatalogs();
   const anilistRails = useAnilistAnimeRails();
   const malRails = useMalAnimeRails();
@@ -31,7 +33,7 @@ export function usePinnedRows(): HomeRow[] {
 
   useEffect(() => {
     let cancelled = false;
-    buildPinnedCatalogRows(pinned)
+    buildPinnedCatalogRows(pinned, { pluginRows: settings.pluginsOutsideTab })
       .then((rows) => {
         if (!cancelled) setCatalogRows(rows);
       })
@@ -39,7 +41,7 @@ export function usePinnedRows(): HomeRow[] {
     return () => {
       cancelled = true;
     };
-  }, [catalogKey]);
+  }, [catalogKey, settings.pluginsOutsideTab]);
 
   const extraMap = useMemo(() => {
     const m = new Map<string, HomeRow>();

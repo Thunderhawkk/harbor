@@ -127,6 +127,7 @@ export const BACKUP_SECTIONS: readonly BackupSection[] = [
       "harbor.favorites.",
       "harbor.charfavorites.",
       "harbor.library.local.v1",
+      "harbor.library.local.removed.v1",
       "harbor.customlists",
       "harbor.collections",
     ],

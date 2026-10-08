@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { FormatBadge } from "@/components/format-badge";
 import { useT } from "@/lib/i18n";
-import { SETTINGS_SAMPLE_META } from "@/lib/sample-artwork";
+import { useSettingsSampleMeta } from "@/lib/sample-artwork";
 import { parseStream } from "@/lib/streams/parser";
 import type { ScoredStream } from "@/lib/streams/types";
 import { PrimaryCard } from "@/views/play-picker/primary-card";
@@ -10,29 +10,30 @@ import { formatSize } from "@/views/play-picker/picker-utils";
 
 const NOOP = () => {};
 const QUALITIES = ["1080p", "720p"] as const;
-const SAMPLE_STREAMS: ScoredStream[] = QUALITIES.map((quality, index) => ({
-  ...parseStream({
-    addonId: "harbor-settings-preview",
-    addonName: "",
-    name: SETTINGS_SAMPLE_META.name,
-    title: `The.General.1926.${quality}.WEB-DL.AVC.mp4`,
-    url: "about:blank",
-    behaviorHints: {
-      filename: `The.General.1926.${quality}.WEB-DL.AVC.mp4`,
-      videoSize: index === 0 ? 1503238554 : 805306368,
-    },
-  }),
-  score: 100 - index,
-  reasons: [],
-  tier: quality,
-}));
-
 export function PickerLayoutPreview({ layout }: { layout: "condensed" | "stremio" }) {
   const t = useT();
   const frameRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
-  const streams = SAMPLE_STREAMS.map((stream) => ({ ...stream, addonName: t("Source") }));
+  const sample = useSettingsSampleMeta(14);
+  const sampleStreams: ScoredStream[] = QUALITIES.map((quality, index) => ({
+    ...parseStream({
+      addonId: "harbor-settings-preview",
+      addonName: "",
+      name: sample.name,
+      title: `${sample.name.replace(/\s+/g, ".")}.${sample.releaseInfo || ""}.${quality}.WEB-DL.AVC.mp4`,
+      url: "about:blank",
+      behaviorHints: {
+        filename: `${sample.name.replace(/\s+/g, ".")}.${sample.releaseInfo || ""}.${quality}.WEB-DL.AVC.mp4`,
+        videoSize: index === 0 ? 1503238554 : 805306368,
+      },
+    }),
+    score: 100 - index,
+    reasons: [],
+    tier: quality,
+  }));
+
+  const streams = sampleStreams.map((stream) => ({ ...stream, addonName: t("Source") }));
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
@@ -55,7 +56,7 @@ export function PickerLayoutPreview({ layout }: { layout: "condensed" | "stremio
     <figure className="w-[340px] max-w-full">
       <figcaption className="mb-2 flex items-center justify-between gap-3 text-[12px] leading-5 text-ink-subtle">
         <span>{t("Preview")}</span>
-        <span dir="ltr">{SETTINGS_SAMPLE_META.name}</span>
+        <span dir="ltr">{sample.name}</span>
       </figcaption>
       <div
         ref={frameRef}
@@ -72,7 +73,7 @@ export function PickerLayoutPreview({ layout }: { layout: "condensed" | "stremio
           {layout === "condensed" ? (
             <div className="flex flex-col gap-5">
               <PrimaryCard
-                meta={SETTINGS_SAMPLE_META}
+                meta={sample}
                 stream={streams[0]}
                 debrids={[]}
                 addonLogo={null}

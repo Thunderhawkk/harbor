@@ -16,8 +16,25 @@ export async function loadMusicLibrary(): Promise<MusicLibrarySnapshot> {
   return { albums, artists, playlists };
 }
 
-export function createMusicPlaylist(name: string): Promise<MusicPlaylist> {
-  return invoke<MusicPlaylist>("music_create_playlist", { name });
+export async function createMusicPlaylist(name: string): Promise<MusicPlaylist> {
+  const base = name.trim();
+  let candidate = base;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await invoke<MusicPlaylist>("music_create_playlist", { name: candidate });
+    } catch (error) {
+      // Keep the database's uniqueness guarantee, including concurrent creations.
+      if (attempt >= 4 || !/UNIQUE constraint failed:\s*playlists\.name/i.test(String(error))) {
+        throw error;
+      }
+      const playlists = await listMusicPlaylists();
+      const names = new Set(playlists.map((playlist) => playlist.name.trim().toLocaleLowerCase()));
+      let suffix = 1;
+      do {
+        candidate = `${base} (${suffix++})`;
+      } while (names.has(candidate.toLocaleLowerCase()));
+    }
+  }
 }
 
 export function renameMusicPlaylist(playlistId: string, name: string): Promise<MusicPlaylist> {

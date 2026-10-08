@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { LoaderCircle, X } from "lucide-react";
+import { LoaderCircle, X } from "@/components/icons/music-icons";
 import { ModalShell } from "@/components/modal-shell";
 import { MusicArtistCard } from "./music-artist-card";
 import { searchTyped } from "@/lib/music/catalog";

@@ -129,29 +129,36 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  min-width: 200px;
-  max-width: 230px;
-  padding: 15px 20px;
+  min-width: 190px;
+  max-width: 228px;
+  padding: 10px 14px;
   text-align: start;
   flex: 1;
-  color: #9fa5af;
-  border-inline-end: 1px solid #ffffff0b;
+  border-radius: 10px;
+  color: var(--color-ink-muted);
+  transition:
+    background-color 200ms ease-out,
+    color 200ms ease-out;
 }
+.sh-carousel-picks > .sh-carousel-pick:hover {
+  background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+  color: var(--color-ink);
+}
+/* The current pick reads by weight and a hairline, never a bar competing with the hero. */
 .sh-carousel-picks > .sh-carousel-pick[data-selected="true"] {
-  color: #fff;
-  background: #ffffff08;
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-ink) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 26%, transparent);
 }
-.sh-carousel-picks > .sh-carousel-pick[data-selected="true"]::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  background: var(--color-accent);
+@media (prefers-reduced-motion: reduce) {
+  .sh-carousel-picks > .sh-carousel-pick {
+    transition: none;
+  }
 }
 @media (max-width: 700px) {
   .sh-carousel-picks > .sh-carousel-pick {
-    min-width: 175px;
-    padding: 12px;
+    min-width: 168px;
+    padding: 9px 11px;
   }
 }
 

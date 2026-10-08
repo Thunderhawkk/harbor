@@ -87,8 +87,8 @@ import { BpControllerToast } from "./bp-controller-toast";
 // element cannot take focus.
 
 const HINTS: Record<string, BpAction[]> = {
-  home: ["select", "exit", "search", "tabs"],
-  anime: ["select", "back", "search", "tabs"],
+  home: ["select", "exit", "quick", "tabs"],
+  anime: ["select", "back", "quick", "tabs"],
   shows: ["select", "back", "tabs"],
   movies: ["select", "back", "tabs"],
   live: ["select", "back", "tabs"],

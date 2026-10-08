@@ -8,7 +8,9 @@ import { BrandBrowse } from "./filter/brand-browse";
 import { BrandFacts, useBrandStats } from "./filter/brand-facts";
 import { BrandPeople } from "./filter/brand-people";
 import { BoxOfficeRail, DecadesSection, FranchisesRail, LongestRunningRail } from "./filter/brand-rails";
+import { CountryBody } from "./filter/country-body";
 import { Rails } from "./filter/rails";
+import { YearTopTen } from "./filter/year-top-ten";
 import {
   SPOTLIGHT_TIMEOUT_MS,
   SpotlightGateContext,
@@ -43,8 +45,13 @@ export function FilterView({ filter }: { filter: MetaFilter }) {
           <div className="flex flex-col gap-12 px-12 pb-24">
             {filter.kind === "studio" || filter.kind === "network" ? (
               <BrandedBody filter={filter} />
+            ) : filter.kind === "country" ? (
+              <CountryBody filter={filter} />
             ) : (
               <Rails filter={filter} />
+            )}
+            {filter.kind === "year" && filter.mediaType === "movie" && (
+              <YearTopTen year={filter.value} />
             )}
           </div>
           <BackToTop scrollRef={scrollRef} />

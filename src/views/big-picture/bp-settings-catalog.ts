@@ -173,8 +173,15 @@ export function bpSettingsControls(
       {
         kind: "options",
         id: "backdrop",
-        label: t("Animated backdrop"),
+        label: t("Backdrop mosaic"),
         value: boolValue(s.bigPictureMosaic),
+        options: onOff(t),
+      },
+      {
+        kind: "options",
+        id: "backdropZoom",
+        label: t("Backdrop zoom"),
+        value: boolValue(s.bigPictureBackdropZoom),
         options: onOff(t),
       },
     ];

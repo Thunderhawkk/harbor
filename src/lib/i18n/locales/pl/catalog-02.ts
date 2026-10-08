@@ -547,6 +547,8 @@ const catalog02: Record<string, string> = {
   "Budget exhausted, resets at midnight UTC.":
     "Limit wyczerpany, zostanie odnowiony o północy czasu UTC.",
   "Buffer fill": "Wypełnienie bufora",
+  "Reveal the dot on hover": "Pokaż kropkę po najechaniu",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Kropka nie przeszkadza i pojawia się, gdy wskażesz pasek. Wyłącz, aby była widoczna cały czas.",
   "Buffer fill brightness": "Jasność wypełnienia bufora",
   "Buffer size": "Rozmiar bufora",
   Buffering: "Buforowanie",

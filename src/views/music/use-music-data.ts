@@ -23,6 +23,7 @@ export type MusicData = {
   freshError: string;
   lastfm: LastFmStatus | null;
   reload: () => void;
+  reloadFresh: () => void;
 };
 
 const HOME_TIMEOUT_MS = CATALOG_REQUEST_TIMEOUT_MS * 2;
@@ -39,6 +40,17 @@ export function useMusicData(recents: MusicTrack[]): MusicData {
   const [freshStatus, setFreshStatus] = useState<MusicFeedStatus>("loading");
   const [freshError, setFreshError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [releaseRefresh, setReleaseRefresh] = useState(0);
+  const reloadFresh = useCallback(() => setReleaseRefresh((value) => value + 1), []);
+  useEffect(() => {
+    const refresh = () => setReleaseRefresh((value) => value + 1);
+    const timer = window.setInterval(refresh, 30 * 60 * 1000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   const generation = useRef(0);
   const recentsRef = useRef(recents);
   recentsRef.current = recents;
@@ -89,7 +101,7 @@ export function useMusicData(recents: MusicTrack[]): MusicData {
   }, [attempt]);
 
   const historyKey = recents
-    .slice(0, 12)
+    .slice(0, 50)
     .map((track) => track.id)
     .join("|");
 
@@ -103,7 +115,9 @@ export function useMusicData(recents: MusicTrack[]): MusicData {
     let live = true;
     setFreshStatus("loading");
     setFreshError("");
-    withTimeout(loadFreshFromArtists(recentsRef.current, 9), CATALOG_REQUEST_TIMEOUT_MS)
+    loadFreshFromArtists(recentsRef.current, 9, (tracks) => {
+      if (live) setFresh(tracks);
+    })
       .then((tracks) => {
         if (!live) return;
         setFresh(tracks);
@@ -111,14 +125,13 @@ export function useMusicData(recents: MusicTrack[]): MusicData {
       })
       .catch((cause) => {
         if (!live) return;
-        setFresh([]);
         setFreshError(errorText(cause));
         setFreshStatus("error");
       });
     return () => {
       live = false;
     };
-  }, [historyKey, attempt]);
+  }, [historyKey, attempt, releaseRefresh]);
 
   const homeRows = useMemo(() => entries.map((entry) => entry.row), [entries]);
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
@@ -139,5 +152,6 @@ export function useMusicData(recents: MusicTrack[]): MusicData {
     freshError,
     lastfm,
     reload,
+    reloadFresh,
   };
 }

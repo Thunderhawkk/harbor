@@ -8,13 +8,28 @@ const Profile = lazy(() =>
   import("./team-profile").then((module) => ({ default: module.TeamProfile })),
 );
 
+const INDIVIDUAL_GROUPS = new Set([
+  "combat",
+  "boxing",
+  "tennis",
+  "golf",
+  "motorsport",
+  "esports",
+  "cycling",
+  "winter",
+  "athletics",
+  "snooker",
+  "darts",
+  "badminton",
+  "tabletennis",
+]);
+
 export function teamIdentity(
   game: SportsGame,
   side: "home" | "away" | SportsSide,
 ): TeamIdentity | undefined {
   const group = hubLeague(game.league)?.group;
-  if (!group || ["combat", "boxing", "tennis", "golf", "motorsport", "esports"].includes(group))
-    return;
+  if (!group || INDIVIDUAL_GROUPS.has(group)) return;
   const team = typeof side === "string" ? game[side] : side;
   if (!team.name || /^(?:tbd|tba|unknown|winner|loser|bye)(?:\b|$)/i.test(team.name)) return;
   return {

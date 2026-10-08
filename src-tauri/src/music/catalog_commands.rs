@@ -195,6 +195,23 @@ pub async fn music_search_videos(
     .map_err(|_| "Music video search timed out".to_string())?
 }
 
+/// One page of exact provider video identities and its continuation.
+#[tauri::command]
+pub async fn music_search_video_page(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, MusicState>,
+    query: String,
+    regular: bool,
+    cursor: Option<String>,
+) -> Result<super::MusicVideoPage, String> {
+    let query = query.trim();
+    if query.is_empty() || query.len() > 200 { return Err("Invalid music video search".into()); }
+    tokio::time::timeout(
+        Duration::from_secs(35),
+        pick(state.inner(), "youtube")?.search_video_page(&app, query, regular, cursor.as_deref()),
+    ).await.map_err(|_| "Music video search timed out".to_string())?
+}
+
 /// The music video for a track, when its source has one. Playback itself runs through the
 /// ordinary video player so the music pane inherits embedding, hardware decoding and geometry.
 #[tauri::command]

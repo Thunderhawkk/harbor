@@ -96,6 +96,12 @@ const misc: Record<string, string> = {
   Code: "Code",
   "Collapse sidebar": "Réduire la barre latérale",
   "Comments are hidden": "Les commentaires sont masqués",
+  "Hosted elsewhere": "Hébergé ailleurs",
+  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.": "Ces offres sont gérées par un tiers. Harbor n’y est pas affilié et ne reçoit rien pour une inscription. Les tarifs et conditions actuels sont sur leur site.",
+  "{name} can run on a hosted instance": "{name} peut tourner sur une instance hébergée",
+  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.": "Un tiers gère ce service. Harbor n’y est pas affilié, ne le revend pas et ne reçoit rien si vous vous inscrivez. Le prix et le contenu sont sur leur site.",
+  "Show comments": "Afficher les commentaires",
+  "Hide comments": "Masquer les commentaires",
   "Comments may take a moment to appear on Trakt":
     "Les commentaires peuvent mettre un moment à apparaître sur Trakt",
   "Common picks for a fresh setup.": "Choix courants pour une nouvelle configuration.",
@@ -178,7 +184,7 @@ const misc: Record<string, string> = {
   Font: "Police",
   "For now, please open this site on a desktop, or build Harbor from source.":
     "Pour l’instant, veuillez ouvrir ce site sur un ordinateur ou compiler Harbor depuis le code source.",
-  "For watching things": "Pour regarder des contenus",
+  "Built for Adventure!": "Conçu pour l'aventure !",
   "found by": "trouvé par",
   France: "France",
   "Free key unlocks Trending, In Theaters, and per-service catalogs. 60 seconds.":

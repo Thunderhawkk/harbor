@@ -1,5 +1,7 @@
 import type { SyncState } from "@/lib/together/protocol";
 import type { MusicTrack } from "@/lib/music/types";
+import { clampNumber } from "@/lib/music/parametric-eq";
+import { packListenMix, unpackListenMix, type ListenMix } from "./mix-state";
 
 export type ListenTrackRef = {
   id: string;
@@ -38,8 +40,11 @@ export function unpackListenMediaId(
  * because both are free text and a separator would have to survive every track name
  * anyone ever plays.
  */
-export function packListenTitle(title: string, artist: string): string {
-  return JSON.stringify({ t: title ?? "", a: artist ?? "" });
+export function packListenTitle(title: string, artist: string, mix?: ListenMix | null): string {
+  const packed = mix ? packListenMix(mix) : null;
+  const body: { t: string; a: string; d?: unknown } = { t: title ?? "", a: artist ?? "" };
+  if (packed) body.d = packed;
+  return JSON.stringify(body);
 }
 
 export function unpackListenTitle(value: string | null): { title: string; artist: string } {
@@ -58,6 +63,19 @@ export function unpackListenTitle(value: string | null): { title: string; artist
   return { title: value, artist: "" };
 }
 
+function readMixPayload(value: string | null): unknown {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (parsed && typeof parsed === "object" && "d" in parsed) {
+      return (parsed as { d?: unknown }).d ?? null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function listenStateFromTrack(
   track: MusicTrack,
   positionSeconds: number,
@@ -65,10 +83,11 @@ export function listenStateFromTrack(
   clientId: string,
   hostClientId: string | null,
   now: number,
+  mix?: ListenMix | null,
 ): SyncState {
-  return {
+  const state: SyncState = {
     mediaId: packListenMediaId(track),
-    mediaTitle: packListenTitle(track.title ?? "", track.artist ?? ""),
+    mediaTitle: packListenTitle(track.title ?? "", track.artist ?? "", mix),
     // Music has no episodes, and the relay drops a malformed one, so it stays null.
     episode: null,
     posterUrl: track.artwork ?? null,
@@ -78,6 +97,8 @@ export function listenStateFromTrack(
     updatedBy: clientId,
     hostClientId,
   };
+  if (mix) state.speed = mix.speed;
+  return state;
 }
 
 export function listenTrackFromState(state: SyncState | null): ListenTrackRef | null {
@@ -91,6 +112,15 @@ export function listenTrackFromState(state: SyncState | null): ListenTrackRef | 
     title,
     artist,
     artwork: state.posterUrl,
+  };
+}
+
+export function listenMixFromState(state: SyncState | null): ListenMix | null {
+  if (!state) return null;
+  if (typeof state.speed !== "number" || !Number.isFinite(state.speed)) return null;
+  return {
+    speed: Math.round(clampNumber(state.speed, 0.5, 1.6, 1) * 1000) / 1000,
+    ...unpackListenMix(readMixPayload(state.mediaTitle)),
   };
 }
 

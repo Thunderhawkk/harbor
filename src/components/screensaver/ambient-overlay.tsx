@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { HarborMark } from "@/components/icons/harbor-mark";
+import {
+  ScreensaverBrand,
+  ScreensaverClockFace,
+  useScreensaverClock,
+} from "./screensaver-clock";
 
 export type AmbientItem = { bg: string; title: string; sub: string };
 
@@ -7,17 +11,6 @@ const DEEP_IDLE_MS = 6 * 60 * 1000;
 const ROTATE_MS = 13000;
 const FADE_MS = 1600;
 const DRIFT_STEPS = 240;
-
-function useClock(): { time: string; date: string } {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 15000);
-    return () => window.clearInterval(id);
-  }, []);
-  const time = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  const date = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-  return { time, date };
-}
 
 function AmbientSlide({ src, out, reduce }: { src: string; out: boolean; reduce: boolean }) {
   const [shown, setShown] = useState(false);
@@ -62,7 +55,7 @@ export function AmbientOverlay({
   onDismiss: () => void;
   neverDeep?: boolean;
 }) {
-  const { time, date } = useClock();
+  const { time, date } = useScreensaverClock();
   const [deep, setDeep] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(() => (items[0] ? [{ key: 0, item: items[0] }] : []));
   const keyRef = useRef(1);
@@ -138,22 +131,10 @@ export function AmbientOverlay({
       )}
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-10">
-        <div className="flex items-center gap-2">
-          <HarborMark className="h-7 w-7 shrink-0 text-white/85 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]" />
-          <span className="font-display text-[26px] font-semibold tracking-tight text-white/85 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]">
-            Harbor
-          </span>
-        </div>
+        <ScreensaverBrand />
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-8 p-12">
-        <div className="flex flex-col">
-          <span className="text-[15px] font-medium uppercase tracking-[0.22em] text-white/60 drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)]">
-            {date}
-          </span>
-          <span className="mt-1 text-[92px] font-light leading-none tabular-nums text-white drop-shadow-[0_6px_28px_rgba(0,0,0,0.75)]">
-            {time}
-          </span>
-        </div>
+        <ScreensaverClockFace time={time} date={date} />
         {!deep && current && (
           <div className="mb-2 flex max-w-[46%] flex-col items-end text-end">
             {current.sub && (

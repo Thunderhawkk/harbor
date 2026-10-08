@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Disc3, Mic2, Music2 } from "lucide-react";
+import { Disc3, Mic2, Music2 } from "@/components/icons/music-icons";
 import { searchTyped } from "@/lib/music/catalog";
 import { artistIdentityKey, peekArtistIdentity, resolveArtist } from "@/lib/music/artist-authority";
 import { collapseArtistRows } from "@/lib/music/search-artists";
 import type { MusicCatalogItem } from "@/lib/music/types";
 import { useT, useUiLanguage } from "@/lib/i18n";
+import { MusicBillboardRank } from "./music-billboard-rank";
+import { MusicSearchAudience } from "./music-search-audience";
 
 const DEBOUNCE_MS = 200;
 const MIN_CHARS = 2;
@@ -18,6 +20,7 @@ export function useMusicSuggest(query: string, connector: string | null, enabled
   const language = useUiLanguage();
   const [found, setFound] = useState<Suggest | null>(null);
   const [pass, setPass] = useState(0);
+  const [loading, setLoading] = useState(false);
   const generation = useRef(0);
 
   useEffect(() => {
@@ -25,14 +28,24 @@ export function useMusicSuggest(query: string, connector: string | null, enabled
     if (!enabled || trimmed.length < MIN_CHARS) {
       generation.current += 1;
       setFound(null);
+      setLoading(false);
       return;
     }
     const mine = ++generation.current;
+    setFound(null);
+    setLoading(true);
     const timer = window.setTimeout(() => {
       void searchTyped(trimmed, 8, connector ?? undefined)
         .then((res) => {
           if (generation.current !== mine) return;
           setFound({ query: trimmed, results: res });
+          // Only the visible artist suggestions need audience enrichment; the authority caches probes.
+          const visible = [...new Map(res.artists.slice(0, CAP.artists).map((artist) => [artistIdentityKey(artist.name), artist])).values()];
+          for (const artist of visible) {
+            if (peekArtistIdentity(artist.name).probed) continue;
+            void resolveArtist(artist.name, { hint: res.artists.filter((ref) => artistIdentityKey(ref.name) === artistIdentityKey(artist.name)) })
+              .catch(() => null).then(() => { if (generation.current === mine) setPass((value) => value + 1); });
+          }
           const key = artistIdentityKey(trimmed);
           const named = res.artists.filter((a) => artistIdentityKey(a.name) === key);
           if (named.length < 2 || peekArtistIdentity(trimmed).probed) return;
@@ -44,13 +57,13 @@ export function useMusicSuggest(query: string, connector: string | null, enabled
         })
         .catch(() => {
           if (generation.current === mine) setFound(null);
-        });
+        }).finally(() => { if (generation.current === mine) setLoading(false); });
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [query, connector, enabled]);
 
-  return useMemo(() => {
-    if (!enabled || !found) return [];
+  const groups = useMemo(() => {
+    if (!enabled || !found || found.query !== query.trim()) return [];
     const res = found.results;
     const next: Group[] = [
       {
@@ -77,7 +90,8 @@ export function useMusicSuggest(query: string, connector: string | null, enabled
       },
     ];
     return next.filter((g) => g.items.length > 0);
-  }, [found, pass, t, language, enabled]);
+  }, [found, pass, t, language, enabled, query]);
+  return { groups, loading };
 }
 
 function artOf(item: MusicCatalogItem): string | null {
@@ -132,9 +146,10 @@ export function MusicSearchSuggest({
   return (
     <div
       ref={listRef}
+      data-music-search-panel
       role="listbox"
       aria-label="search suggestions"
-      className="harbor-float animate-menu-in max-h-[336px] overflow-y-auto overscroll-contain rounded-md bg-elevated p-1 ring-1 ring-edge-soft"
+      className="harbor-float animate-menu-in max-h-[min(560px,60vh)] overflow-y-auto overscroll-contain rounded-md bg-elevated p-1 ring-1 ring-edge-soft"
     >
       {groups.map((group) => (
         <div key={group.key}>
@@ -156,12 +171,12 @@ export function MusicSearchSuggest({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => onHover(i)}
                 onClick={() => onPick(item)}
-                className={`flex h-[42px] w-full items-center gap-2.5 rounded-md px-2 text-start transition-colors duration-150 ease-out ${
+                className={`flex h-[62px] w-full items-center gap-3 rounded-md px-3 text-start transition-colors duration-150 ease-out ${
                   i === activeIndex ? "bg-raised" : ""
                 }`}
               >
                 <span
-                  className={`grid size-[30px] shrink-0 place-items-center overflow-hidden bg-canvas/60 text-ink-subtle ${
+                  className={`grid size-[44px] shrink-0 place-items-center overflow-hidden bg-canvas/60 text-ink-subtle ${
                     item.kind === "artist" ? "rounded-full" : "rounded-[5px]"
                   }`}
                 >
@@ -179,8 +194,16 @@ export function MusicSearchSuggest({
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[12.5px] text-ink">{titleOf(item)}</span>
-                  {sub ? <span className="truncate text-[11px] text-ink-subtle">{sub}</span> : null}
+                  {item.kind === "artist" ? <MusicSearchAudience artist={item} /> : sub ? <span className="truncate text-[11px] text-ink-subtle">{sub}</span> : null}
                 </span>
+                {item.kind === "track" && (
+                  <MusicBillboardRank
+                    title={item.title}
+                    artist={item.artist}
+                    logoSize={11}
+                    className="ms-auto inline-flex shrink-0 items-center gap-1 text-[10.5px] font-semibold text-ink-subtle"
+                  />
+                )}
               </button>
             );
           })}

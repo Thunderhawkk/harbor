@@ -65,17 +65,17 @@ const BROWSE_MODES: Array<{
 
 void Library;
 
-export function AddonsView() {
+export function AddonsView({ active = true }: { active?: boolean }) {
   const t = useT();
   const { settings, update } = useSettings();
   const { authKey } = useAuth();
-  const { byId, installedIds, loading, refetch } = useAddonsCatalog(settings.showAdultAddons);
+  const { byId, installedIds, installedAddons, loading, refetch } = useAddonsCatalog(
+    settings.showAdultAddons,
+  );
   const { addonDetailId, openAddonDetail, goBack } = useView();
   const [tab, setTab] = useState<Tab>(() => consumeAddonsTab() ?? "discover");
 
   useEffect(() => {
-    const requested = consumeAddonsTab();
-    if (requested) setTab(requested);
     void prefetchTopAddonLogos();
     void import("@/lib/providers/stremio-addons-index").then((m) =>
       m.ensureCommunityIndex().catch(() => undefined),
@@ -95,6 +95,16 @@ export function AddonsView() {
     if (!settings.showAdultAddons && categoryFilter === "nsfw") setCategoryFilter(null);
   }, [settings.showAdultAddons, categoryFilter]);
   const [query, setQuery] = useState("");
+  useEffect(() => {
+    if (!active) return;
+    const requested = consumeAddonsTab();
+    if (!requested) return;
+    // Settings can reopen this still-mounted page. Explicit Manage navigation
+    // should show the full collection rather than a previous catalog search.
+    setTab(requested);
+    setQuery("");
+    setCategoryFilter(null);
+  }, [active]);
   const goToCategory = (cat: string) => {
     setCategoryFilter(cat);
     setTab("browse");
@@ -162,14 +172,12 @@ export function AddonsView() {
     seq.forEach((url, i) => {
       if (!rank.has(url)) rank.set(url, i);
     });
-    return allAddons
-      .filter((r) => r.installed)
-      .sort(
-        (a, b) =>
-          (rank.get(a.transportUrl) ?? Number.MAX_SAFE_INTEGER) -
-          (rank.get(b.transportUrl) ?? Number.MAX_SAFE_INTEGER),
-      );
-  }, [allAddons]);
+    return [...installedAddons].sort(
+      (a, b) =>
+        (rank.get(a.transportUrl) ?? Number.MAX_SAFE_INTEGER) -
+        (rank.get(b.transportUrl) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [installedAddons]);
   const trimmedQuery = query.trim();
   useEffect(() => {
     if (trimmedQuery.length > 0 && tab !== "installed") setTab("browse");
@@ -309,7 +317,7 @@ export function AddonsView() {
                         active ? "bg-canvas/15 text-canvas" : "bg-edge text-ink-muted"
                       }`}
                     >
-                      {installedIds.size}
+                      {installed.length}
                     </span>
                   </button>
                 );

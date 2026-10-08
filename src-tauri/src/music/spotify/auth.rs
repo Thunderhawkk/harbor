@@ -55,14 +55,17 @@ pub fn setup_hint() -> String {
 }
 
 pub async fn authorize(app: &AppHandle) -> Result<Authorization, String> {
-    reserve_port()?;
+    ensure_port_free().await?;
     let client_id = client_id(app)?;
     let granted = tokio::task::spawn_blocking(move || {
         client(&client_id)?.get_access_token().map_err(describe)
     });
     match tokio::time::timeout(OAUTH_TIMEOUT, granted).await {
         Ok(Ok(token)) => token.map(authorization),
-        Ok(Err(_)) => Err("Spotify sign in stopped before it finished".to_string()),
+        Ok(Err(_)) => {
+            release_listener().await;
+            Err("Spotify sign in stopped before it finished".to_string())
+        }
         Err(_) => {
             release_listener().await;
             Err(format!(
@@ -108,16 +111,26 @@ fn authorization(token: OAuthToken) -> Authorization {
     }
 }
 
-fn reserve_port() -> Result<(), String> {
-    match TcpListener::bind(callback_address()) {
-        Ok(listener) => {
-            drop(listener);
-            Ok(())
-        }
-        Err(_) => Err(format!(
-            "Spotify sign in needs port {REDIRECT_PORT}. Close the app that is holding it and try again."
-        )),
+fn port_free() -> bool {
+    TcpListener::bind(callback_address()).is_ok()
+}
+
+/// A sign in the listener abandoned leaves our own callback socket bound, so the retry has to
+/// nudge that listener loose before deciding another program is holding the port.
+async fn ensure_port_free() -> Result<(), String> {
+    if port_free() {
+        return Ok(());
     }
+    release_listener().await;
+    for _ in 0..12 {
+        tokio::time::sleep(Duration::from_millis(120)).await;
+        if port_free() {
+            return Ok(());
+        }
+    }
+    Err(format!(
+        "Spotify sign in needs port {REDIRECT_PORT}. Close whatever is using it, or restart Harbor, and try again."
+    ))
 }
 
 async fn release_listener() {

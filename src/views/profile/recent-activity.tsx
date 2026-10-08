@@ -5,6 +5,7 @@ import { useT } from "@/lib/i18n";
 import { SectionHeader } from "./section-header";
 import { timeAgo } from "./profile-bits";
 import type { ActivityItem, ActivityKind } from "./profile-types";
+import { useProfileTitle } from "./use-profile-title";
 
 export const ACTIVITY_VERB: Record<ActivityKind, string> = {
   watched: "Watched",
@@ -63,15 +64,17 @@ function ActivityCard({
   onOpenRatings?: () => void;
 }) {
   const t = useT();
+  const media = useProfileTitle(a.kind === "imported" ? undefined : a.metaId, a.title, a.posterUrl);
   if (a.kind === "imported") return <ImportCard a={a} onOpenRatings={onOpenRatings} />;
   return (
     <button
-      onClick={() => a.metaId && onOpen?.(a.metaId, undefined, { name: a.title, poster: a.posterUrl })}
+      ref={media.ref}
+      onClick={() => a.metaId && onOpen?.(a.metaId, undefined, { name: media.title, poster: media.poster })}
       disabled={!a.metaId}
       className="group w-full text-start disabled:cursor-default"
     >
       <Poster
-        src={a.posterUrl}
+        src={media.poster}
         seed={a.title}
         ratio="portrait"
         className="rounded-md ring-1 ring-edge-soft shadow-[0_2px_8px_-2px_rgba(0,0,0,0.35)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0.24,1)] motion-safe:group-hover:will-change-transform group-hover:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.6)] motion-safe:group-hover:[transform:translate3d(0,-0.5rem,0)_scale(1.03)]"
@@ -82,7 +85,7 @@ function ActivityCard({
         {t(ACTIVITY_VERB[a.kind])}
         {a.kind === "rated" && a.rating !== undefined && <span className="text-accent">{a.rating}/10</span>}
       </div>
-      <div className="mt-0.5 truncate text-[13px] font-medium text-ink">{a.title}</div>
+      <div className="mt-0.5 truncate text-[13px] font-medium text-ink">{media.title}</div>
       <div className="mt-0.5 text-[11px] tabular-nums text-ink-subtle">{timeAgo(a.at)}</div>
     </button>
   );

@@ -16,12 +16,17 @@ const SMALL_IMAGE_KEY: &str = "harbor_logo";
 struct Desired {
     active: bool,
     paused: bool,
+    listening: bool,
     details: Option<String>,
+    details_url: Option<String>,
     state: Option<String>,
+    state_url: Option<String>,
     large_image: Option<String>,
     large_text: Option<String>,
+    large_url: Option<String>,
     small_image: Option<String>,
     small_text: Option<String>,
+    small_url: Option<String>,
     start_ts: Option<i64>,
     end_ts: Option<i64>,
     party_id: Option<String>,
@@ -48,12 +53,17 @@ impl DiscordState {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PresenceInput {
+    pub activity_type: Option<String>,
     pub details: Option<String>,
+    pub details_url: Option<String>,
     pub state: Option<String>,
+    pub state_url: Option<String>,
     pub poster_url: Option<String>,
     pub large_text: Option<String>,
+    pub large_url: Option<String>,
     pub small_image_url: Option<String>,
     pub small_text: Option<String>,
+    pub small_url: Option<String>,
     pub start_ts: Option<i64>,
     pub end_ts: Option<i64>,
     #[serde(default)]
@@ -87,6 +97,15 @@ fn safe_button_url(url: &str) -> bool {
     url.starts_with("https://") && url.len() <= 512
 }
 
+fn safe_link(url: Option<String>) -> Option<String> {
+    let u = url?;
+    if safe_button_url(&u) {
+        Some(u)
+    } else {
+        None
+    }
+}
+
 fn safe_buttons(buttons: Vec<ButtonInput>) -> Vec<(String, String)> {
     buttons
         .into_iter()
@@ -102,12 +121,17 @@ pub fn discord_set_presence(state: tauri::State<'_, DiscordState>, p: PresenceIn
         let mut d = state.desired.lock().unwrap();
         d.active = true;
         d.paused = p.paused;
+        d.listening = p.activity_type.as_deref() == Some("listening");
         d.details = clean(p.details);
+        d.details_url = safe_link(p.details_url);
         d.state = clean(p.state);
+        d.state_url = safe_link(p.state_url);
         d.large_image = safe_image(p.poster_url);
         d.large_text = clean(p.large_text);
+        d.large_url = safe_link(p.large_url);
         d.small_image = safe_image(p.small_image_url);
         d.small_text = clean(p.small_text);
+        d.small_url = safe_link(p.small_url);
         d.start_ts = if p.paused { None } else { p.start_ts };
         d.end_ts = if p.paused { None } else { p.end_ts };
         d.party_id = clean(p.party_id);
@@ -195,15 +219,32 @@ pub fn run_loop(app: AppHandle) {
             if let Some(t) = desired.large_text.as_deref() {
                 assets = assets.large_text(t);
             }
+            if let Some(u) = desired.large_url.as_deref() {
+                assets = assets.large_url(u);
+            }
+            if let Some(u) = desired.small_url.as_deref() {
+                assets = assets.small_url(u);
+            }
+            let kind = if desired.listening {
+                ActivityType::Listening
+            } else {
+                ActivityType::Watching
+            };
             let mut act = Activity::new()
-                .activity_type(ActivityType::Watching)
+                .activity_type(kind)
                 .status_display_type(StatusDisplayType::Details)
                 .assets(assets);
             if let Some(d) = desired.details.as_deref() {
                 act = act.details(d);
             }
+            if let Some(u) = desired.details_url.as_deref() {
+                act = act.details_url(u);
+            }
             if let Some(s) = desired.state.as_deref() {
                 act = act.state(s);
+            }
+            if let Some(u) = desired.state_url.as_deref() {
+                act = act.state_url(u);
             }
             match (desired.start_ts, desired.end_ts) {
                 (Some(start), Some(end)) => {

@@ -46,11 +46,13 @@ export const MUSIC_DOCK_PART_LABELS: Record<MusicDockPart, string> = {
   download: "music.download.action",
 };
 
+const QUALITY_OFF_KEY = "harbor.music.dock-quality-off.v1";
+
 function defaults(): MusicDockLayout {
   return {
     shuffle: true,
     repeat: true,
-    quality: true,
+    quality: false,
     source: true,
     time: true,
     queue: true,
@@ -68,7 +70,17 @@ function read(): MusicDockLayout {
     const value = JSON.parse(readMusicPreference(KEY) ?? "{}") as Partial<
       Record<MusicDockPart, unknown>
     >;
-    for (const part of MUSIC_DOCK_PARTS) if (value[part] === false) base[part] = false;
+    if (!readMusicPreference(QUALITY_OFF_KEY)) {
+      writeMusicPreference(QUALITY_OFF_KEY, "1");
+      if (value.quality === true) {
+        delete value.quality;
+        writeMusicPreference(KEY, JSON.stringify(value));
+      }
+    }
+    for (const part of MUSIC_DOCK_PARTS) {
+      const stored = value[part];
+      if (typeof stored === "boolean") base[part] = stored;
+    }
     return base;
   } catch {
     return defaults();

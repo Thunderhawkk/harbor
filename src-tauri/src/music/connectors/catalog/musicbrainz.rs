@@ -113,6 +113,7 @@ pub async fn artist_albums(artist: &MusicArtistRef) -> Result<Vec<MusicAlbumRef>
                     .as_str()
                     .and_then(super::release_year),
                 track_count: None,
+                explicit: None,
             })
         })
         .collect())
@@ -181,6 +182,7 @@ fn parse_artist_page(
                             .as_str()
                             .and_then(super::release_year),
                         track_count: None,
+                        explicit: None,
                     })
                 })
             }

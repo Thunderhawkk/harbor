@@ -6,6 +6,7 @@ import {
   Loader2,
   Info,
   Plus,
+  RefreshCw,
   Save,
   X,
 } from "lucide-react";
@@ -15,6 +16,8 @@ import { useContextMenu } from "@/lib/context-menu";
 import { saveSubtitleToDisk } from "@/lib/subtitles/save-to-disk";
 import { markAddedSub, useAddedSubs } from "@/lib/subtitles/added-subs";
 import { wasLimitReached } from "@/lib/subtitles/limit-signal";
+import { wasPendingSub } from "@/lib/subtitles/pending-subs";
+import { useTranslationJob } from "@/lib/subtitles/translation-jobs";
 import type { SubResult } from "@/lib/subtitles/types";
 import { parseRelease } from "@/lib/subtitles/release-match";
 import { providerLabel } from "@/lib/subtitles/provider-label";
@@ -155,11 +158,18 @@ function ResultRow({
   const { openAt } = useContextMenu();
   const addedSubs = useAddedSubs();
   const added = addedSubs.has(result.url);
+  // Some addon subtitles are generated on demand from the same URL (AI translation),
+  // so an already-added entry must stay selectable to pull the finished file later.
+  const refreshable = result.source === "addon";
+  // Pending translations are tracked by the player loop and added automatically once
+  // ready, so their "Translating…" state stays visible instead of flashing briefly.
+  const translating = useTranslationJob(result.url);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [addStatus, setAddStatus] = useState<"failed" | "limited" | null>(null);
+  const [addStatus, setAddStatus] = useState<"failed" | "limited" | "pending" | null>(null);
   const [downloadStatus, setDownloadStatus] = useState<"failed" | "limited" | null>(null);
+  const effectiveStatus = translating ? "pending" : addStatus;
   const timer = useRef<number | null>(null);
   const failTimer = useRef<number | null>(null);
   const downloadFailTimer = useRef<number | null>(null);
@@ -174,7 +184,8 @@ function ResultRow({
   );
 
   const handleAdd = async () => {
-    if (adding || added) return;
+    if (adding) return;
+    if (added && !refreshable) return;
     setAdding(true);
     setAddStatus(null);
     try {
@@ -183,9 +194,11 @@ function ResultRow({
         markAddedSub(result.url);
         return;
       }
-      setAddStatus(wasLimitReached(result.url) ? "limited" : "failed");
+      setAddStatus(
+        wasPendingSub(result.url) ? "pending" : wasLimitReached(result.url) ? "limited" : "failed",
+      );
       if (failTimer.current !== null) window.clearTimeout(failTimer.current);
-      failTimer.current = window.setTimeout(() => setAddStatus(null), 2200);
+      failTimer.current = window.setTimeout(() => setAddStatus(null), 2600);
     } finally {
       setAdding(false);
     }
@@ -236,6 +249,7 @@ function ResultRow({
   const primaryName =
     (isMeaningful(result.release) ? result.release : null) ||
     filenameFromUrl(result.url) ||
+    result.label ||
     result.displayTitle ||
     result.title ||
     lang;
@@ -273,28 +287,38 @@ function ResultRow({
   return (
     <div
       className={`group flex w-full items-start gap-3 px-4 py-2.5 transition-colors duration-300 ${
-        added ? "bg-emerald-400/12" : addStatus ? "bg-red-400/10" : "hover:bg-canvas/60"
+        added
+          ? "bg-emerald-400/12"
+          : effectiveStatus === "pending"
+            ? "bg-amber-400/10"
+            : effectiveStatus
+              ? "bg-red-400/10"
+              : "hover:bg-canvas/60"
       }`}
     >
       <button
         onClick={handleAdd}
-        disabled={added}
+        disabled={added && !refreshable}
         className="flex min-w-0 flex-1 items-start gap-3 text-start disabled:cursor-default"
       >
         <span
           className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
             added
               ? "bg-emerald-400/20 text-emerald-300"
-              : addStatus
-                ? "bg-red-400/20 text-red-300"
-                : ""
+              : effectiveStatus === "pending"
+                ? "bg-amber-400/20 text-amber-200"
+                : effectiveStatus
+                  ? "bg-red-400/20 text-red-300"
+                  : ""
           }`}
         >
           {adding ? (
             <Loader2 size={14} className="animate-spin text-ink-subtle" />
           ) : added ? (
             <Check size={12} strokeWidth={3} className="animate-in zoom-in-50 duration-200" />
-          ) : addStatus ? (
+          ) : effectiveStatus === "pending" ? (
+            <RefreshCw size={12} strokeWidth={2.4} className="animate-spin" />
+          ) : effectiveStatus ? (
             <X size={12} strokeWidth={3} className="animate-in zoom-in-50 duration-200" />
           ) : (
             <Plus
@@ -311,12 +335,22 @@ function ResultRow({
             </span>
             {added && (
               <span className="shrink-0 rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300 animate-in fade-in slide-in-from-left-1 duration-200">
-                {t("Added")}
+                {refreshable ? t("Added · refresh for updates") : t("Added")}
               </span>
             )}
-            {addStatus && (
-              <span className="shrink-0 rounded bg-red-400/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-red-300 animate-in fade-in slide-in-from-left-1 duration-200">
-                {addStatus === "limited" ? t("Limit reached") : t("Couldn't add, try again")}
+            {effectiveStatus && (
+              <span
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] animate-in fade-in slide-in-from-left-1 duration-200 ${
+                  effectiveStatus === "pending"
+                    ? "bg-amber-400/20 text-amber-200"
+                    : "bg-red-400/20 text-red-300"
+                }`}
+              >
+                {effectiveStatus === "pending"
+                  ? t("Translating… we'll add it when it's ready")
+                  : effectiveStatus === "limited"
+                    ? t("Limit reached")
+                    : t("Couldn't add, try again")}
               </span>
             )}
           </span>
@@ -355,6 +389,25 @@ function ResultRow({
           </span>
         </div>
       </button>
+      {added && refreshable && (
+        <button
+          type="button"
+          aria-label={t("Refresh subtitle")}
+          title={t("Refresh subtitle")}
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleAdd();
+          }}
+          disabled={adding}
+          className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-elevated hover:text-ink disabled:opacity-40"
+        >
+          {adding ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <RefreshCw size={13} strokeWidth={2} />
+          )}
+        </button>
+      )}
       <button
         type="button"
         aria-label={t("Open subtitle details")}

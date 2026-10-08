@@ -105,6 +105,24 @@ const MODEL_MIGRATIONS: Record<string, string> = {
   "x-ai/grok-2-1212": "x-ai/grok-4.5",
 };
 
+const NO_SAMPLING = /^anthropic\/claude-(?:opus|sonnet)-(?:4[.-][678]|5)/;
+const JSON_SCHEMA_READY = [
+  "openai/gpt-4o",
+  "openai/gpt-5",
+  "anthropic/claude-",
+  "google/gemini-3",
+  "google/gemini-2",
+  "deepseek/deepseek-v4",
+];
+
+export function supportsSampling(id: string): boolean {
+  return !NO_SAMPLING.test(id);
+}
+
+export function supportsJsonSchema(id: string): boolean {
+  return !id.endsWith(":free") && JSON_SCHEMA_READY.some((prefix) => id.startsWith(prefix));
+}
+
 export function migrateModelId(id: string): string {
   return MODEL_MIGRATIONS[id] ?? id;
 }

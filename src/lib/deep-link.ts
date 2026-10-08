@@ -1,9 +1,16 @@
 import { makeSafeTauriUnlisten } from "@/lib/tauri-unlisten";
 import { focusWindow } from "@/lib/window";
+import {
+  isMusicDeepLink,
+  parseMusicDeepLink,
+  takeMusicBounce,
+  type MusicDeepLink,
+} from "@/lib/music/deep-link";
 
 const EVENT = "harbor:deeplink-install";
 const OPEN_EVENT = "harbor:deeplink-open";
 const OPEN_LIST_EVENT = "harbor:deeplink-open-list";
+const OPEN_MUSIC_EVENT = "harbor:deeplink-open-music";
 const PROFILE_EDIT_EVENT = "harbor:deeplink-profile-edit";
 
 type DeepLinkDetail = { rawUrl: string };
@@ -11,6 +18,7 @@ type DeepLinkOpen = { type: string; id: string; videoId?: string };
 type DeepLinkOpenDetail = { open: DeepLinkOpen };
 export type DeepLinkList = { handle: string; listId: string };
 type DeepLinkListDetail = { list: DeepLinkList };
+type DeepLinkMusicDetail = { music: MusicDeepLink };
 
 let pendingUrl: string | null = null;
 
@@ -66,6 +74,28 @@ export function onDeepLinkOpenList(handler: (list: DeepLinkList) => void): () =>
   };
   window.addEventListener(OPEN_LIST_EVENT, listener);
   return () => window.removeEventListener(OPEN_LIST_EVENT, listener);
+}
+
+export function emitDeepLinkOpenMusic(music: MusicDeepLink): void {
+  window.dispatchEvent(
+    new CustomEvent<DeepLinkMusicDetail>(OPEN_MUSIC_EVENT, { detail: { music } }),
+  );
+}
+
+export function onDeepLinkOpenMusic(handler: (music: MusicDeepLink) => void): () => void {
+  const listener = (e: Event) => {
+    const ev = e as CustomEvent<DeepLinkMusicDetail>;
+    if (ev.detail?.music) handler(ev.detail.music);
+  };
+  window.addEventListener(OPEN_MUSIC_EVENT, listener);
+  return () => window.removeEventListener(OPEN_MUSIC_EVENT, listener);
+}
+
+function routeMusic(url: string): boolean {
+  const music = parseMusicDeepLink(url);
+  if (!music) return false;
+  emitDeepLinkOpenMusic(music);
+  return true;
 }
 
 export function emitOpenProfileEdit(): void {
@@ -141,6 +171,7 @@ export function parseHarborList(url: string): DeepLinkList | null {
 }
 
 function shouldForward(url: string): boolean {
+  if (isMusicDeepLink(url)) return false;
   if (url.startsWith("harbor://")) return true;
   if (url.startsWith("stremio://")) {
     if (window.__harborInstallerOpen) return true;
@@ -178,7 +209,11 @@ function saveLaunchSeen(map: Record<string, number>): void {
 export async function startDeepLinkBridge(): Promise<() => void> {
   const isTauri =
     typeof window !== "undefined" && ("__TAURI__" in window || "__TAURI_INTERNALS__" in window);
-  if (!isTauri) return () => {};
+  if (!isTauri) {
+    const bounce = takeMusicBounce();
+    if (bounce) window.location.replace(bounce);
+    return () => {};
+  }
   try {
     const mod = await import("@tauri-apps/plugin-deep-link");
     const handle = (urls: string[]) => {
@@ -194,6 +229,7 @@ export async function startDeepLinkBridge(): Promise<() => void> {
           emitDeepLinkOpenList(list);
           continue;
         }
+        if (routeMusic(u)) continue;
         if (isProfileEditUrl(u)) {
           emitOpenProfileEdit();
           continue;
@@ -217,6 +253,7 @@ export async function startDeepLinkBridge(): Promise<() => void> {
           emitDeepLinkOpenList(list);
           return;
         }
+        if (routeMusic(u)) return;
         if (isProfileEditUrl(u)) {
           emitOpenProfileEdit();
           return;
@@ -250,6 +287,7 @@ export async function startDeepLinkBridge(): Promise<() => void> {
         emitDeepLinkOpenList(list);
         return;
       }
+      if (routeMusic(u)) return;
       if (isProfileEditUrl(u)) {
         emitOpenProfileEdit();
         return;

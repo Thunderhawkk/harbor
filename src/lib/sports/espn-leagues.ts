@@ -301,6 +301,8 @@ export const LEAGUES: LeagueDef[] = [
     [
       ["WSL", "Women's Super League", "eng.w.1", "2314"],
       ["CLUBFRIENDLY", "Club Friendly", "club.friendly", ""],
+      ["INTFRIENDLY", "International Friendly", "fifa.friendly", ""],
+      ["INTFRIENDLYW", "Women's International Friendly", "fifa.friendly.w", ""],
       ["SCOTTISHLC", "Scottish League Cup", "sco.cis", ""],
       ["USLSUPER", "USL Super League", "usa.w.usl.1", ""],
       ["LIGAF", "Liga F", "esp.w.1", ""],

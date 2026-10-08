@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "Playback cache folder",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.",
   "1 option formatted correctly": "1 option formatted correctly",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens",
   "3 to 24 letters, numbers, or underscores.": "3 to 24 letters, numbers, or underscores.",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "The saved {name} will be removed and its changes will stop applying.",
   "The server responded in {ms} ms.": "The server responded in {ms} ms.",
   "The six largest local settings entries, including preferences and lookup data.": "The six largest local settings entries, including preferences and lookup data.",
+  "{count} entries": "{count} entries",
   "The volume pop-up is hidden.": "The volume pop-up is hidden.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "Theme, the player's own layout, artwork, and what Harbor shows on a card.",
   "This account has been suspended. Reach out to support if you think that's wrong.": "This account has been suspended. Reach out to support if you think that's wrong.",

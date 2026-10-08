@@ -1,6 +1,6 @@
 #[cfg(windows)]
 mod win {
-    use std::sync::OnceLock;
+    use std::sync::{Mutex, OnceLock};
     use tauri::{AppHandle, Emitter, Manager};
     use windows::core::HSTRING;
     use windows::Foundation::TypedEventHandler;
@@ -16,6 +16,7 @@ mod win {
     unsafe impl Sync for Holder {}
 
     static SMTC: OnceLock<Option<Holder>> = OnceLock::new();
+    static LAST_PUSHED: OnceLock<Mutex<Option<(bool, String, String)>>> = OnceLock::new();
 
     fn controls() -> Option<&'static SystemMediaTransportControls> {
         SMTC.get().and_then(|h| h.as_ref()).map(|h| &h.0)
@@ -75,26 +76,50 @@ mod win {
         Ok(smtc)
     }
 
+    fn sanitize(s: &str) -> String {
+        s.trim()
+            .chars()
+            .map(|c| if c.is_control() { ' ' } else { c })
+            .take(256)
+            .collect()
+    }
+
     pub fn update(playing: bool, title: &str, subtitle: &str) {
+        let title = sanitize(title);
+        let subtitle = sanitize(subtitle);
+
         let Some(smtc) = controls() else { return };
-        let _ = smtc.SetIsEnabled(true);
-        let _ = smtc.SetPlaybackStatus(if playing {
-            MediaPlaybackStatus::Playing
-        } else {
-            MediaPlaybackStatus::Paused
-        });
-        if let Ok(du) = smtc.DisplayUpdater() {
-            let _ = du.SetType(MediaPlaybackType::Video);
-            if let Ok(vp) = du.VideoProperties() {
-                let _ = vp.SetTitle(&HSTRING::from(title));
-                let _ = vp.SetSubtitle(&HSTRING::from(subtitle));
-            }
-            let _ = du.Update();
+
+        let last = LAST_PUSHED.get_or_init(|| Mutex::new(None));
+        let mut guard = last.lock().unwrap_or_else(|error| error.into_inner());
+        let next = (playing, title, subtitle);
+        if guard.as_ref() == Some(&next) {
+            return;
         }
+        let result = (|| -> windows::core::Result<()> {
+            smtc.SetIsEnabled(true)?;
+            smtc.SetPlaybackStatus(if playing {
+                MediaPlaybackStatus::Playing
+            } else {
+                MediaPlaybackStatus::Paused
+            })?;
+            let du = smtc.DisplayUpdater()?;
+            du.SetType(MediaPlaybackType::Video)?;
+            let vp = du.VideoProperties()?;
+            vp.SetTitle(&HSTRING::from(next.1.as_str()))?;
+            vp.SetSubtitle(&HSTRING::from(next.2.as_str()))?;
+            du.Update()
+        })();
+        // Failed pushes must remain retryable on the next update.
+        *guard = result.ok().map(|_| next);
     }
 
     pub fn clear() {
         let Some(smtc) = controls() else { return };
+        let last = LAST_PUSHED.get_or_init(|| Mutex::new(None));
+        let mut guard = last.lock().unwrap_or_else(|error| error.into_inner());
+        // Refocusing or replaying the same title must enable the session again.
+        *guard = None;
         let _ = smtc.SetPlaybackStatus(MediaPlaybackStatus::Closed);
         if let Ok(du) = smtc.DisplayUpdater() {
             let _ = du.ClearAll();
@@ -683,6 +708,8 @@ pub fn media_controls_update(
     #[cfg(windows)]
     win::update(playing, &title, &subtitle);
     #[cfg(windows)]
+    crate::taskbar::set_playing(playing);
+    #[cfg(windows)]
     let _ = (art_url, duration_sec, position_sec, volume);
     #[cfg(target_os = "linux")]
     linux::update(
@@ -704,6 +731,22 @@ pub fn media_controls_update(
         position_sec,
         volume,
     );
+}
+
+#[tauri::command]
+pub fn media_controls_music_state(playing: bool, liked: bool, muted: bool) {
+    #[cfg(windows)]
+    crate::taskbar::update(playing, liked, muted);
+    #[cfg(not(windows))]
+    let _ = (playing, liked, muted);
+}
+
+#[tauri::command]
+pub fn media_controls_music_art(art_url: Option<String>, app_icon: bool) {
+    #[cfg(windows)]
+    crate::taskbar::set_artwork(art_url, app_icon);
+    #[cfg(not(windows))]
+    let _ = (art_url, app_icon);
 }
 
 #[tauri::command]

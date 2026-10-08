@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, LoaderCircle, ShoppingBag } from "lucide-react";
+import { ArrowUpRight, LoaderCircle, ShoppingBag } from "@/components/icons/music-icons";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 import type { MusicArtistProfile } from "@/lib/music/artist-profile";
@@ -111,19 +111,31 @@ export function MusicArtistExtras({
                   className="music-tour-event"
                   onClick={() => openUrl(event.url)}
                 >
-                  <time dateTime={event.date}>
+                  <time className="music-tour-date" dateTime={event.date}>
+                    <span className="music-tour-month">
+                      {new Intl.DateTimeFormat(language, {
+                        month: "short",
+                        timeZone: "UTC",
+                      }).format(new Date(`${event.date.slice(0, 10)}T12:00:00Z`))}
+                    </span>
+                    <span className="music-tour-day">
+                      {new Intl.DateTimeFormat(language, {
+                        day: "numeric",
+                        timeZone: "UTC",
+                      }).format(new Date(`${event.date.slice(0, 10)}T12:00:00Z`))}
+                    </span>
+                  </time>
+                  <span className="music-tour-where">
+                    <strong>{event.city || event.venue || event.name}</strong>
+                    <small>
+                      {[event.venue, event.venue ? event.name : ""].filter(Boolean).join(" · ")}
+                    </small>
+                  </span>
+                  <span className="music-tour-year">
                     {new Intl.DateTimeFormat(language, {
-                      month: "short",
-                      day: "numeric",
                       year: "numeric",
                       timeZone: "UTC",
                     }).format(new Date(`${event.date.slice(0, 10)}T12:00:00Z`))}
-                  </time>
-                  <span>
-                    <strong>{event.venue || event.name}</strong>
-                    <small>
-                      {[event.city, event.venue ? event.name : ""].filter(Boolean).join(" · ")}
-                    </small>
                   </span>
                   <ArrowUpRight size={18} aria-label={t("music.extras.event")} />
                 </button>

@@ -6,12 +6,14 @@ export function PortCard({
   meta,
   onClick,
   onHover,
+  describedBy,
   index = 0,
   state = "heading",
 }: {
   meta: Meta;
   onClick?: () => void;
   onHover?: (rect: DOMRect | null) => void;
+  describedBy?: string;
   index?: number;
   state?: "heading" | "done" | "current";
 }) {
@@ -26,6 +28,7 @@ export function PortCard({
   return (
     <button
       type="button"
+      aria-describedby={describedBy}
       onClick={onClick}
       onMouseEnter={(e) => !passive && onHover?.(e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => !passive && onHover?.(null)}

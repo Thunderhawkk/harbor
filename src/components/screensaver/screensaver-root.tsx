@@ -20,6 +20,10 @@ const CustomMediaOverlay = lazy(() =>
   import("./custom-media-overlay").then((m) => ({ default: m.CustomMediaOverlay })),
 );
 
+const HalloweenOverlay = lazy(() =>
+  import("./halloween-overlay").then((m) => ({ default: m.HalloweenOverlay })),
+);
+
 const EXIT_MS = 460;
 
 function toItems(metas: Meta[]): AmbientItem[] {
@@ -44,13 +48,14 @@ export function ScreensaverRoot() {
   const playerStatus = usePlaybackStatus();
   const enabled = settings.screensaver;
   const catBoat = settings.screensaverStyle === "catBoat";
+  const halloween = settings.screensaverStyle === "halloween";
   const [failedId, setFailedId] = useState<string | null>(null);
   const picked =
     settings.screensaverStyle === "custom"
       ? activeScreensaverMedia(settings.screensaverMedia, settings.screensaverMediaId)
       : null;
   const customMedia = picked && picked.id !== failedId ? picked : null;
-  const ambient = !catBoat && !customMedia;
+  const ambient = !catBoat && !halloween && !customMedia;
   const delayMs = Math.max(1, settings.screensaverDelayMin || 5) * 60000;
   // Big Picture claims keydown in the capture phase, so this hook's bubble
   // listeners never see its navigation and it would idle out mid use.
@@ -101,13 +106,15 @@ export function ScreensaverRoot() {
       () =>
         void (catBoat
           ? import("./cat-boat-overlay")
+          : halloween
+            ? import("./halloween-overlay")
           : customMedia
             ? import("./custom-media-overlay")
             : import("./ambient-overlay")),
       3000,
     );
     return () => window.clearTimeout(warm);
-  }, [enabled, catBoat, customMedia]);
+  }, [enabled, catBoat, halloween, customMedia]);
 
   useEffect(() => {
     if (!ambient || !showing || fetchedRef.current) return;
@@ -125,7 +132,8 @@ export function ScreensaverRoot() {
     };
   }, [showing, settings.heroFeed, ambient]);
 
-  const wantShow = showing && !suppressed && (catBoat || !!customMedia || items.length > 0);
+  const wantShow =
+    showing && !suppressed && (catBoat || halloween || !!customMedia || items.length > 0);
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -144,6 +152,8 @@ export function ScreensaverRoot() {
     <Suspense fallback={null}>
       {catBoat ? (
         <CatBoatOverlay reduce={reduce} visible={visible} onDismiss={dismissAll} />
+      ) : halloween ? (
+        <HalloweenOverlay reduce={reduce} visible={visible} onDismiss={dismissAll} />
       ) : customMedia ? (
         <CustomMediaOverlay
           media={customMedia}

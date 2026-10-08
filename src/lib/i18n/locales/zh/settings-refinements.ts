@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "播放缓存文件夹",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "用于视频临时缓冲，包括 debrid 流。重新开始播放时生效；现有文件保留在当前文件夹中。",
   "1 option formatted correctly": "1 个选项的格式正确",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. 打开“电影”\n2. 选择一部影片\n3. 按“播放”\n4. 描述发生的情况",
   "3 to 24 letters, numbers, or underscores.": "3 至 24 个字母、数字或下划线。",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "已保存的{name}将被移除，其更改将不再生效。",
   "The server responded in {ms} ms.": "服务器在 {ms} 毫秒内响应。",
   "The six largest local settings entries, including preferences and lookup data.": "六项占用空间最大的本地设置条目，包括偏好和查询数据。",
+  "{count} entries": "{count} 条",
   "The volume pop-up is hidden.": "音量弹出框已隐藏。",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "主题、播放器布局、图片，以及卡片上显示的内容。",
   "This account has been suspended. Reach out to support if you think that's wrong.": "此账号已被暂停使用。如果你认为有误，请联系支持团队。",

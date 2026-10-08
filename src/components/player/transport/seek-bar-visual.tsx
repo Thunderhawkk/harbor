@@ -22,6 +22,7 @@ export function SeekBarVisual({
   bufferedPct,
   scrubbing = false,
   hovered = false,
+  forceDot = false,
   segments,
 }: {
   settings: Settings;
@@ -29,6 +30,7 @@ export function SeekBarVisual({
   bufferedPct?: number;
   scrubbing?: boolean;
   hovered?: boolean;
+  forceDot?: boolean;
   segments?: SeekSegmentSpan[];
 }) {
   const accent = resolveAccent(settings);
@@ -47,6 +49,7 @@ export function SeekBarVisual({
   const isRainbow = style === "rainbow";
   const isImage = style === "image" && !!settings.seekBarImage;
   const dotColor = isRainbow || isImage ? "#ffffff" : accent;
+  const revealed = forceDot || settings.seekDotHover === false || hovered || scrubbing;
 
   const fillStyle: React.CSSProperties = {
     width: `${pct}%`,
@@ -102,7 +105,7 @@ export function SeekBarVisual({
           }}
         />
       ))}
-      {shape !== "hidden" && (
+      {shape !== "hidden" && revealed && (
         <SeekDot
           shape={shape}
           size={dotSize}

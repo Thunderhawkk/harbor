@@ -1,6 +1,13 @@
 import type { ExternalCwSource } from "@/lib/stremio";
+import { privateCwProfileId } from "./cw-profile";
 
 const KEY = "harbor.resume";
+const PRIVATE_PREFIX = "harbor.resume.private.v1.";
+
+function readKey(): string {
+  const profileId = privateCwProfileId();
+  return profileId ? PRIVATE_PREFIX + profileId : KEY;
+}
 
 type Entry = { ms: number; t: number; s?: number; pct?: number; source?: ExternalCwSource };
 
@@ -11,18 +18,18 @@ function entryKey(id: string, season?: number, episode?: number): string {
   return id;
 }
 
-function readAll(): Record<string, Entry> {
+function readAll(key = readKey()): Record<string, Entry> {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as Record<string, Entry>) : {};
   } catch {
     return {};
   }
 }
 
-function writeAll(all: Record<string, Entry>): void {
+function writeAll(all: Record<string, Entry>, key: string): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(all));
+    localStorage.setItem(key, JSON.stringify(all));
   } catch {
     /* noop */
   }
@@ -36,22 +43,27 @@ export function saveResumeMs(
   displaySeason?: number,
   pct?: number,
   source?: ExternalCwSource,
+  ownerId?: string,
 ): void {
   if (!Number.isFinite(ms) || ms < 0) return;
   if (typeof season === "number" && typeof episode === "number") {
     if (season < 0 || episode < 1) return;
   }
-  const all = readAll();
   const s = typeof displaySeason === "number" && displaySeason >= 1 ? displaySeason : undefined;
   const p = pct !== undefined && Number.isFinite(pct) && pct >= 0 && pct <= 1 ? pct : undefined;
-  all[entryKey(id, season, episode)] = {
+  const entry: Entry = {
     ms,
     t: Date.now(),
     ...(s !== undefined ? { s } : {}),
     ...(p !== undefined ? { pct: p } : {}),
     ...(source !== undefined ? { source } : {}),
   };
-  writeAll(all);
+  // Imported/cloud progress never establishes a profile's playback ownership.
+  for (const key of ownerId ? [KEY, PRIVATE_PREFIX + ownerId] : [KEY]) {
+    const all = readAll(key);
+    all[entryKey(id, season, episode)] = entry;
+    writeAll(all, key);
+  }
 }
 
 export function saveResumeBatch(
@@ -66,7 +78,7 @@ export function saveResumeBatch(
   }[],
 ): void {
   if (entries.length === 0) return;
-  const all = readAll();
+  const all = readAll(KEY);
   const now = Date.now();
   for (const e of entries) {
     if (!Number.isFinite(e.ms) || e.ms < 0) continue;
@@ -82,7 +94,7 @@ export function saveResumeBatch(
       ...(e.source !== undefined ? { source: e.source } : {}),
     };
   }
-  writeAll(all);
+  writeAll(all, KEY);
 }
 
 export function readResumeMs(id: string, season?: number, episode?: number): number {
@@ -116,10 +128,12 @@ export function readResumeSource(
   return readAll()[entryKey(id, season, episode)]?.source;
 }
 
-export function clearResume(id: string, season?: number, episode?: number): void {
-  const all = readAll();
-  delete all[entryKey(id, season, episode)];
-  writeAll(all);
+export function clearResume(id: string, season?: number, episode?: number, ownerId?: string): void {
+  for (const key of ownerId ? [KEY, PRIVATE_PREFIX + ownerId] : [readKey()]) {
+    const all = readAll(key);
+    delete all[entryKey(id, season, episode)];
+    writeAll(all, key);
+  }
 }
 
 export function lastPlayedEpisode(seriesId: string): {

@@ -1,5 +1,10 @@
 import { searchCinemeta } from "./search";
-import { DEFAULT_AI_MODEL, migrateModelId } from "./ai-models";
+import {
+  DEFAULT_AI_MODEL,
+  migrateModelId,
+  supportsJsonSchema,
+  supportsSampling,
+} from "./ai-models";
 import { meta as fetchFullMeta, type Meta } from "./cinemeta";
 
 import { releaseText } from "@/lib/release-info";
@@ -58,7 +63,41 @@ export class AiSearchError extends Error {
 }
 
 const SYSTEM_PROMPT =
-  'You are a film and TV discovery engine for a media app. The user describes what they want to watch in natural language. Reply with ONLY a JSON array (no prose, no markdown code fences) of up to 12 specific, real movies or TV shows that best match, most relevant first. Each element is an object: {"title": string, "year": number, "type": "movie" or "series"}. If the user is clearly asking about a SPECIFIC EPISODE (by plot, scene, character, quote, or meme, for example \'the south park episode with kanye west\'), return that show as the first result and add its "season" and "episode" numbers plus "episodeTitle", like {"title": "South Park", "type": "series", "season": 13, "episode": 5, "episodeTitle": "Fishsticks"}. Use your own knowledge of the show to pick the exact episode. Use the original or most internationally recognized title. Never repeat a title. When live web context is provided below, treat it as authoritative ground truth for fact-grounded queries (people\'s filmographies, box office, recency, regional titles, memes, current seasons/episodes): use it as your primary source and cite the exact title/year it mentions rather than guessing from training data.';
+  'You are a film and TV discovery engine for a media app. The user describes what they want to watch in natural language. Reply with ONLY a JSON array (no prose, no markdown code fences) of up to 12 specific, real movies or TV shows that best match, most relevant first. Each element is an object: {"title": string, "year": number, "type": "movie" or "series"}. If the user is clearly asking about a SPECIFIC EPISODE (by plot, scene, character, quote, or meme, for example \'the seinfeld one about the puffy shirt\'), return that show as the first result and add its "season" and "episode" numbers plus "episodeTitle", like {"title": "South Park", "type": "series", "season": 13, "episode": 5, "episodeTitle": "Fishsticks"}. Use your own knowledge of the show to pick the exact episode. Use the original or most internationally recognized title. When live web context is provided below, treat it as authoritative ground truth for fact-grounded queries (people\'s filmographies, box office, recency, regional titles, memes, current seasons/episodes): use it as your primary source and cite the exact title/year it mentions rather than guessing from training data.';
+
+const SCHEMA_NOTE =
+  'Return the array under a top-level "results" key, as {"results": [ ... ]}.';
+
+const SUGGESTION_SCHEMA = {
+  type: "json_schema",
+  json_schema: {
+    name: "harbor_suggestions",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["results"],
+      properties: {
+        results: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["title", "year", "type", "season", "episode", "episodeTitle"],
+            properties: {
+              title: { type: "string" },
+              year: { type: ["number", "null"] },
+              type: { type: ["string", "null"], enum: ["movie", "series", null] },
+              season: { type: ["number", "null"] },
+              episode: { type: ["number", "null"] },
+              episodeTitle: { type: ["string", "null"] },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 export async function aiSuggest(
   key: string,
@@ -81,15 +120,21 @@ export async function aiSuggest(
   const systemPrompt = webContext?.trim()
     ? `${SYSTEM_PROMPT}\n\nLive web context for this query (use it when relevant, fall back to your own knowledge otherwise):\n${webContext}`
     : SYSTEM_PROMPT;
+  const resolved = migrateModelId(model.trim()) || DEFAULT_AI_MODEL;
+  const schema = supportsJsonSchema(resolved);
   const res = await fetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify({
-      model: migrateModelId(model.trim()) || DEFAULT_AI_MODEL,
-      temperature: 0.4,
+      model: resolved,
+      ...(supportsSampling(resolved) ? { temperature: 0.4 } : {}),
       max_tokens: 2000,
+      ...(schema ? { response_format: SUGGESTION_SCHEMA } : {}),
       messages: [
-        { role: "system", content: systemPrompt },
+        {
+          role: "system",
+          content: schema ? `${systemPrompt}\n\n${SCHEMA_NOTE}` : systemPrompt,
+        },
         { role: "user", content: q },
       ],
     }),
@@ -177,13 +222,15 @@ export function extractJsonArray(raw: string): string | null {
 }
 
 function parseSuggestions(content: string): AiSuggestion[] {
-  const span = extractJsonArray(content);
-  if (!span) return [];
-  let arr: unknown;
-  try {
-    arr = JSON.parse(span);
-  } catch {
-    return [];
+  let arr: unknown = wrappedResults(content);
+  if (arr === null) {
+    const span = extractJsonArray(content);
+    if (!span) return [];
+    try {
+      arr = JSON.parse(span);
+    } catch {
+      return [];
+    }
   }
   if (!Array.isArray(arr)) return [];
   const out: AiSuggestion[] = [];
@@ -213,6 +260,17 @@ function parseSuggestions(content: string): AiSuggestion[] {
     if (out.length >= MAX_SUGGESTIONS) break;
   }
   return out;
+}
+
+function wrappedResults(content: string): unknown[] | null {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as { results?: unknown };
+    return Array.isArray(parsed.results) ? parsed.results : null;
+  } catch {
+    return null;
+  }
 }
 
 function norm(s: string): string {

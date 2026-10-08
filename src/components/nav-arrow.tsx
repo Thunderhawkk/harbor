@@ -35,18 +35,21 @@ export function NavArrow({
   label,
   size = 32,
   className = "",
+  tabIndex,
 }: {
   dir: "left" | "right" | "up" | "down";
   onClick: () => void;
   label: string;
   size?: number;
   className?: string;
+  tabIndex?: number;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
+      tabIndex={tabIndex}
       className={`grid place-items-center text-white/85 drop-shadow-[0_2px_7px_rgba(0,0,0,0.75)] transition-all duration-150 hover:scale-110 hover:text-white active:scale-95 ${className}`}
     >
       <NavChevron dir={dir} size={size} />

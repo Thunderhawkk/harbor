@@ -184,3 +184,18 @@ export function useTrackPlaylists(
 export function useArtistPlaylists(artist: string | null | undefined): MusicArtistPresence {
   return artistPresenceIn(useMusicPlaylistIndex(), artist);
 }
+
+/** The same per-playlist identities used by the artist's song count. */
+export function artistPlaylistTracks(playlists: MusicPlaylist[], artist: string): MusicTrack[] {
+  const wanted = normalize(artist);
+  return playlists.flatMap((playlist) => {
+    const seen = new Set<string>();
+    return (playlist.tracks ?? []).filter((track) => {
+      if (!musicArtistKeys(track.artist).includes(wanted)) return false;
+      const key = musicTrackKeys(track)[0] ?? `${playlist.id}:${track.title}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  });
+}

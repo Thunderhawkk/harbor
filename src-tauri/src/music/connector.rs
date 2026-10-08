@@ -194,6 +194,17 @@ pub trait MusicConnector: Send + Sync {
     }
 
     /// Video-only discovery; audio search results must not be relabeled as videos.
+    async fn search_video_page(
+        &self,
+        _app: &tauri::AppHandle,
+        _query: &str,
+        _regular: bool,
+        _cursor: Option<&str>,
+    ) -> Result<super::MusicVideoPage, String> {
+        Err(self.unsupported("music video search"))
+    }
+
+    /// Video-only discovery; audio search results must not be relabeled as videos.
     async fn search_videos(
         &self,
         _app: &tauri::AppHandle,

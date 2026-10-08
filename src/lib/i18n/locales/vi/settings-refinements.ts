@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "Thư mục bộ nhớ đệm phát video",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "Lưu video tạm thời vào bộ đệm, bao gồm luồng debrid. Áp dụng khi bắt đầu phát lại; các tệp hiện có vẫn ở thư mục hiện tại.",
   "1 option formatted correctly": "Đã định dạng đúng 1 tùy chọn",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. Mở Phim\n2. Chọn một phim\n3. Nhấn Phát\n4. Mô tả điều xảy ra",
   "3 to 24 letters, numbers, or underscores.": "Từ 3 đến 24 chữ cái, chữ số hoặc dấu gạch dưới.",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "{name} đã lưu sẽ bị xóa và các thay đổi của nó sẽ ngừng áp dụng.",
   "The server responded in {ms} ms.": "Máy chủ đã phản hồi sau {ms} mili giây.",
   "The six largest local settings entries, including preferences and lookup data.": "Sáu mục cài đặt cục bộ lớn nhất, gồm tùy chọn và dữ liệu tra cứu.",
+  "{count} entries": "{count} mục",
   "The volume pop-up is hidden.": "Bảng âm lượng đang ẩn.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "Chủ đề, bố cục trình phát, hình ảnh và nội dung Harbor hiển thị trên thẻ.",
   "This account has been suspended. Reach out to support if you think that's wrong.": "Tài khoản này đã bị đình chỉ. Hãy liên hệ bộ phận hỗ trợ nếu bạn cho rằng có nhầm lẫn.",

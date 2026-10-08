@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "Oynatma önbelleği klasörü",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "Debrid akışları dahil geçici video arabelleği. Oynatma yeniden başlatıldığında uygulanır; mevcut dosyalar bulundukları klasörde kalır.",
   "1 option formatted correctly": "1 seçenek doğru biçimlendirildi",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. Filmler'i açın\n2. Bir yapım seçin\n3. Oynat'a basın\n4. Ne olduğunu açıklayın",
   "3 to 24 letters, numbers, or underscores.": "3 ila 24 harf, rakam veya alt çizgi.",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "Kaydedilen {name} kaldırılacak ve değişiklikleri artık uygulanmayacak.",
   "The server responded in {ms} ms.": "Sunucu {ms} ms içinde yanıt verdi.",
   "The six largest local settings entries, including preferences and lookup data.": "Tercihler ve arama verileri dahil en büyük altı yerel ayar kaydı.",
+  "{count} entries": "{count} kayıt",
   "The volume pop-up is hidden.": "Ses düzeyi açılır göstergesi gizli.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "Tema, oynatıcının düzeni, görseller ve Harbor'ın kartlarda gösterdikleri.",
   "This account has been suspended. Reach out to support if you think that's wrong.": "Bu hesap askıya alınmış. Bunun bir hata olduğunu düşünüyorsanız destek ekibiyle iletişime geçin.",

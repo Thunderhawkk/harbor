@@ -139,6 +139,8 @@ const catalog02: Record<string, string> = {
   Budget: "Budget",
   "Budget exhausted, resets at midnight UTC.": "Budget esaurito, si azzera a mezzanotte UTC.",
   "Buffer fill": "Riempimento del buffer",
+  "Reveal the dot on hover": "Mostra il punto al passaggio del mouse",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Il punto resta defilato e compare quando punti la barra. Disattivalo per tenerlo sempre visibile.",
   "Buffer fill brightness": "Luminosità del riempimento del buffer",
   Buffering: "Buffering",
   "Buffers the whole file in the background as you watch, even while paused, so big remuxes pre-load and you can scrub a cached file with no re-buffering. Works for debrid and P2P streams. Uses more disk and bandwidth; cleared when you switch or close.": "Carica in buffer l'intero file in background durante la visione, anche in pausa, così i remux di grandi dimensioni vengono precaricati e puoi spostarti all'interno di un file in cache senza dover attendere un nuovo buffering. Funziona con gli stream debrid e P2P. Usa più spazio su disco e larghezza di banda; la cache viene svuotata quando cambi contenuto o chiudi.",
@@ -600,6 +602,12 @@ const catalog02: Record<string, string> = {
   "Comments are blurred until you reveal them, even if they are not tagged as spoilers.":
     "I commenti restano sfocati finché non li riveli, anche se non sono contrassegnati come spoiler.",
   "Comments are hidden": "I commenti sono nascosti",
+  "Hosted elsewhere": "Ospitato altrove",
+  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.": "Questi piani sono gestiti da terzi. Harbor non è affiliato e non riceve nulla da un’iscrizione. Prezzi e condizioni aggiornati sono sul loro sito.",
+  "{name} can run on a hosted instance": "{name} può girare su un’istanza ospitata",
+  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.": "È gestito da terzi. Harbor non è affiliato, non lo rivende e non riceve nulla se ti iscrivi. Prezzo e contenuti sono sul loro sito.",
+  "Show comments": "Mostra i commenti",
+  "Hide comments": "Nascondi i commenti",
   "Comments may take a moment to appear on Trakt":
     "La visualizzazione dei commenti su Trakt potrebbe richiedere qualche istante",
   "Comments on anime pages are blurred until you reveal them, even if they are not tagged as spoilers.":
@@ -699,8 +707,7 @@ const catalog02: Record<string, string> = {
   "Connect your Trakt account": "Collega il tuo account Trakt",
   "Connect your Trakt account to scrobble playback, sync your watchlist, and pull personalized recommendations.":
     "Collega il tuo account Trakt per registrare automaticamente le riproduzioni, sincronizzare la tua Lista e ottenere consigli personalizzati.",
-  "Connect your Trakt account to see comments and reviews.":
-    "Collega il tuo account Trakt per vedere commenti e recensioni.",
+  "Connect your Trakt account to leave comments and reviews.": "Collega il tuo account Trakt per lasciare commenti e recensioni.",
   "Connect your provider.": "Collega il tuo provider.",
   "Connect {name} in Settings first": "Prima collega {name} nelle Impostazioni",
   Connected: "Collegato",

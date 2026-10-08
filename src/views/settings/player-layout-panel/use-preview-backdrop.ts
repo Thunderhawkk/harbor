@@ -1,5 +1,5 @@
-import previewBackdrop from "@/assets/settings-preview/the-toll-of-the-sea.webp";
+import { useSampleArtwork } from "@/lib/sample-artwork";
 
 export function usePreviewBackdrop(): string {
-  return previewBackdrop;
+  return useSampleArtwork(2).background;
 }

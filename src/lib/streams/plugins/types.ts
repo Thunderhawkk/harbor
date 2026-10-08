@@ -1,4 +1,24 @@
-export type StreamPluginFormat = "harbor" | "provider-script";
+import type { MetaType } from "@/lib/cinemeta";
+
+export type StreamPluginFormat = "harbor" | "provider-script" | "android-extension";
+
+/** One browsable row a plugin offers of its own, named the way the plugin names it. */
+export type PluginCatalogue = {
+  pluginId: string;
+  pluginName: string;
+  pluginIcon?: string;
+  providerId: string;
+  /** Present when the row came from a listing, which is the only place it is shown. */
+  providerName?: string;
+  type: MetaType;
+  row: string;
+};
+
+export type NativeExtensionRef = {
+  extensionId: string;
+  providerIds: string[];
+  file: string;
+};
 
 export type StreamRepoEntry = {
   id: string;
@@ -51,6 +71,7 @@ export type InstalledStreamPlugin = {
   code: string;
   hash: string;
   etag?: string;
+  native: NativeExtensionRef | null;
   icon?: string;
   description?: string;
   author?: string;
@@ -121,6 +142,11 @@ export type StreamPluginRequest = {
   season: number | null;
   episode: number | null;
   absoluteEpisode: number | null;
+  /** The page the item was listed from, when it named one. Opening it is what the person was
+   * looking at; searching for the title instead can land somewhere else entirely. */
+  url?: string;
+  /** The provider that listed the item, which is the only one that can open [url]. */
+  providerId?: string;
   settings: Record<string, string | boolean>;
 };
 

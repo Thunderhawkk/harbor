@@ -824,6 +824,9 @@ const personalization: Record<string, string> = {
   "Show me 3 others": "3 tane daha göster",
   "Show my rating on movie posters": "Film afişlerinde puanımı göster",
   "Show on Discord": "Discord'da göster",
+  "Show what you are listening to": "Ne dinlediğinizi göster",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Müzik çalarken parçayı, sanatçıyı ve albüm kapağını «Listen in Harbor» düğmesiyle birlikte paylaşın.",
   "Show or hide the playback stats overlay.":
     "Oynatma istatistikleri katmanını gösterin veya gizleyin.",
   "Show pages": "İçerik sayfaları",

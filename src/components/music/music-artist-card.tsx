@@ -1,5 +1,5 @@
 import { useState, type MouseEvent } from "react";
-import { Play, UserRound } from "lucide-react";
+import { Play, UserRound } from "@/components/icons/music-icons";
 import { MusicPlaylistCover } from "@/components/music/music-playlist-cover";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";

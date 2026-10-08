@@ -34,6 +34,7 @@ import { useSubDrop } from "./use-sub-drop";
 import { useSubStyleApply } from "./use-sub-style-apply";
 import { useAssNormalize } from "./use-ass-normalize";
 import { useTrackAutoload } from "./use-track-autoload";
+import { useTranslationAutoSelect } from "./use-translation-auto-select";
 import { useSecondarySub } from "./use-secondary-sub";
 import { useAutoSync } from "./use-auto-sync";
 import { publishAutoSync } from "@/components/player/autosync/autosync-store";
@@ -161,6 +162,8 @@ export function usePlayerMedia(params: {
     authKey,
   });
 
+  useTranslationAutoSelect({ bridgeRef, mediaUrl: src.url });
+
   const autoSync = useAutoSync({
     bridgeRef,
     src,
@@ -194,7 +197,18 @@ export function usePlayerMedia(params: {
     return () => publishAutoSync(null);
   }, [asStatus, asOffer, asApply, asRevert, asRetry, asRun, asStop, asFeedback]);
 
-  const subEmbed = engine === "mpv" && settings.playerMpvEmbed;
+  // Whether the video actually renders inside Harbor's webview. This mirrors the
+  // `embedActive` value the player bridge sends to mpv (use-player-bridge.ts):
+  // embedded only when mpv is set to embed AND HDR is not forcing its own opaque
+  // window. "True HDR, separate window" keeps playerMpvEmbed on but moves the
+  // video to a separate VO window, so keying only off playerMpvEmbed drew the
+  // HTML subtitle overlay on the Harbor window while mpv played elsewhere.
+  const videoInHarborWebview =
+    engine === "mpv"
+      ? settings.playerMpvEmbed && !(isWindowsDesktop() && settings.playerHdrOpaqueWindow)
+      : false;
+  const subEmbed = engine === "mpv" && videoInHarborWebview;
+  const mpvNativeWindow = engine === "mpv" && !videoInHarborWebview;
   const hdrNativeSurface =
     engine === "mpv" &&
     isWindowsDesktop() &&
@@ -208,7 +222,8 @@ export function usePlayerMedia(params: {
   const selectedImageSub = isImageSubTrack(selectedSubTrack);
   const subAssNative =
     subEmbed && selectedAssSub && (!subAssOverridden || !selectedSubTrack?.external);
-  const subNativeRender = hdrNativeSurface || subAssNative || (subEmbed && selectedImageSub);
+  const subNativeRender =
+    hdrNativeSurface || subAssNative || mpvNativeWindow || (subEmbed && selectedImageSub);
   const assNativeActive = selectedAssSub && (subNativeRender || !subEmbed);
   const imageNativeActive = selectedImageSub && (subNativeRender || !subEmbed);
   const assNormalizeScale = useAssNormalize({
@@ -227,7 +242,8 @@ export function usePlayerMedia(params: {
       snap.videoWidth > 0 ||
       snap.audioTracks.length > 0 ||
       snap.subtitleTracks.length > 0);
-  const suppressHtmlSubs = subAssNative || (subEmbed && selectedImageSub) || hdrNativeSurface;
+  const suppressHtmlSubs =
+    subAssNative || mpvNativeWindow || (subEmbed && selectedImageSub) || hdrNativeSurface;
   const sdhFilterAllowed =
     !selectedSubTrack?.forced &&
     !selectedSubTrack?.foreignOnly &&
@@ -249,11 +265,12 @@ export function usePlayerMedia(params: {
   });
   const captionsPopout = useCaptionsPopoutOpen();
   useEffect(() => {
-    if (!subEmbed && !hdrNativeSurface) return;
+    if (!subEmbed && !hdrNativeSurface && !mpvNativeWindow) return;
     if (!bridgeReady) return;
     bridgeRef.current?.setSubVisible(subNativeRender && !captionsPopout);
   }, [
     subEmbed,
+    mpvNativeWindow,
     hdrNativeSurface,
     subNativeRender,
     selectedSubTrack?.id,
@@ -271,6 +288,11 @@ export function usePlayerMedia(params: {
     snap,
     sourceUrl: src.url,
     lang: settings.secondarySubLang,
+    nativeReady: engine === "mpv" && bridgeReady && mpvMediaReadyForStyle,
+    nativeRender: hdrNativeSurface && !captionsPopout,
+    bridgeKey,
+    placement: settings.subSecondaryPlacement,
+    marginY: settings.subMarginY,
   });
   useEffect(() => {
     clearImportedSubs();

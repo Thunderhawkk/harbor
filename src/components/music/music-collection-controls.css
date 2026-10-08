@@ -2,35 +2,49 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
 }
 .music-collection-play {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  min-height: 44px;
-  padding: 10px 20px;
-  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: 50%;
   background: var(--color-ink);
   color: var(--color-canvas);
-  font-size: 14px;
-  font-weight: 650;
+  transition:
+    transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 180ms ease-out;
 }
-.music-collection-play:hover {
-  opacity: 0.9;
+[data-art-colors] .music-collection-play {
+  background: var(--music-art-accent, var(--color-ink));
+  color: var(--music-art-ink, var(--color-canvas));
 }
-.music-collection-shuffle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 8px;
+.music-collection-play:hover:not(:disabled) {
+  transform: scale(1.055);
+}
+.music-collection-play:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.music-collection-shuffle,
+.music-collection-extra {
+  display: grid;
+  place-items: center;
+  inline-size: 48px;
+  block-size: 48px;
+  border-radius: 50%;
   color: var(--color-ink-muted);
-  font-size: 13px;
+  transition:
+    color 160ms ease-out,
+    transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-.music-collection-shuffle:hover,
-.music-collection-shuffle[aria-pressed="true"] {
+.music-collection-shuffle:hover:not(:disabled),
+.music-collection-extra:hover:not(:disabled) {
+  color: var(--color-ink);
+  transform: scale(1.06);
+}
+.music-collection-shuffle[aria-pressed="true"],
+.music-collection-extra[aria-pressed="true"] {
   color: var(--color-accent);
 }
 .music-collection-controls button:disabled {
@@ -40,5 +54,16 @@
 .music-collection-controls button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
-  border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .music-collection-play,
+  .music-collection-shuffle,
+  .music-collection-extra {
+    transition: none;
+  }
+  .music-collection-play:hover:not(:disabled),
+  .music-collection-shuffle:hover:not(:disabled),
+  .music-collection-extra:hover:not(:disabled) {
+    transform: none;
+  }
 }

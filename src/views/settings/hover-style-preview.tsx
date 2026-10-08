@@ -2,7 +2,7 @@ import { ChevronDown, Pencil, Plus, Star, ThumbsUp } from "./icons";
 import { Play } from "@/components/icons/play-filled";
 import { useState, useSyncExternalStore } from "react";
 import type { Meta } from "@/lib/cinemeta";
-import { SETTINGS_SAMPLE_META } from "@/lib/sample-artwork";
+import { useSettingsSampleMeta } from "@/lib/sample-artwork";
 import {
   CardHoverOverlay,
   cardHoverPosterClass,
@@ -32,10 +32,7 @@ export function HoverStyleGallery({
   onChange: (style: CardHoverStyle, customId?: string) => void;
 }) {
   const t = useT();
-  const sample: Meta = {
-    ...SETTINGS_SAMPLE_META,
-    description: t(SETTINGS_SAMPLE_META.description),
-  };
+  const sample = useSettingsSampleMeta(13);
   const customs = useSyncExternalStore(subscribeCustomHovers, listCustomHovers);
   const [editing, setEditing] = useState<CustomHoverConfig | null | "new">(null);
   return (

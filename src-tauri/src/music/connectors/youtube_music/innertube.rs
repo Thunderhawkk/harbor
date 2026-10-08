@@ -56,6 +56,10 @@ impl Client {
             .await
     }
 
+    pub async fn search_continuation(&self, app: &tauri::AppHandle, token: &str) -> Result<Value, String> {
+        self.post(app, "search", json!({ "continuation": token })).await
+    }
+
     pub async fn browse_collection(
         &self,
         app: &tauri::AppHandle,

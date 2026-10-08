@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type JSX, type KeyboardEvent } from "react";
-import { Loader2, MicVocal, X } from "lucide-react";
+import { Loader2, MicVocal, X } from "@/components/icons/music-icons";
 import { useT } from "@/lib/i18n";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { useMusicPlayer, seekMusic } from "@/lib/music/player";

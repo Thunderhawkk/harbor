@@ -971,7 +971,7 @@ const catalog03: Record<string, string> = {
     "Per la procedura manuale: {code} 20+ e la CLI di {code}.",
   "For users who want to deploy themselves or already have a wrangler workflow.":
     "Per chi vuole eseguire autonomamente il deployment o usa già un flusso di lavoro wrangler.",
-  "For watching things": "Per guardare contenuti",
+  "Built for Adventure!": "Fatto per l'avventura!",
   "Force of Nature": "Forza della natura",
   "Force on": "Forza attivazione",
   "Force player menus and panels to pure black, ignoring your theme tint.":

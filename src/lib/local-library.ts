@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import { episodeSpanContains, parseEpisodeSpan } from "@/lib/episode-span";
 import { loadLocalLibraryStore, saveLocalLibraryStore } from "@/lib/local-library/storage";
+import {
+  clearLocalRemovals,
+  localPathKey,
+  rememberLocalRemovals,
+  removedLocalPaths,
+  restoreLocalPaths,
+} from "@/lib/local-library/removals";
 
 const KEY = "harbor.library.local.v1";
 const subs = new Set<() => void>();
@@ -43,7 +50,8 @@ let cache: LocalEntry[] | null = null;
 let generation = 0;
 let hydrated = false;
 let hydration: Promise<void> | null = null;
-let dirtyBeforeHydration = false;
+type LocalMutation = (entries: LocalEntry[]) => LocalEntry[];
+let pendingMutations: LocalMutation[] = [];
 let persistQueue = Promise.resolve();
 
 function normalizeEntries(entries: LocalEntry[]): LocalEntry[] {
@@ -103,24 +111,23 @@ function persist(entries: LocalEntry[]): void {
 
 function ensureHydrated(): void {
   if (hydration) return;
-  const legacy = readLegacy();
+  const visible = (entries: LocalEntry[]) => {
+    const removed = removedLocalPaths();
+    return entries.filter((entry) => !removed.has(localPathKey(entry.path)));
+  };
+  const legacy = visible(readLegacy());
   if (legacy.length > 0) cache = legacy;
   hydration = (async () => {
     const stored = await loadLocalLibraryStore<LocalEntry>();
+    const hasStored = stored != null && stored.length > 0;
+    const base = hasStored ? visible(normalizeEntries(stored)) : legacy;
+    // Replay early changes over the durable copy, never save the provisional
+    // cache: it may contain only the newly imported folder.
+    cache = pendingMutations.reduce((entries, mutate) => mutate(entries), base);
     hydrated = true;
-    if (dirtyBeforeHydration) {
-      persist(cache ?? []);
-      notify();
-      return;
-    }
-    if (stored != null && stored.length > 0) {
-      cache = normalizeEntries(stored);
-      generation += 1;
-      notify();
-      return;
-    }
-    cache ??= legacy;
-    if (legacy.length > 0) persist(legacy);
+    generation += 1;
+    if (pendingMutations.length > 0 || (!hasStored && legacy.length > 0)) persist(cache);
+    pendingMutations = [];
     notify();
   })();
 }
@@ -130,11 +137,14 @@ function read(): LocalEntry[] {
   return cache ?? [];
 }
 
-function write(entries: LocalEntry[]): void {
-  cache = entries;
+function write(mutate: LocalMutation): void {
+  ensureHydrated();
+  const previous = cache ?? [];
+  cache = mutate(previous);
+  if (!hydrated) pendingMutations.push(mutate);
+  if (cache === previous) return;
   generation += 1;
-  if (!hydrated) dirtyBeforeHydration = true;
-  persist(entries);
+  if (hydrated) persist(cache);
   notify();
 }
 
@@ -158,7 +168,11 @@ export function restoreLocalLibrary(serialized: string): boolean {
   try {
     const value = JSON.parse(serialized);
     if (!Array.isArray(value)) return false;
-    write(normalizeEntries(value as LocalEntry[]));
+    const entries = normalizeEntries(value as LocalEntry[]);
+    write(() => {
+      restoreLocalPaths(entries.map((entry) => entry.path));
+      return entries;
+    });
     return true;
   } catch {
     return false;
@@ -196,20 +210,35 @@ export function findLocalEpisode(
   );
 }
 
-export function addLocalEntries(entries: LocalEntry[]): void {
-  if (entries.length === 0) return;
-  const existing = read();
-  const byPath = new Map(existing.map((e) => [e.path, e]));
-  for (const e of entries) byPath.set(e.path, e);
-  write(Array.from(byPath.values()).sort((a, b) => b.addedAt - a.addedAt));
+export function addLocalEntries(entries: LocalEntry[], restoreRemoved = false): number {
+  if (entries.length === 0) return 0;
+  let added = 0;
+  write((existing) => {
+    // Only an explicit Add folder import restores removals, never a refresh.
+    if (restoreRemoved) restoreLocalPaths(entries.map((entry) => entry.path));
+    const removed = removedLocalPaths();
+    const accepted = entries.filter((entry) => !removed.has(localPathKey(entry.path)));
+    added = accepted.length;
+    if (!added) return existing;
+    const byPath = new Map(existing.map((e) => [e.path, e]));
+    for (const e of accepted) byPath.set(e.path, e);
+    return Array.from(byPath.values()).sort((a, b) => b.addedAt - a.addedAt);
+  });
+  return added;
 }
 
 export function removeLocalEntry(id: string): void {
-  write(read().filter((e) => e.id !== id));
+  write((entries) => {
+    rememberLocalRemovals(entries.filter((entry) => entry.id === id).map((entry) => entry.path));
+    return entries.filter((entry) => entry.id !== id);
+  });
 }
 
 export function removeLocalFolder(folder: string): void {
-  write(read().filter((e) => e.folder !== folder));
+  write((entries) => {
+    rememberLocalRemovals(entries.filter((entry) => entry.folder === folder).map((entry) => entry.path));
+    return entries.filter((entry) => entry.folder !== folder);
+  });
 }
 
 export function updateLocalEntry(id: string, patch: Partial<LocalEntry>): void {
@@ -219,17 +248,22 @@ export function updateLocalEntry(id: string, patch: Partial<LocalEntry>): void {
 export function updateLocalEntries(ids: string[], patch: Partial<LocalEntry>): void {
   if (ids.length === 0) return;
   const idSet = new Set(ids);
-  let changed = false;
-  const next = read().map((e) => {
-    if (!idSet.has(e.id)) return e;
-    changed = true;
-    return { ...e, ...patch };
+  write((entries) => {
+    let changed = false;
+    const next = entries.map((e) => {
+      if (!idSet.has(e.id)) return e;
+      changed = true;
+      return { ...e, ...patch };
+    });
+    return changed ? next : entries;
   });
-  if (changed) write(next);
 }
 
 export function clearLocalLibrary(): void {
-  write([]);
+  write(() => {
+    clearLocalRemovals();
+    return [];
+  });
 }
 
 export function findLocalMovie(tmdbId?: number | null, imdbId?: string | null): LocalEntry | null {

@@ -1,11 +1,12 @@
 import { useT } from "@/lib/i18n";
 import { PreviewScreen, PreviewShell } from "../preview-shell";
-import filmStill from "@/assets/settings-preview/steamboat-willie.webp";
+import { useSampleArtwork } from "@/lib/sample-artwork";
 import { Play } from "@/components/icons/play-filled";
 
 const FADE = "absolute inset-0 transition-opacity duration-300 ease-in-out";
 
 export function PressPlayPreview({ instant }: { instant: boolean }) {
+  const { background: filmStill } = useSampleArtwork(5);
   const t = useT();
 
   return (

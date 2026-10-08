@@ -35,6 +35,16 @@
 .sports-embed-player header {
   min-height: 54px;
 }
+/* Tauri starts a drag from the event target, so the title must not swallow the press. */
+.sports-embed-player > header[data-tauri-drag-region] > span,
+.sports-embed-player > header[data-tauri-drag-region] > span *,
+.sports-embed-player > header[data-tauri-drag-region] > .broadcast-channel-avatar {
+  pointer-events: none;
+}
+.sports-embed-player > header[data-tauri-drag-region] button {
+  pointer-events: auto;
+}
+
 .sports-embed-player[data-docked="true"] > header {
   cursor: grab;
   touch-action: none;

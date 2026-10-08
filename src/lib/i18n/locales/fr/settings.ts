@@ -1560,6 +1560,9 @@ const settings: Record<string, string> = {
   "Show MAL score on cards": "Afficher la note MAL sur les fiches",
   "Show my rating on movie posters": "Afficher ma note sur les affiches de films",
   "Show on Discord": "Afficher sur Discord",
+  "Show what you are listening to": "Afficher ce que vous écoutez",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "Partagez le titre, l'artiste et la pochette pendant la lecture, avec un bouton « Listen in Harbor ».",
   "Show or hide the playback stats overlay.":
     "Afficher ou masquer les statistiques de lecture en surimpression.",
   "Show P2P status overlay": "Afficher l’état P2P en surimpression",

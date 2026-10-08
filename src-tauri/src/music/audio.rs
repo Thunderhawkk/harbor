@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 #[path = "audio_dsp.rs"]
 pub mod dsp;
+#[path = "audio_fx.rs"]
+pub mod fx;
+
+const PITCH_RATE: u32 = 48_000;
 
 pub const EQ_FREQUENCIES: [f64; 10] = [
     31.5, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
@@ -26,6 +30,12 @@ pub struct MusicAudioSettings {
     pub dsp_bypass: bool,
     pub exclusive: bool,
     pub sample_rate: u32,
+    pub speed: f64,
+    pub keep_pitch: bool,
+    pub reverb: f64,
+    pub pitch: f64,
+    pub broadcast_enabled: bool,
+    pub broadcast_device: String,
 }
 
 impl Default for MusicAudioSettings {
@@ -48,6 +58,12 @@ impl Default for MusicAudioSettings {
             dsp_bypass: false,
             exclusive: false,
             sample_rate: 0,
+            speed: 1.0,
+            keep_pitch: false,
+            reverb: 0.0,
+            pitch: 0.0,
+            broadcast_enabled: false,
+            broadcast_device: "auto".into(),
         }
     }
 }
@@ -64,6 +80,9 @@ impl MusicAudioSettings {
         self.eq_strength = dsp::bounded(self.eq_strength, 0.0, 1.0, 1.0);
         self.preamp_db = dsp::bounded(self.preamp_db, -60.0, 12.0, 0.0);
         self.crossfeed = dsp::bounded(self.crossfeed, 0.0, 1.0, 0.0);
+        self.speed = dsp::bounded(self.speed, 0.5, 1.6, 1.0);
+        self.reverb = dsp::bounded(self.reverb, 0.0, 1.0, 0.0);
+        self.pitch = dsp::bounded(self.pitch, -12.0, 12.0, 0.0);
         if ![0, 44100, 48000, 88200, 96000, 176400, 192000].contains(&self.sample_rate) {
             self.sample_rate = 0;
         }
@@ -72,6 +91,12 @@ impl MusicAudioSettings {
             || self.device.chars().any(char::is_control)
         {
             self.device = "auto".into();
+        }
+        if self.broadcast_device.is_empty()
+            || self.broadcast_device.len() > 500
+            || self.broadcast_device.chars().any(char::is_control)
+        {
+            self.broadcast_device = "auto".into();
         }
         for gain in &mut self.eq_bands {
             *gain = if gain.is_finite() {
@@ -142,6 +167,25 @@ impl MusicAudioSettings {
         if preamp.abs() >= 0.01 {
             filters.insert(0, format!("volume={preamp:.2}dB"));
         }
+        if self.pitch.abs() >= 0.01 {
+            let ratio = 2f64.powf(self.pitch / 12.0);
+            filters.push(format!(
+                "aresample={PITCH_RATE},asetrate={:.0},aresample={PITCH_RATE},atempo={:.6}",
+                f64::from(PITCH_RATE) * ratio,
+                1.0 / ratio
+            ));
+        }
+        if self.reverb > 0.0 {
+            let wet = 0.22 + self.reverb * 0.45;
+            filters.push(format!(
+                "aecho=0.8:0.85:{}|{}:{:.3}|{:.3}",
+                (60.0 + self.reverb * 40.0) as u32,
+                (130.0 + self.reverb * 90.0) as u32,
+                wet * 0.7,
+                wet * 0.45
+            ));
+        }
+        filters.extend(fx::chain());
         if self.crossfeed > 0.0 {
             filters.push(format!(
                 "crossfeed=strength={:.4}:range=0.5:level_in=1:level_out=1",
@@ -216,4 +260,26 @@ mod tests {
         settings.replay_gain = "loud".into();
         assert_eq!(settings.normalized().replay_gain, "off");
     }
+}
+
+pub fn export_filter_chain(settings: &MusicAudioSettings) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let speed = if settings.speed.is_finite() {
+        settings.speed.clamp(0.5, 1.6)
+    } else {
+        1.0
+    };
+    if (speed - 1.0).abs() >= 0.001 {
+        if settings.keep_pitch {
+            parts.push(format!("atempo={speed:.4}"));
+        } else {
+            parts.push(format!("asetrate=48000*{speed:.4}"));
+            parts.push("aresample=48000".to_string());
+        }
+    }
+    let tail = settings.filter();
+    if !tail.is_empty() {
+        parts.push(tail);
+    }
+    parts.join(",")
 }

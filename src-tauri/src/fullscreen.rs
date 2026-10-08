@@ -33,15 +33,39 @@ pub async fn window_fullscreen_enter(
     app: AppHandle,
     state: State<'_, FullscreenState>,
 ) -> Result<(), String> {
+    run_window_transition(&app, Arc::clone(&state.saved), enter_fullscreen).await
+}
+
+// Tauri setters called from an async command only enqueue window messages.
+// Keep the bounds reads and writes in one window-thread operation: otherwise a
+// simultaneous player reassert can save fullscreen dimensions as restore bounds.
+async fn run_window_transition(
+    app: &AppHandle,
+    saved: Arc<Mutex<Option<SavedWindowState>>>,
+    transition: impl FnOnce(&tauri::WebviewWindow, &Mutex<Option<SavedWindowState>>) -> Result<(), String>
+        + Send
+        + 'static,
+) -> Result<(), String> {
     let main = app
         .get_webview_window("main")
         .ok_or_else(|| "main window missing".to_string())?;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(transition(&main, &saved));
+    })
+    .map_err(|e| format!("fullscreen transition dispatch: {}", e))?;
+    rx.await
+        .map_err(|e| format!("fullscreen transition result: {}", e))?
+}
 
+fn enter_fullscreen(
+    main: &tauri::WebviewWindow,
+    saved: &Mutex<Option<SavedWindowState>>,
+) -> Result<(), String> {
     let already_fs = main.is_fullscreen().unwrap_or(false);
     if !already_fs {
-        // Capture whether the window is maximized before unmaximizing. On
-        // Windows unmaximize() is async, so reading is_maximized() right after
-        // would still report true and drop the saved geometry.
+        // The OS owns a maximized window's restored bounds. Save its mode before
+        // unmaximizing instead of capturing the maximized dimensions.
         let maximized = main.is_maximized().unwrap_or(false);
         if maximized {
             let _ = main.unmaximize();
@@ -58,12 +82,15 @@ pub async fn window_fullscreen_enter(
         } else {
             None
         };
-        *state.saved.lock().unwrap() = Some(SavedWindowState { maximized, geometry });
+        let mut saved = saved.lock().unwrap();
+        // Preserve the original snapshot if the OS temporarily drops fullscreen
+        // and the player reasserts it before the user has actually exited.
+        saved.get_or_insert(SavedWindowState { maximized, geometry });
         main.set_fullscreen(true)
             .map_err(|e| format!("set_fullscreen(true): {}", e))?;
         let _ = main.set_focus();
     }
-    let _ = app.emit_to("main", "fs://entered", ());
+    let _ = main.app_handle().emit_to("main", "fs://entered", ());
     Ok(())
 }
 
@@ -73,10 +100,17 @@ pub async fn window_fullscreen_exit(
     state: State<'_, FullscreenState>,
     restore_position: Option<bool>,
 ) -> Result<(), String> {
-    let main = app
-        .get_webview_window("main")
-        .ok_or_else(|| "main window missing".to_string())?;
+    run_window_transition(&app, Arc::clone(&state.saved), move |main, saved| {
+        exit_fullscreen(main, saved, restore_position.unwrap_or(true))
+    })
+    .await
+}
 
+fn exit_fullscreen(
+    main: &tauri::WebviewWindow,
+    saved: &Mutex<Option<SavedWindowState>>,
+    restore_position: bool,
+) -> Result<(), String> {
     let is_fs = main.is_fullscreen().unwrap_or(false);
     if is_fs {
         main.set_fullscreen(false)
@@ -86,7 +120,7 @@ pub async fn window_fullscreen_exit(
     // Restore even when the window is already unfullscreen'd: frontend paths
     // like exitAnyFullscreen call setFullscreen(false) directly before this
     // command runs, and the saved geometry must still be applied.
-    let saved = state.saved.lock().unwrap().take();
+    let saved = saved.lock().unwrap().take();
     if let Some(saved) = saved {
         if saved.maximized {
             let _ = main.maximize();
@@ -95,7 +129,7 @@ pub async fn window_fullscreen_exit(
                 width: geo.w,
                 height: geo.h,
             });
-            if restore_position.unwrap_or(true) {
+            if restore_position {
                 let _ = main.set_position(tauri::PhysicalPosition { x: geo.x, y: geo.y });
             } else {
                 let _ = main.center();
@@ -106,6 +140,6 @@ pub async fn window_fullscreen_exit(
         }
         let _ = main.set_focus();
     }
-    let _ = app.emit_to("main", "fs://exited", ());
+    let _ = main.app_handle().emit_to("main", "fs://exited", ());
     Ok(())
 }

@@ -10,6 +10,8 @@ import { CURATED_ADDONS, type CuratedEntry } from "./curated";
 
 const ALWAYS_HIDDEN_IDS = new Set<string>(["org.stremio.opensubtitles", "com.opensubtitles.v3"]);
 
+const CURATED_BY_ID = new Map<string, CuratedEntry>(CURATED_ADDONS.map((e) => [e.id, e]));
+
 function normalizeAddonName(name: string | undefined): string {
   if (!name) return "";
   return name
@@ -36,12 +38,14 @@ export function useAddonsCatalog(adultsAllowed: boolean): {
   loading: boolean;
   byId: Map<string, ResolvedAddon>;
   installedIds: Set<string>;
+  installedAddons: ResolvedAddon[];
   refetch: () => void;
 } {
   const { authKey } = useAuth();
   const [byId, setById] = useState<Map<string, ResolvedAddon>>(new Map());
   const [loading, setLoading] = useState(true);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
+  const [installedAddons, setInstalledAddons] = useState<ResolvedAddon[]>([]);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -54,6 +58,33 @@ export function useAddonsCatalog(adultsAllowed: boolean): {
         ...local.map((a) => a.manifest.id),
         ...stremio.map((a) => a.manifest.id),
       ]);
+      // One row per installation. The catalog map below is keyed by manifest id, so an
+      // addon installed twice (Torrentio with two debrid configs, say) would collapse into
+      // a single entry and only one of the two could be removed. The account list wins;
+      // local installs it does not know about are appended.
+      const rows: ResolvedAddon[] = [];
+      const seenUrls = new Set<string>();
+      const addRow = (a: Addon, source: ResolvedAddon["source"]) => {
+        const id = a.manifest?.id;
+        // Only the host is case-insensitive; configured paths and tokens are not.
+        let url = a.transportUrl.trim();
+        try { url = new URL(url).href; } catch { /* Keep nonstandard transports distinct. */ }
+        if (!id || seenUrls.has(url)) return;
+        seenUrls.add(url);
+        const curated = CURATED_BY_ID.get(id);
+        rows.push({
+          curated,
+          manifest: a.manifest,
+          transportUrl: a.transportUrl,
+          source: curated ? "curated" : source,
+          installed: true,
+        });
+      };
+      for (const a of stremio) addRow(a, "stremio-user");
+      for (const a of local) addRow(a, "harbor-local");
+      const installedRows = rows
+        .filter((r) => !ALWAYS_HIDDEN_IDS.has(r.manifest?.id ?? ""))
+        .filter((r) => adultsAllowed || !isAdultAddon(r));
       if (cancelled) return;
 
       const map = new Map<string, ResolvedAddon>();
@@ -223,6 +254,7 @@ export function useAddonsCatalog(adultsAllowed: boolean): {
 
       setById(new Map(map));
       setInstalledIds(installed);
+      setInstalledAddons(installedRows);
       setLoading(false);
     })();
     return () => {
@@ -263,7 +295,7 @@ export function useAddonsCatalog(adultsAllowed: boolean): {
     return () => window.removeEventListener("harbor:active-profile-changed", onProfileChanged);
   }, []);
 
-  return { loading, byId, installedIds, refetch: () => setTick((t) => t + 1) };
+  return { loading, byId, installedIds, installedAddons, refetch: () => setTick((t) => t + 1) };
 }
 
 export function isAdultAddon(r: ResolvedAddon): boolean {

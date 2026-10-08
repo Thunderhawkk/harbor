@@ -11,9 +11,9 @@ export function PreviewImage({
   className?: string;
   style?: CSSProperties;
 }) {
-  const [failed, setFailed] = useState(false);
-  const blank = !src || failed;
-  const [ready, setReady] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string>();
+  const blank = !src || failedSrc === src;
+  const [readySrc, setReadySrc] = useState<string>();
   return (
     <img
       src={blank ? BLANK : src}
@@ -21,10 +21,10 @@ export function PreviewImage({
       aria-hidden
       draggable={false}
       decoding="async"
-      data-ready={!blank && ready ? "1" : undefined}
+      data-ready={!blank && readySrc === src ? "1" : undefined}
       data-blank={blank ? "1" : undefined}
-      onLoad={() => setReady(true)}
-      onError={() => setFailed(true)}
+      onLoad={() => setReadySrc(src)}
+      onError={() => setFailedSrc(src)}
       style={style}
       className={`harbor-preview-img ${className}`}
     />

@@ -9,11 +9,24 @@ export type ScrobbleInfo = { title?: string; year?: number | null; imdb?: string
 function node(ids: Record<string, unknown>, info?: ScrobbleInfo): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...ids };
   if (info?.imdb && /^tt\d+$/.test(info.imdb) && merged.imdb == null) merged.imdb = info.imdb;
-  if (info?.tmdb != null && Number.isFinite(info.tmdb) && merged.tmdb == null) merged.tmdb = info.tmdb;
+  if (info?.tmdb != null && Number.isFinite(info.tmdb) && merged.tmdb == null)
+    merged.tmdb = info.tmdb;
   const out: Record<string, unknown> = { ids: merged };
   if (info?.title) out.title = info.title;
   if (info?.year != null) out.year = info.year;
   return out;
+}
+
+export function buildEpisodeBody(
+  showIds: Record<string, unknown>,
+  season: number,
+  number: number,
+  progress: number,
+): Record<string, unknown> {
+  const p = Math.min(100, Math.max(0, progress));
+  // The resolved ids belong to the tracker entry; original-entry metadata can
+  // point at a different show when a continuation is catalogued separately.
+  return { progress: p, show: { ids: { ...showIds } }, episode: { season, number } };
 }
 
 export function buildBody(
@@ -47,7 +60,9 @@ export function buildBody(
     return { progress: p, show: node({ tmdb: id }, ids), episode: ep };
   }
 
-  const animePrefix = ["kitsu:", "mal:", "anilist:", "anidb:"].find((pre) => metaId.startsWith(pre));
+  const animePrefix = ["kitsu:", "mal:", "anilist:", "anidb:"].find((pre) =>
+    metaId.startsWith(pre),
+  );
   if (animePrefix) {
     const num = Number(metaId.split(":")[1]);
     if (!Number.isFinite(num)) return null;

@@ -1,6 +1,13 @@
 use super::MusicTrack;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MusicVideoPage {
+    pub tracks: Vec<MusicTrack>,
+    pub next: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MusicAlbumRef {
@@ -11,6 +18,8 @@ pub struct MusicAlbumRef {
     pub artwork: String,
     pub year: Option<u32>,
     pub track_count: Option<u32>,
+    #[serde(default)]
+    pub explicit: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -168,6 +177,8 @@ pub struct MusicConnection {
     pub error: Option<String>,
     pub capabilities: Vec<String>,
     pub needs: Vec<MusicConnectionField>,
+    /// A source needing no account is always usable, so it is never signed in or out of.
+    pub anonymous: bool,
 }
 
 impl MusicConnection {
@@ -182,7 +193,13 @@ impl MusicConnection {
             error: None,
             capabilities: capabilities.iter().map(|value| value.to_string()).collect(),
             needs: Vec::new(),
+            anonymous: false,
         }
+    }
+
+    pub fn anonymous(mut self) -> Self {
+        self.anonymous = true;
+        self
     }
 
     pub fn needs(mut self, needs: Vec<MusicConnectionField>) -> Self {
@@ -228,6 +245,7 @@ mod tests {
             artwork: "https://example.test/art.jpg".to_string(),
             year: Some(2003),
             track_count: Some(14),
+            explicit: None,
         });
         let value = serde_json::to_value(&album).expect("album item");
         assert_eq!(value["kind"], "album");

@@ -9,9 +9,11 @@ const at = (p: string) => new URL(`../${p}`, import.meta.url);
 const mpv = readFileSync(at("src-tauri/src/mpv.rs"), "utf8");
 const prune = readFileSync(at("src-tauri/src/temp_prune.rs"), "utf8");
 const lib = readFileSync(at("src-tauri/src/lib.rs"), "utf8");
+const cache = readFileSync(at("src-tauri/src/playback_cache.rs"), "utf8");
 
 test("mpv still writes its demuxer cache to a directory on disk", () => {
-  assert.match(mpv, /let dvr = base\.join\("mpv-cache"\);/);
+  assert.match(cache, /default_base\.join\("mpv-cache"\)/);
+  assert.match(mpv, /playback_cache::cache_dir\(&base, args\.cache_dir\.as_deref\(\)\)/);
   assert.match(mpv, /set_property\("cache-on-disk", "yes"\)/);
 });
 
@@ -19,6 +21,7 @@ test("every unbounded on-disk cache Harbor writes has a sweeper", () => {
   assert.match(prune, /pub fn sweep_mpv_cache\(dir: PathBuf\) -> u64/);
   assert.match(prune, /const MPV_CACHE_MAX_AGE: Duration/);
   assert.match(lib, /temp_prune::sweep_mpv_cache\(base\.join\("mpv-cache"\)\)/);
+  assert.match(mpv, /temp_prune::sweep_mpv_cache\(dir\.clone\(\)\)/);
 });
 
 test("the sweep only reclaims entries old enough to be orphans", () => {

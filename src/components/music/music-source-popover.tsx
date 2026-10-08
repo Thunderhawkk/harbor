@@ -19,11 +19,15 @@ export function MusicSourcePopover({
   useEscape(onDismiss);
   useLayoutEffect(() => {
     const place = () => {
-      const button = anchor.current;
-      if (!button) return;
-      const rect = button.getBoundingClientRect();
+      // The source button lives in a row the dock hides on narrow widths, so its ref can be null
+      // while the popover is open. Falling back to the dock keeps the panel over the controls
+      // instead of stranding it against the left edge.
+      const dock = document.querySelector<HTMLElement>("[data-music-dock]");
+      const host = anchor.current ?? dock;
+      if (!host) return;
+      const rect = host.getBoundingClientRect();
       const width = Math.min(360, window.innerWidth - 16);
-      const top = button.closest("[data-music-dock]")?.getBoundingClientRect().top ?? rect.top;
+      const top = (host.closest("[data-music-dock]") ?? dock)?.getBoundingClientRect().top ?? rect.top;
       setBox({
         width,
         left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
@@ -37,7 +41,8 @@ export function MusicSourcePopover({
     };
     place();
     const observer = new ResizeObserver(place);
-    if (anchor.current) observer.observe(anchor.current);
+    const observed = anchor.current ?? document.querySelector<HTMLElement>("[data-music-dock]");
+    if (observed) observer.observe(observed);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     document.addEventListener("pointerdown", outside, true);

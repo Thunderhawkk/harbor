@@ -1,6 +1,6 @@
 import { ScoreMetric, ScoreBreakdown } from "./score-breakdown";
 import { TeamProfileLink, teamIdentity } from "./team-profile-link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, LoaderCircle, MapPin, Play } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
@@ -11,9 +11,11 @@ import {
   type PublishedEvent,
 } from "@/lib/sports/event-enrichment";
 import { EventLogo } from "./hub-cards";
+import { parseCompetitionResultText } from "@/lib/sports/competition-metadata";
+import { CompetitionAthletes } from "./competition-athletes";
 import "./event-metadata.css";
 
-/** One selected event request; cards keep using the schedule payload. */
+/** Selected event details; only individual results request a supplementary athlete classification. */
 export function EventMetadata({ game, league }: { game: SportsGame; league: LeagueDef }) {
   const t = useT();
   const [data, setData] = useState<PublishedEvent | undefined>(() =>
@@ -36,10 +38,16 @@ export function EventMetadata({ game, league }: { game: SportsGame; league: Leag
       });
     return () => controller.abort();
   }, [game.id, league.key, retry]);
-  const event = data?.game || game;
-  const artwork = event.artwork || data?.banner || data?.square || event.poster;
+  const current =
+    data?.game.id === game.id && data.game.league === game.league ? data : undefined;
+  const event = current?.game || game;
+  const artwork = event.artwork || current?.banner || current?.square || event.poster;
+  const classification = useMemo(
+    () => current?.entrants ?? parseCompetitionResultText(current?.resultText),
+    [current?.entrants, current?.resultText],
+  );
   const hasScore = event.home.score !== "" && event.away.score !== "";
-  const venue = data?.venue?.name || event.context?.venue;
+  const venue = current?.venue?.name || event.context?.venue;
   return (
     <section className="sh-published-event">
       {artwork && failedImage !== artwork && (
@@ -76,19 +84,42 @@ export function EventMetadata({ game, league }: { game: SportsGame; league: Leag
             {venue}
           </span>
         )}
-        {data?.season && (
+        {current?.season && (
           <span>
-            {t("Season")} {data.season}
+            {t("Season")} {current.season}
           </span>
         )}
-        {data?.round && (
+        {current?.round && (
           <span>
-            {t("Round")} {data.round}
+            {t("Round")} {current.round}
           </span>
         )}
       </div>
-      {data?.description && <p className="sh-published-description">{data.description}</p>}
-      {data?.resultText && <p className="sh-published-description">{data.resultText}</p>}
+      {current?.description && <p className="sh-published-description">{current.description}</p>}
+      {classification.length > 0 ? (
+        <div className="sh-published-classification">
+          <h4>{t("Results")}</h4>
+          <ol>
+            {classification.map((entrant) => (
+              <li key={entrant.id}>
+                <span>{entrant.position}</span>
+                <strong>
+                  <CompetitionAthletes
+                    name={entrant.name}
+                    athletes={entrant.athletes}
+                    league={game.league}
+                    group={league.group}
+                  />
+                </strong>
+                {entrant.team && <em>{entrant.team}</em>}
+                <b>{entrant.result}</b>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        current?.resultText && <p className="sh-published-description">{current.resultText}</p>
+      )}
       {status === "loading" && (
         <div className="sh-published-state" role="status">
           <LoaderCircle size={17} className="animate-spin" />
@@ -104,15 +135,15 @@ export function EventMetadata({ game, league }: { game: SportsGame; league: Leag
         </div>
       )}
       <div className="sh-published-links">
-        {data?.videoUrl && (
-          <button className="sh-button" onClick={() => openUrl(data.videoUrl!)}>
+        {current?.videoUrl && (
+          <button className="sh-button" onClick={() => openUrl(current.videoUrl!)}>
             <Play size={15} />
             {t("View video")}
             <ArrowUpRight size={14} />
           </button>
         )}
-        {data?.sourceUrl && (
-          <button className="sh-text-button" onClick={() => openUrl(data.sourceUrl)}>
+        {current?.sourceUrl && (
+          <button className="sh-text-button" onClick={() => openUrl(current.sourceUrl)}>
             {t("Event source")}
             <ArrowUpRight size={14} />
           </button>

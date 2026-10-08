@@ -32,6 +32,7 @@ export function HeroCarousel({
   bottomAlign = false,
   playSquare = false,
   moreInfo = false,
+  onActive,
 }: {
   slides: Slide[];
   full?: boolean;
@@ -41,6 +42,8 @@ export function HeroCarousel({
   bottomAlign?: boolean;
   playSquare?: boolean;
   moreInfo?: boolean;
+  /** The slide on show, for a caller that has something of its own to place over it. */
+  onActive?: (index: number) => void;
 }) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -101,6 +104,14 @@ export function HeroCarousel({
   }, [slides.length, active]);
 
   const safeActive = slides.length > 0 ? Math.min(Math.max(active, 0), slides.length - 1) : 0;
+
+  // Held in a ref, so a caller that places something over the slide is told when it changes rather
+  // than on every render.
+  const onActiveRef = useRef(onActive);
+  onActiveRef.current = onActive;
+  useEffect(() => {
+    onActiveRef.current?.(safeActive);
+  }, [safeActive]);
 
   if (slides.length === 0) {
     return (

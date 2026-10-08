@@ -169,6 +169,12 @@ const misc: Record<string, string> = {
   Reveal: "表示",
   "Reveal comments": "コメントを表示",
   "Comments are hidden": "コメントは非表示です",
+  "Hosted elsewhere": "外部ホスティング",
+  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.": "これらのプランは第三者が運営しています。Harbor は提携しておらず、登録から何も受け取りません。最新の料金と条件は先方のサイトでご確認ください。",
+  "{name} can run on a hosted instance": "{name} はホスティング環境でも動きます",
+  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.": "これは第三者が運営しています。Harbor は提携も転売もしておらず、登録しても何も受け取りません。料金や内容は先方のサイトをご覧ください。",
+  "Show comments": "コメントを表示",
+  "Hide comments": "コメントを非表示",
   "You haven't commented yet": "まだコメントしていません",
   "Reveal image": "画像を表示",
   "Trakt Comments": "Traktのコメント",
@@ -847,7 +853,7 @@ const misc: Record<string, string> = {
   "Your Stremio library + addons sync in untouched.":
     "Stremioのライブラリとアドオンをそのまま同期。",
   "No telemetry, no servers, no bundled keys.": "テレメトリなし、サーバーなし、組み込みキーなし。",
-  "For watching things": "視聴向け",
+  "Built for Adventure!": "冒険のために！",
   "Harbor curated": "Harborセレクト",
   "Hero, Top 10, Trending, In Theaters, per-service rails. Your addons append underneath.":
     "ヒーロー、トップ10、トレンド、劇場公開中、配信サービス別レールを表示します。その下にアドオンのカタログが追加されます。",

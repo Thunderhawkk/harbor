@@ -469,6 +469,8 @@ const player: Record<string, string> = {
   "Couldn't save the synced subtitle. Try again.":
     "Не удалось сохранить синхронизированные субтитры. Повторите попытку.",
   "Saving...": "Сохранение...",
+  "Search audio language": "Поиск языка аудио",
+  "No audio track in that language.": "Нет аудиодорожки на этом языке.",
 };
 
 export default player;

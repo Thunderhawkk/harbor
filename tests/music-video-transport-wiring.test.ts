@@ -5,6 +5,7 @@ import test from "node:test";
 // @ts-expect-error Node test types are outside the browser tsconfig.
 import { readFileSync } from "node:fs";
 import ts from "typescript";
+import { dedupeMusicTracks, sameMusicTrack } from "../src/lib/music/track-identity.ts";
 
 function read(path: string): string {
   return readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
@@ -76,9 +77,20 @@ function loadPlayer() {
         usableCheckpointPosition: () => 0,
         writeCheckpointToDb: () => {},
       };
+    if (name === "./hidden-recents") return { unhideMusicRecent: () => {} };
     if (name === "./playback-origin")
       return { getMusicPlaybackOrigin: () => null, restoreMusicPlaybackOrigin: () => {} };
     if (name === "@/lib/cast-ownership") return { stopCastOwner: () => {} };
+    if (name === "./track-identity") return { dedupeMusicTracks, sameMusicTrack };
+    if (name === "./deck-sync")
+      return {
+        answerDeckRequests: () => () => {},
+        broadcastDeckState: () => {},
+        sendDeckAdopted: () => {},
+        serveDeckCommands: () => () => {},
+      };
+    if (name === "./deck-primary")
+      return { createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }) };
     if (name === "./casting")
       return {
         getMusicSpeakerState: () => ({ active: false, device: null, positionSec: 0 }),

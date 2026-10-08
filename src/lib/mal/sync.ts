@@ -1,7 +1,7 @@
 import { activeProfileId } from "@/lib/active-profile-id";
 import { malRequest, MalApiError } from "./client";
 import { resolveMalMediaId } from "./mutations";
-import { isAuthenticated } from "./session";
+import { isAuthenticated, getSession } from "./session";
 
 export type SyncError = "update-not-confirmed" | "unreachable";
 
@@ -34,7 +34,25 @@ const SENT_KEY_BASE = "harbor.mal.synced.v1";
 function sentKey(): string {
   return `${SENT_KEY_BASE}.${activeProfileId()}`;
 }
-type SentMap = Record<string, number>;
+type SentValue = number | { p: number; t: number };
+type SentMap = Record<string, SentValue>;
+
+// Only collapses the per-tick writes of one playback session. Kept indefinitely it
+// outlives the server, so removing the entry there could never be re-synced.
+const SENT_TTL_MS = 60 * 1000;
+
+function sentProgress(map: SentMap, key: string): { p: number; t: number } | null {
+  const value = map[key];
+  if (typeof value === "number") return { p: value, t: 0 };
+  if (value && typeof value === "object" && typeof value.p === "number") {
+    return { p: value.p, t: typeof value.t === "number" ? value.t : 0 };
+  }
+  return null;
+}
+
+function rememberSent(map: SentMap, key: string, progress: number): void {
+  map[key] = { p: progress, t: Date.now() };
+}
 
 function loadSent(): SentMap {
   try {
@@ -76,17 +94,21 @@ export function resetForProfile(): void {
 
 export async function markMalWatching(harborId: string, title: string): Promise<void> {
   if (!isAuthenticated()) return;
+  const profile = activeProfileId();
+  const session = getSession();
+  const owned = () => activeProfileId() === profile && getSession() === session;
   if (watchingMarked.has(harborId)) return;
   watchingMarked.add(harborId);
   try {
     const malId = await resolveMalMediaId(harborId);
-    if (malId == null) {
+    if (!owned() || malId == null) {
       watchingMarked.delete(harborId);
       return;
     }
     const cur = await malRequest<EntryResponse>(
       `/anime/${malId}?fields=num_episodes,my_list_status`,
     );
+    if (!owned()) return;
     if (cur?.my_list_status && cur.my_list_status.status !== "plan_to_watch") return;
     const total = cur?.num_episodes ?? 0;
     if (cur?.my_list_status && total > 0 && cur.my_list_status.num_episodes_watched >= total)
@@ -95,7 +117,7 @@ export async function markMalWatching(harborId: string, title: string): Promise<
       method: "PATCH",
       body: new URLSearchParams({ status: "watching" }),
     });
-    emit({ kind: "watching", title });
+    if (owned()) emit({ kind: "watching", title });
   } catch (e) {
     watchingMarked.delete(harborId);
     if (e instanceof MalApiError && e.status === 401) return;
@@ -106,28 +128,31 @@ export async function syncMalProgress(
   harborId: string,
   episode: number | undefined,
   title: string,
-  absoluteEpisode?: number,
   season?: number,
 ): Promise<void> {
   if (!isAuthenticated()) return;
+  const profile = activeProfileId();
+  const session = getSession();
+  const owned = () => activeProfileId() === profile && getSession() === session;
   const ep = episode ?? 1;
-  if (!Number.isFinite(ep) || ep < 1) return;
-  const abs =
-    absoluteEpisode != null && Number.isFinite(absoluteEpisode) && absoluteEpisode > ep
-      ? absoluteEpisode
-      : null;
+  if (!Number.isInteger(ep) || ep < 1) return;
 
   const sent = loadSent();
   const sentKey = `${harborId}|${season ?? ""}|${ep}`;
-  if ((sent[sentKey] ?? 0) >= (abs ?? ep)) return;
+  const prevSent = sentProgress(sent, sentKey);
+  if (prevSent && Date.now() - prevSent.t < SENT_TTL_MS && prevSent.p >= ep) {
+    return;
+  }
 
-  const flightKey = `${harborId}|${ep}|${abs ?? ""}`;
-  if (inflight.has(flightKey)) return;
+  const flightKey = `${profile}|${harborId}|${ep}`;
+  if (inflight.has(flightKey)) {
+    return;
+  }
   inflight.add(flightKey);
 
   try {
     const malId = await resolveMalMediaId(harborId);
-    if (malId == null) return;
+    if (!owned() || malId == null) return;
 
     const cur = await malRequest<EntryResponse>(
       `/anime/${malId}?fields=num_episodes,my_list_status`,
@@ -135,19 +160,19 @@ export async function syncMalProgress(
 
     // Never overwrite entries the user completed or marked as re-watching;
     // auto-sync would otherwise flip completed/rewatching back to "watching".
+    if (!owned()) return;
     const listStatus = cur?.my_list_status;
-    if (listStatus && (listStatus.status === "completed" || listStatus.is_rewatching)) return;
+    if (listStatus && (listStatus.status === "completed" || listStatus.is_rewatching)) {
+      return;
+    }
 
     const current = cur?.my_list_status?.num_episodes_watched ?? 0;
     const total = cur?.num_episodes ?? 0;
-    let target = ep;
-    if (abs != null && total > 0 && abs <= total && ep <= current && abs > current) target = abs;
-    if (total > 0 && target > total) {
-      if (target > total + 1) return;
-      target = total;
-    }
+    // The caller resolves entry-relative numbering before reaching this layer.
+    const target = ep;
+    if (total > 0 && target > total) return;
     if (target <= current) {
-      sent[sentKey] = Math.max(sent[sentKey] ?? 0, current);
+      rememberSent(sent, sentKey, Math.max(prevSent?.p ?? 0, current));
       saveSent(sent);
       return;
     }
@@ -166,16 +191,17 @@ export async function syncMalProgress(
       },
     );
 
+    if (!owned()) return;
     if (saved?.num_episodes_watched === target) {
-      sent[sentKey] = target;
+      rememberSent(sent, sentKey, target);
       saveSent(sent);
       emit({ kind: "ok", title, episode: target });
     } else {
-      sent[sentKey] = Math.max(sent[sentKey] ?? 0, target);
-      saveSent(sent);
+      // Unconfirmed writes stay retryable; recording them as sent would suppress retries.
       emit({ kind: "error", title, error: "update-not-confirmed" });
     }
   } catch (e) {
+    if (!owned()) return;
     if (e instanceof MalApiError && e.status === 401) return;
     emit({ kind: "error", title, error: "unreachable" });
   } finally {

@@ -7,6 +7,7 @@ import { ListHeart } from "./list-heart";
 import { ListShareButton } from "./list-share-button";
 import { SaveListButton } from "./save-list-button";
 import type { FeaturedItem, FeaturedList } from "@/lib/social/featured-lists";
+import { useProfileTitle } from "./use-profile-title";
 
 function ListPoster({
   item,
@@ -15,20 +16,22 @@ function ListPoster({
   item: FeaturedItem;
   onOpenMeta?: (id: string, kind?: string, hint?: { name?: string; poster?: string }) => void;
 }) {
+  const media = useProfileTitle(item.id, item.name, item.poster, item.type);
   return (
     <button
-      onClick={() => onOpenMeta?.(item.id, item.type, { name: item.name, poster: item.poster })}
+      ref={media.ref}
+      onClick={() => onOpenMeta?.(item.id, item.type, { name: media.title, poster: media.poster })}
       disabled={!onOpenMeta}
       className="group w-full text-start disabled:cursor-default"
     >
       <Poster
-        src={item.poster || undefined}
+        src={media.poster || undefined}
         seed={item.name || item.id}
         ratio="portrait"
         className="rounded-md ring-1 ring-edge-soft shadow-[0_2px_8px_-2px_rgba(0,0,0,0.35)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0.24,1)] motion-safe:group-hover:will-change-transform group-hover:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.6)] motion-safe:group-hover:[transform:translate3d(0,-0.5rem,0)_scale(1.03)]"
         lazy
       />
-      {item.name && <div className="mt-1.5 truncate text-[12px] text-ink-muted">{item.name}</div>}
+      {media.title && <div className="mt-1.5 truncate text-[12px] text-ink-muted">{media.title}</div>}
     </button>
   );
 }
@@ -100,9 +103,7 @@ export function MyListsShowcase({
                     interactive={!!signedIn && !isOwner}
                   />
                   <ListShareButton handle={handle ?? ""} listId={list.id} name={list.name} />
-                  {signedIn && !isOwner && (
-                    <SaveListButton handle={handle ?? ""} listId={list.id} />
-                  )}
+                  {!isOwner && <SaveListButton handle={handle ?? ""} listId={list.id} />}
                 </div>
               }
               min={96}

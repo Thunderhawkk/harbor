@@ -4,7 +4,7 @@ import { imdbToKitsu } from "@/lib/providers/anime-mapping";
 import { setItemWithRecovery } from "@/lib/storage-recovery";
 
 const STORAGE_KEY = "harbor.anime.detected.v2";
-const NEGATIVE_KEY = "harbor.anime.notanime.v1";
+const NEGATIVE_KEY = "harbor.anime.notanime.v2";
 const NEGATIVE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const NEGATIVE_MAX = 1500;
 const NEGATIVE_FLUSH_MS = 2000;
@@ -131,6 +131,34 @@ function isJapaneseAnime(m: { genres?: string[]; country?: string; originalLangu
   return c.includes("japan") || c === "jp" || c === "jpn" || lang === "ja" || lang === "jpn";
 }
 
+export function isOrphanAnimeCandidate(meta: {
+  type?: string;
+  animeFormat?: string;
+  genres?: string[];
+  country?: string;
+  originalLanguage?: string;
+  productionCountries?: string[];
+}): boolean {
+  if (meta.type === "anime" || !!meta.animeFormat) return true;
+  if (!hasAnimationGenre(meta)) return false;
+
+  const lang = (meta.originalLanguage ?? "").toLowerCase();
+  const metaCountry = (meta.country ?? "").toLowerCase();
+  const countries = (meta.productionCountries ?? []).map((c) => c.toUpperCase());
+
+  return (
+    lang === "ja" ||
+    lang === "jpn" ||
+    lang === "zh" ||
+    lang === "zho" ||
+    lang === "chi" ||
+    lang === "ko" ||
+    lang === "kor" ||
+    countries.some((c) => ["JP", "CN", "KR", "TW"].includes(c)) ||
+    /japan|china|korea|taiwan/i.test(metaCountry)
+  );
+}
+
 function settled(id: string): boolean {
   return detected.has(id) || negatives.has(id) || checked.has(id);
 }
@@ -144,7 +172,10 @@ async function checkOne(it: DetectItem): Promise<void> {
     checked.add(id);
     let anime = !!m && isJapaneseAnime(m);
     const originUnknown = !m || !primaryCountry(m);
-    if (!anime && originUnknown && (!m || hasAnimationGenre(m) || (m.genres ?? []).length === 0)) {
+    // Donghua and other mapped animation can have a known non-Japanese origin.
+    // Require an exact anime mapping rather than treating all animation as anime.
+    const needsMapping = !m || hasAnimationGenre(m) || (originUnknown && (m.genres ?? []).length === 0);
+    if (!anime && needsMapping) {
       anime = (await imdbToKitsu(id).catch(() => null)) != null;
     }
     if (anime) {

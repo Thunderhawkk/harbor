@@ -268,6 +268,22 @@ fn interview_results(raw: &str, limit: usize) -> Result<Vec<super::super::super:
     }).take(limit).collect())
 }
 
+/// Continue regular YouTube results. yt-dlp walks the provider's search continuation;
+/// playlist-start skips earlier entries and the extra entry signals whether another page exists.
+pub async fn search_video_page(app: &tauri::AppHandle, query: &str, offset: usize, limit: usize) -> Result<(Vec<super::super::super::MusicTrack>, bool), String> {
+    let end = offset.checked_add(limit + 1).ok_or("Invalid video search offset")?;
+    let args = vec!["--no-warnings".into(), "--flat-playlist".into(), "--dump-single-json".into(), "--skip-download".into(),
+        "--playlist-start".into(), (offset + 1).to_string(), "--playlist-end".into(), end.to_string(),
+        "--".into(), format!("ytsearch{end}:{query}")];
+    let output = super::ytdlp_update::run(app, args, Duration::from_secs(32), "YouTube video search").await?;
+    let raw = String::from_utf8_lossy(&output.stdout);
+    let value: serde_json::Value = serde_json::from_str(&raw).map_err(|_| "YouTube search returned invalid metadata")?;
+    let entries = value.get("entries").and_then(serde_json::Value::as_array).ok_or("YouTube search returned no entries")?;
+    // The lookahead is fetched again at the start of the next page, so never expose it here.
+    let page = serde_json::json!({"entries": entries.iter().take(limit).collect::<Vec<_>>()});
+    Ok((interview_results(&page.to_string(), limit)?, entries.len() > limit))
+}
+
 #[cfg(test)]
 mod interview_tests {
     use super::*;

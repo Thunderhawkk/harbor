@@ -39,6 +39,7 @@ const BUILT_IN_CATALOG_ROW_KEYS: Readonly<Record<string, true>> = {
   "decade-90": true,
   "decade-80": true,
   "decade-70": true,
+  "black-and-white": true,
   "lang-jp": true,
   "lang-kr": true,
   "lang-fr": true,
@@ -97,7 +98,7 @@ function RowTitle({
   if (!row.fetcher) return <>{title}</>;
   return (
     <button
-      onClick={() => openGrid({ title, fetcher: row.fetcher!, initial: row.metas })}
+      onClick={() => openGrid({ title, fetcher: row.fetcher!, initial: row.metas, initialPage: 0 })}
       className={`group/see inline-flex items-center gap-1.5 transition-colors ${
         kids ? "text-[#0e3a43] hover:text-[#1f8f88]" : "text-ink hover:text-ink-muted"
       }`}
@@ -155,7 +156,7 @@ export function CatalogRows({
           row.key in custom.renamed || !isBuiltInCatalogRow(row.key) ? row.title : t(row.title);
         const eager = i < 2;
         const viewAll = row.fetcher
-          ? () => openGrid({ title, fetcher: row.fetcher!, initial: row.metas })
+          ? () => openGrid({ title, fetcher: row.fetcher!, initial: row.metas, initialPage: 0 })
           : undefined;
         const rowEl =
           row.variant === "rank" ? (

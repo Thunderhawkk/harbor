@@ -1,4 +1,5 @@
 import { publishedScore, publishedScoreDetail } from "./score-detail";
+import { toSide } from "./espn-parse";
 import { safeFetch } from "@/lib/safe-fetch";
 import type {
   LeagueDef,
@@ -21,6 +22,14 @@ import {
   parsePlayerStatTables,
   parseTeamStatRows,
 } from "./match-boxscore";
+
+const FIELD_SUMMARY_GROUPS = new Set([
+  "motorsport",
+  "golf",
+  "cycling",
+  "swimming",
+  "athletics",
+]);
 
 function headerSide(c: any, group: string): SportsSide {
   return {
@@ -143,6 +152,11 @@ export function parseTeamSummary(
     startMs: Date.parse(header.date) || 0,
   };
 
+  const field =
+    FIELD_SUMMARY_GROUPS.has(def.group) && teams.length > 2
+      ? teams.map((competitor: any) => toSide(competitor, def.group))
+      : undefined;
+
   const rosters = data.rosters || [];
   const homeRosterData = rosters.find(
     (r: any) => r.homeAway === "home" || r.team?.id === homeHeader.team?.id,
@@ -185,6 +199,7 @@ export function parseTeamSummary(
   const awayRoster = rosterFor(awayRosterData, awayHeader.team?.id);
   return {
     ...game,
+    ...(field ? { field } : {}),
     baseball: def.group === "baseball" ? parseBaseballSituation(data.situation) : undefined,
     football: def.group === "football" ? parseFootballSituation(data) : undefined,
     homeFormation: homeRosterData?.formation,

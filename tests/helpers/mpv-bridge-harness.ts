@@ -7,6 +7,7 @@ import * as cleanups from "../../src/lib/player/prepared-subtitle-cleanups.ts";
 import * as seeds from "../../src/lib/subtitles/seed-batch.ts";
 import * as failures from "../../src/lib/player/mpv-failure.ts";
 import type { PlayerBridge, PlayerSnapshot } from "../../src/lib/player/bridge.ts";
+import type { MpvOptions } from "../../src/lib/player/mpv.ts";
 
 export function deferred<T = void>() {
   let resolve!: (value: T) => void;
@@ -41,7 +42,7 @@ export function playerSnapshotChanged() {
   ) => boolean;
 }
 
-export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }) {
+export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }, options?: MpvOptions) {
   const source = readFileSync(new URL("../../src/lib/player/mpv.ts", import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -81,10 +82,26 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }) {
         return () => handlers.delete(name);
       },
     },
-    "@/lib/subtitles/prepare": { prepareSubtitle: (input: { url: string }) => prepare(input) },
+    "@/lib/subtitles/prepare": {
+      prepareSubtitle: (input: { url: string }) => prepare(input),
+      SubtitlePreparationError: class SubtitlePreparationError extends Error {
+        reason: string;
+        constructor(reason: string, message: string) {
+          super(message);
+          this.name = "SubtitlePreparationError";
+          this.reason = reason;
+        }
+      },
+    },
     "@/lib/subtitles/provider-auth": { subtitleTrackDownloadHeaders: () => undefined },
     "@/lib/subtitles/prepared-registry": { takePreparedSubtitle: () => null },
     "@/lib/subtitles/limit-signal": { markLimitReached() {} },
+    "@/lib/subtitles/pending-subs": {
+      markPendingSub() {},
+      clearPendingSub() {},
+      wasPendingSub: () => false,
+    },
+    "@/lib/subtitles/translation-jobs": { registerTranslationJob() {} },
     "./mpv-failure": failures,
     "@/lib/platform": {
       isWindowsDesktop: () => true,
@@ -108,9 +125,12 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }) {
       initialPlayerSnapshot: () => ({ ...snapshots.emptySnapshot, ...prefs }),
     },
   };
-  const module = { exports: {} as { createMpvBridge: () => PlayerBridge } };
+  const module = { exports: {} as { createMpvBridge: (options?: MpvOptions) => PlayerBridge } };
   const windowEvents = new EventTarget();
-  new Function("require", "module", "exports", "window", "console", compiled)(
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0;
+  const documentEvents = new EventTarget();
+  new Function("require", "module", "exports", "window", "console", "document", compiled)(
     (id: string) => {
       if (!(id in dependencies)) throw new Error(`Unexpected dependency: ${id}`);
       return dependencies[id];
@@ -118,6 +138,11 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }) {
     module,
     module.exports,
     {
+      requestAnimationFrame: (callback: FrameRequestCallback) => {
+        frames.set(++frameId, callback);
+        return frameId;
+      },
+      cancelAnimationFrame: (id: number) => frames.delete(id),
       addEventListener: windowEvents.addEventListener.bind(windowEvents),
       removeEventListener: windowEvents.removeEventListener.bind(windowEvents),
       dispatchEvent: (event: Event) => {
@@ -126,8 +151,12 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }) {
       },
     },
     { warn() {}, info() {} },
+    {
+      addEventListener: documentEvents.addEventListener.bind(documentEvents),
+      removeEventListener: documentEvents.removeEventListener.bind(documentEvents),
+    },
   );
-  const bridge = module.exports.createMpvBridge();
+  const bridge = module.exports.createMpvBridge(options);
   let snapshot: PlayerSnapshot = snapshots.emptySnapshot;
   bridge.subscribe((next) => {
     snapshot = next;
@@ -136,7 +165,16 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }) {
     bridge,
     commands,
     errors,
+    emitWindow(name: string) { windowEvents.dispatchEvent(new Event(name)); },
+    runFrame() {
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(0));
+    },
     snapshot: () => snapshot,
+    emitEvent(event: Record<string, unknown>) {
+      handlers.get("mpv://event")?.({ payload: event });
+    },
     emit(name: string, data: unknown) {
       properties.set(name, data);
       handlers.get("mpv://event")?.({ payload: { event: "property-change", name, data } });

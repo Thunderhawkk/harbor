@@ -7,6 +7,13 @@ import {
 import type { TrackInfo } from "@/lib/player/bridge";
 import type { SubtitleAddHandler } from "@/lib/player/subtitle-load";
 import { ResizableSubtitlePanel } from "@/components/player/subtitle-menu/resizable-panel";
+import type { GeneratedSubtitleGroup } from "@/lib/subtitles/types";
+import {
+  clearTranslationJobs,
+  registerTranslationJob,
+  type TranslationJob,
+} from "@/lib/subtitles/translation-jobs";
+import { replaceAddedSubs } from "@/lib/subtitles/added-subs";
 
 export type SubtitleModalState = {
   tracks: TrackInfo[];
@@ -19,6 +26,9 @@ export type SubtitleModalState = {
   episode: number | null;
   preferredLanguages: string[];
   subtitleContext: SubtitleContentContext | null;
+  generated?: GeneratedSubtitleGroup[];
+  translations?: TranslationJob[];
+  addedUrls?: string[];
 };
 
 type Props = {
@@ -45,6 +55,13 @@ export function SubtitleModal({
     return () => publishSubtitleContext(null);
   }, [state.subtitleContext]);
 
+  useEffect(() => {
+    clearTranslationJobs();
+    for (const job of state.translations ?? []) registerTranslationJob(job);
+    replaceAddedSubs(state.addedUrls ?? []);
+  }, [state.translations, state.addedUrls]);
+  useEffect(() => () => clearTranslationJobs(), []);
+
   return (
     <div
       className="fixed inset-0 flex items-end justify-end"
@@ -56,6 +73,7 @@ export function SubtitleModal({
       <ResizableSubtitlePanel className="mb-[84px] me-[56px]">
         <div className="flex min-h-0 flex-1 flex-col" onClick={(e) => e.stopPropagation()}>
           <SubtitleMenuBody
+            generated={state.generated}
             tracks={state.tracks}
             selectedId={state.selectedId}
             delaySec={state.delaySec}

@@ -35,7 +35,10 @@ const DOMAIN_PREFIXES: Record<Exclude<ImportDomain, "settings" | "addons">, read
     "harbor.manualunwatched.at.v1.",
     "harbor.manualwatched.fromremote.v1.",
   ],
-  continueWatching: ["harbor.localcw.v1.", "harbor.playback-history.v1."],
+  continueWatching: [
+    "harbor.localcw.v1.", "harbor.playback-history.v1.",
+    "harbor.localcw.private.v1.", "harbor.resume.private.v1.", "harbor.cw.dismissed.private.v1.",
+  ],
 };
 
 const INSTALLED_PREFIX = "harbor.installed-addons.";

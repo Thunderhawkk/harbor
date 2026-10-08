@@ -360,6 +360,9 @@ const catalog09: Record<string, string> = {
   "Show off. [b]bold[/b], [color=gold]color[/color], [youtube]link[/youtube], [img]https://...[/img] and more.":
     "마음껏 꾸며 보세요. [b]굵게[/b], [color=gold]색상[/color], [youtube]링크[/youtube], [img]https://...[/img] 등을 사용할 수 있습니다.",
   "Show on Discord": "Discord에 표시",
+  "Show what you are listening to": "듣고 있는 음악 표시",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "음악을 재생하는 동안 곡, 아티스트, 앨범 아트를 공유하고 'Listen in Harbor' 버튼을 함께 표시합니다.",
   "Show on home": "홈에 표시",
   "Show or hide the playback stats overlay.": "재생 통계 오버레이를 표시하거나 숨깁니다.",
   "Show original language": "원문 보기",

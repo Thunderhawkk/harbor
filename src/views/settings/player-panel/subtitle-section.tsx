@@ -2,7 +2,7 @@ import { fillStyle, SliderReset } from "@/components/slider";
 import { DEFAULT } from "@/lib/settings/defaults";
 import { Plus, RotateCcw, X } from "../icons";
 import { useEffect, useRef, useState } from "react";
-import subtitleStill from "@/assets/settings-preview/steamboat-willie.webp";
+import subtitleStill from "@/assets/godfather-offer.svg";
 import { sfntFamilyName } from "@/lib/font-family-name";
 import { saveFontData } from "@/lib/font-storage";
 import { useSettings } from "@/lib/settings";

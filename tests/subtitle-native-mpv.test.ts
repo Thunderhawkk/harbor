@@ -5,7 +5,7 @@ import test from "node:test";
 // @ts-expect-error Node test types are intentionally outside the browser-only tsconfig.
 import { spawn, execFileSync } from "node:child_process";
 // @ts-expect-error Node test types are intentionally outside the browser-only tsconfig.
-import { mkdtempSync, unlinkSync, rmdirSync } from "node:fs";
+import { mkdtempSync, unlinkSync, rmdirSync, readFileSync } from "node:fs";
 // @ts-expect-error Node test types are intentionally outside the browser-only tsconfig.
 import { tmpdir } from "node:os";
 // @ts-expect-error Node test types are intentionally outside the browser-only tsconfig.
@@ -16,6 +16,7 @@ import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
 import { emptySnapshot } from "../src/lib/player/bridge.ts";
 import { mpvBridgeHarness, playerSnapshotChanged } from "./helpers/mpv-bridge-harness.ts";
+import ts from "typescript";
 
 // @ts-expect-error This opt-in test runs only in Node, not in the browser build.
 const binary = process.env.HARBOR_MPV_TEST_BINARY;
@@ -27,7 +28,7 @@ async function eventually(predicate: () => boolean, timeout = 5000) {
 }
 
 test(
-  "native Windows mpv delivers consecutive primary and secondary cues with native rendering hidden",
+  "native Windows mpv preserves subtitle cues while switching secondary rendering",
   {
     skip: !binary,
     timeout: 25000,
@@ -170,6 +171,38 @@ test(
       );
       assert.equal(String(await command(["get_property", "sid"])), english);
       assert.equal(await command(["get_property", "sub-visibility"]), false);
+
+      // Run the real style writer against this isolated native player's IPC.
+      const styleSource = readFileSync(
+        new URL("../src/lib/player/sub-style.ts", import.meta.url),
+        "utf8",
+      );
+      const styleCode = ts.transpileModule(styleSource, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+      }).outputText;
+      const styleModule = { exports: {} as Record<string, (...args: unknown[]) => Promise<void>> };
+      new Function("require", "module", "exports", styleCode)(
+        (id: string) => {
+          assert.equal(id, "@tauri-apps/api/core");
+          return {
+            invoke: (name: string, args: { name: string; value: unknown }) => {
+              assert.equal(name, "mpv_set_property");
+              return command(["set_property", args.name, args.value]);
+            },
+          };
+        },
+        styleModule,
+        styleModule.exports,
+      );
+      await styleModule.exports.applySecondarySubNative(true, "top", 4);
+      assert.equal(await command(["get_property", "secondary-sub-visibility"]), true);
+      assert.equal(await command(["get_property", "secondary-sub-pos"]), 0);
+      await styleModule.exports.applySecondarySubNative(true, "bottom", 12);
+      assert.equal(await command(["get_property", "secondary-sub-pos"]), 80);
+      await styleModule.exports.applySecondarySubNative(false, "bottom", 12);
+      assert.equal(await command(["get_property", "secondary-sub-visibility"]), false);
+      assert.equal(String(await command(["get_property", "secondary-sid"])), arabic);
+
       const changed = playerSnapshotChanged();
       let previous = emptySnapshot;
       const primary: string[] = [];

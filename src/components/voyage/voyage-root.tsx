@@ -1,7 +1,4 @@
-import { useVoyageOpen } from "@/lib/voyage/store";
-import { VoyageModal } from "./voyage-modal";
-
+// Voyage now opens inside its Discover card instead of a global dialog.
 export function VoyageRoot() {
-  const open = useVoyageOpen();
-  return open ? <VoyageModal /> : null;
+  return null;
 }

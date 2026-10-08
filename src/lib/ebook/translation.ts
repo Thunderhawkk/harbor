@@ -2,7 +2,7 @@ import { getUiLanguage, LANGUAGES, type UiLanguage } from "@/lib/i18n";
 import { safeFetchStream } from "@/lib/safe-fetch";
 import { setItemWithRecovery } from "@/lib/storage-recovery";
 import { ebookTranslationCacheGet, ebookTranslationCachePut } from "./cache";
-import translationInstructions from "./translation-instructions.md?raw";
+import translationInstructions from "./translation-chapter-instructions.md?raw";
 
 const STORAGE_KEY = "harbor.ebook.translation.v1";
 const CACHE_PREFIX = "harbor.ebook.translation.cache.v1.";

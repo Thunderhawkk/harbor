@@ -1,4 +1,5 @@
 import { isAndroidTv } from "@/lib/platform";
+import { useSettings } from "@/lib/settings";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Measured on a Fire TV Stick 4K Max: that WebView does not composite transform
@@ -14,5 +15,6 @@ import { useReducedMotion } from "@/lib/use-reduced-motion";
 // native Android handheld very likely composites these fine.
 export function useBpDecorMotion(): boolean {
   const reduce = useReducedMotion();
-  return !reduce && !isAndroidTv();
+  const { settings } = useSettings();
+  return !reduce && !isAndroidTv() && settings.bigPictureBackdropZoom !== false;
 }

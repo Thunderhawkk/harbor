@@ -93,10 +93,17 @@ async function gatherStreamAddons(authKey: string | null, settings: Settings): P
       list.push(torbox);
     }
   }
+  // The switch holds back the extensions that have a page of their own; a plugin with no rows of
+  // its own is asked either way, which is why only the first is required here.
   if (settings.pluginsEnabled && settings.pluginsBackground) {
     await loadStreamPlugins();
     setStreamPluginConfig({ tmdbKey: settings.tmdbKey });
-    list.push(...pluginAddons({ enabled: true, groupByRepo: settings.pluginsGroupByRepo }));
+    list.push(
+      ...pluginAddons({
+        groupByRepo: settings.pluginsGroupByRepo,
+        includeExtensions: settings.pluginsOutsideTab,
+      }),
+    );
   }
   return list;
 }

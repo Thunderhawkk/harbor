@@ -3,17 +3,33 @@ use super::super::{
 };
 use tauri::Manager;
 
+fn music_db_file(profile: Option<&str>) -> String {
+    let id = profile.unwrap_or("").trim();
+    if id.is_empty() || id == "default" {
+        return "music.db".to_string();
+    }
+    let safe: String = id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .take(48)
+        .collect();
+    format!("music-{safe}.db")
+}
+
 #[tauri::command]
 pub fn music_db_init(
     app: tauri::AppHandle,
     state: tauri::State<'_, MusicState>,
     migration: Option<MusicMigration>,
+    profile: Option<String>,
 ) -> Result<MusicBootstrap, String> {
     let directory = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    state.db.initialize(&directory.join("music.db"))?;
+    state
+        .db
+        .initialize(&directory.join(music_db_file(profile.as_deref())))?;
     if let Some(migration) = migration {
         store::migrate(&state.db, &migration)?;
     }

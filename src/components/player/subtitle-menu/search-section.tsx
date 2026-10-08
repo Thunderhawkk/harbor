@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import type { Addon } from "@/lib/addons";
 import { gatherSubtitleAddons } from "@/lib/subtitles/addon-source";
-import { languageName } from "@/lib/subtitles/language";
+import { isKnownLanguage, languageName, langScore } from "@/lib/subtitles/language";
 import { HoverTooltip } from "@/components/hover-tooltip";
 import { searchSubtitles, type SearchOptions } from "@/lib/subtitles/search";
 import { subtitleLoadMetadataOf, subtitleTitleOf } from "@/lib/subtitles/provider-label";
@@ -74,9 +74,24 @@ function playingKeyOf(
   return `${metaImdbId ?? ""}|${metaTitle ?? ""}|${season ?? ""}|${episode ?? ""}`;
 }
 
-export function SearchSection(props: SubtitleMenuProps) {
+export function SearchSection(
+  props: SubtitleMenuProps & {
+    focusLang?: string | null;
+    focusLabel?: string | null;
+    onClearFocus?: () => void;
+  },
+) {
   const t = useT();
-  const { metaImdbId, metaTitle, season, episode, onAddSubtitle } = props;
+  const {
+    metaImdbId,
+    metaTitle,
+    season,
+    episode,
+    onAddSubtitle,
+    focusLang,
+    focusLabel,
+    onClearFocus,
+  } = props;
   const { settings } = useSettings();
   const { authKey } = useAuth();
   const playbackContext = useSubtitleContext();
@@ -408,8 +423,22 @@ export function SearchSection(props: SubtitleMenuProps) {
     if (sortBySource) {
       for (const g of out) g.items.sort((a, b) => a.source.localeCompare(b.source));
     }
+    // A translating addon labels its generated entries with a display name (e.g.
+    // "Make Hindi") instead of a language code. Those groups are exactly what the addon
+    // exists for, so keep them near the user's preferred languages instead of leaving
+    // them dead last behind every other language. Order: preferred, generated, rest.
+    const preferred = settings.preferredSubLangs ?? [];
+    const tier = (lang: string) =>
+      langScore(lang, preferred) > 0 ? 0 : isKnownLanguage(lang) ? 2 : 1;
+    out.sort((a, b) => tier(a.lang) - tier(b.lang));
     return out;
-  }, [filtered, sortBySource]);
+  }, [filtered, sortBySource, settings.preferredSubLangs]);
+
+  // A generated translation group picked from the sidebar narrows the list to that group.
+  const visibleGroups = useMemo(
+    () => (focusLang ? grouped.filter((g) => g.lang === focusLang) : grouped),
+    [grouped, focusLang],
+  );
 
   useLayoutEffect(() => {
     if (scrollRestored.current || !restorable) return;
@@ -551,6 +580,20 @@ export function SearchSection(props: SubtitleMenuProps) {
             : t("No subtitles found. Try another title above, or adjust the season and episode.")}
         </p>
       )}
+      {focusLang && results !== null && (
+        <div className="flex items-center gap-2 px-4 py-1.5 text-[11.5px] text-ink-subtle">
+          <span className="min-w-0 flex-1 truncate">
+            {t("Showing {lang}", { lang: focusLabel ?? focusLang })}
+          </span>
+          <button
+            type="button"
+            onClick={() => onClearFocus?.()}
+            className="shrink-0 rounded-full bg-elevated px-2.5 py-1 font-semibold text-ink ring-1 ring-edge-soft transition-colors hover:bg-raised"
+          >
+            {t("Show all")}
+          </button>
+        </div>
+      )}
       <div
         ref={resultsRef}
         onScroll={(e) => {
@@ -558,7 +601,7 @@ export function SearchSection(props: SubtitleMenuProps) {
         }}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {grouped.map(({ lang, items }, i) => (
+        {visibleGroups.map(({ lang, items }, i) => (
           <LangGroup
             key={lang}
             lang={lang}

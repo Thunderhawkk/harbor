@@ -73,6 +73,14 @@ export function LibraryTab() {
         )}
       >
         <SettingGroup label={t("On disk")}>
+          <ToggleRow
+            label={t("Keep folders up to date")}
+            sub={t(
+              "Checks the folders already in your library when you open it and adds anything new it finds. Titles you already have are left alone, including any you corrected with Identify.",
+            )}
+            value={settings.localAutoScan}
+            onChange={(v) => update({ localAutoScan: v })}
+          />
           <SettingRow
             icon={<HardDrive size={18} strokeWidth={2} />}
             label={t("Minimum file size")}
@@ -148,7 +156,7 @@ export function LibraryTab() {
 
 function ArtworkSwatch({ ratio }: { ratio: "portrait" | "landscape" | "logo" }) {
   const t = useT();
-  const art = useSampleArtwork();
+  const art = useSampleArtwork(10);
   if (ratio === "logo") {
     return (
       <div className="flex h-14 w-full items-center justify-center rounded-[10px] bg-elevated px-3">

@@ -406,13 +406,16 @@ Download the latest build for macOS or Windows from the [Releases page][releases
 
 | Platform    | Format                                                                                                   |
 | ----------- | -------------------------------------------------------------------------------------------------------- |
-| **macOS**   | `.dmg` (macOS 11.0 or newer)                                                                             |
+| **macOS**   | `.dmg` (macOS 15.0 or newer, Apple silicon)                                                              |
 | **Windows** | `.exe` NSIS installer (current user install), or `winget install HarborStremio.Harbor`                   |
 | **Web**     | Open in any modern browser, nothing to install                                                           |
 | **Linux**   | [Unofficial `.deb`, `.rpm`, and Flatpak packages](https://github.com/AdityaHebballe/harbor-linux-builds) |
 
 > [!NOTE]
 > Linux packages above are community-maintained. Official Harbor Linux packages are coming soon.
+
+> [!NOTE]
+> **First launch on macOS.** Harbor's macOS builds carry an ad-hoc code signature rather than an Apple Developer ID, so Gatekeeper reports it as coming from an unidentified developer and some antivirus tools flag the download. Drag Harbor to Applications, then either run `xattr -dr com.apple.quarantine /Applications/Harbor.app` in Terminal, or open **System Settings > Privacy & Security** and choose **Open Anyway**. If you would rather not trust a binary, [build from source](#build-from-source).
 
 **Out of the box, Harbor works on Cinemeta.** You can browse, play, and cast immediately. Adding a free **TMDB key** in Settings is optional and unlocks the richer trending, theaters, per service, and Watch on experiences described above. Your installed Stremio addons merge in automatically when you sign in, deduplicated against the built in rails.
 

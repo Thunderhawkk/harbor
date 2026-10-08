@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createAthleteCareerClient,
+  golfStatSeasons,
+  parseGolfAthleteSeason,
   parseCoreAthleteCareer,
   parseMmaAthleteCareer,
   parseWebAthleteCareer,
@@ -242,4 +244,111 @@ test("malformed paths and cancelled consumers never trigger requests", async () 
   c.abort();
   await assert.rejects(client("football/nfl", "12", c.signal), { name: "AbortError" });
   assert.equal(calls, 0);
+});
+
+const golfRef = (path: string) => ({ $ref: `http://sports.core.api.espn.com/v2/sports/golf/leagues/${path}?lang=en&region=us` });
+const golfLog = (years = [2026, 2024], id = "11056", tour = "pga") => ({
+  entries: years.map((year) => ({
+    season: golfRef(`${tour}/seasons/${year}`),
+    statistics: [{ statistics: golfRef(`${tour}/seasons/${year}/types/2/athletes/${id}/statistics/0`) }],
+  })),
+});
+const golfSeason = (year = 2026, id = "11056", tour = "pga") => ({
+  athlete: golfRef(`${tour}/seasons/${year}/athletes/${id}`),
+  season: golfRef(`${tour}/seasons/${year}`),
+  splits: { type: "total", categories: [{ name: "general", stats: [
+    { name: "tournamentsPlayed", abbreviation: "EVENTS", displayName: "Tournaments played", value: 22, displayValue: "22" },
+    { name: "wins", displayName: "Wins", value: 0, displayValue: "0" },
+    { name: "scoringAverage", displayName: "Scoring average per round", value: 70.21212, displayValue: "70.2" },
+    { name: "amount", displayName: "Official money won", value: 1959986, displayValue: "$1,959,986" },
+    { name: "yardsPerDrive", displayValue: "0" },
+    { name: "birdies", displayValue: "—" },
+    { name: "puttsGirAvg" },
+  ] }] },
+});
+
+test("golf discovers published seasons in order, skipping gaps, duplicates, foreign tours and other athletes", () => {
+  const data = golfLog([2024, 2026, 2024]);
+  data.entries.push({ season: golfRef("pga/seasons/2025"), statistics: [] });
+  data.entries.push(...golfLog([2027], "999").entries, ...golfLog([2028], "11056", "lpga").entries);
+  const malicious = golfLog([2029]);
+  malicious.entries[0].statistics[0].statistics.$ref = "https://evil.test/v2/sports/golf/leagues/pga/seasons/2029/types/2/athletes/11056/statistics/0";
+  data.entries.push(...malicious.entries);
+  assert.deepEqual(golfStatSeasons(data, "pga", "11056"), ["2026", "2024"]);
+  assert.deepEqual(golfStatSeasons(null, "pga", "11056"), []);
+});
+
+test("golf preserves the season, source rounding, money and genuine zeroes without displaying placeholder zeroes", () => {
+  const [category] = parseGolfAthleteSeason(golfSeason(), "pga", "11056", "2026");
+  assert.equal(category.season, "2026");
+  assert.deepEqual(category.totals, ["22", "0", "70.2", "$1,959,986"]);
+  assert.equal(category.descriptions[0], "Tournaments played");
+  assert.deepEqual(category.rows, []);
+  assert.deepEqual(parseGolfAthleteSeason(golfSeason(), "pga", "999", "2026"), []);
+  assert.deepEqual(parseGolfAthleteSeason(golfSeason(), "pga", "11056", "2025"), []);
+  assert.deepEqual(parseGolfAthleteSeason(golfSeason(), "lpga", "11056", "2026"), []);
+  const split = golfSeason(); split.splits.type = "home";
+  assert.deepEqual(parseGolfAthleteSeason(split, "pga", "11056", "2026"), []);
+});
+
+test("PGA loads its log and newest published season instead of the failing common /stats endpoint, then caches", async () => {
+  const urls: string[] = [];
+  const client = createAthleteCareerClient(async (url) => {
+    urls.push(url);
+    return url.endsWith("statisticslog") ? golfLog() : golfSeason();
+  });
+  const result = await client("golf/pga", "11056", new AbortController().signal);
+  assert.equal(result[0].season, "2026");
+  assert.deepEqual(urls, [
+    "https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/athletes/11056/statisticslog",
+    "https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons/2026/types/2/athletes/11056/statistics/0",
+  ]);
+  assert.equal(await client("golf/pga", "11056", new AbortController().signal), result);
+  assert.equal(urls.length, 2);
+});
+
+test("golf falls back only across published empty seasons and labels older results accurately", async () => {
+  const calls: string[] = [];
+  const client = createAthleteCareerClient(async (url) => {
+    calls.push(url);
+    if (url.endsWith("statisticslog")) return golfLog();
+    return url.includes("/2024/") ? golfSeason(2024) : null;
+  });
+  const result = await client("golf/pga", "11056", new AbortController().signal);
+  assert.equal(result[0].season, "2024");
+  assert.equal(calls.length, 3);
+});
+
+test("empty golf feeds are bounded, while transient errors remain retryable and never become stale stats", async () => {
+  let calls = 0;
+  const empty = createAthleteCareerClient(async (url) => {
+    calls++;
+    return url.endsWith("statisticslog") ? golfLog([2026, 2025, 2024, 2023, 2022]) : null;
+  });
+  assert.deepEqual(await empty("golf/pga", "11056", new AbortController().signal), []);
+  assert.equal(calls, 4);
+  let fail = true;
+  const retry = createAthleteCareerClient(async (url) => {
+    if (url.endsWith("statisticslog")) return golfLog();
+    if (fail) throw new Error("503");
+    return golfSeason();
+  });
+  await assert.rejects(retry("golf/pga", "11056", new AbortController().signal), /503/);
+  fail = false;
+  assert.equal((await retry("golf/pga", "11056", new AbortController().signal))[0].season, "2026");
+});
+
+test("cancelling a golf profile stops the follow-up request even if the transport completes late", async () => {
+  const controller = new AbortController();
+  let calls = 0, resolve: (raw: unknown) => void = () => {};
+  const client = createAthleteCareerClient(async () => {
+    calls++;
+    return new Promise((done) => { resolve = done; });
+  });
+  const pending = client("golf/pga", "11056", controller.signal);
+  await new Promise((done) => setTimeout(done, 0));
+  controller.abort();
+  resolve(golfLog());
+  await assert.rejects(pending, { name: "AbortError" });
+  assert.equal(calls, 1);
 });

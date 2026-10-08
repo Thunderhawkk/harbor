@@ -11,13 +11,13 @@ const source = readFileSync(
 );
 
 test("a signed-out movie rewatch keeps updating its local Continue Watching entry", () => {
-  assert.match(source, /movieWasWatched \|\| localCwEntry\(id\) !== null/);
+  assert.match(source, /movieWasWatched \|\| localCwEntry\(id, true, current\.ownerId\) !== null/);
   assert.match(source, /rewatchMovie[\s\S]*?saveLocalCw\(/);
 });
 
 test("finishing a movie clears the local Continue Watching entry", () => {
   assert.match(
     source,
-    /if \(s\.meta\.type === "movie" && finished\) \{\s*setMovieWatchedLocal\(id, true\);\s*clearLocalCw\(id\);/,
+    /if \(s\.meta\.type === "movie" && finished\) \{\s*setMovieWatchedLocal\(id, true\);\s*clearLocalCw\(id, current\.ownerId\);/,
   );
 });

@@ -1,4 +1,5 @@
 import { lruSet } from "@/lib/cache";
+import { browseDiscoverKey, type BrowseId, type BrowseKind } from "./browse-kind";
 import { get, IMG } from "./tmdb-client";
 
 const COMPANY_CACHE_MAX = 500;
@@ -39,9 +40,9 @@ function yearOf(value: unknown): number | null {
 
 export async function tmdbCompanyArt(
   key: string,
-  id: number,
+  id: BrowseId,
   mediaType: "movie" | "tv",
-  brand: "studio" | "network" = "studio",
+  brand: BrowseKind = "studio",
 ): Promise<CompanyArt> {
   if (!key || !id) return EMPTY_ART;
   const k = `${brand}:${id}:${mediaType}`;
@@ -51,18 +52,20 @@ export async function tmdbCompanyArt(
   if (running) return running;
   const p = (async () => {
     const [images, top] = await Promise.all([
-      get<{ logos?: Array<{ file_path?: string }> }>(
-        key,
-        brand === "network" ? `network/${id}/images` : `company/${id}/images`,
-        {},
-      ).catch(() => null),
+      brand === "country"
+        ? Promise.resolve(null)
+        : get<{ logos?: Array<{ file_path?: string }> }>(
+            key,
+            brand === "network" ? `network/${id}/images` : `company/${id}/images`,
+            {},
+          ).catch(() => null),
       get<{
         results?: Array<{ backdrop_path?: string; release_date?: string; first_air_date?: string }>;
         total_results?: number;
       }>(key, `discover/${mediaType}`, {
-        [brand === "network" ? "with_networks" : "with_companies"]: String(id),
+        [browseDiscoverKey(brand)]: String(id),
         sort_by: "popularity.desc",
-        "vote_count.gte": "50",
+        "vote_count.gte": brand === "country" ? "10" : "50",
       }).catch(() => null),
     ]);
     const logoPath = images?.logos?.find((l) => l.file_path)?.file_path ?? null;

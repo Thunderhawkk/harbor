@@ -142,6 +142,7 @@ impl MusicConnector for SoundCloudConnector {
             status,
             &["search", "browse", "play"],
         )
+        .anonymous()
     }
 }
 

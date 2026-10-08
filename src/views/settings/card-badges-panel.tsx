@@ -132,7 +132,7 @@ function PreviewCard({
   watchlistBadge: WatchlistPos;
   limit: number;
 }) {
-  const normalPoster = useSampleArtwork().poster;
+  const normalPoster = useSampleArtwork(8).poster;
   const animePoster = ANIME_PREVIEW;
   const extras = previewExtras(flags);
   const normal: React.ReactNode[] = [];

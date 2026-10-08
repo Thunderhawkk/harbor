@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, LoaderCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, LoaderCircle, RefreshCw } from "@/components/icons/music-icons";
 import { CastIcon } from "@/components/player/cast-icon";
 import type { CastDeviceInfo } from "@/lib/cast";
 import { useT } from "@/lib/i18n";

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { cloudWriteId, libraryGetOne, libraryGetOneStrict, type LibraryItem } from "@/lib/stremio";
 import { cloudLibraryPut, flushWriteQueue, queuedWatched } from "@/lib/stremio-write-queue";
 import { withItemLock } from "@/lib/stremio-item-lock";
@@ -10,6 +10,7 @@ import { recordWatchedBy } from "@/lib/watched-by";
 import { recordAnimeCwId } from "@/lib/anime-cw-ids";
 import type { PlayerSrc } from "@/lib/view";
 import { resumeLibraryGetOne } from "@/lib/player/resume-start";
+import { playerLoadIdentity } from "@/lib/player/load-identity";
 
 const ANIME_SCHEME = /^(kitsu|mal|anilist|anidb):/;
 
@@ -83,13 +84,21 @@ export function useStremioSync(params: {
   const fetchedRef = useRef<string | null>(null);
   const lastWrittenMtimesRef = useRef<Set<string>>(new Set());
   const sessionCidRef = useRef<string | null>(null);
-  const lastGoodPosRef = useRef(0);
   const wroteOnceRef = useRef(false);
   const loadResetSeenRef = useRef(true);
   const latestRef = useRef({ src, snap, authKey, canonicalId, resolutionSettled });
   latestRef.current = { src, snap, authKey, canonicalId, resolutionSettled };
 
   const ourVideoId = videoIdFor(src, canonicalId);
+  // Preserve the outgoing playback's data through effect cleanup. latestRef
+  // already describes the incoming episode by the time that cleanup runs.
+  const sourceIdentity = playerLoadIdentity(src, src.url, src.episode?.season, src.episode?.episode);
+  const progress = useMemo(
+    () => ({ latest: null as typeof latestRef.current | null, position: 0 }),
+    [sourceIdentity],
+  );
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
 
   useEffect(() => {
     const vid = ourVideoId;
@@ -106,11 +115,17 @@ export function useStremioSync(params: {
         });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ourVideoId, src.url]);
+
+  useEffect(() => {
     return () => {
-      const { src: s, snap: sn, authKey: ak } = latestRef.current;
-      const cid = sessionCidRef.current ?? latestRef.current.canonicalId;
+      const saved = progress.latest;
+      if (!saved) return;
+      const { src: s, snap: sn, authKey: ak, canonicalId: cid } = saved;
+      const vid = videoIdFor(s, cid);
       if (!ak || !cid || !vid) return;
-      const pos = getPlaybackPosition() || lastGoodPosRef.current;
+      const pos = progress.position;
       if (pos < MIN_POSITION_SEC) return;
       const base = baseItemRef.current?._id === cid ? baseItemRef.current : null;
       void writeLibraryItem(ak, s, sn, base, cid, pos, false, vid).then((mt) => {
@@ -118,20 +133,26 @@ export function useStremioSync(params: {
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ourVideoId, src.url]);
+  }, [progress]);
 
   useEffect(() => {
     sessionStartRef.current = Date.now();
-    lastGoodPosRef.current = 0;
+    lastSyncedRef.current = 0;
     loadResetSeenRef.current = false;
-  }, [ourVideoId, src.url]);
+  }, [progress]);
 
   useEffect(() => {
     if (loadResetSeenRef.current) return;
     if (snap.status === "loading" || (snap.positionSec === 0 && snap.durationSec === 0)) {
       loadResetSeenRef.current = true;
     }
-  }, [snap.status, snap.positionSec, snap.durationSec]);
+  }, [progress, snap.status, snap.positionSec, snap.durationSec]);
+
+  useEffect(() => {
+    if (!loadResetSeenRef.current || snap.status === "loading" || snap.status === "idle") return;
+    if (snap.durationSec > 0) progress.latest = latestRef.current;
+    if (snap.positionSec >= MIN_POSITION_SEC) progress.position = snap.positionSec;
+  });
 
   useEffect(() => {
     sessionCidRef.current = null;
@@ -141,8 +162,10 @@ export function useStremioSync(params: {
   useEffect(
     () =>
       subscribePlaybackClock(() => {
+        const current = progressRef.current;
+        if (!current.latest) return;
         const pos = getPlaybackPosition();
-        if (pos >= MIN_POSITION_SEC) lastGoodPosRef.current = pos;
+        if (pos >= MIN_POSITION_SEC) current.position = pos;
       }),
     [],
   );
@@ -173,21 +196,24 @@ export function useStremioSync(params: {
   }, [authKey, canonicalId]);
 
   const writeWithFreshBase = async (isTerminal: boolean, withGet: boolean) => {
+    const current = progressRef.current;
+    if (!current.latest) return;
     const {
       src: s,
       snap: sn,
       authKey: ak,
       canonicalId: liveCid,
       resolutionSettled: settled,
-    } = latestRef.current;
+    } = current.latest;
     if (!ak || !settled || !loadResetSeenRef.current) return;
     const cid = sessionCidRef.current ?? liveCid;
     if (!cid) return;
-    const pos = getPlaybackPosition() || lastGoodPosRef.current;
+    const pos = getPlaybackPosition() || current.position;
     if (pos < MIN_POSITION_SEC || sn.durationSec <= 0) return;
     const vid = videoIdFor(s, cid);
     const fresh =
       withGet || !wroteOnceRef.current ? await libraryGetOne(ak, cid).catch(() => null) : null;
+    if (current !== progressRef.current) return;
     if (fresh) baseItemRef.current = fresh;
     const base = fresh ?? (baseItemRef.current?._id === cid ? baseItemRef.current : null);
     const remoteMs = (base?.state?.timeOffset ?? 0) as number;
@@ -209,7 +235,7 @@ export function useStremioSync(params: {
     }
     lastSyncedRef.current = ourMs;
     const wroteMtime = await writeLibraryItem(ak, s, sn, base, cid, pos, isTerminal);
-    if (wroteMtime) {
+    if (wroteMtime && current === progressRef.current) {
       lastWrittenMtimesRef.current.add(wroteMtime);
       sessionCidRef.current = cid;
       wroteOnceRef.current = true;
@@ -217,17 +243,19 @@ export function useStremioSync(params: {
   };
 
   const writeFlushFast = (): Promise<void> => {
+    const current = progressRef.current;
+    if (!current.latest) return Promise.resolve();
     const {
       src: s,
       snap: sn,
       authKey: ak,
       canonicalId: liveCid,
       resolutionSettled: settled,
-    } = latestRef.current;
+    } = current.latest;
     if (!ak || !settled || !loadResetSeenRef.current) return Promise.resolve();
     const cid = sessionCidRef.current ?? liveCid;
     if (!cid) return Promise.resolve();
-    const pos = getPlaybackPosition() || lastGoodPosRef.current;
+    const pos = getPlaybackPosition() || current.position;
     if (pos < MIN_POSITION_SEC || sn.durationSec <= 0) return Promise.resolve();
     const base = baseItemRef.current?._id === cid ? baseItemRef.current : null;
     return writeLibraryItem(ak, s, sn, base, cid, pos, true).then((mt) => {

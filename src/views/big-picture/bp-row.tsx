@@ -182,13 +182,13 @@ export function BpRow({
     if (!section || leads.length === 0) return;
     let timer = 0;
     const stop = onBpCardVisible(section, () => {
-      timer = window.setTimeout(() => prefetchBpHeroArt(leads), 300);
+      timer = window.setTimeout(() => prefetchBpHeroArt(leads, settings.heroFullQuality), 300);
     });
     return () => {
       stop();
       window.clearTimeout(timer);
     };
-  }, [leads]);
+  }, [leads, settings.heroFullQuality]);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -206,7 +206,7 @@ export function BpRow({
           timer = window.setTimeout(tick, 90);
           return;
         }
-        prefetchBpRowNeighbours(all, index, settings.tmdbKey);
+        prefetchBpRowNeighbours(all, index, settings.tmdbKey, settings.heroFullQuality);
       };
       timer = window.setTimeout(tick, 90);
     };
@@ -215,7 +215,7 @@ export function BpRow({
       window.clearTimeout(timer);
       track.removeEventListener("focusin", onFocus);
     };
-  }, [all, settings.tmdbKey]);
+  }, [all, settings.tmdbKey, settings.heroFullQuality]);
 
   if (all.length === 0) return null;
 

@@ -6,7 +6,7 @@ import { externalWatchedIds } from "@/lib/feed/external-watched";
 import { isVoyageWatched, voyageProgress } from "./progress";
 import { movieWatchedIds } from "@/lib/movie-watched";
 import { watchedFlagIds } from "@/lib/watched-flag";
-import { generatePool, usable, type PoolExclude } from "./generate";
+import { deeperPool, generatePool, usable, type PoolExclude } from "./generate";
 import { ensureRelated, prefetchRelated, relatedResolved } from "./affinity";
 import { themeById } from "./themes";
 import type { StoredVoyage, Voyage, VoyageState, VoyageTheme } from "./types";
@@ -328,10 +328,54 @@ export function rerollHeadings(key = "") {
     new Set(v.seen ?? []),
     3,
   );
-  if (headingIds.length === 0) return;
+  if (headingIds.length > 0) {
+    const nextSeen = [...new Set([...(v.seen ?? []), ...headingIds])];
+    set({ active: { ...v, headingIds, seen: nextSeen } });
+    prefetchRelated(headingMetas(v, headingIds), key);
+  }
+  if (headingIds.length < 3) void fillPool(v.id, key);
+}
+
+async function fillPool(voyageId: string, key: string) {
+  const current = state.active;
+  if (!current || current.id !== voyageId || current.phase !== "building") return;
+  if (current.poolFilling) return;
+  const theme = themeById(current.themeId);
+  if (!theme) return;
+  const round = (current.poolRound ?? 0) + 1;
+  set({ active: { ...current, poolFilling: true } });
+  let fresh: Meta[] = [];
+  try {
+    fresh = await deeperPool(theme, buildExclude(), round);
+  } catch {
+    fresh = [];
+  }
+  const v = state.active;
+  if (!v || v.id !== voyageId || v.phase !== "building") return;
+  const have = new Set(v.pool.map((m) => m.id));
+  const added = fresh.filter((m) => !have.has(m.id) && onTheme(m, theme.genre));
+  if (added.length === 0) {
+    set({ active: { ...v, poolFilling: false, poolRound: round } });
+    return;
+  }
+  const pool = [...v.pool, ...added];
+  const used = new Set([...v.routeIds, ...v.headingIds]);
+  const headingIds = rankHeadings(
+    pool,
+    pickedMetasOf({ ...v, pool }, v.routeIds),
+    v.recVotes ?? {},
+    used,
+    new Set(v.seen ?? []),
+    3,
+  );
+  const next: Voyage = { ...v, pool, poolFilling: false, poolRound: round };
+  if (headingIds.length === 0) {
+    set({ active: next });
+    return;
+  }
   const nextSeen = [...new Set([...(v.seen ?? []), ...headingIds])];
-  set({ active: { ...v, headingIds, seen: nextSeen } });
-  prefetchRelated(headingMetas(v, headingIds), key);
+  set({ active: { ...next, headingIds, seen: nextSeen } });
+  prefetchRelated(headingMetas(next, headingIds), key);
 }
 
 export function endVoyage() {

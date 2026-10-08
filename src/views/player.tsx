@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SportsDockControls } from "./sports/dock-controls";
+import { useDockDrag, type DockSpot } from "./sports/use-dock-drag";
+import { readEmbedRect } from "@/lib/player/embed-rect";
 import { EmbeddedBroadcastPlayer } from "./sports/embedded-broadcast-player";
 import { resolveChromeTheme } from "@/lib/theme";
 import { useBigPicture } from "@/lib/big-picture";
@@ -128,19 +130,20 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
     exitPlayback,
     replacePlayerSrc,
     exitPlayer,
+    setPipDocked,
     picker,
   } = useView();
   const docked = !!src.sportsDocked;
   const [dockMinimized, setDockMinimized] = useState(false);
   const setChromeHidden = useCallback(
-    (hidden: boolean) => setAppChromeHidden(docked ? false : hidden),
-    [docked, setAppChromeHidden],
+    (hidden: boolean) => setAppChromeHidden(docked || src.pipDocked ? false : hidden),
+    [docked, src.pipDocked, setAppChromeHidden],
   );
   useEffect(() => {
     setAppChromeHidden(false);
     window.dispatchEvent(new Event("resize"));
     window.dispatchEvent(new Event("harbor:mpv-refresh-geom"));
-  }, [docked, setAppChromeHidden]);
+  }, [docked, src.pipDocked, setAppChromeHidden]);
   const { settings, update } = useSettings();
   const bigPictureActive = useBigPicture().active;
   const isKid = useActiveKid() != null;
@@ -184,6 +187,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
     hostSource,
   } = useTogether();
   const stageRef = useRef<HTMLDivElement>(null);
+  const refreshDockGeometry = useCallback(() => window.dispatchEvent(new Event("harbor:mpv-refresh-geom")), []);
   const videoMountRef = useRef<HTMLDivElement>(null);
   const bridgeRef = useRef<PlayerBridge | null>(null);
   const selfFrameReadyRef = useRef(false);
@@ -195,7 +199,19 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
     settings,
   });
   const nativeDock = docked && engine === "mpv" && embedActive;
-  useSportsDockSurface(nativeDock && !dockMinimized, videoMountRef);
+  const prepareDockMove = useCallback((next: DockSpot, commit: () => void) => {
+    if (!nativeDock) return false;
+    const stage = stageRef.current?.getBoundingClientRect();
+    const rect = readEmbedRect(videoMountRef.current);
+    if (!stage || !rect) return false;
+    return bridgeRef.current?.moveEmbeddedSurface?.({
+      ...rect,
+      cssLeft: rect.cssLeft + next.x - stage.left,
+      cssTop: rect.cssTop + next.y - stage.top,
+    }, commit) ?? false;
+  }, [nativeDock]);
+  const dockDrag = useDockDrag(stageRef, docked, refreshDockGeometry, prepareDockMove);
+  useSportsDockSurface(nativeDock && !src.pipDocked, videoMountRef);
   const isP2pEngine =
     (isBundledEngineUrl(src.url) || isLocalEngineUrl(src.url)) &&
     !src.url.includes("/hlsv2/") &&
@@ -246,7 +262,14 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
   );
   const [hasStarted, setHasStarted] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const { pipMode, togglePipMode, exitPip } = usePipMode({ bridgeRef, setChromeHidden });
+  // Detached PiP keeps this view mounted so the session survives, and only yields the
+  // page underneath, the way a docked sports broadcast already does.
+  const { pipMode, togglePipMode, exitPip } = usePipMode({
+    bridgeRef,
+    setChromeHidden,
+    onDetach: () => setPipDocked(true),
+    onReattach: () => setPipDocked(false),
+  });
   const { slowLoad, transcodedUrl, sourceError, clearSourceError } = useAutoRetry({
     bridgeRef,
     src,
@@ -569,7 +592,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
   useKeyboardNavigation({
     // TV focus navigation intentionally owns arrows and Space while enabled.
     // Keep it opt-in so standard player hotkeys remain the default.
-    enabled: settings.tvNavigation && settings.playerTvNavigation && !screenLocked,
+    enabled: settings.tvNavigation && settings.playerTvNavigation && !screenLocked && !src.pipDocked,
     wrap: true,
     arrows: chromeVisible && !pipMode,
     onBack: () => {
@@ -801,7 +824,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
 
   const videoFill = useVideoFill(bridgeRef, src.url, playing);
   useLivePictureEq(bridgeRef, src.url);
-  const anime4k = useAnime4k(bridgeRef, src.url, src, snap.videoWidth);
+  const anime4k = useAnime4k(bridgeRef, src.url, src, snap.videoWidth, bridgeReady);
   const [mouseHoldSpeedActive, setMouseHoldSpeedActive] = useState(false);
   const mouseHoldRef = useRef<{
     pointerId: number | null;
@@ -1011,6 +1034,10 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
   });
 
   useEffect(() => {
+    if (snap.status === "idle" || snap.status === "ended" || snap.status === "error") {
+      clearMediaControls();
+      return;
+    }
     const ep = src.episode;
     const subtitle = ep ? `S${ep.season} E${ep.episode}${ep.name ? ` · ${ep.name}` : ""}` : "";
     const artUrl = src.episode?.still || src.meta.background || src.meta.poster || null;
@@ -1022,6 +1049,10 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
     const unsub = subscribePlaybackClock(() => {
       const livePos = getPlaybackPosition();
       const currentSnap = snapRef.current;
+      if (currentSnap.status === "idle" || currentSnap.status === "ended" || currentSnap.status === "error") {
+        clearMediaControls();
+        return;
+      }
       const playingNow =
         currentSnap.status === "playing" && (currentSnap.firstFrameReady || livePos > 0.3);
       updateMediaControls(
@@ -1070,7 +1101,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
     onVolumeFeedback: showVolumeFeedback,
   });
 
-  const { pendingResumeSec, acknowledgeResume, pendingSeekSec, clearPendingSeek } = useBridgeLoad({
+  const { pendingResumeSec, acknowledgeResume, pendingSeekSec, clearPendingSeek, sourceKey, resumeReady } = useBridgeLoad({
     bridgeRef,
     inRoomRef,
     isHostRef,
@@ -1085,6 +1116,8 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
 
   usePendingSeekApply({
     pendingSeekSec,
+    sourceKey,
+    startPaused: src.startPaused,
     clearPendingSeek,
     durationSec: snap.durationSec,
     bridgeRef,
@@ -1151,7 +1184,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
   useTrickplay({
     url: playUrl,
     enabled: settings.seekPreviewEnabled,
-    isLive: src.meta.id?.startsWith("iptv:") ?? false,
+    isLive: isLiveLike,
   });
   const adSegments = useAdSegments(
     src.meta.id,
@@ -1259,7 +1292,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
         url: src.url,
         subtitles: src.subtitles,
         notWebReady: src.notWebReady,
-        isLive: src.meta.id?.startsWith("iptv:"),
+        isLive: isLivePlaybackSrc(src),
         headers: src.headers,
       });
     }
@@ -1333,7 +1366,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
     nextEp: canChangeEpisode && !autoNextCancelled ? airedNext : null,
     nextEpMask,
     pillsVisible: hasStarted || !inRoom,
-    allowAutoSkip: !roomGuest,
+    allowAutoSkip: !roomGuest && resumeReady,
     seekTo,
     goToEpisode,
     playNext,
@@ -1442,12 +1475,14 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
     <main
       ref={stageRef}
       data-harbor-player
+      data-detached={src.pipDocked || undefined}
+      inert={src.pipDocked || undefined}
       data-docked={docked}
       data-native-dock={nativeDock}
       data-audio-only={docked && dockMinimized}
       dir="ltr"
       className={`fixed z-[100] overflow-hidden ${docked ? "sports-player-dock" : "inset-0"} ${stageBg}`}
-      style={screenLocked ? { cursor: "default" } : cursorStyle}
+      style={{ ...(screenLocked ? { cursor: "default" } : cursorStyle), ...dockDrag.style, ...(src.pipDocked ? { visibility: "hidden", pointerEvents: "none" } : {}) }}
       onMouseMove={wakeChrome}
       onMouseEnter={wakeChrome}
     >
@@ -1523,6 +1558,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
       />
       {docked && (
         <SportsDockControls
+          dragHandlers={dockDrag.handlers}
           src={src}
           snap={snap}
           bridge={bridgeRef.current}

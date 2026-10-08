@@ -16,6 +16,7 @@ import { useView } from "@/lib/view";
 import { generateListenRoomCode, isListenRoomCode, normalizeListenRoomCode } from "./room";
 import { listenTrackFromState, type ListenTrackRef } from "./track-state";
 import { listenListenerCount } from "./session";
+import { useListenSession } from "./use-listen-session";
 
 const LISTEN_NAME_KEY = "harbor.together.name";
 const LISTEN_CLIENT_KEY = "harbor.listen-together.clientId";
@@ -186,6 +187,8 @@ export function ListenTogetherProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (snapshot?.room) setBusy(false);
   }, [snapshot?.room]);
+
+  useListenSession({ room, clientId, snapshot, clientRef });
 
   const value = useMemo<ListenTogetherValue>(
     () => ({

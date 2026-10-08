@@ -1,6 +1,7 @@
 import type { KitsuEpisode } from "@/lib/providers/kitsu";
 import { pickLocalizedText } from "@/lib/localized-text";
 import { seasonDateRange, type TvdbOrder } from "@/lib/providers/tvdb-order";
+import { resolveAnimeSlotMatch } from "./anime-slot-match";
 import type { PickerItem } from "../series-episodes/season-arc-picker";
 
 export type AnimeOrderBuild = { items: PickerItem[]; subsetByKey: Map<string, KitsuEpisode[]> };
@@ -35,8 +36,16 @@ export function buildAnimeOrder(
     if (bucket.length === 0) continue;
     const ordered: KitsuEpisode[] = bucket.map((e) => {
       const abs = ordering.absByEpId.get(e.id);
-      let match = byTvdbId.get(e.id) ?? byPair.get(`${e.seasonNumber}:${e.episodeNumber}`);
-      if (!match && abs != null) match = byAbs.get(abs);
+      const match = resolveAnimeSlotMatch(
+        e.seasonNumber,
+        e.episodeNumber,
+        e.id,
+        abs ?? undefined,
+        byTvdbId,
+        byPair,
+        byAbs,
+        matched,
+      );
       if (match) {
         matched.add(match.id);
         return match;

@@ -10,12 +10,14 @@ use stream_cache::{is_fresh, stream_ttl};
 
 pub struct MusicDb {
     connection: Mutex<Option<Connection>>,
+    opened: Mutex<Option<std::path::PathBuf>>,
 }
 
 impl MusicDb {
     pub fn new() -> Self {
         Self {
             connection: Mutex::new(None),
+            opened: Mutex::new(None),
         }
     }
 
@@ -24,8 +26,15 @@ impl MusicDb {
             .connection
             .lock()
             .map_err(|_| "Music database lock is unavailable".to_string())?;
-        if slot.is_some() {
+        let mut opened = self
+            .opened
+            .lock()
+            .map_err(|_| "Music database lock is unavailable".to_string())?;
+        if slot.is_some() && opened.as_deref() == Some(path) {
             return Ok(());
+        }
+        if slot.is_some() {
+            *slot = None;
         }
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -33,6 +42,7 @@ impl MusicDb {
         let mut connection = Connection::open(path).map_err(|error| error.to_string())?;
         Self::configure(&mut connection)?;
         *slot = Some(connection);
+        *opened = Some(path.to_path_buf());
         Ok(())
     }
 
@@ -162,6 +172,7 @@ impl MusicDb {
         Self::configure(&mut connection).expect("configure in-memory music database");
         Self {
             connection: Mutex::new(Some(connection)),
+            opened: Mutex::new(None),
         }
     }
 }

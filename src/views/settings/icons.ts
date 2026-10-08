@@ -149,6 +149,7 @@ export const Power = setIconComponent("Power");
 export const Puzzle = setIconComponent("Puzzle");
 export const Quote = setIconComponent("Quote");
 export const Radio = setIconComponent("Radio");
+export const Relay = setIconComponent("Relay");
 export const RectangleHorizontal = setIconComponent("RectangleHorizontal");
 export const Redo2 = setIconComponent("Redo2");
 export const RefreshCw = setIconComponent("RefreshCw");

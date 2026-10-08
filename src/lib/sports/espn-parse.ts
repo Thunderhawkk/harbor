@@ -1,11 +1,22 @@
 import type { LeagueDef, SportsGame, SportsSide } from "./espn-types";
+import { espnPublishedAthleteId } from "./athlete-identity";
 import { publishedPortraitUrl } from "./athlete-portraits.ts";
 import { publishedScore, publishedScoreDetail } from "./score-detail";
 import { publishedSideContext } from "./card-context.ts";
 
+/** 21st, not 21th: only 11, 12 and 13 take th among the teens. */
+function ordinal(value: number): string {
+  const teen = value % 100;
+  if (teen >= 11 && teen <= 13) return `${value}th`;
+  const last = value % 10;
+  const suffix = last === 1 ? "st" : last === 2 ? "nd" : last === 3 ? "rd" : "th";
+  return `${value}${suffix}`;
+}
+
 export function toSide(c: Record<string, unknown> | undefined, group?: string): SportsSide {
   const team = (c?.team ?? {}) as Record<string, unknown>;
   const athlete = (c?.athlete ?? {}) as Record<string, unknown>;
+  const roster = (c?.roster ?? {}) as Record<string, unknown>;
   const isAthlete = c?.type === "athlete";
 
   let scoreValue = publishedScore(c?.score);
@@ -14,10 +25,8 @@ export function toSide(c: Record<string, unknown> | undefined, group?: string): 
     const won = sets.filter((s) => s?.winner === true).length;
     scoreValue = sets.length > 0 ? String(won) : "";
   }
-  if (!scoreValue && (group === "motorsport" || group === "golf") && typeof c?.order === "number") {
-    const order = c.order as number;
-    const suffix = order === 1 ? "st" : order === 2 ? "nd" : order === 3 ? "rd" : "th";
-    scoreValue = `${order}${suffix}`;
+  if (!scoreValue && FIELD_GROUPS.has(group ?? "") && typeof c?.order === "number") {
+    scoreValue = ordinal(c.order as number);
   }
 
   if (isAthlete) {
@@ -44,6 +53,41 @@ export function toSide(c: Record<string, unknown> | undefined, group?: string): 
       logo: logoUrl,
       score: scoreValue,
       winner: c?.winner === true,
+      athleteId: espnPublishedAthleteId(c),
+      athleteSource: "espn",
+      athleteImage: publishedPortraitUrl(headshot) || undefined,
+    };
+  }
+  // A doubles pair arrives as type:"team" with NO team object, carrying a roster instead. Without
+  // this branch the side comes back unnamed and the blank-name guard below discards a real match.
+  const pairName = typeof roster.displayName === "string" ? roster.displayName.trim() : "";
+  if (pairName) {
+    const squad = Array.isArray(roster.athletes) ? (roster.athletes as Record<string, unknown>[]) : [];
+    const members = squad
+      .map((entry) => {
+        const person = ((entry?.athlete ?? entry) ?? {}) as Record<string, unknown>;
+        const flag = person.flag;
+        return {
+          id: String(person.id ?? ""),
+          name:
+            ((person.displayName as string) ?? (person.fullName as string) ?? "").trim(),
+          flag:
+            typeof flag === "object" && flag !== null
+              ? (((flag as Record<string, unknown>).href as string) ?? "")
+              : "",
+        };
+      })
+      .filter((member) => member.name);
+    return {
+      ...publishedSideContext(c),
+      ...publishedScoreDetail(c, group),
+      id: String(c?.id ?? ""),
+      name: pairName,
+      abbr: typeof roster.shortDisplayName === "string" ? roster.shortDisplayName : "",
+      logo: members[0]?.flag ?? "",
+      score: scoreValue,
+      winner: c?.winner === true,
+      ...(members.length > 0 ? { members } : {}),
     };
   }
   return {
@@ -57,6 +101,9 @@ export function toSide(c: Record<string, unknown> | undefined, group?: string): 
     winner: c?.winner === true,
   };
 }
+
+/** Races and leaderboards place a whole field; a pair of them is not the result. */
+const FIELD_GROUPS = new Set(["motorsport", "golf", "cycling", "swimming", "athletics"]);
 
 export function parseEvents(events: unknown[], def: LeagueDef): SportsGame[] {
   const out: SportsGame[] = [];
@@ -129,7 +176,7 @@ export function parseEvents(events: unknown[], def: LeagueDef): SportsGame[] {
 
     for (const comp of compsToProcess) {
       const cs = (comp.competitors as Record<string, unknown>[] | undefined) ?? [];
-      if (cs.length < 2 && !["motorsport", "golf"].includes(def.group)) continue;
+      if (cs.length < 2 && !FIELD_GROUPS.has(def.group)) continue;
 
       const isAthleteType = cs.some((x) => x.type === "athlete");
       let home: Record<string, unknown> | undefined;
@@ -148,7 +195,7 @@ export function parseEvents(events: unknown[], def: LeagueDef): SportsGame[] {
         away = cs.find((x) => x.homeAway === "away") ?? cs[1];
       }
 
-      if ((!home || !away) && !["motorsport", "golf"].includes(def.group)) continue;
+      if ((!home || !away) && !FIELD_GROUPS.has(def.group)) continue;
       const t = ((comp.status as Record<string, unknown>)?.type ?? {}) as Record<string, unknown>;
       const rawState = t.state;
       const state = rawState === "in" || rawState === "post" ? rawState : "pre";
@@ -175,7 +222,14 @@ export function parseEvents(events: unknown[], def: LeagueDef): SportsGame[] {
         ((comp.venue as Record<string, unknown> | undefined)?.fullName as string) ||
         ((ev.venue as Record<string, unknown> | undefined)?.displayName as string) ||
         "";
-      const contextual = ["tennis", "combat", "motorsport", "golf"].includes(def.group);
+      const contextual = ["tennis", "combat"].includes(def.group) || FIELD_GROUPS.has(def.group);
+      const field =
+        FIELD_GROUPS.has(def.group) && cs.length > 2
+          ? [...cs]
+              .sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999))
+              .map((entry) => toSide(entry, def.group))
+              .filter((side) => side.name.trim().length > 0)
+          : undefined;
       out.push({
         id: idStr,
         league: def.tag,
@@ -183,6 +237,7 @@ export function parseEvents(events: unknown[], def: LeagueDef): SportsGame[] {
         detail: (t.shortDetail as string) ?? (t.detail as string) ?? "",
         home: hSide,
         away: aSide,
+        field,
         broadcasts: Array.isArray(comp.broadcasts)
           ? comp.broadcasts.flatMap((b: { names?: string[] }) => b.names ?? [])
           : [],

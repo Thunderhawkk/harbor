@@ -1,5 +1,6 @@
-import { Music2, Plus } from "lucide-react";
-import { MusicTrackPlaylistChip } from "@/components/music/music-playlist-chip";
+import { Music2, Plus, X } from "@/components/icons/music-icons";
+import { hideMusicRecent, isMusicRecentHidden } from "@/lib/music/hidden-recents";
+import { MusicTrackMixChip, MusicTrackPlaylistChip } from "@/components/music/music-playlist-chip";
 import { MusicMediaBadge } from "@/components/music/music-media-badge";
 import { MusicArtistLink } from "@/components/music/music-artist-link";
 import { MUSIC_SHELF_MIN, MusicCatalogRow } from "@/components/music/music-catalog-row";
@@ -8,6 +9,8 @@ import { Row } from "@/components/row";
 import { favoriteArtists } from "@/lib/music/sources";
 import type { MusicArtistRef, MusicCatalogItem, MusicTrack } from "@/lib/music/types";
 import { localRow, trackItem, type MusicBand, type MusicBandContext } from "./music-band-types";
+import { recentContextsBand } from "./music-recent-contexts-band";
+import { MusicFreshRow } from "./music-fresh-row";
 
 function artistRefs(ctx: MusicBandContext): MusicArtistRef[] {
   const t = ctx.t;
@@ -116,7 +119,7 @@ function NewPlaylistTile({
 }
 
 function recentsBand(ctx: MusicBandContext): MusicBand | null {
-  const recents = ctx.player.recents.slice(0, 18);
+  const recents = ctx.player.recents.filter((track) => !isMusicRecentHidden(track.id)).slice(0, 18);
   if (recents.length === 0) return null;
   const t = ctx.t;
   const items = recents.map(trackItem);
@@ -130,6 +133,18 @@ function recentsBand(ctx: MusicBandContext): MusicBand | null {
         <div className="music-quick-grid">
           {recents.slice(0, 8).map((item) => (
             <div key={item.id} className="music-quick-item">
+              <button
+                type="button"
+                className="music-quick-remove"
+                aria-label={t("music.recents.remove", { title: item.title })}
+                title={t("music.recents.remove", { title: item.title })}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  hideMusicRecent(item.id);
+                }}
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
               <button
                 className="music-quick-art"
                 type="button"
@@ -150,6 +165,7 @@ function recentsBand(ctx: MusicBandContext): MusicBand | null {
                 <div className="music-quick-indicators">
                   <MusicMediaBadge kind={item.mediaKind} />
                   <MusicTrackPlaylistChip track={item} />
+                  <MusicTrackMixChip track={item} />
                 </div>
               </div>
             </div>
@@ -176,26 +192,18 @@ function freshBand(ctx: MusicBandContext): MusicBand | null {
           row={{ ...charts, title, titleLiteral: true, layout: "trackGrid" }}
           count={9}
           numbered
-          onPlay={(item) => ctx.openItem(item, items)}
+          onOpen={(item) => ctx.openItem(item, items)}
         />
       ),
     };
   }
   if (ctx.player.recents.length === 0) return null;
-  const items = ctx.data.fresh.map(trackItem);
   return {
     key: "fresh",
     title: t("music.row.fresh"),
     catalog: false,
     render: (title) => (
-      <MusicCatalogRow
-        row={localRow("fresh", title, t("music.row.freshSubtitle"), "trackGrid", items)}
-        status={ctx.data.freshStatus}
-        error={ctx.data.freshError}
-        onRetry={ctx.data.reload}
-        count={9}
-        onPlay={(item) => ctx.openItem(item, items)}
-      />
+      <MusicFreshRow title={title} data={ctx.data} onOpen={ctx.openItem} />
     ),
   };
 }
@@ -303,6 +311,10 @@ function playlistsBand(ctx: MusicBandContext): MusicBand {
           status={ctx.data.libraryStatus === "loading" ? "loading" : "ready"}
           leadingCard={tile}
           onOpen={(item) => ctx.openLibrary({ view: "playlists", playlistId: item.id })}
+          onPlay={(_item, index) => {
+            const tracks = playlists[index]?.tracks ?? [];
+            if (tracks[0]) ctx.playTrack(tracks[0], tracks);
+          }}
           onViewAll={() => ctx.openLibrary({ view: "playlists" })}
         />
       ),
@@ -311,6 +323,7 @@ function playlistsBand(ctx: MusicBandContext): MusicBand {
 
 export function personalBands(ctx: MusicBandContext): {
   recents: MusicBand | null;
+  recentContexts: MusicBand | null;
   fresh: MusicBand | null;
   artists: MusicBand;
   queue: MusicBand;
@@ -318,6 +331,7 @@ export function personalBands(ctx: MusicBandContext): {
 } {
   return {
     recents: recentsBand(ctx),
+    recentContexts: recentContextsBand(ctx),
     fresh: freshBand(ctx),
     artists: artistsBand(ctx),
     queue: queueBand(ctx),

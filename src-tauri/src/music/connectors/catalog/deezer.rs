@@ -32,6 +32,7 @@ struct Album {
     cover_medium: Option<String>,
     release_date: Option<String>,
     nb_tracks: Option<u32>,
+    explicit_lyrics: Option<bool>,
     artist: Option<Artist>,
 }
 
@@ -375,6 +376,7 @@ fn album(entry: Album) -> Option<MusicAlbumRef> {
         artwork: entry.cover_big.or(entry.cover_medium).unwrap_or_default(),
         year: entry.release_date.as_deref().and_then(release_year),
         track_count: entry.nb_tracks,
+        explicit: entry.explicit_lyrics,
     })
 }
 

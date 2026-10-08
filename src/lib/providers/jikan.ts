@@ -1,8 +1,7 @@
 import type { Meta } from "@/lib/cinemeta";
 import { adultContentHidden, isAdultText } from "@/lib/addons-store/adult-filter";
 import { armKitsuIds, catalogGet, catalogSet } from "./jikan-cache";
-
-const JIKAN = "https://api.jikan.moe/v4";
+import { animeCatalogRequest } from "./anime-catalog-client";
 
 type JikanAnime = {
   mal_id: number;
@@ -168,48 +167,14 @@ async function metasFromJikan(items: JikanAnime[]): Promise<Meta[]> {
 
 const inflight = new Map<string, Promise<Meta[]>>();
 
-const MIN_INTERVAL_MS = 400;
-const JIKAN_TIMEOUT_MS = 12000;
-const RAW_PAGE_TIMEOUT_MS = 8000;
-
-let queueChain: Promise<void> = Promise.resolve();
-
-// The timeout is armed HERE, when the chain reaches this entry, never by the
-// caller before it enqueues. Twenty rows fire at once and this chain spaces them
-// 400ms apart, so a caller-armed budget is spent waiting in line: the tail of the
-// queue aborted while still queued, returned [], and every one of those rows was
-// then dropped from the page as settled-and-empty.
-function throttledJikanFetch(url: string, timeoutMs: number): Promise<Response> {
-  let resolveOuter!: (r: Response) => void;
-  let rejectOuter!: (e: unknown) => void;
-  const result = new Promise<Response>((resolve, reject) => {
-    resolveOuter = resolve;
-    rejectOuter = reject;
-  });
-
-  queueChain = queueChain.then(async () => {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
-    try {
-      const r = await fetch(url, { signal: ac.signal });
-      resolveOuter(r);
-    } catch (e) {
-      rejectOuter(e);
-    } finally {
-      clearTimeout(timer);
-    }
-    await new Promise<void>((r) => setTimeout(r, MIN_INTERVAL_MS));
-  });
-
-  return result;
-}
-
 async function jikanQuery(
   path: string,
   params: Record<string, string | number> = {},
 ): Promise<Meta[]> {
   const effective = adultContentHidden() ? { sfw: "true", ...params } : params;
   const qs = new URLSearchParams();
+  // Pin the page size: Midnight's default is 50, while Tenrai's is 25.
+  qs.set("limit", "25");
   for (const [k, v] of Object.entries(effective)) qs.set(k, String(v));
   const key = `${path}?${qs.toString()}`;
 
@@ -220,26 +185,11 @@ async function jikanQuery(
   if (existing) return existing;
 
   const p = (async () => {
-    const url = `${JIKAN}${path}${qs.toString() ? `?${qs.toString()}` : ""}`;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try {
-        const r = await throttledJikanFetch(url, JIKAN_TIMEOUT_MS);
-        if (r.status === 429) {
-          const backoff = 2000 * Math.pow(2, attempt);
-          await new Promise((resolve) => setTimeout(resolve, backoff));
-          continue;
-        }
-        if (!r.ok) return [];
-        const j = await r.json();
-        const items: JikanAnime[] = j?.data ?? [];
-        const metas = await metasFromJikan(items);
-        catalogSet(key, metas);
-        return metas;
-      } catch {
-        return [];
-      }
-    }
-    return [];
+    const j = await animeCatalogRequest<JikanAnime[]>(`${path}${qs.toString() ? `?${qs.toString()}` : ""}`);
+    if (!Array.isArray(j.data)) throw new Error("Invalid anime catalog list");
+    const metas = await metasFromJikan(j.data);
+    catalogSet(key, metas);
+    return metas;
   })();
 
   inflight.set(key, p);
@@ -307,31 +257,17 @@ export const jikanSearchByTitle = (title: string, limit = 1) =>
 // instead, because the caller persists this result forever and a failure cached
 // as a no-match disables that franchise for the life of the device.
 export async function jikanResolveMalId(title: string): Promise<number | null> {
-  const url = `${JIKAN}/anime?q=${encodeURIComponent(title)}&limit=1&sfw=true&order_by=popularity&sort=desc`;
-  const r = await throttledJikanFetch(url, JIKAN_TIMEOUT_MS);
-  if (!r.ok) throw new Error(`jikan ${r.status}`);
-  const j = await r.json();
-  const items: Array<{ mal_id?: number }> = j?.data ?? [];
-  return items[0]?.mal_id ?? null;
+  const j = await animeCatalogRequest<Array<{ mal_id?: number }>>(`/anime?q=${encodeURIComponent(title)}&limit=1&sfw=true&order_by=popularity&sort=asc`);
+  if (!Array.isArray(j.data)) throw new Error("Invalid anime search response");
+  return j.data[0]?.mal_id ?? null;
 }
 
 export async function jikanRecommendationsForMalId(malId: number): Promise<Meta[]> {
-  const url = `${JIKAN}/anime/${malId}/recommendations`;
-  try {
-    const r = await throttledJikanFetch(url, JIKAN_TIMEOUT_MS);
-    if (!r.ok) return [];
-    const j = await r.json();
-    const items: Array<{ entry?: JikanAnime; votes?: number }> = j?.data ?? [];
-    items.sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
-    const animes = items
-      .map((it) => it.entry)
-      .filter((e): e is JikanAnime => !!e?.mal_id)
-      .slice(0, 12);
-    if (animes.length === 0) return [];
-    return await metasFromJikan(animes);
-  } catch {
-    return [];
-  }
+  const j = await animeCatalogRequest<Array<{ entry?: JikanAnime; votes?: number }>>(`/anime/${malId}/recommendations`);
+  if (!Array.isArray(j.data)) throw new Error("Invalid anime recommendations response");
+  const animes = [...j.data].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))
+    .map(item => item.entry).filter((entry): entry is JikanAnime => !!entry?.mal_id).slice(0, 12);
+  return metasFromJikan(animes);
 }
 
 export const jikanByEra = (start: string, end: string, page = 1) =>
@@ -358,23 +294,11 @@ function isSequelTitle(a: JikanAnime): boolean {
 
 async function fetchRawAnimePage(params: Record<string, string | number>): Promise<JikanAnime[]> {
   const qs = new URLSearchParams();
+  qs.set("limit", "25");
   for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
-  const url = `${JIKAN}/anime?${qs.toString()}`;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const r = await throttledJikanFetch(url, RAW_PAGE_TIMEOUT_MS);
-      if (r.status === 429) {
-        await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
-        continue;
-      }
-      if (!r.ok) return [];
-      const j = await r.json();
-      return (j?.data ?? []) as JikanAnime[];
-    } catch {
-      return [];
-    }
-  }
-  return [];
+  const j = await animeCatalogRequest<JikanAnime[]>(`/anime?${qs.toString()}`);
+  if (!Array.isArray(j.data)) throw new Error("Invalid anime catalog list");
+  return j.data;
 }
 
 export async function jikanUnderratedGems(page = 1): Promise<Meta[]> {

@@ -1,4 +1,6 @@
-export type MusicCheckpointOrigin = { kind: "playlist"; id: string; name: string };
+import type { MusicPlaybackOrigin } from "./playback-origin";
+
+export type MusicCheckpointOrigin = NonNullable<MusicPlaybackOrigin>;
 
 export type MusicCheckpoint = {
   key?: string;

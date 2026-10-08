@@ -44,6 +44,7 @@ export type SubtitlePreparationReason =
   | "unsupported-format"
   | "decode-unhealthy"
   | "invalid-cues"
+  | "translation-pending"
   | "not-supported";
 
 export class SubtitlePreparationError extends Error {
@@ -66,6 +67,7 @@ export type SubtitlePreparationHints = {
   filename?: string;
   durationSec?: number;
   requestHeaders?: Record<string, string>;
+  translation?: boolean;
 };
 
 export type SubtitlePreparationInput = SubtitlePreparationHints & {
@@ -603,6 +605,17 @@ export async function prepareSubtitle(
       limits.networkBytes,
     );
     const bytes = await readSubtitleResponseBytes(response, limits.networkBytes);
+    // SubMaker uses HTTP 200 for both placeholders and partial translations. Its
+    // response filename is independent of the user's chosen interface language.
+    const disposition = response.headers.get("content-disposition") ?? "";
+    if (
+      input.translation &&
+      /\bfilename\s*=\s*"?(?:translating|click_to_translate)_[\w-]+\.(?:srt|vtt|ass|ssa)\b/i.test(
+        disposition,
+      )
+    ) {
+      throw new SubtitlePreparationError("translation-pending", "subtitle translation is pending");
+    }
     return await prepareSubtitleBytes(input.url, bytes, input, dependencies);
   } catch (error) {
     if (error instanceof SubtitlePreparationError) throw error;

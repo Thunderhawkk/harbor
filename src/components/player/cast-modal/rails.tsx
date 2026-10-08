@@ -2,6 +2,7 @@ import { Check } from "lucide-react";
 import { NavArrow } from "@/components/nav-arrow";
 import { useEffect, useRef, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
+import type { MusicSearchHit } from "@/lib/search";
 import { IMG } from "@/lib/providers/tmdb/tmdb-client";
 import { useTmdbImdbId } from "@/lib/providers/tmdb/tmdb-imdb-resolve";
 import { useMetaWatched } from "@/lib/watched-flag";
@@ -31,18 +32,26 @@ export function RailSection({
 }
 
 const RAIL =
-  "flex gap-3 overflow-x-auto px-0.5 py-2 [scrollbar-width:none] [scroll-snap-type:x_proximity] [&::-webkit-scrollbar]:hidden";
+  "flex gap-3 overflow-x-auto px-2 -mx-2 py-3 -my-1 scroll-px-2 [scrollbar-width:none] [scroll-snap-type:x_proximity] [&::-webkit-scrollbar]:hidden";
+const RAIL_GAP = 12;
+const RAIL_PAD = 16;
+const RAIL_MIN_CELL = 116;
 
 function ScrollRail({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  const [cell, setCell] = useState(RAIL_MIN_CELL);
 
   const update = () => {
     const el = ref.current;
     if (!el) return;
     setCanLeft(el.scrollLeft > 4);
     setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    const inner = el.clientWidth - RAIL_PAD;
+    if (inner <= 0) return;
+    const perView = Math.max(2, Math.floor((inner + RAIL_GAP) / (RAIL_MIN_CELL + RAIL_GAP)));
+    setCell(Math.floor((inner - RAIL_GAP * (perView - 1)) / perView));
   };
 
   useEffect(() => {
@@ -61,7 +70,12 @@ function ScrollRail({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="group/rail relative">
-      <div ref={ref} onScroll={update} className={RAIL}>
+      <div
+        ref={ref}
+        onScroll={update}
+        className={RAIL}
+        style={{ "--rail-cell": `${cell}px` } as React.CSSProperties}
+      >
         {children}
       </div>
       {canLeft && <RailArrow dir="left" onClick={() => nudge(-1)} />}
@@ -169,7 +183,7 @@ function PosterCard({
     <button
       type="button"
       onClick={() => onOpen(meta)}
-      className={`group flex flex-col gap-1.5 text-start ${grid ? "w-full" : "w-[116px] shrink-0 [scroll-snap-align:start]"}`}
+      className={`group flex flex-col gap-1.5 text-start ${grid ? "w-full" : "w-[var(--rail-cell,116px)] shrink-0 [scroll-snap-align:start]"}`}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-white/[0.06] ring-1 ring-white/10 transition duration-200 group-hover:scale-[1.04] group-hover:ring-white/25">
         {src ? (
@@ -242,5 +256,43 @@ export function RailSkeleton({ portrait }: { portrait?: boolean }) {
         </div>
       ))}
     </div>
+  );
+}
+
+export function MusicRail({
+  items,
+  onOpen,
+}: {
+  items: MusicSearchHit[];
+  onOpen: (item: MusicSearchHit) => void;
+}) {
+  return (
+    <ScrollRail>
+      {items.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onOpen(item)}
+          className="group flex w-[116px] shrink-0 flex-col gap-1.5 text-start [scroll-snap-align:start]"
+        >
+          <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-white/[0.06] ring-1 ring-white/10 transition duration-200 group-hover:scale-[1.04] group-hover:ring-white/25">
+            {item.artwork && (
+              <img
+                src={item.artwork}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                className="h-full w-full object-cover"
+              />
+            )}
+          </div>
+          <span className="line-clamp-1 text-[12.5px] font-medium text-white/90">{item.title}</span>
+          <span className="text-[11px] text-white/40">
+            {item.kind === "album" ? "Album" : "Song"}
+          </span>
+        </button>
+      ))}
+    </ScrollRail>
   );
 }

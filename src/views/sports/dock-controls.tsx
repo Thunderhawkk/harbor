@@ -10,10 +10,12 @@ import {
   Minus,
   PictureInPicture2,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import type { PlayerBridge, PlayerSnapshot } from "@/lib/player/bridge";
 import type { PlayerSrc } from "@/lib/view";
 import { useDockAudio } from "./use-dock-audio";
+import type { useDockDrag } from "./use-dock-drag";
 import "./dock.css";
 
 export function SportsDockControls({
@@ -26,6 +28,7 @@ export function SportsDockControls({
   onClose,
   onExpand,
   onFullscreen,
+  dragHandlers,
 }: {
   src: PlayerSrc;
   snap: PlayerSnapshot;
@@ -36,13 +39,32 @@ export function SportsDockControls({
   onClose: () => void;
   onExpand: () => void;
   onFullscreen: () => void;
+  dragHandlers: ReturnType<typeof useDockDrag>["handlers"];
 }) {
   const t = useT();
   const audio = useDockAudio(bridge, snap);
+  const volumeControl = useRef<HTMLDivElement>(null);
+  const audioRef = useRef(audio);
+  audioRef.current = audio;
+  const logo = src.meta.logo || src.meta.poster;
+  const [failedLogo, setFailedLogo] = useState<string>();
+  useEffect(() => {
+    const node = volumeControl.current;
+    if (!node) return;
+    const adjust = (event: WheelEvent) => {
+      if (event.ctrlKey || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      audioRef.current.changeVolume(Math.round((audioRef.current.volume + (event.deltaY < 0 ? .05 : -.05)) * 100) / 100);
+    };
+    node.addEventListener("wheel", adjust, { passive: false });
+    return () => node.removeEventListener("wheel", adjust);
+  }, []);
   const loading = snap.status === "idle" || snap.status === "loading" || snap.buffering;
   return (
     <div className="sports-dock-chrome">
-      <header>
+      <header {...dragHandlers}>
+        {logo && logo !== failedLogo && <img className="sports-dock-logo" src={logo} alt="" draggable={false} onError={() => setFailedLogo(logo)} />}
         <span>
           <strong>{src.title}</strong>
           <small>
@@ -85,22 +107,24 @@ export function SportsDockControls({
         <button onClick={onPlayPause} aria-label={t(snap.status === "playing" ? "Pause" : "Play")}>
           {snap.status === "playing" ? <Pause size={20} /> : <Play size={20} />}
         </button>
-        <button
-          onClick={audio.toggleMute}
-          aria-pressed={audio.muted}
-          aria-label={t(audio.muted ? "Unmute" : "Mute")}
-        >
-          {audio.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-        </button>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={audio.volume}
-          aria-label={t("Volume")}
-          onChange={(e) => audio.changeVolume(Number(e.target.value))}
-        />
+        <div className="sports-dock-volume" ref={volumeControl}>
+          <button
+            onClick={audio.toggleMute}
+            aria-pressed={audio.muted}
+            aria-label={t(audio.muted ? "Unmute" : "Mute")}
+          >
+            {audio.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={audio.volume}
+            aria-label={t("Volume")}
+            onChange={(e) => audio.changeVolume(Number(e.target.value))}
+          />
+        </div>
         <span className="sports-dock-live">{t(src.isLive ? "Live" : "Video")}</span>
         <button
           onClick={onExpand}

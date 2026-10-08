@@ -31,7 +31,7 @@ export type CardContextRow =
 /** Metadata already on the scoreboard can fill a card without per-card requests. */
 export function matchCardContext(game: SportsGame, now = Date.now()): CardContextRow[] {
   const stage = [text(game.context?.round), text(game.context?.draw)].filter(
-    (value) => value && !/^(?:standard|std|regular season)$/i.test(value),
+    (value) => value && !/^(?:standard|std|regular season|0|\d{1,2})$/i.test(value),
   );
   const venue = text(game.context?.venue);
   const channels = [

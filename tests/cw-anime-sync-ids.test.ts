@@ -220,7 +220,7 @@ test("an imdb keyed Continue Watching play no longer drops the AniList and MAL s
     "utf8",
   );
   assert.match(src, /animeIdentityEligibleForSync\(id, s\.episode\)/);
-  assert.match(src, /resolveAnimeIdentity\(id, latestRef\.current\.resolvedImdbId, \{/);
+  assert.match(src, /resolveAnimeIdentity\(id, rid, \{/);
   assert.match(src, /fireTrackers\(`kitsu:\$\{identity\.kitsuId\}`, identity\.number\)/);
   assert.doesNotMatch(
     src,

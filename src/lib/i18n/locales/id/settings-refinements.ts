@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "Folder cache pemutaran",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "Penyangga video sementara, termasuk stream debrid. Berlaku saat pemutaran dimulai ulang; file yang ada tetap di folder saat ini.",
   "1 option formatted correctly": "1 opsi diformat dengan benar",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. Buka Film\n2. Pilih judul\n3. Tekan Putar\n4. Jelaskan apa yang terjadi",
   "3 to 24 letters, numbers, or underscores.": "3 hingga 24 huruf, angka, atau garis bawah.",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "{name} yang tersimpan akan dihapus dan perubahannya tidak lagi diterapkan.",
   "The server responded in {ms} ms.": "Server merespons dalam {ms} ms.",
   "The six largest local settings entries, including preferences and lookup data.": "Enam entri pengaturan lokal terbesar, termasuk preferensi dan data pencarian.",
+  "{count} entries": "{count} entri",
   "The volume pop-up is hidden.": "Pop-up volume disembunyikan.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "Tema, tata letak pemutar, gambar, dan informasi yang ditampilkan Harbor pada kartu.",
   "This account has been suspended. Reach out to support if you think that's wrong.": "Akun ini telah ditangguhkan. Hubungi dukungan jika menurut Anda ini keliru.",

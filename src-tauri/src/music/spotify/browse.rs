@@ -188,12 +188,34 @@ pub async fn playlist_tracks(
     let id =
         parse::base62(&playlist.id).ok_or_else(|| "Spotify playlist id is invalid".to_string())?;
     let token = state.web_token().await?;
-    let body = api::playlist_items(state.http(), &token, id, DETAIL_LIMIT, &state.market()).await?;
-    Ok(parse::list(&body, "/items")
-        .into_iter()
-        .filter_map(parse::entry)
-        .filter_map(parse::track)
-        .collect())
+    let market = state.market();
+    load_playlist_tracks(id, |offset| {
+        api::playlist_items(state.http(), &token, id, DETAIL_LIMIT, offset, &market)
+    })
+    .await
+}
+
+async fn load_playlist_tracks<F, Fut>(id: &str, mut fetch_page: F) -> Result<Vec<MusicTrack>, String>
+where
+    F: FnMut(usize) -> Fut,
+    Fut: std::future::Future<Output = Result<Value, api::ApiError>>,
+{
+    let paths = [format!("/playlists/{id}/items"), format!("/playlists/{id}/tracks")];
+    let mut offset = 0;
+    let mut tracks = Vec::new();
+    loop {
+        let body = fetch_page(offset).await?;
+        let items = body.get("items").and_then(Value::as_array)
+            .ok_or_else(|| "Spotify returned an invalid playlist page".to_string())?;
+        // Advance using the raw page, including removed tracks, rather than the
+        // parsed track count. Never silently return a partial playlist on error.
+        let next = super::library::next_offset(&body, offset, items.len(), &[&paths[0], &paths[1]])?;
+        tracks.extend(items.iter().filter_map(parse::entry).filter_map(parse::track));
+        match next {
+            Some(next) => offset = next,
+            None => return Ok(tracks),
+        }
+    }
 }
 
 fn row(
@@ -285,6 +307,67 @@ fn top_result(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[tokio::test]
+    async fn playlist_detail_loads_beyond_fifty_and_keeps_order_and_duplicates() {
+        let mut offsets = Vec::new();
+        let tracks = load_playlist_tracks("playlist", |offset| {
+            offsets.push(offset);
+            let end = (offset + 50).min(107);
+            let items: Vec<Value> = (offset..end).map(|n| {
+                // Removed entries must not shorten the pagination offset.
+                if n == 12 { return json!({"track": null}); }
+                // Repeated tracks are intentional playlist entries.
+                let n = if n == 106 { 1 } else { n };
+                json!({"track": {"uri": format!("spotify:track:{n}"), "name": format!("Song {n}")}})
+            }).collect();
+            let next = if end < 107 {
+                json!(format!("https://api.spotify.com/v1/playlists/playlist/items?offset={end}&limit=50"))
+            } else { Value::Null };
+            std::future::ready(Ok(json!({"items": items, "next": next})))
+        }).await.unwrap();
+        assert_eq!(offsets, vec![0, 50, 100]);
+        assert_eq!(tracks.len(), 106);
+        assert_eq!(tracks[49].title, "Song 50");
+        assert_eq!(tracks[104].title, "Song 105");
+        assert_eq!(tracks[105].title, "Song 1");
+    }
+
+    #[tokio::test]
+    async fn playlist_detail_rejects_failed_or_invalid_later_pages() {
+        for failure in ["network", "repeated", "wrong-playlist", "empty", "malformed"] {
+            let result = load_playlist_tracks("playlist", |offset| {
+                let next = "https://api.spotify.com/v1/playlists/playlist/tracks?offset=50";
+                let item = json!({"item": {"uri": "spotify:track:one", "name": "One"}});
+                std::future::ready(if offset == 0 {
+                    Ok(json!({"items": [item], "next": next}))
+                } else {
+                    match failure {
+                        "network" => Err(api::ApiError { status: None, message: "Network failed".into() }),
+                        "repeated" => Ok(json!({"items": [item], "next": next})),
+                        "wrong-playlist" => Ok(json!({"items": [item], "next": "https://api.spotify.com/v1/playlists/other/items?offset=100"})),
+                        "empty" => Ok(json!({"items": [], "next": "https://api.spotify.com/v1/playlists/playlist/items?offset=100"})),
+                        _ => Ok(json!({"next": null})),
+                    }
+                })
+            }).await;
+            assert!(result.is_err(), "{failure} must not return a truncated playlist");
+        }
+    }
+
+    #[tokio::test]
+    async fn playlist_detail_stops_at_the_final_page_including_empty_playlists() {
+        for items in [json!([]), json!([{"item": {"uri": "spotify:track:one", "name": "One"}}])] {
+            let mut calls = 0;
+            let expected = items.as_array().unwrap().len();
+            let result = load_playlist_tracks("playlist", |_| {
+                calls += 1;
+                std::future::ready(Ok(json!({"items": items, "next": null})))
+            }).await.unwrap();
+            assert_eq!(calls, 1);
+            assert_eq!(result.len(), expected);
+        }
+    }
 
     #[test]
     fn track_rows_accept_every_wrapper_spotify_uses() {

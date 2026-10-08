@@ -3,7 +3,7 @@ import type { PlayerBridge } from "@/lib/player/bridge";
 import type { Settings } from "@/lib/settings";
 import type { PlayerSrc } from "@/lib/view";
 import { markAddedSub } from "./added-subs";
-import { langScore, normalizeLang } from "./language";
+import { isGeneratedLangLabel, langScore, languageName, normalizeLang } from "./language";
 import {
   releaseOf,
   subtitleLoadMetadataOf,
@@ -17,7 +17,7 @@ import {
   streamMatchDetail,
   type StreamHints,
 } from "./search";
-import type { SubResult } from "./types";
+import type { GeneratedSubtitleGroup, SubResult } from "./types";
 import { prepareRankedSubtitleCandidates, prepareSubtitle } from "./prepare";
 import {
   choosePreparedCandidate,
@@ -85,7 +85,40 @@ export type SubFetchResult = {
   found: number;
   hints: StreamHints;
   selected: SubResult | null;
+  /** Generated translation offers found in this search (e.g. "Make Hindi"). */
+  generated: GeneratedSubtitleGroup[];
 };
+
+/**
+ * Detect addon entries whose "language" is really a generated label (a translating
+ * addon's "Make <language>") rather than a language code. A language code is a single
+ * token; a display label contains whitespace. Real unknown codes ("spl") are ignored.
+ */
+export function collectGeneratedSubtitleGroups(
+  results: readonly SubResult[],
+): GeneratedSubtitleGroup[] {
+  const byKey = new Map<string, GeneratedSubtitleGroup>();
+  for (const result of results) {
+    if (result.source !== "addon") continue;
+    if (!isGeneratedLangLabel(result.lang)) continue;
+    const lang = result.lang.trim();
+    const key = languageName(lang);
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byKey.set(key, {
+        key,
+        label: lang
+          .split(/\s+/)
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" "),
+        count: 1,
+      });
+    }
+  }
+  return [...byKey.values()];
+}
 
 export type SubtitleFetchDependencies = {
   search?: typeof searchSubtitles;
@@ -303,10 +336,11 @@ export async function fetchSubtitlesIntoPlayer(
     },
   );
   const results = searchedResults.filter((result) => isSafeProviderSubtitleUrl(result.url));
+  const generated = collectGeneratedSubtitleGroups(results);
 
   await progressiveQueue;
 
-  if (!p.isActive()) return { added: 0, found: results.length, hints, selected: null };
+  if (!p.isActive()) return { added: 0, found: results.length, hints, selected: null, generated };
 
   if (!deep) {
     const rankedAuto = rankSubtitleCandidates(results, p.langs, hints).filter(
@@ -432,5 +466,5 @@ export async function fetchSubtitlesIntoPlayer(
     ? spreadBySource(eagerPool, consumed, DEEP_EXTRA_TRACKS)
     : spreadBySourcePerLanguage(eagerPool, consumed, EXTRA_TRACKS_PER_LANGUAGE);
   await addCandidates(extras);
-  return { added, found: results.length, hints, selected };
+  return { added, found: results.length, hints, selected, generated };
 }

@@ -1,9 +1,10 @@
+import traktLogo from "@/assets/trakt.svg";
+import "./trakt-comments.css";
 import { useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
 import {
   Heart,
   MessageCircle,
   ChevronDown,
-  Settings,
   Loader2,
   Send,
   AlertCircle,
@@ -373,6 +374,7 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<Sort>("likes");
   const [showSort, setShowSort] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [myComments, setMyComments] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
@@ -581,9 +583,25 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
   );
 
   return (
-    <section>
+    <section className="group/trakt" data-trakt-collapsed={collapsed || undefined}>
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-[20px] font-bold text-ink">{t("Trakt Comments")}</h2>
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-[20px] font-bold text-ink">{t("Trakt Comments")}</h2>
+          <button
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-expanded={!collapsed}
+            aria-label={t(collapsed ? "Show comments" : "Hide comments")}
+            title={t(collapsed ? "Show comments" : "Hide comments")}
+            className="grid size-7 place-items-center rounded-full text-ink-subtle opacity-0 transition-[opacity,color,background-color] duration-200 ease-out hover:bg-elevated hover:text-ink focus-visible:opacity-100 group-hover/trakt:opacity-100"
+          >
+            <ChevronDown
+              size={16}
+              strokeWidth={2.2}
+              className={`transition-transform duration-200 ease-out ${collapsed ? "-rotate-90" : ""}`}
+            />
+          </button>
+        </div>
         {target && (
           <div className="flex items-center gap-3">
             <button
@@ -633,8 +651,9 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
         )}
       </div>
 
+      <div className="trakt-comments-shell">
       <div
-        className={`relative rounded-xl ${settings.blurComments && blurred ? "overflow-hidden" : ""}`}
+        className={`trakt-comments-body relative rounded-xl ${settings.blurComments && blurred ? "overflow-hidden" : ""}`}
       >
         {settings.blurComments && blurred && (
           <div
@@ -689,18 +708,21 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
         )}
 
         {target && !connected && (
-          <div className="mb-5 rounded-xl border border-edge-soft bg-elevated/60 p-5 text-center">
+          <div className="mb-5 flex flex-col items-start gap-2">
+            <button
+              onClick={() => openSettings("trakt")}
+              className="group inline-flex items-center gap-2.5 text-[22px] font-semibold text-ink no-underline transition-opacity hover:opacity-80"
+            >
+              {t("Connect Trakt")}
+              <img
+                src={traktLogo}
+                alt=""
+                draggable={false}
+                className="h-[22px] w-auto shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5"
+              />
+            </button>
             <p className="text-[14px] text-ink-muted">
-              {t("Connect your Trakt account to see comments and reviews.")}
-            </p>
-            <p className="mt-3">
-              <button
-                onClick={() => openSettings("trakt")}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-4 py-2 text-[13px] font-semibold text-canvas transition-transform hover:scale-[1.02]"
-              >
-                <Settings size={14} strokeWidth={2.2} />
-                {t("Connect Trakt")}
-              </button>
+              {t("Connect your Trakt account to leave comments and reviews.")}
             </p>
           </div>
         )}
@@ -820,6 +842,7 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
             )}
           </div>
         )}
+      </div>
       </div>
     </section>
   );

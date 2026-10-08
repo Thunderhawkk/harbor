@@ -31,6 +31,29 @@ export type Meta = {
   providerBadge?: { name: string; logo: string; tint: string };
   sourceRank?: number;
   tmdbScore?: number;
+  /** Resolution a plugin's own catalogue row claimed. A plugin row arrives as a poster with no
+   * addon meta behind it, so this is the only field its quality can be carried in. */
+  pluginQuality?: string;
+  /** What a plugin wrote on its listing line beyond the title, read back out of it and kept. A
+   * provider names a listing after everything it carries, so this is where its languages are: the
+   * title has them cut off it, and nothing else in the payload states them. */
+  /** What a plugin wrote on its listing line beyond the title, read back out of it and kept. A
+   * provider names a listing after everything it carries, so this is where its languages are: the
+   * title has them cut off it, and nothing else in the payload states them.
+   *
+   * `resolutions` is every tier the line names, best first — a line naming `2160p`, `4K` and `UHD`
+   * is one tier, not three. `hdr` is null when the line said nothing, which is not a claim that the
+   * file has none. */
+  listingExtras?: {
+    rest: string;
+    languages: string[];
+    quality: string[];
+    resolutions: string[];
+    hdr: string | null;
+  };
+  /** A year a plugin put on the listing line, when it wrote one. The addon meta carries its own
+   * `releaseInfo`; this is for rows that have no addon meta behind them. */
+  listingYear?: number;
   runtime?: string;
   genres?: string[];
   trailers?: Array<{ source: string; type?: string }>;
@@ -51,18 +74,25 @@ export type Meta = {
     overview?: string;
     description?: string;
     thumbnail?: string;
+    /** Episode length in minutes, when the source states one. */
+    runtime?: number;
     streams?: Array<Record<string, unknown>>;
   }>;
 };
 
 export function persistableAddonOrigin(origin: unknown): AddonOrigin | undefined {
   if (!origin || typeof origin !== "object") return undefined;
-  const value = origin as { id?: unknown; name?: unknown; logo?: unknown };
+  const value = origin as { id?: unknown; name?: unknown; logo?: unknown; base?: unknown };
   if (typeof value.id !== "string" || !value.id) return undefined;
+  // The base is what a saved row is resolved and played through: an addon's manifest address, or
+  // the plugin catalogue it came from. Without it a plugin row saved to the library loses which
+  // plugin listed it, and playing it asks every plugin instead of that one.
+  const base = typeof value.base === "string" && value.base ? value.base : undefined;
   return {
     id: value.id,
     name: typeof value.name === "string" && value.name ? value.name : value.id,
     logo: typeof value.logo === "string" ? value.logo : undefined,
+    ...(base ? { base } : {}),
   };
 }
 

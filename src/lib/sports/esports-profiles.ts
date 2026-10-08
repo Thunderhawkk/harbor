@@ -96,6 +96,16 @@ export function parseEsportsTeams(raw: unknown, now = Date.now()): EsportsTeam[]
   }
   return [...unique.values()].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 200);
 }
+
+/** Past fixtures still need their teams' marks, even after a team leaves the active rankings. */
+export function parseEsportsTeamLogos(raw: unknown): Map<string, string> {
+  const logos = new Map<string, string>();
+  for (const value of list(raw).slice(0, 1000)) {
+    const team = parseEsportsTeam(value);
+    if (team?.logo) logos.set(String(team.id), team.logo);
+  }
+  return logos;
+}
 export function parseEsportsRoster(raw: unknown, pros: unknown): EsportsPlayer[] {
   const identities = new Map(
     list(pros)
@@ -285,6 +295,7 @@ export function createEsportsProfileClient(loader: Loader) {
     entry.status === "fulfilled" ? entry.value : null;
   return {
     fetchTeams: async (signal: AbortSignal) => parseEsportsTeams(await json("teams", signal)),
+    fetchTeamLogos: async (signal: AbortSignal) => parseEsportsTeamLogos(await json("teams", signal)),
     fetchTeam: async (teamId: number, signal: AbortSignal): Promise<EsportsTeamRecord> => {
       valid(teamId);
       const budget = AbortSignal.any([signal, AbortSignal.timeout(10000)]);
@@ -333,5 +344,6 @@ const client = createEsportsProfileClient(async (url, signal) => {
   return response.json();
 });
 export const fetchEsportsTeams = client.fetchTeams;
+export const fetchEsportsTeamLogos = client.fetchTeamLogos;
 export const fetchEsportsTeamProfile = client.fetchTeam;
 export const fetchEsportsPlayerProfile = client.fetchPlayer;

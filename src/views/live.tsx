@@ -260,7 +260,7 @@ export function LiveView({ active }: { active: boolean }) {
 
   if (sources.length === 0) {
     return (
-      <main data-rail-flush data-live-page className="relative flex min-h-0 flex-1 flex-col overflow-y-auto pt-20">
+      <main data-live-page className="media-start-scroll pt-24">
         <PlaylistEmpty onSave={(entry) => addPlaylist(entry)} />
       </main>
     );

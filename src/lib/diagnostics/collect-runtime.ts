@@ -1,3 +1,6 @@
+import { bridgeRows, formatBridgeSection } from "../fetch-bridge-stats";
+import { getInstrumentationSupport } from "../memory-profiler";
+
 const CONSOLE_RING_MAX = 400;
 const consoleRing: string[] = [];
 let patched = false;
@@ -66,12 +69,25 @@ function scrubClient(text: string): string {
   return out;
 }
 
+function serializeSupport(): string {
+  const support = getInstrumentationSupport();
+  return [
+    `performance.memory ${support.jsHeap ? "available" : "MISSING"}`,
+    `longtask observer ${support.longTasks ? "available" : "MISSING"}`,
+    `native rss ${support.nativeRss ? "available" : "MISSING"}`,
+  ].join(" | ");
+}
+
 function serializeProfiler(): string {
   const api = typeof window !== "undefined" ? window.__harborProfiler : undefined;
   if (!api) return "(profiler unavailable)";
   try {
     const samples = api.getSamples();
-    const head = `heap ${api.getHeapMB()}MB baseline ${api.getBaselineMB()}MB peak ${api.getPeakMB()}MB net ${api.getNetworkMB()}MB`;
+    const support = getInstrumentationSupport();
+    const heap = support.jsHeap
+      ? `heap ${api.getHeapMB()}MB baseline ${api.getBaselineMB()}MB peak ${api.getPeakMB()}MB`
+      : "heap not measurable on this webview";
+    const head = `${heap} net ${api.getNetworkMB()}MB`;
     const rows = samples.map(
       (s) =>
         `${new Date(s.ts).toISOString()} [${s.kind}] ${s.heapMB}MB dom=${s.domNodes} imgs=${s.imgs} vids=${s.vids} ${s.label}`,
@@ -84,6 +100,12 @@ function serializeProfiler(): string {
 
 export function collectRuntime(): string {
   const sections = [
+    "===== INSTRUMENTATION =====",
+    serializeSupport(),
+    "",
+    "===== NETWORK BRIDGES =====",
+    formatBridgeSection(bridgeRows()).join("\n"),
+    "",
     "===== PROFILER =====",
     serializeProfiler(),
     "",

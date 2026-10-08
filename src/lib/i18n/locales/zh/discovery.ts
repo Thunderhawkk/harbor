@@ -159,6 +159,9 @@ const discovery: Record<string, string> = {
   "Sits above the title strip": "位于标题栏上方",
   "Title text": "标题文字",
   "Show on Discord": "在 Discord 上显示",
+  "Show what you are listening to": "显示正在收听的内容",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "播放音乐时分享曲目、艺人和专辑封面，并附上“Listen in Harbor”按钮。",
   "Hide the title": "隐藏标题",
   "Show 'Watching something' with no show name or poster.":
     "显示“正在观看内容”，不显示节目名称或海报。",

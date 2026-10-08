@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, LoaderCircle } from "lucide-react";
+import { ExternalLink, LoaderCircle } from "@/components/icons/music-icons";
 import { MusicCoverCard } from "./music-cover-card";
+import { useMusicItemMenu } from "./music-item-menu";
+import { useMusicCatalogPlayback } from "./use-music-catalog-playback";
 import { MusicSectionEmpty, MusicSectionError, MusicSectionHead } from "./music-track-grid";
 import { MusicDiscoveryIcon } from "./music-discovery-icon";
 import { MusicServiceLogo } from "./music-service-logo";
@@ -40,7 +42,12 @@ export function MusicDiscoveryChartRow({
   rowId?: string;
 }) {
   const t = useT();
+  const playback = useMusicCatalogPlayback();
   const items: MusicCatalogItem[] = tracks.map((track) => ({ ...track, kind: "track" }));
+  const itemMenu = useMusicItemMenu({
+    onOpen: (item) => onOpen(item, items),
+    onPlay: (item) => { void playback.play(item, items); },
+  });
   const heading = title ?? t("music.row.charts");
   const sourceLabel = (
     <span className="inline-flex items-center gap-2">
@@ -62,31 +69,42 @@ export function MusicDiscoveryChartRow({
       </section>
     );
   return (
-    <Row
-      title={head}
-      shape="square"
-      min={160}
-      scrollKey={rowId ?? `music-discovery-chart:${genreId}`}
-    >
-      {loading
-        ? Array.from({ length: 8 }, (_, index) => (
-            <div
-              key={index}
-              className="aspect-square rounded-md bg-elevated/40"
-              aria-hidden="true"
-            />
-          ))
-        : items.map((item, index) => (
-            <div key={item.id} className="music-discovery-chart-card">
-              <MusicCoverCard item={item} badge={null} onOpen={() => onOpen(item, items)} />
-              {positions[index] !== null && positions[index] !== undefined && (
-                <span className="music-discovery-chart-rank">
-                  {String(positions[index]).padStart(2, "0")}
-                </span>
-              )}
-            </div>
-          ))}
-    </Row>
+    <>
+      <Row
+        title={head}
+        shape="square"
+        min={160}
+        scrollKey={rowId ?? `music-discovery-chart:${genreId}`}
+      >
+        {loading
+          ? Array.from({ length: 8 }, (_, index) => (
+              <div
+                key={index}
+                className="aspect-square rounded-md bg-elevated/40"
+                aria-hidden="true"
+              />
+            ))
+          : items.map((item, index) => (
+              <div key={item.id} className="music-discovery-chart-card">
+                <MusicCoverCard
+                  item={item}
+                  badge={null}
+                  onOpen={() => onOpen(item, items)}
+                  onPlay={() => { void playback.play(item, items); }}
+                  playing={playback.pending?.id === item.id && playback.pending?.connectorId === item.connectorId}
+                  onMenu={itemMenu.openFor(item, index)}
+                />
+                {positions[index] !== null && positions[index] !== undefined && (
+                  <span className="music-discovery-chart-rank">
+                    {String(positions[index]).padStart(2, "0")}
+                  </span>
+                )}
+              </div>
+            ))}
+      </Row>
+      {itemMenu.menu}
+      {playback.error && <p role="alert" className="text-[13px] text-ink-muted">{playback.error}</p>}
+    </>
   );
 }
 

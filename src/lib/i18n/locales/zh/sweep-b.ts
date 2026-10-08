@@ -467,6 +467,12 @@ const sweepB: Record<string, string> = {
   "Comments are blurred until you reveal them, even if they are not tagged as spoilers.":
     "评论在你主动显示前会被模糊处理，即使未标记为剧透也是如此。",
   "Comments are hidden": "评论已隐藏",
+  "Hosted elsewhere": "由外部托管",
+  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.": "这些套餐由第三方运营。Harbor 与其无关联，也不会因注册获得任何收益。最新价格和条款请见其网站。",
+  "{name} can run on a hosted instance": "{name} 可以运行在托管实例上",
+  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.": "该服务由第三方运营。Harbor 与其无关联，不转售，也不会因您注册获得任何收益。价格及包含内容请见其网站。",
+  "Show comments": "显示评论",
+  "Hide comments": "隐藏评论",
   Compact: "紧凑",
   "Companion series for whatever the afternoon throws at you.":
     "无论午后如何展开，都有这些剧集相伴。",

@@ -1,5 +1,4 @@
-import still1 from "@/assets/settings-preview/steamboat-river.webp";
-import still2 from "@/assets/settings-preview/steamboat-deck.webp";
+import { useSettingsSamples } from "@/lib/sample-artwork";
 import {
   SPOILER_TEXT_CLASS,
   SPOILER_THUMB_CLASS,
@@ -11,6 +10,9 @@ import { useT } from "@/lib/i18n";
 import { PreviewImage } from "./preview-image";
 
 export function SpoilerPreview() {
+  const samples = useSettingsSamples();
+  const first = samples[0];
+  const second = samples[1] || first;
   const { settings } = useSettings();
   const t = useT();
   const mask = spoilerMaskFor(settings, { watched: false, isNextUp: false });
@@ -32,26 +34,22 @@ export function SpoilerPreview() {
         <PreviewCard
           mask={mask}
           n={7}
-          title={t("Down the river")}
+          title={first.name}
           rating="8.9"
           runtime={48}
-          img={still1}
+          img={first.background || first.poster || ""}
           imgPos="object-center"
-          synopsis={t(
-            "A small steamboat makes its way down the river.",
-          )}
+          synopsis={first.description || ""}
         />
         <PreviewCard
           mask={mask}
           n={8}
-          title={t("All hands on deck")}
+          title={second.name}
           rating="9.1"
           runtime={51}
-          img={still2}
+          img={second.background || second.poster || ""}
           imgPos="object-center"
-          synopsis={t(
-            "The captain interrupts a quiet morning at the wheel.",
-          )}
+          synopsis={second.description || ""}
         />
       </div>
     </div>

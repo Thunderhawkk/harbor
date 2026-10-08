@@ -125,3 +125,28 @@ test("repeat all keeps going past the end of the order", () => {
   }
   assert.ok(plays > QUEUE.length, `only played ${plays}`);
 });
+
+test("peeking at the previous track does not consume the history", () => {
+  const order = new MusicQueueOrder();
+  const first = order.next(QUEUE, 0, ON, true, null, seeded(7));
+  assert.ok(first);
+  const at = QUEUE.findIndex((t) => queueTrackKey(t) === queueTrackKey(first!));
+
+  const peeked = order.peekPrevious(QUEUE, at, true);
+  assert.equal(peeked?.id, "a");
+  assert.equal(order.peekPrevious(QUEUE, at, true)?.id, "a");
+  assert.equal(order.previous(QUEUE, at, true)?.id, "a");
+});
+
+test("the warm preview matches the track shuffle actually advances to", () => {
+  const warm = new MusicQueueOrder();
+  const play = new MusicQueueOrder();
+  let index = 0;
+  for (let i = 0; i < QUEUE.length - 1; i += 1) {
+    const predicted = warm.upcoming(QUEUE, index, ON, 3, seeded(19))[0];
+    const actual = play.next(QUEUE, index, ON, true, null, seeded(19));
+    assert.ok(actual, `advance stopped at step ${i}`);
+    assert.equal(predicted?.id, actual!.id, `step ${i} warmed the wrong track`);
+    index = QUEUE.findIndex((t) => queueTrackKey(t) === queueTrackKey(actual!));
+  }
+});

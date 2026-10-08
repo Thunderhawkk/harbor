@@ -205,6 +205,8 @@ const settings: Record<string, string> = {
   "Bottom right": "أسفل اليمين",
   "Browse all releases": "تصفّح جميع الإصدارات",
   "Buffer fill": "تعبئة المخزن المؤقت",
+  "Reveal the dot on hover": "إظهار النقطة عند التمرير فوقها",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "تبقى النقطة بعيدة عن الطريق وتظهر عندما توجّه المؤشر إلى الشريط. أوقف هذا الخيار لإبقائها ظاهرة طوال الوقت.",
   "Buffer fill brightness": "سطوع تعبئة المخزن المؤقت",
   Build: "البناء",
   "Build a named quality preference once and set it active. The picker prefers streams that match it, including the instant pick, and falls back to the next best source when nothing matches. Each filter ANDs its dimensions and ignores any you leave blank.":
@@ -2322,6 +2324,9 @@ const settings: Record<string, string> = {
   "Update now": "التحديث الآن",
   "Check for updates": "التحقّق من التحديثات",
   "Show on Discord": "الإظهار على Discord",
+  "Show what you are listening to": "إظهار ما تستمع إليه",
+  "Share the track, artist and album art while music plays, with a Listen in Harbor button.":
+    "شارك اسم المقطع والفنان وصورة الألبوم أثناء تشغيل الموسيقى، مع زرّ «Listen in Harbor».",
   "Display what you are watching on your Discord profile, with the show poster and a live progress bar. Requires the Discord desktop app to be running.":
     "اعرض ما تشاهده في ملفّك الشخصي على Discord، مع ملصق العمل وشريط تقدّم مباشر. يتطلب تشغيل تطبيق Discord لسطح المكتب.",
   "Hide the title": "إخفاء العنوان",

@@ -9,6 +9,7 @@ import { resolveStream } from "@/lib/streams/resolve";
 import type { ScoredStream } from "@/lib/streams/types";
 import { registerStreamProxy, unregisterStreamProxy } from "@/lib/stream-proxy";
 import { playbackStartupProfile } from "@/lib/player/startup-profile";
+import { resolvePlaybackRedirect } from "@/lib/streams/playback-redirect";
 import type { PlayerSrc } from "@/lib/view";
 import type { DebridStore } from "@/lib/debrid/types";
 
@@ -100,6 +101,17 @@ export function useStreamSwitcher(params: {
         return;
       }
       let playUrl = r.data.url;
+      if (r.via === "direct") {
+        playUrl = await resolvePlaybackRedirect({
+          url: playUrl,
+          headers: r.data.headers,
+          signal: ac.signal,
+        });
+        if (ac.signal.aborted) {
+          if (swapAcRef.current === ac) setSwapResolvingKey(null);
+          return;
+        }
+      }
       let nextProxySessionId: string | null = null;
       const hasProxyHeaders = !!r.data.headers && Object.keys(r.data.headers).length > 0;
       if (hasProxyHeaders) {

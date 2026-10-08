@@ -77,6 +77,12 @@ const misc: Record<string, string> = {
   Reveal: "Hiện",
   "Reveal comments": "Hiện bình luận",
   "Comments are hidden": "Bình luận đã bị ẩn",
+  "Hosted elsewhere": "Được lưu trữ nơi khác",
+  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.": "Các gói này do một bên thứ ba vận hành. Harbor không liên kết và không nhận gì từ việc đăng ký. Giá và điều khoản hiện tại nằm trên trang của họ.",
+  "{name} can run on a hosted instance": "{name} có thể chạy trên một phiên bản được lưu trữ",
+  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.": "Một bên thứ ba vận hành dịch vụ này. Harbor không liên kết, không bán lại và không nhận gì nếu bạn đăng ký. Giá và nội dung nằm trên trang của họ.",
+  "Show comments": "Hiện bình luận",
+  "Hide comments": "Ẩn bình luận",
   "You haven't commented yet": "Bạn chưa bình luận",
   "Reveal image": "Hiện ảnh",
   "Trakt Comments": "Bình luận trên Trakt",
@@ -425,7 +431,7 @@ const misc: Record<string, string> = {
     "Thư viện Stremio và tiện ích bổ sung của bạn được đồng bộ nguyên vẹn.",
   "No telemetry, no servers, no bundled keys.":
     "Không thu thập dữ liệu từ xa, không máy chủ, không khóa đi kèm.",
-  "For watching things": "Để xem phim",
+  "Built for Adventure!": "Được tạo ra cho cuộc phiêu lưu!",
   "Hero, Top 10, Trending, In Theaters, per-service rails. Your addons append underneath.":
     "Nổi bật, Top 10, Thịnh hành, Đang chiếu rạp và các hàng theo từng dịch vụ. Tiện ích bổ sung của bạn sẽ được thêm bên dưới.",
   "Continue Watching, then your addon catalogs in install order. No hero, no Harbor rails.":

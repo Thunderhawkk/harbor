@@ -1,3 +1,4 @@
+import { HOISTED_SOURCE } from "./music-spotify-band";
 import { MusicCatalogRow } from "@/components/music/music-catalog-row";
 import { MusicConnectCard } from "@/components/music/music-connect-card";
 import type { MusicCatalogRow as MusicCatalogRowData, MusicConnection } from "@/lib/music/types";
@@ -39,7 +40,8 @@ function homeBand(
         status={status}
         error={ctx.data.homeError}
         onRetry={ctx.data.reload}
-        onPlay={(item) => ctx.openItem(item, base.items)}
+        onOpen={(item) => ctx.openItem(item, base.items)}
+        playable
       />
     ),
   };
@@ -117,7 +119,7 @@ export function catalogBands(ctx: MusicBandContext): {
         ? [homeBand(ctx, "stations", undefined, "music.row.stations", "music.row.stationsSubtitle")]
         : [];
 
-  const extras = [...spare, ...slots.extra].map((row) =>
+  const extras = [...spare, ...slots.extra.filter((row) => row.source !== HOISTED_SOURCE)].map((row) =>
     homeBand(ctx, `home:${row.id}`, row, "music.row.newReleases", "music.rail.newSubtitle"),
   );
 

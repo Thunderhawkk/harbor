@@ -6,6 +6,7 @@ import { CinemaHero } from "@/components/cinema-hero";
 import { Row, ScrollRootContext } from "@/components/row";
 import { PickCard } from "@/components/pick-card";
 import { TmdbNudge } from "@/components/nudge";
+import { blackAndWhitePage } from "@/lib/black-and-white";
 import { topMovies, type Meta } from "@/lib/cinemeta";
 import { useHideAnimeMetas, useHideAnimeRows } from "@/lib/anime-hide";
 import { recentlyPlayed } from "@/lib/playback-history";
@@ -183,6 +184,14 @@ export function Movies({ active = true }: { active?: boolean }) {
           fetcher: listPager(list),
         });
       }
+      built.push({
+        key: "black-and-white",
+        title: "In Black and White",
+        metas: await blackAndWhitePage(1),
+        page: 1,
+        hasMore: false,
+        fetcher: blackAndWhitePage,
+      });
       setRows(built);
     })().catch(console.error);
     return () => {

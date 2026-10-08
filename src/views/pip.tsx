@@ -3,6 +3,8 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SkipBackIcon, SkipIcon } from "@/components/icons/harbor-glyphs";
 import { useT } from "@/lib/i18n";
+import { broadcastFromPipSession } from "@/lib/sports/broadcast-pip";
+import { EmbeddedBroadcastPip } from "./sports/embedded-broadcast-player";
 
 type PipSubtitle = {
   url: string;
@@ -51,6 +53,7 @@ export function PipApp() {
     try {
       await invoke("pip_close", { exit });
     } catch (e) {
+      closingRef.current = false;
       console.warn("[pip] close failed", e);
     }
   }, []);
@@ -59,21 +62,25 @@ export function PipApp() {
     let cancelled = false;
     let unlistenReplace: UnlistenFn | null = null;
     let closeTimer: number | null = null;
-    (async () => {
+    let readVersion = 0;
+    const readSession = async () => {
+      const version = ++readVersion;
       try {
         const s = await invoke<PipSession | null>("pip_get_session");
-        if (cancelled) return;
+        if (cancelled || version !== readVersion) return;
+        if (closeTimer != null) window.clearTimeout(closeTimer);
         if (!s) {
           setError(t("No PiP session. Closing."));
           closeTimer = window.setTimeout(() => closeWithState(), 800);
           return;
         }
+        setError(null);
         setSession(s);
         setMuted(s.muted);
         setVol(s.volume);
         setPlaying(s.playing);
       } catch (e) {
-        if (!cancelled) {
+        if (!cancelled && version === readVersion) {
           setError(
             t("Failed to read session: {message}", {
               message: e instanceof Error ? e.message : String(e),
@@ -81,22 +88,15 @@ export function PipApp() {
           );
         }
       }
-    })();
-    listen("pip://session-replaced", () => {
-      if (cancelled) return;
-      (async () => {
-        const s = await invoke<PipSession | null>("pip_get_session");
-        if (cancelled || !s) return;
-        setSession(s);
-        setMuted(s.muted);
-        setVol(s.volume);
-        setPlaying(s.playing);
-      })();
-    }).then((u) => {
+    };
+    void readSession();
+    listen("pip://session-replaced", () => void readSession()).then((u) => {
       if (cancelled) {
         u();
       } else {
         unlistenReplace = u;
+        // Read again after subscribing so replacements during listener setup are not lost.
+        void readSession();
       }
     });
     return () => {
@@ -160,7 +160,7 @@ export function PipApp() {
       v.removeEventListener("durationchange", onDur);
       v.removeEventListener("volumechange", onVol);
     };
-  }, []);
+  }, [session?.url]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -209,6 +209,11 @@ export function PipApp() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        void closeWithState();
+        return;
+      }
       const v = videoRef.current;
       if (!v) return;
       if (e.code === "Space") {
@@ -224,8 +229,6 @@ export function PipApp() {
           Number.isFinite(v.duration) ? v.duration - 0.25 : v.currentTime + 5,
           v.currentTime + 5,
         );
-      } else if (e.key === "Escape") {
-        closeWithState();
       } else if (e.key === "m" || e.key === "M") {
         v.muted = !v.muted;
       }
@@ -275,6 +278,16 @@ export function PipApp() {
   };
 
   const progressPct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+  const broadcast = session && broadcastFromPipSession(session, window.location.hostname);
+
+  if (broadcast)
+    return (
+      <EmbeddedBroadcastPip
+        key={broadcast.url}
+        stream={broadcast}
+        onClose={() => void closeWithState()}
+      />
+    );
 
   return (
     <main

@@ -63,38 +63,49 @@ async function readJsonBody(res: Response, path: string): Promise<string> {
 
 const TMDB_TIMEOUT_MS = 15000;
 
-async function tmdbHttpFetch(url: string): Promise<Response> {
+function runWithDeadline<T>(ms: number, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TMDB_TIMEOUT_MS);
-  try {
-    return await safeFetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+  return new Promise<T>((resolve, reject) => {
+    let timer!: ReturnType<typeof setTimeout>;
+    let settled = false;
+    const finish = (run: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      run();
+    };
+    timer = setTimeout(() => {
+      controller.abort();
+      finish(() => reject(new Error("tmdb-timeout")));
+    }, ms);
+    work(controller.signal).then(
+      (value) => finish(() => resolve(value)),
+      (error) => finish(() => reject(error)),
+    );
+  });
 }
 
-async function fetchTmdbOnce<T>(
-  url: string,
-  path: string,
-): Promise<{ status: number; data: T | null }> {
-  const res = await tmdbHttpFetch(url);
-  if (!res.ok) {
-    const body = await readJsonBody(res, path).catch(() => "");
-    logTmdbFailure(path, res.status, body);
-    return { status: res.status, data: null };
-  }
-  const text = await readJsonBody(res, path);
-  try {
-    return { status: 200, data: JSON.parse(text) as T };
-  } catch (e) {
-    const preview = JSON.stringify(text.slice(0, 200));
-    console.warn(`[tmdb] parse failure on ${path} (len=${text.length}, starts=${preview})`, e);
-    throw new Error("tmdb-parse-failure");
-  }
+function fetchTmdbOnce<T>(url: string, path: string): Promise<{ status: number; data: T | null }> {
+  return runWithDeadline<{ status: number; data: T | null }>(TMDB_TIMEOUT_MS, async (signal) => {
+    const res = await safeFetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal,
+    });
+    if (!res.ok) {
+      const body = await readJsonBody(res, path).catch(() => "");
+      logTmdbFailure(path, res.status, body);
+      return { status: res.status, data: null };
+    }
+    const text = await readJsonBody(res, path);
+    try {
+      return { status: 200, data: JSON.parse(text) as T };
+    } catch (e) {
+      const preview = JSON.stringify(text.slice(0, 200));
+      console.warn(`[tmdb] parse failure on ${path} (len=${text.length}, starts=${preview})`, e);
+      throw new Error("tmdb-parse-failure");
+    }
+  });
 }
 
 export async function get<T>(

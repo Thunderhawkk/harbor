@@ -4,7 +4,7 @@ import { Section, ToggleRow, settingsAnchor, useSettingsActiveContext } from "./
 import { ROW_ACTION } from "./kit";
 import { SongIdCard, type SongCardStyle } from "@/components/song-id-card";
 import songArtwork from "@/assets/settings-preview/maple-leaf-rag.webp";
-import filmStill from "@/assets/settings-preview/steamboat-river.webp";
+import { useSampleArtwork } from "@/lib/sample-artwork";
 
 export function SongCardStylePicker() {
   const { settings, update } = useSettings();
@@ -89,6 +89,7 @@ export function SongCardStylePicker() {
 }
 
 function StyleThumb({ kind, showDetails }: { kind: SongCardStyle; showDetails: boolean }) {
+  const { background: filmStill } = useSampleArtwork(12);
   return (
     <div aria-hidden className="relative flex h-[280px] w-full items-center justify-center overflow-hidden rounded-[8px] bg-black">
       <img src={filmStill} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover opacity-35" />

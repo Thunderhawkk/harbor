@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { Poster } from "@/components/poster";
+import { movieWatchedVersion, subscribeMovieWatched } from "@/lib/movie-watched";
 import {
   creditToMeta,
   tmdbPerson,
   tmdbPersonCached,
-  type PersonCredit,
   type PersonDetail,
 } from "@/lib/providers/tmdb";
 import { tmdbDepartmentLabelKey } from "@/lib/providers/tmdb/tmdb-people";
@@ -24,25 +24,22 @@ import { FilmRow } from "./person/film-row";
 import { FilmographyBar } from "./person/filmography-bar";
 import { useCollaborators } from "./person/use-collaborators";
 import {
-  applyMinRating,
   rankByRating,
-  sortFilmography,
   TOP_PERFORMANCE_COUNT,
   TOP_PERFORMANCE_MIN,
   type FilmographySort,
 } from "./person/filmography-rank";
+import { buildFilmography, signatureFilms } from "./person/filmography-groups";
+import { filmographyCompletion } from "./person/filmography-completion";
 import { TopPerformancesRow } from "./person/top-performances-row";
 import { BirthdayLink, PlaceLink } from "./person/person-meta-links";
 import {
   calcAge,
   dedupe,
   dedupeByMedia,
-  DIRECTOR_JOBS,
   fmtDate,
   isCameoOrGuest,
   notableScore,
-  PRODUCER_JOBS,
-  WRITER_JOBS,
 } from "./person/person-utils";
 
 export function PersonView({ personId }: { personId: number }) {
@@ -130,40 +127,19 @@ export function PersonView({ personId }: { personId: number }) {
   );
   const collaborators = useCollaborators(person);
 
-  const film = useMemo(() => {
-    const crewIn = (jobs: Set<string>) => dedupe(sortedCrew.filter((c) => jobs.has(c.job ?? "")));
-    const otherAll = dedupe(
-      sortedCrew.filter(
-        (c) =>
-          !DIRECTOR_JOBS.has(c.job ?? "") &&
-          !WRITER_JOBS.has(c.job ?? "") &&
-          !PRODUCER_JOBS.has(c.job ?? ""),
-      ),
-    );
-    const raw = {
-      movies: sortedCast.filter((c) => c.mediaType === "movie"),
-      shows: sortedCast.filter((c) => c.mediaType === "tv"),
-      directing: crewIn(DIRECTOR_JOBS),
-      writing: crewIn(WRITER_JOBS),
-      producing: crewIn(PRODUCER_JOBS),
-      otherCrew: otherAll.length > 4 ? otherAll.slice(0, 24) : [],
-    };
-    const shape = (list: PersonCredit[]) => sortFilmography(applyMinRating(list, minRating), sort);
-    const shown = {
-      movies: shape(raw.movies),
-      shows: shape(raw.shows),
-      directing: shape(raw.directing),
-      writing: shape(raw.writing),
-      producing: shape(raw.producing),
-      otherCrew: shape(raw.otherCrew),
-    };
-    const count = (lists: PersonCredit[][]) => lists.reduce((n, l) => n + l.length, 0);
-    return {
-      ...shown,
-      total: count(Object.values(raw)),
-      shownTotal: count(Object.values(shown)),
-    };
-  }, [sortedCast, sortedCrew, sort, minRating]);
+  const film = useMemo(
+    () => buildFilmography(sortedCast, sortedCrew, sort, minRating),
+    [sortedCast, sortedCrew, sort, minRating],
+  );
+  const watchedVersion = useSyncExternalStore(
+    subscribeMovieWatched,
+    movieWatchedVersion,
+    movieWatchedVersion,
+  );
+  const completion = useMemo(
+    () => filmographyCompletion(signatureFilms(person?.knownForDepartment, sortedCast, sortedCrew)),
+    [person?.knownForDepartment, sortedCast, sortedCrew, watchedVersion],
+  );
 
   const photo = person?.profilePath
     ? `https://image.tmdb.org/t/p/h632${person.profilePath}`
@@ -272,6 +248,7 @@ export function PersonView({ personId }: { personId: number }) {
               minRating={minRating}
               onMinRating={setMinRating}
               resultCount={{ shown: film.shownTotal, total: film.total }}
+              completion={completion}
             />
             {film.movies.length > 0 && (
               <FilmRow
@@ -295,6 +272,18 @@ export function PersonView({ personId }: { personId: number }) {
             )}
             {film.producing.length > 0 && (
               <FilmRow title={t("Producing")} credits={film.producing} showRole />
+            )}
+            {film.cinematography.length > 0 && (
+              <FilmRow title={t("Cinematography")} credits={film.cinematography} showRole />
+            )}
+            {film.editing.length > 0 && (
+              <FilmRow title={t("Editing")} credits={film.editing} showRole />
+            )}
+            {film.productionDesign.length > 0 && (
+              <FilmRow title={t("Production Design")} credits={film.productionDesign} showRole />
+            )}
+            {film.costume.length > 0 && (
+              <FilmRow title={t("Costume Design")} credits={film.costume} showRole />
             )}
             {film.otherCrew.length > 0 && (
               <FilmRow title={t("Other Work")} credits={film.otherCrew} showRole />

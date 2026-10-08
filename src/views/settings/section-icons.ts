@@ -9,7 +9,7 @@ export const SECTION_ICONS: Record<SectionId, string> = {
   mal: "BookMarked",
   simkl: "RefreshCw",
   letterboxd: "Clapperboard",
-  relay: "Radio",
+  relay: "Relay",
   streaming: "Waypoints",
   streamFilters: "Filter",
   p2p: "Share2",

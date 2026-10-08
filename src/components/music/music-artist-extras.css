@@ -86,23 +86,58 @@
 }
 .music-tour-list {
   display: grid;
+  gap: 2px;
 }
 .music-tour-event {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   min-height: 78px;
-  padding: 14px 8px;
-  border-bottom: 1px solid var(--color-edge-soft);
+  padding: 10px 12px;
+  border-radius: 10px;
+  transition: background-color 180ms ease-out;
   text-align: start;
 }
 .music-tour-event:hover {
   background: var(--color-elevated);
 }
-.music-tour-event time {
-  flex: 0 0 105px;
-  font-size: 13px;
-  font-weight: 600;
+.music-tour-date {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  inline-size: 58px;
+  block-size: 58px;
+  border-radius: 8px;
+  background: var(--color-elevated);
+}
+.music-tour-month {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-subtle);
+}
+.music-tour-day {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+.music-tour-where {
+  flex: 1;
+  min-width: 0;
+}
+.music-tour-year {
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-subtle);
+}
+.music-tour-event:hover .music-tour-date {
+  background: var(--color-surface);
 }
 .music-tour-event > span {
   flex: 1;

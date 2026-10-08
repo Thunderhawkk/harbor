@@ -9,6 +9,7 @@ import { useLiveImdbRating } from "@/lib/live-imdb";
 import { useT } from "@/lib/i18n";
 import { ImdbIcon } from "../icons/imdb-icon";
 import type { LightboxState } from "./types";
+import { artAtWidth } from "@/lib/image-rung";
 
 export function SidePanel({
   meta,
@@ -139,7 +140,7 @@ function Still({
       className="group/still relative aspect-[16/9] overflow-hidden rounded-md border border-edge-soft transition-colors duration-200 hover:border-ink"
     >
       <img
-        src={src}
+        src={artAtWidth(src, 200)}
         alt={alt}
         loading="lazy"
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover/still:scale-[1.04]"

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { Dices, Flag, Undo2 } from "lucide-react";
 import type { Meta } from "@/lib/cinemeta";
 import { useT } from "@/lib/i18n";
@@ -8,7 +8,7 @@ import type { Voyage } from "@/lib/voyage/types";
 import { PortCard } from "./port-card";
 import { PortHoverCard, usePortHover } from "./port-hover-card";
 
-export function VoyagePicker({ voyage }: { voyage: Voyage }) {
+export function VoyagePicker({ voyage, inline = false }: { voyage: Voyage; inline?: boolean }) {
   const t = useT();
   const { settings } = useSettings();
   const tmdbKey = settings.tmdbKey ?? "";
@@ -17,12 +17,13 @@ export function VoyagePicker({ voyage }: { voyage: Voyage }) {
     .filter((m): m is Meta => !!m);
   const picked = voyage.routeIds.length;
   const hover = usePortHover();
+  const hoverId = useId();
   const lineup = voyage.headingIds.join(",");
   useEffect(() => hover.drop(), [lineup]);
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-baseline gap-2">
+      <div className="flex flex-wrap items-baseline gap-2" aria-live="polite" aria-atomic="true">
         <span className="text-[13px] font-semibold text-ink">
           {picked === 0
             ? t("Choose your starting film")
@@ -31,13 +32,14 @@ export function VoyagePicker({ voyage }: { voyage: Voyage }) {
         <span className="text-[11px] text-ink-subtle">{t("Choose 1 of 3")}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3.5">
+      <div key={lineup} className={inline ? "voyage-inline-picks" : "grid grid-cols-3 gap-3.5"}>
         {headings.map((meta, i) => (
           <PortCard
             key={meta.id}
             meta={meta}
             index={i}
             state="heading"
+            describedBy={hover.meta?.id === meta.id ? hoverId : undefined}
             onHover={(rect) => (rect ? hover.enter(meta, rect) : hover.leave())}
             onClick={() => {
               hover.drop();
@@ -47,7 +49,9 @@ export function VoyagePicker({ voyage }: { voyage: Voyage }) {
         ))}
       </div>
 
-      {hover.meta && hover.anchor && <PortHoverCard meta={hover.meta} anchor={hover.anchor} />}
+      {hover.meta && hover.anchor && (
+        <PortHoverCard key={hover.meta.id} id={hoverId} meta={hover.meta} anchor={hover.anchor} onEnter={hover.keep} onLeave={hover.leave} />
+      )}
 
       <div className="mt-1 flex items-center justify-between gap-2">
         <button

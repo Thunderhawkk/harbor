@@ -84,6 +84,7 @@ export function createMusicMeterMonitor(call: NativeInvoke = invoke) {
   };
   const poll = async (ticket: number) => {
     if (!users || ticket !== generation) return;
+    const started = performance.now();
     let delay = 50;
     try {
       if (!attached) {
@@ -114,6 +115,10 @@ export function createMusicMeterMonitor(call: NativeInvoke = invoke) {
       if (changedTrack || ((!data?.channels.length || missingSpectrum) && Date.now() >= repairAt))
         attached = false;
       publish({ status: data?.channels.length ? "ready" : "unavailable", data });
+      // The native analysis produces 50 ms windows. Include IPC time in that
+      // cadence instead of adding another 50 ms after every completed read.
+      // Reads remain serial, with breathing room when the native call is slow.
+      delay = Math.max(8, 50 - (performance.now() - started));
     } catch {
       if (!users || ticket !== generation) return;
       attached = false;

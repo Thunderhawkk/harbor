@@ -9,6 +9,7 @@ import { hubLeague } from "@/lib/sports/hub-data";
 import { SportIcon } from "./sport-icon";
 import { AthleteProfileLink, type AthleteIdentity } from "./athlete-profile";
 import { useAthletePortrait } from "./use-athlete-portrait";
+import { publishedPortraitUrl } from "@/lib/sports/athlete-portraits";
 import "./field-preview.css";
 import "./venue-preview.css";
 
@@ -25,16 +26,21 @@ function VenueAthlete({
   const [selected, setSelected] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const provided = athlete.image || athlete.logo || "";
+  const group = hubLeague(league)?.group;
+  // Boxing parsers already verify each promoter photo against the named fighter.
+  const providedPortrait = group === "boxing" ? provided : publishedPortraitUrl(provided);
   const photo = useAthletePortrait(
     {
       path: hubLeague(league)?.path ?? "",
+      group,
       id: athlete.id,
       name: athlete.name,
       image: broken === provided ? "" : provided,
     },
-    resolvePortrait || selected,
+    (resolvePortrait || selected) && (!providedPortrait || broken === providedPortrait),
   );
-  const image = photo.image || athlete.image || athlete.logo;
+  const image =
+    (providedPortrait && broken !== providedPortrait ? providedPortrait : photo.image) || provided;
   return (
     <div className="sh-venue-athlete" ref={root}>
       <button

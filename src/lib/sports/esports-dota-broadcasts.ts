@@ -1,4 +1,4 @@
-import { requestEsportsText, type EsportsMatch } from "./esports-feeds";
+import { requestEsportsJson, requestEsportsText, type EsportsMatch } from "./esports-feeds";
 import { esportsEmbedUrl, type EsportsStream } from "./esports-streams";
 
 type Row = Record<string, unknown>;
@@ -11,6 +11,52 @@ const normalize = (v: unknown) =>
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, "");
 const slug = (v: unknown) => /^[a-z0-9][a-z0-9-]{0,180}$/.test(text(v));
+
+const PLATFORMS: Record<string, EsportsStream["platform"]> = {
+  "twitch.tv": "twitch",
+  "player.twitch.tv": "twitch",
+  "youtube.com": "youtube",
+  "youtu.be": "youtube",
+  "youtube-nocookie.com": "youtube",
+  "kick.com": "kick",
+};
+const LABELS: Record<string, string> = { twitch: "Twitch", youtube: "YouTube", kick: "Kick" };
+
+/**
+ * One host allowlist for every Dota source. A scheme is prepended first because Valve returns at
+ * least one broadcast without one, and an unparseable row would otherwise discard the whole list.
+ */
+export function dotaBroadcastStream(raw: unknown, name?: unknown): EsportsStream | null {
+  const candidate = text(raw).trim();
+  if (!candidate) return null;
+  try {
+    const url = new URL(
+      /^[a-z][a-z0-9+.-]*:/i.test(candidate) ? candidate : `https://${candidate}`,
+    );
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    const host = url.hostname.replace(/^www\./, "");
+    const platform = PLATFORMS[host];
+    if (!platform) return null;
+    const title = text(name).trim();
+    if (platform === "twitch") {
+      const channel =
+        host === "player.twitch.tv"
+          ? (url.searchParams.get("channel") ?? "")
+          : (url.pathname.split("/")[1] ?? "");
+      if (!/^[a-z0-9_]{1,25}$/i.test(channel)) return null;
+      const stream: EsportsStream = {
+        title: title || channel,
+        url: `https://www.twitch.tv/${channel}`,
+        platform: "twitch",
+      };
+      return esportsEmbedUrl(stream, "localhost") ? stream : null;
+    }
+    const stream: EsportsStream = { title: title || LABELS[platform], url: url.href, platform };
+    return esportsEmbedUrl(stream, "localhost") ? stream : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Read public page data only. Never execute scripts or import advertising markup. */
 export function dotaPageProps(html: string): Row {
@@ -72,34 +118,119 @@ export function parseDotaBroadcasts(html: string, match: EsportsMatch): EsportsS
   const result = new Map<string, EsportsStream>();
   for (const value of streams) {
     const item = row(value);
-    try {
-      const url = new URL(text(item.url));
-      if (url.protocol !== "https:" || url.username || url.password) continue;
-      const host = url.hostname.replace(/^www\./, "");
-      const channel =
-        host === "player.twitch.tv"
-          ? url.searchParams.get("channel")
-          : host === "twitch.tv"
-            ? url.pathname.split("/")[1]
-            : null;
-      const stream: EsportsStream | null =
-        channel && /^[a-z0-9_]{1,25}$/i.test(channel)
-          ? {
-              title: text(item.name) || channel,
-              url: `https://www.twitch.tv/${channel}`,
-              platform: "twitch",
-            }
-          : ["youtube.com", "youtu.be", "youtube-nocookie.com"].includes(host)
-            ? { title: text(item.name) || "YouTube", url: url.href, platform: "youtube" }
-            : host === "kick.com"
-              ? { title: text(item.name) || "Kick", url: url.href, platform: "kick" }
-              : null;
-      if (stream && esportsEmbedUrl(stream, "localhost")) result.set(stream.url, stream);
-    } catch {
-      /* Skip invalid or unrelated links. */
-    }
+    const stream = dotaBroadcastStream(item.url, item.name);
+    if (stream) result.set(stream.url, stream);
   }
   return [...result.values()];
+}
+
+/** Valve's keyless league endpoint. OpenDota supplies the league id on every professional row. */
+export function dotaLeagueDataUrl(leagueId: string): string | null {
+  return /^\d{1,10}$/.test(leagueId)
+    ? `https://www.dota2.com/webapi/IDOTA2DPC/GetLeagueData/v001/?league_id=${leagueId}`
+    : null;
+}
+
+/**
+ * The broadcast list's key names are not documented, so rows are found by shape: any string under
+ * a url shaped key that resolves to an allowlisted channel host. A renamed field costs nothing
+ * beyond the links it held, and an unrelated host is still refused by the allowlist.
+ */
+export function parseDotaLeagueBroadcasts(payload: unknown): EsportsStream[] {
+  const found = new Map<string, EsportsStream>();
+  const walk = (value: unknown, depth: number) => {
+    if (found.size >= 12 || depth > 6) return;
+    if (Array.isArray(value)) {
+      for (const item of value.slice(0, 64)) walk(item, depth + 1);
+      return;
+    }
+    const node = row(value);
+    const label = ["name", "title", "stream_name", "broadcast_provider", "language"]
+      .map((key) => text(node[key]).trim())
+      .find(Boolean);
+    for (const [key, child] of Object.entries(node)) {
+      if (typeof child !== "string") {
+        walk(child, depth + 1);
+        continue;
+      }
+      if (!/url|link|stream/i.test(key)) continue;
+      const stream = dotaBroadcastStream(child, label);
+      if (stream) found.set(stream.url, stream);
+    }
+  };
+  walk(payload, 0);
+  return [...found.values()];
+}
+
+/** Only an OpenDota row carries a Valve league id in event.id; a bo3 row carries its own id. */
+export function dotaLeagueId(match: EsportsMatch): string | null {
+  const id = text(match.event.id);
+  return match.game === "dota2" &&
+    match.sourceUrl.startsWith("https://www.opendota.com/matches/") &&
+    /^\d{1,10}$/.test(id)
+    ? id
+    : null;
+}
+
+const LEAGUE_TTL = 30 * 60_000;
+const leagueCache = new Map<string, { at: number; streams: EsportsStream[] }>();
+const leaguePending = new Map<string, Promise<EsportsStream[]>>();
+
+export async function fetchDotaLeagueBroadcasts(
+  leagueId: string,
+  signal?: AbortSignal,
+): Promise<EsportsStream[]> {
+  const url = dotaLeagueDataUrl(leagueId);
+  if (!url) return [];
+  const cached = leagueCache.get(leagueId);
+  if (cached && Date.now() - cached.at < LEAGUE_TTL) return cached.streams;
+  let task = leaguePending.get(leagueId);
+  if (!task) {
+    task = (async () => {
+      const streams = parseDotaLeagueBroadcasts(await requestEsportsJson(url, LEAGUE_TTL));
+      leagueCache.set(leagueId, { at: Date.now(), streams });
+      if (leagueCache.size > 32) leagueCache.delete(leagueCache.keys().next().value!);
+      return streams;
+    })().finally(() => leaguePending.delete(leagueId));
+    leaguePending.set(leagueId, task);
+  }
+  const streams = await task;
+  signal?.throwIfAborted();
+  return streams;
+}
+
+/**
+ * Official league broadcasts, so a live card has somewhere to watch. Best effort by design: one
+ * request per distinct league, never per match, and a failure leaves the board exactly as it was.
+ */
+export async function attachDotaLeagueBroadcasts(
+  matches: EsportsMatch[],
+  limit = 4,
+): Promise<EsportsMatch[]> {
+  const pendingIds = [
+    ...new Set(
+      matches
+        .filter((match) => match.state !== "recent" && !match.streams.length)
+        .flatMap((match) => {
+          const id = dotaLeagueId(match);
+          return id ? [id] : [];
+        }),
+    ),
+  ].slice(0, limit);
+  if (!pendingIds.length) return matches;
+  const loaded = new Map<string, EsportsStream[]>();
+  await Promise.all(
+    pendingIds.map(async (id) => {
+      const streams = await fetchDotaLeagueBroadcasts(id).catch(() => []);
+      if (streams.length) loaded.set(id, streams);
+    }),
+  );
+  if (!loaded.size) return matches;
+  return matches.map((match) => {
+    const id = match.streams.length ? null : dotaLeagueId(match);
+    const streams = id ? loaded.get(id) : undefined;
+    return streams ? { ...match, streams } : match;
+  });
 }
 
 const pending = new Map<string, Promise<EsportsStream[]>>();
@@ -109,6 +240,12 @@ export async function fetchDotaBroadcasts(
 ): Promise<EsportsStream[]> {
   signal?.throwIfAborted();
   if (match.game !== "dota2") return [];
+  const leagueId = dotaLeagueId(match);
+  if (leagueId) {
+    const official = await fetchDotaLeagueBroadcasts(leagueId, signal).catch(() => []);
+    if (official.length) return official;
+  }
+  // The community listing stays behind it: Valve answers per league, this answers per series.
   const key = `${match.id}:${match.startMs}:${match.teams.map((team) => team.name).join("|")}`;
   let task = pending.get(key);
   if (!task) {

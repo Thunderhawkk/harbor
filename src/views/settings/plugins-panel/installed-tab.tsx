@@ -1,4 +1,5 @@
-import { Puzzle } from "../icons";
+import { useState } from "react";
+import { Loader2, Puzzle, RefreshCw } from "../icons";
 import { useT } from "@/lib/i18n";
 import { pluginKinds, usePluginKindsVersion, type KindAdapter, type PluginKind, type PluginView } from "@/lib/plugins";
 import { useSettings } from "@/lib/settings";
@@ -29,24 +30,56 @@ export function InstalledTab({ onAddRepository }: { onAddRepository: () => void 
   usePluginKindsVersion();
   const groups = groupByRepo();
   const waitSeconds = Math.max(8, Math.min(120, settings.addonTimeoutSec ?? 30));
+  const [refreshing, setRefreshing] = useState(false);
+  // Only a plugin Harbor stood down has anything to gain from a run: one that answers comes back,
+  // and the rest are already asked when Play is pressed. Nothing is offered while every plugin is
+  // paused, because then there is nothing to try.
+  const stoodDown = groups.flatMap((g) =>
+    g.plugins
+      .filter((p) => p.state === "auto-paused")
+      .map((p) => ({ plugin: p, adapter: g.adapter })),
+  );
+
+  const refreshAll = async () => {
+    setRefreshing(true);
+    try {
+      const waitMs = waitSeconds * 1000;
+      // The same run a row's Try again makes, one per plugin. They go together: the gate holds the
+      // whole of it to its own limit, so this costs the runtime what a search would.
+      await Promise.allSettled(
+        stoodDown.map(({ plugin, adapter }) => adapter.check?.(plugin.id, waitMs)),
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <>
       <Section
         title={t("Use plugins")}
         subtitle={t(
-          "Plugins are small scripts that look for streams on sites Harbor does not know about. Everything here was installed by you, from repositories you chose.",
+          "Plugins look for streams on sites Harbor does not know about. Everything here was installed by you, from repositories you chose.",
         )}
         newId="plugins:use-plugins"
       >
         <ToggleRow
           label={t("Use plugins")}
           sub={t(
-            "Ask every enabled plugin for streams when you press Play. Turn this off to pause them all without removing anything.",
+            "Pause or resume every plugin at once, without removing anything. The switch below decides where they are asked.",
           )}
           value={settings.pluginsEnabled}
           onChange={(v) => update({ pluginsEnabled: v })}
           newId="plugins:use-plugins"
+        />
+        <ToggleRow
+          label={t("Use plugins outside the Plugins page")}
+          sub={t(
+            "Let Android extensions, which stand up rows of their own, be asked from Home, Discover, Catalogs, search and the Play button too. A plugin with no rows of its own has nowhere else to be found, so it is asked either way.",
+          )}
+          value={settings.pluginsOutsideTab}
+          onChange={(v) => update({ pluginsOutsideTab: v })}
+          newId="plugins:outside-tab"
         />
         <ToggleRow
           label={t("Group by repository")}
@@ -59,10 +92,28 @@ export function InstalledTab({ onAddRepository }: { onAddRepository: () => void 
         <ToggleRow
           label={t("Also use plugins for background checks")}
           sub={t(
-            "Let auto-download and the next-episode prefetch ask plugins too. Off keeps plugins to the moment you press Play.",
+            "Let auto-download and the next-episode prefetch ask plugins too. Off keeps plugins out of background work.",
           )}
           value={settings.pluginsBackground}
           onChange={(v) => update({ pluginsBackground: v })}
+        />
+        <ToggleRow
+          label={t("Show languages on plugin posters")}
+          sub={t(
+            "Some plugins name a listing after everything it carries, so its languages are in the title. Harbor reads them back out and badges the poster. Shown only when the plugin provides it.",
+          )}
+          value={settings.pluginsPosterLanguages}
+          onChange={(v) => update({ pluginsPosterLanguages: v })}
+          newId="plugins:poster-languages"
+        />
+        <ToggleRow
+          label={t("Show quality on plugin posters")}
+          sub={t(
+            "Badge the resolutions a plugin's listing names, best first, and count the rest. Shown only when the plugin provides it.",
+          )}
+          value={settings.pluginsPosterQuality}
+          onChange={(v) => update({ pluginsPosterQuality: v })}
+          newId="plugins:poster-quality"
         />
         <SettingRow
           label={t("Wait time")}
@@ -79,6 +130,26 @@ export function InstalledTab({ onAddRepository }: { onAddRepository: () => void 
           settings.pluginsEnabled ? undefined : t("Plugins are paused. Turn on Use plugins above to run them.")
         }
       >
+        {stoodDown.length > 0 && settings.pluginsEnabled && (
+          <SettingRow
+            icon={<RefreshCw size={18} strokeWidth={2} />}
+            label={t("Refresh all")}
+            desc={t(
+              "Runs every plugin Harbor stood down. One that answers comes back; the others stay paused.",
+            )}
+          >
+            <SButton disabled={refreshing} onClick={() => void refreshAll()}>
+              {refreshing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {t("Checking…")}
+                </>
+              ) : (
+                t("Refresh all")
+              )}
+            </SButton>
+          </SettingRow>
+        )}
         {groups.length === 0 ? (
           <SettingRow
             icon={<Puzzle size={18} strokeWidth={2} />}

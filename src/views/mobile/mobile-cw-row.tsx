@@ -34,6 +34,7 @@ function localToLibraryItem(e: LocalCwEntry): LibraryItem {
     name: e.name,
     poster: e.poster,
     background: e.background,
+    isAnime: e.isAnime,
     state: {
       timeOffset: e.positionMs,
       duration: e.durationMs,
@@ -136,7 +137,7 @@ export function useMobileCw(limit = 14): LibraryItem[] {
     const base = hideSharedCw
       ? []
       : [...items.filter((i) => !ANIME_CLOUD_ID.test(i._id)), ...externalCw];
-    const merged = [...base, ...listLocalCw().map(localToLibraryItem)]
+    const merged = [...base, ...listLocalCw(hideSharedCw).map(localToLibraryItem)]
       .filter(
         (i) =>
           (i.type as string) !== "other" &&
@@ -157,7 +158,7 @@ export function useMobileCw(limit = 14): LibraryItem[] {
       if (out.length >= limit) break;
     }
     return out;
-  }, [items, externalCw, localVersion, dismissVersion, limit, hideAnime, hideSharedCw]);
+  }, [items, externalCw, localVersion, dismissVersion, limit, hideAnime, hideSharedCw, activeProfile?.id]);
 }
 
 function toMeta(item: LibraryItem): Meta {

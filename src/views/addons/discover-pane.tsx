@@ -1,5 +1,4 @@
 import { CommunityAddonsRail } from "@/components/community-addons-rail";
-import { ElfHostedBundleCard } from "@/components/elfhosted-bundle-card";
 import { CategoryGrid } from "./category-grid";
 import { AddonSpotlight } from "./addon-spotlight";
 import { LazyReveal } from "./lazy-reveal";
@@ -21,7 +20,6 @@ export function DiscoverPane({
   return (
     <div className="flex flex-col gap-12">
       <SyncNudge authKey={authKey} />
-      <ElfHostedBundleCard />
       <AddonSpotlight installedIds={installedIds} onOpen={onOpen} onChange={onRefetch} />
       <CommunityAddonsRail installedIds={installedIds} onChange={onRefetch} onOpen={onOpen} />
       <LazyReveal minHeight={220}>

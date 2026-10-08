@@ -90,7 +90,8 @@ export function scrobbleShelf(ctx: MusicBandContext, band: MusicBand | null): Mu
         error={ctx.data.homeError}
         onRetry={ctx.data.reload}
         emptyLabel={ctx.t("music.row.scrobbleWaiting")}
-        onPlay={(item) => ctx.openItem(item, items)}
+        onOpen={(item) => ctx.openItem(item, items)}
+        playable
       />
     ),
   };

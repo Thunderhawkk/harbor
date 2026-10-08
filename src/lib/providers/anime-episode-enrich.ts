@@ -31,16 +31,21 @@ async function enrichCinemetaThumbs(
   const bySeasonEpisode = new Map<string, string>();
   const byAbsolute = new Map<number, string>();
   const ordered = videos
-    .filter((v) => v.thumbnail && v.season != null && v.episode != null)
+    .filter((v) => v.season != null && v.episode != null)
     .sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0));
   let pos = 0;
+  const positions = new Map<string, number>();
   for (const v of ordered) {
-    const thumb = v.thumbnail as string;
-    bySeasonEpisode.set(`${v.season}:${v.episode}`, thumb);
-    if ((v.season ?? 0) > 0) {
-      pos += 1;
-      if (!byAbsolute.has(pos)) byAbsolute.set(pos, thumb);
+    const key = `${v.season}:${v.episode}`;
+    const regular = (v.season ?? 0) > 0;
+    // Missing artwork still occupies an episode position in the full series.
+    if (!positions.has(key)) {
+      if (regular) pos += 1;
+      positions.set(key, pos);
     }
+    if (!v.thumbnail) continue;
+    bySeasonEpisode.set(key, v.thumbnail);
+    if (regular) byAbsolute.set(positions.get(key)!, v.thumbnail);
   }
 
   for (const ep of episodes) {
@@ -48,7 +53,8 @@ async function enrichCinemetaThumbs(
     const season = ep.imdbSeason ?? ep.seasonNumber ?? 1;
     const epNum = ep.imdbEpisode ?? ep.number;
     const hit =
-      bySeasonEpisode.get(`${season}:${epNum}`) ?? byAbsolute.get(ep.absoluteNumber ?? ep.number);
+      bySeasonEpisode.get(`${season}:${epNum}`) ??
+      (ep.absoluteNumber != null ? byAbsolute.get(ep.absoluteNumber) : undefined);
     if (hit) ep.thumbnail = hit;
   }
 }
@@ -71,8 +77,7 @@ async function enrichTvdbThumbs(
     const epNum = ep.imdbEpisode ?? ep.number;
     const hit =
       index.bySeasonEpisode.get(`${season}:${epNum}`) ??
-      (ep.absoluteNumber ? index.byAbsolute.get(ep.absoluteNumber) : undefined) ??
-      index.byAbsolute.get(ep.number);
+      (ep.absoluteNumber != null ? index.byAbsolute.get(ep.absoluteNumber) : undefined);
     if (hit) ep.thumbnail = hit;
   }
 }
@@ -86,9 +91,9 @@ async function enrichHarborImdb(episodes: KitsuEpisode[], imdbId: string | null)
     const num = ep.imdbEpisode ?? ep.number;
     let real = map.get(`${season}:${num}`);
     if (real == null) {
-      const abs = ep.absoluteNumber ?? ep.number;
+      const abs = ep.absoluteNumber;
       if (abs != null) {
-        real = map.get(`1:${abs}`) ?? map.get(`0:${abs}`);
+        real = map.get(`1:${abs}`);
       }
     }
     if (real != null && real > 0) {

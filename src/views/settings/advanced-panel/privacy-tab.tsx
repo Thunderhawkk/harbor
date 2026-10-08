@@ -87,6 +87,14 @@ function DiscordPresenceRow() {
             onChange={(discordShowTimestamp) => update({ discordShowTimestamp })}
           />}
           <ToggleRow
+            label={t("Show what you are listening to")}
+            sub={t(
+              "Share the track, artist and album art while music plays, with a Listen in Harbor button.",
+            )}
+            value={settings.discordMusicPresence}
+            onChange={(discordMusicPresence) => update({ discordMusicPresence })}
+          />
+          <ToggleRow
             label={t("Watch party join button")}
             sub={t("Add a Join button with your room link while you're in a watch party.")}
             value={settings.discordShowPartyJoin}

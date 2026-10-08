@@ -242,7 +242,27 @@ function locate(ranking: ArtistRanking, ref: MusicArtistRef): MusicArtistRef {
   return ref;
 }
 
+const verifiedRefs = new Map<string, Promise<MusicArtistRef>>();
+
 export async function identityForRef(ref: MusicArtistRef): Promise<MusicArtistRef> {
   if (ref.connectorId === "local") return ref;
-  return locate(await resolveArtist(ref.name, { hint: [ref] }), ref);
+  const ranking = await resolveArtist(ref.name, { hint: [ref] });
+  const located = locate(ranking, ref);
+  const canonical = ranking.canonical;
+  if (!canonical || ranking.ambiguous || refKey(located) === refKey(canonical)
+    || located.connectorId === canonical.connectorId
+    || artistIdentityKey(located.name) !== artistIdentityKey(canonical.name)) return located;
+  const key = `${refKey(located)}=>${refKey(canonical)}`;
+  const held = lruGet(verifiedRefs, key);
+  if (held) return held;
+  const checked = (async () => {
+    // Search may arrive after a dock lookup cached a ranking without this provider's ref.
+    const [{ artistTop }, { sharesArtistRecordings }, { withTimeout }] = await Promise.all([
+      import("./catalog"), import("./artist-recording-match"), import("@/lib/progressive-rows"),
+    ]);
+    const [left, right] = await withTimeout(Promise.all([artistTop(located), artistTop(canonical)]), 12_000);
+    return sharesArtistRecordings(left, right) ? canonical : located;
+  })().catch(() => { verifiedRefs.delete(key); return located; });
+  lruSet(verifiedRefs, key, checked, RANKING_MAX);
+  return checked;
 }

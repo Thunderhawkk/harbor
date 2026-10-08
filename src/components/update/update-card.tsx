@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { ArrowUpCircle, Check, Download, Loader2, RefreshCw, RotateCw, X } from "lucide-react";
+import {
+  ArrowUpCircle,
+  Check,
+  ChevronDown,
+  Download,
+  Loader2,
+  RefreshCw,
+  RotateCw,
+  X,
+} from "lucide-react";
 import {
   closeUpdatePanel,
   downloadUpdate,
@@ -92,13 +101,17 @@ export function UpdateCard() {
               </span>
             )}
           </div>
-          {u.status !== "installing" && u.status !== "downloading" && (
+          {u.status !== "installing" && (
             <button
               onClick={closeUpdatePanel}
-              aria-label={t("common.close")}
+              aria-label={t(u.status === "downloading" ? "chrome.minimize" : "common.close")}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-raised hover:text-ink"
             >
-              <X size={16} strokeWidth={2.2} />
+              {u.status === "downloading" ? (
+                <ChevronDown size={16} strokeWidth={2.2} />
+              ) : (
+                <X size={16} strokeWidth={2.2} />
+              )}
             </button>
           )}
         </div>

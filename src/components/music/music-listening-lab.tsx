@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "@/components/icons/music-icons";
 import { useT } from "@/lib/i18n";
 import { Dropdown } from "@/components/dropdown";
 import type { MusicAudioSettingsValue } from "@/lib/music/audio-settings";

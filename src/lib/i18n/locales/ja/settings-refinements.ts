@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "再生キャッシュフォルダー",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "debrid ストリームを含む動画の一時バッファーです。再生を再開すると適用され、既存のファイルは現在のフォルダーに残ります。",
   "1 option formatted correctly": "1個のオプションの書式が正しいです",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1.「映画」を開く\n2. 作品を選ぶ\n3.「再生」を押す\n4. 起きたことを説明する",
   "3 to 24 letters, numbers, or underscores.": "3～24文字の英数字またはアンダースコア。",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "保存した{name}を削除し、その変更の適用を停止します。",
   "The server responded in {ms} ms.": "サーバーは {ms} ミリ秒で応答しました。",
   "The six largest local settings entries, including preferences and lookup data.": "設定や検索データを含む、容量の大きいローカル設定6項目です。",
+  "{count} entries": "{count} 件",
   "The volume pop-up is hidden.": "音量のポップアップは非表示です。",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "テーマ、プレーヤーのレイアウト、画像、カードの表示内容を設定します。",
   "This account has been suspended. Reach out to support if you think that's wrong.": "このアカウントは利用停止になっています。誤りだと思われる場合はサポートにお問い合わせください。",

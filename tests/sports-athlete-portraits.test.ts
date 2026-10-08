@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { ADDITIONAL_LEAGUES } from "../src/lib/sports/additional-sports-catalog.ts";
 import {
   createAthletePortraitResolver,
   espnAthletePortrait,
@@ -89,6 +90,55 @@ test("secondary lookup preserves exact person, sport, tour and ambiguous-name bo
   );
 });
 
+test("numeric boxing and individual-sport catalog paths resolve by name and sport without ESPN IDs", async () => {
+  const snooker = ADDITIONAL_LEAGUES.find((league) => league.key === "WST")!;
+  for (const fixture of [
+    { path: "4445", group: "boxing", name: "Audit Boxer", sport: "Boxing" },
+    { path: snooker.path, group: snooker.group, name: "Audit Player", sport: "Snooker" },
+  ]) {
+    const urls: string[] = [];
+    const resolver = createAthletePortraitResolver({
+      fetchJson: async (url) => {
+        urls.push(url);
+        return db({ ...player, strPlayer: fixture.name, strSport: fixture.sport });
+      },
+    });
+    // A numeric schedule-side ID is not necessarily an ESPN athlete ID.
+    const who = { path: fixture.path, group: fixture.group, id: "123", name: fixture.name };
+    assert.equal((await resolver.resolve(who))?.url, image);
+    assert.equal(urls.length, 1);
+    assert.equal(new URL(urls[0]).hostname, "www.thesportsdb.com");
+    assert.equal(new URL(urls[0]).searchParams.get("p"), fixture.name);
+    assert.equal((await resolver.resolve(who))?.url, image);
+    assert.equal(urls.length, 1, "A verified portrait remains cached");
+  }
+});
+
+test("provider-path fallbacks retain sport, full-name and ambiguity checks and scope negative cache", async () => {
+  const boxer = { ...player, strPlayer: "Audit Boxer", strSport: "Boxing" };
+  const who = { path: "4445", group: "boxing", id: "", name: boxer.strPlayer };
+  assert.equal(sportsDbAthletePortrait(db({ ...boxer, strPlayer: "Different Boxer" }), who), null);
+  assert.equal(sportsDbAthletePortrait(db({ ...boxer, strSport: "Fighting" }), who), null);
+  assert.equal(
+    sportsDbAthletePortrait({ player: [boxer, { ...boxer, idPlayer: "42" }] }, who),
+    null,
+  );
+  let calls = 0;
+  const resolver = createAthletePortraitResolver({
+    fetchJson: async () => {
+      calls++;
+      return db(boxer);
+    },
+  });
+  assert.equal(await resolver.resolve({ ...who, group: undefined }), null);
+  assert.equal(calls, 0, "A provider route alone cannot establish the sport");
+  assert.equal(await resolver.resolve({ ...who, group: "snooker" }), null);
+  assert.equal(await resolver.resolve({ ...who, group: "snooker" }), null);
+  assert.equal(calls, 3, "Unavailable portraits are negatively cached within their sport");
+  assert.equal((await resolver.resolve(who))?.url, image);
+  assert.equal(calls, 4, "One sport's negative cache cannot suppress another sport's identity");
+});
+
 test("visible-athlete lookups deduplicate, cap parallel work and cache unavailable photos", async () => {
   let active = 0,
     maximum = 0,
@@ -115,14 +165,20 @@ test("visible-athlete lookups deduplicate, cap parallel work and cache unavailab
   const thirdRequest = { ...request, id: "3204", name: "Jurij Rodionov" };
   const third = resolver.resolve(thirdRequest);
   assert.equal(calls, 2);
-  gates.splice(0).forEach((done) => done());
-  await tick();
-  assert.equal(calls, 3);
-  gates.splice(0).forEach((done) => done());
-  assert.deepEqual(await Promise.all([first, duplicate, second, third]), [null, null, null, null]);
+  const settled = Promise.all([first, duplicate, second, third]);
+  let finished = false;
+  void settled.then(() => {
+    finished = true;
+  });
+  for (let pass = 0; pass < 20 && !finished; pass++) {
+    gates.splice(0).forEach((release) => release());
+    await tick();
+  }
+  assert.deepEqual(await settled, [null, null, null, null]);
   assert.equal(maximum, 2);
+  const before = calls;
   await resolver.resolve(thirdRequest);
-  assert.equal(calls, 3);
+  assert.equal(calls, before, "A cached miss never asks a source again");
 });
 
 test("one unmounted subscriber does not abort another and cancelled queue entries never fetch", async () => {
@@ -208,6 +264,7 @@ test("reload cache paints valid portraits immediately without a request; expired
   });
   assert.deepEqual(resolver.peek(request), value);
   assert.deepEqual(await resolver.resolve(request), value);
+  assert.deepEqual(await resolver.resolve({ ...request, group: "tennis" }), value);
   assert.equal(calls, 0);
   clock += 8 * 86400000;
   assert.equal((await resolver.resolve(request))?.url, image);

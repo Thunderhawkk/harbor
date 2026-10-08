@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "مجلد التخزين المؤقت للتشغيل",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "تخزين مؤقت للفيديو، بما في ذلك بث ديبريد. يُطبّق عند إعادة بدء التشغيل؛ تبقى الملفات الموجودة في مجلدها الحالي.",
   "Skipped: {reason}": "تم التخطي: {reason}",
   "1 option formatted correctly": "تم تنسيق خيار واحد بشكل صحيح",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens":
@@ -637,6 +639,7 @@ const settingsRefinements: Record<string, string> = {
   "The server responded in {ms} ms.": "استجاب الخادم خلال {ms} مللي ثانية.",
   "The six largest local settings entries, including preferences and lookup data.":
     "أكبر ستة إدخالات للإعدادات المحلية، بما فيها التفضيلات وبيانات البحث.",
+  "{count} entries": "{count} عنصرًا",
   "The volume pop-up is hidden.": "نافذة مستوى الصوت مخفية.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.":
     "السمة وتخطيط المشغّل والصور وما يعرضه Harbor على البطاقات.",

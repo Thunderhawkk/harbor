@@ -1,4 +1,5 @@
 import { safeFetch } from "@/lib/safe-fetch";
+import { activeProfileId } from "@/lib/active-profile-id";
 import {
   SIMKL_API_BASE,
   SIMKL_APP_NAME,
@@ -7,6 +8,7 @@ import {
   SIMKL_USER_AGENT,
 } from "./config";
 import { getSession, setSession } from "./session";
+import { simklRetryPolicy } from "./retry-policy";
 
 export type SimklRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -19,6 +21,7 @@ export class SimklApiError extends Error {
   constructor(
     public status: number,
     public body: string,
+    public retryAt?: number,
   ) {
     super(`Simkl HTTP ${status}: ${body.slice(0, 200)}`);
   }
@@ -40,9 +43,6 @@ async function doFetch(path: string, opts: SimklRequestOptions): Promise<Respons
   const headers = baseHeaders(method);
   if (opts.token) {
     headers["Authorization"] = `Bearer ${opts.token}`;
-  } else if (opts.authed !== false) {
-    const session = getSession();
-    if (session) headers["Authorization"] = `Bearer ${session.accessToken}`;
   }
 
   const url = new URL(`${SIMKL_API_BASE}${path}`);
@@ -59,34 +59,57 @@ async function doFetch(path: string, opts: SimklRequestOptions): Promise<Respons
 
 const RETRY_STATUSES = new Set([429, 500, 502, 503]);
 
-async function sendRequest<T>(path: string, opts: SimklRequestOptions): Promise<T> {
-  let res = await doFetch(path, opts);
-
-  for (let attempt = 0; RETRY_STATUSES.has(res.status) && attempt < 5; attempt += 1) {
-    await new Promise((r) => setTimeout(r, Math.min(16, 2 ** attempt) * 1000));
+async function sendRequest<T>(
+  path: string,
+  opts: SimklRequestOptions,
+  assertOwner: () => void,
+  usesSession: boolean,
+): Promise<T> {
+  let res: Response;
+  for (let attempt = 0; ; attempt += 1) {
+    assertOwner();
+    await acquireSlot(opts.method ?? "GET");
+    assertOwner();
     res = await doFetch(path, opts);
+    assertOwner();
+    if (!RETRY_STATUSES.has(res.status)) break;
+    const body = await res.clone().text().catch(() => "");
+    assertOwner();
+    const policy = simklRetryPolicy(res.status, body, res.headers.get("Retry-After"), attempt);
+    if (policy.cooldown) {
+      const blocked = { until: Date.now() + policy.delayMs, status: res.status, body };
+      if (policy.cooldown === "app") appCooldown = blocked;
+      else userCooldowns.set(opts.token ?? "", blocked);
+      throw new SimklApiError(res.status, body, blocked.until);
+    }
+    if (attempt >= 5) break;
+    await sleep(policy.delayMs);
   }
 
   // 412 client_id_failed = over the total limit or the app is throttle-blocked. Simkl's
   // guidance is to STOP hammering, not keep draining the queue into the block.
   if (res.status === 412) {
-    blockedUntil = Date.now() + BLOCK_COOLDOWN_MS;
     const body = await res.text().catch(() => "client_id_failed");
-    throw new SimklApiError(412, body);
+    assertOwner();
+    appCooldown = { until: Date.now() + BLOCK_COOLDOWN_MS, status: 412, body };
+    throw new SimklApiError(412, body, appCooldown.until);
   }
 
-  if (res.status === 401 && opts.authed !== false) {
+  if (res.status === 401 && usesSession) {
     setSession(null);
     throw new SimklApiError(401, "unauthorized");
   }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    assertOwner();
     throw new SimklApiError(res.status, body);
   }
 
   if (res.status === 204) return undefined as unknown as T;
-  return (await res.json()) as T;
+  const data = (await res.json()) as T;
+  assertOwner();
+  return data;
 }
 
 const GET_MIN_GAP_MS = 110;
@@ -96,10 +119,21 @@ const BLOCK_COOLDOWN_MS = 60000;
 let queueTail: Promise<unknown> = Promise.resolve();
 let lastGetAt = 0;
 let lastPostAt = 0;
-let blockedUntil = 0;
+type Cooldown = { until: number; status: number; body: string };
+let appCooldown: Cooldown | null = null;
+const userCooldowns = new Map<string, Cooldown>();
+
+function currentCooldown(token?: string): Cooldown | null {
+  const now = Date.now();
+  if (appCooldown && appCooldown.until <= now) appCooldown = null;
+  for (const [key, value] of userCooldowns) {
+    if (value.until <= now) userCooldowns.delete(key);
+  }
+  return appCooldown ?? userCooldowns.get(token ?? "") ?? null;
+}
 
 export function isSimklBlocked(): boolean {
-  return Date.now() < blockedUntil;
+  return currentCooldown(getSession()?.accessToken) !== null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -119,12 +153,20 @@ async function acquireSlot(method: string): Promise<void> {
 }
 
 export function simklRequest<T>(path: string, opts: SimklRequestOptions = {}): Promise<T> {
-  const run = async (): Promise<T> => {
-    if (Date.now() < blockedUntil) {
-      throw new SimklApiError(412, "simkl temporarily unavailable (throttle block)");
+  const profile = activeProfileId();
+  const usesSession = !opts.token && opts.authed !== false;
+  const session = usesSession ? getSession() : null;
+  const request = { ...opts, token: opts.token || session?.accessToken };
+  const assertOwner = () => {
+    if (usesSession && (activeProfileId() !== profile || getSession() !== session)) {
+      throw new DOMException("SIMKL request cancelled after account change", "AbortError");
     }
-    await acquireSlot(opts.method ?? "GET");
-    return sendRequest<T>(path, opts);
+  };
+  const run = async (): Promise<T> => {
+    assertOwner();
+    const blocked = currentCooldown(request.token);
+    if (blocked) throw new SimklApiError(blocked.status, blocked.body, blocked.until);
+    return sendRequest<T>(path, request, assertOwner, usesSession);
   };
   const result = queueTail.then(run, run);
   queueTail = result.then(

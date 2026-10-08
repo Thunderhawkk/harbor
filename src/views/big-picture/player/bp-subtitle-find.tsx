@@ -7,6 +7,7 @@ import type { SubtitleAddHandler } from "@/lib/player/subtitle-load";
 import { useSettings } from "@/lib/settings";
 import { markAddedSub, useAddedSubs } from "@/lib/subtitles/added-subs";
 import { gatherSubtitleAddons } from "@/lib/subtitles/addon-source";
+import { useTranslationJobs } from "@/lib/subtitles/translation-jobs";
 import { languageName } from "@/lib/subtitles/language";
 import { providerLabel, releaseOf, subtitleLoadMetadataOf } from "@/lib/subtitles/provider-label";
 import { searchSubtitles, type SearchOptions } from "@/lib/subtitles/search";
@@ -59,6 +60,11 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
   const { settings } = useSettings();
   const { authKey } = useAuth();
   const addedUrls = useAddedSubs();
+  const translationJobs = useTranslationJobs();
+  const translatingUrls = useMemo(
+    () => new Set(translationJobs.map((job) => job.url)),
+    [translationJobs],
+  );
   const { home, hideHI, forcedOnly, onAddSubtitle } = props;
 
   const [target, setTarget] = useState<BpSubtitleTarget>(home);
@@ -273,19 +279,37 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
       )}
       {flat.slice(0, limit).map(({ lang, r }, i) => {
         const added = addedUrls.has(r.url);
+        const translating = translatingUrls.has(r.url);
         return (
           <div key={`${r.source}:${r.id}:${r.url}`} className="contents">
             {(i === 0 || flat[i - 1].lang !== lang) && <p className={LABEL}>{lang}</p>}
             <SubLine
               title={releaseOf(r) || r.title || lang}
               detail={resultDetail(r, t)}
-              badges={added ? [t("Added"), ...tagsOf(r, t)] : tagsOf(r, t)}
+              badges={
+                translating
+                  ? [t("Translating… we'll add it when it's ready")]
+                  : added
+                    ? [t("Added"), ...tagsOf(r, t)]
+                    : tagsOf(r, t)
+              }
               icon={
-                added ? <Check size={22} strokeWidth={3} /> : <Plus size={22} strokeWidth={2.4} />
+                translating ? (
+                  <Loader2 size={22} className={SPIN} strokeWidth={2.2} />
+                ) : added ? (
+                  <Check size={22} strokeWidth={3} />
+                ) : (
+                  <Plus size={22} strokeWidth={2.4} />
+                )
               }
               onPress={() => {
-                markAddedSub(r.url);
-                void onAddSubtitle(r.url, r.lang, providerLabel(r), subtitleLoadMetadataOf(r));
+                // Only reflect "Added" once the subtitle actually loads, so a not-ready
+                // translating addon stays re-pressable instead of showing as added.
+                void Promise.resolve(
+                  onAddSubtitle(r.url, r.lang, providerLabel(r), subtitleLoadMetadataOf(r)),
+                ).then((ok) => {
+                  if (ok !== false) markAddedSub(r.url);
+                });
               }}
             />
           </div>

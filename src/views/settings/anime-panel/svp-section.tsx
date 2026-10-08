@@ -58,6 +58,20 @@ export function SvpSection() {
     }
   };
 
+  const onRetarget = async (next: "double" | "48" | "60" | "display") => {
+    update({ svpTargetFps: next });
+    if (!settings.playerSvp || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      update({ svpVpyPath: await svpApply(next) });
+    } catch (e) {
+      setError(t("Couldn't set up SVP: {err}", { err: String(e) }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onToggle = async (on: boolean) => {
     if (busy) return;
     setError(null);
@@ -67,7 +81,7 @@ export function SvpSection() {
     }
     setBusy(true);
     try {
-      const vpy = await svpApply("60");
+      const vpy = await svpApply(settings.svpTargetFps);
       update({ playerSvp: true, svpVpyPath: vpy });
       svpStatus()
         .then(setStatus)
@@ -250,6 +264,33 @@ export function SvpSection() {
                   { value: "non-anime", label: t("Movies & TV") },
                 ]}
                 onChange={(v) => update({ svpScope: v as "all" | "anime" | "non-anime" })}
+              />
+            </fieldset>
+          </SettingRow>
+
+          <SettingRow
+            wide
+            label={t("Smoothed frame rate")}
+            desc={t(
+              "Doubling is the cleanest: a 24fps film becomes an exact 48, so every frame is evenly spaced. Fixed 60 divides 24 unevenly and is the usual cause of shimmering or torn motion.",
+            )}
+            lockReason={
+              settings.playerSvp ? undefined : t("Turn on SVP above to choose the frame rate.")
+            }
+          >
+            <fieldset
+              disabled={!settings.playerSvp || busy}
+              className={`w-full min-w-0 ${settings.playerSvp ? "" : "pointer-events-none"}`}
+            >
+              <Segmented
+                value={settings.svpTargetFps}
+                options={[
+                  { value: "double", label: t("Double") },
+                  { value: "48", label: t("48 fps") },
+                  { value: "60", label: t("60 fps") },
+                  { value: "display", label: t("Match display") },
+                ]}
+                onChange={(v) => void onRetarget(v as "double" | "48" | "60" | "display")}
               />
             </fieldset>
           </SettingRow>

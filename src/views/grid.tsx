@@ -18,8 +18,12 @@ export function GridView({ grid }: { grid: GridSpec }) {
   const scrollRef = useRef<HTMLElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [metas, setMetas] = useState<Meta[]>(grid.initial ?? []);
-  const [page, setPage] = useState(grid.initial?.length ? 1 : 0);
-  const [done, setDone] = useState(false);
+  const initialPage = grid.initialPage ?? (grid.initial?.length ? 1 : 0);
+  const [page, setPage] = useState(initialPage);
+  const [done, setDone] = useState(initialPage >= PAGE_CAP);
+  // Preview seeds are not complete pages. Provider offsets count raw results,
+  // including duplicates, rather than the number of visible cards.
+  const loadedRef = useRef(initialPage === 0 ? 0 : (grid.initial?.length ?? 0));
   const loadingRef = useRef(false);
   useScrollMemory(`grid:${grid.title}`, scrollRef);
 
@@ -33,17 +37,18 @@ export function GridView({ grid }: { grid: GridSpec }) {
         loadingRef.current = true;
         const next = page + 1;
         grid
-          .fetcher(next, metas.length)
+          .fetcher(next, loadedRef.current)
           .then((batch) => {
             setPage(next);
-            if (batch.length === 0 || next >= PAGE_CAP) {
-              setDone(true);
-              return;
-            }
+            loadedRef.current += batch.length;
+            if (batch.length === 0 || next >= PAGE_CAP) setDone(true);
             const seen = new Set(metas.map((m) => m.id));
-            const fresh = batch.filter((m) => !seen.has(m.id));
-            if (fresh.length === 0) setDone(true);
-            else setMetas((prev) => [...prev, ...fresh]);
+            const fresh = batch.filter((m) => {
+              if (seen.has(m.id)) return false;
+              seen.add(m.id);
+              return true;
+            });
+            if (fresh.length > 0) setMetas((prev) => [...prev, ...fresh]);
           })
           .catch(() => setDone(true))
           .finally(() => {

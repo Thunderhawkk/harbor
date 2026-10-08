@@ -403,6 +403,9 @@ const player: Record<string, string> = {
   "{word} {n} seconds": "{word} {n} Sekunden",
   "{word} {n} seconds. Hold for options": "{word} {n} Sekunden. Für Optionen gedrückt halten",
   "{word} {n}s · hold for options": "{word} {n}s · für Optionen gedrückt halten",
+  "Search audio language": "Audiosprache suchen",
+  "No audio track in that language.": "Keine Tonspur in dieser Sprache.",
+  "Clear": "Löschen",
 };
 
 export default player;

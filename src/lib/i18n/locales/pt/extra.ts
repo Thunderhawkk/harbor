@@ -191,6 +191,8 @@ const extra: Record<string, string> = {
   Browsing: "Navegando",
   Budget: "Orçamento",
   "Buffer fill": "Preenchimento do buffer",
+  "Reveal the dot on hover": "Mostrar o ponto ao passar o cursor",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "O ponto fica fora do caminho e aparece quando você aponta para a barra. Desligue para mantê-lo sempre visível.",
   "Buffer fill brightness": "Brilho do preenchimento do buffer",
   Buffering: "Armazenando em buffer",
   Build: "Build",
@@ -247,8 +249,7 @@ const extra: Record<string, string> = {
     "Conecte um serviço debrid (Real-Debrid, TorBox, AllDebrid) para HD instantâneo sem espera.",
   "Connect MyAnimeList": "Conectar MyAnimeList",
   "Connect your MyAnimeList account": "Conecte sua conta do MyAnimeList",
-  "Connect your Trakt account to see comments and reviews.":
-    "Conecte sua conta do Trakt para ver comentários e avaliações.",
+  "Connect your Trakt account to leave comments and reviews.": "Conecte sua conta Trakt para deixar comentários e avaliações.",
   "Connected as {username}": "Conectado como {username}",
   "Connected as @{user}": "Conectado como @{user}",
   "Connected as @{username}": "Conectado como @{username}",

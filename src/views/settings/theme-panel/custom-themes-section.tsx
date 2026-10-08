@@ -36,15 +36,21 @@ import {
 } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 
-export function CustomThemesSection() {
+export function CustomThemesSection({
+  startOpenTab,
+}: {
+  startOpenTab?: "library" | "community" | "mine";
+} = {}) {
   const t = useT();
   const { settings, update } = useSettings();
   const [themes, setThemes] = useState<CustomTheme[]>(() => getCustomThemes());
   const [error, setError] = useState<string | null>(null);
   const [exportText, setExportText] = useState("");
   const [studioOpen, setStudioOpen] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryTab, setLibraryTab] = useState<"library" | "community" | "mine">("library");
+  const [libraryOpen, setLibraryOpen] = useState(!!startOpenTab);
+  const [libraryTab, setLibraryTab] = useState<"library" | "community" | "mine">(
+    startOpenTab ?? "library",
+  );
   const [libraryStoreTab, setLibraryStoreTab] = useState<StoreTab | undefined>(undefined);
   const [importedNotice, setImportedNotice] = useState<string | null>(null);
   const browsingActivity = t("Browsing the theme library");

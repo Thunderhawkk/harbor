@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import { kitsuToMal } from "@/lib/providers/anime-mapping";
-
-const JIKAN = "https://api.jikan.moe/v4";
+import { animeCatalogRequest } from "./providers/anime-catalog-client";
 const CACHE_KEY = "harbor.malscorecache";
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -32,9 +31,7 @@ export async function jikanScore(malId: number): Promise<string | null> {
   if (existing) return existing;
   const p = (async () => {
     try {
-      const r = await fetch(`${JIKAN}/anime/${malId}`);
-      if (!r.ok) return null;
-      const j = (await r.json()) as { data?: { score?: number } };
+      const j = await animeCatalogRequest<{ score?: number }>(`/anime/${malId}`);
       const score = typeof j?.data?.score === "number" && j.data.score > 0 ? j.data.score.toFixed(1) : null;
       const c = readCache();
       c[malId] = { score, t: Date.now() };

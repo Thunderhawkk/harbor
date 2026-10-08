@@ -179,6 +179,8 @@ const extra: Record<string, string> = {
   "Browse by country": "Explorar por país",
   "Browse channels": "Explorar canales",
   "Buffer fill": "Llenado del búfer",
+  "Reveal the dot on hover": "Mostrar el punto al pasar el cursor",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "El punto se mantiene al margen y aparece cuando apuntas a la barra. Desactívalo para que se vea todo el tiempo.",
   "Buffer fill brightness": "Brillo del llenado del búfer",
   Build: "Compilación",
   "Build a named filter once, then apply it in the source picker to hide everything that doesn't match. Each filter ANDs its dimensions and ignores any you leave blank.":
@@ -223,8 +225,7 @@ const extra: Record<string, string> = {
     "Conecta un servicio de debrid (Real-Debrid, TorBox, AllDebrid) para obtener HD al instante y sin esperas.",
   "Connect MyAnimeList": "Conectar MyAnimeList",
   "Connect your MyAnimeList account": "Conectar tu cuenta de MyAnimeList",
-  "Connect your Trakt account to see comments and reviews.":
-    "Conecta tu cuenta de Trakt para ver comentarios y reseñas.",
+  "Connect your Trakt account to leave comments and reviews.": "Conecta tu cuenta de Trakt para dejar comentarios y reseñas.",
   "Connected as {username}": "Conectado como {username}",
   "Connected as @{user}": "Conectado como @{user}",
   "Connected as @{username}": "Conectado como @{username}",

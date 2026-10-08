@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ListMusic } from "lucide-react";
+import { ListMusic } from "@/components/icons/music-icons";
 import { posterPlate } from "@/components/poster";
 import { useProxiedImageSrc } from "@/lib/remote-image-proxy";
 

@@ -7,6 +7,9 @@
   color: var(--color-ink);
   container-type: inline-size;
   scroll-padding-top: 100px;
+  /* The music dock floats over this scroller, so the last card needs room to clear it. */
+  padding-bottom: var(--harbor-dock-gap, 0px);
+  scroll-padding-bottom: var(--harbor-dock-gap, 0px);
 }
 .sh-masthead {
   padding: 104px 40px 24px;
@@ -126,11 +129,30 @@
   align-items: center;
   gap: 8px;
 }
-.sh-status-dot {
-  width: 6px;
-  height: 6px;
+.sh-status-spin {
+  flex: none;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--color-accent);
+  border: 1.5px solid color-mix(in oklch, var(--color-accent) 20%, transparent);
+  border-top-color: var(--color-accent);
+  animation: sh-status-spin 900ms ease-in-out infinite;
+}
+@keyframes sh-status-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sh-status-spin {
+    animation: none;
+  }
 }
 .sh-hero {
   isolation: isolate;
@@ -458,8 +480,42 @@
   overflow-x: auto;
   scroll-snap-type: x proximity;
   padding: 4px 3px 14px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-edge-soft) transparent;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+.sh-event-rail::-webkit-scrollbar {
+  height: 22px;
+}
+.sh-event-rail::-webkit-scrollbar-track {
+  background: linear-gradient(var(--color-edge-soft), var(--color-edge-soft)) center / 100% 2px no-repeat;
+}
+.sh-event-rail::-webkit-scrollbar-thumb {
+  min-width: 52px;
+  border: 5px solid transparent;
+  border-radius: 12px;
+  background-color: var(--color-raised);
+  background-image: repeating-linear-gradient(90deg, var(--color-ink-muted) 0 1px, transparent 1px 4px);
+  background-size: 9px 6px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-clip: padding-box;
+}
+.sh-event-rail::-webkit-scrollbar-thumb:hover,
+.sh-event-rail::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-edge);
+}
+.sh-event-rail::-webkit-scrollbar-button {
+  display: none;
+}
+.sh-event-rail:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .sh-event-rail {
+    scrollbar-color: var(--color-ink-muted) transparent;
+  }
 }
 .sh-event-card {
   display: flex;
@@ -565,6 +621,53 @@
   font-size: 12px;
   color: var(--color-ink-muted);
   margin-top: 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sh-card-serving {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-end: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  vertical-align: middle;
+}
+.sh-card-sets {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--color-ink-subtle);
+}
+.sh-card-sets b {
+  font-weight: 600;
+}
+.sh-card-sets b[data-won] {
+  color: var(--color-ink);
+}
+.sh-card-sets sup {
+  margin-inline-start: 1px;
+  font-size: 9px;
+  vertical-align: super;
+}
+.sh-card-sets em {
+  margin-inline-start: 2px;
+  padding-inline: 5px;
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--color-accent) 18%, transparent);
+  color: var(--color-ink);
+  font-style: normal;
+  font-weight: 600;
+}
+.sh-card-records {
+  margin-top: 3px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-subtle);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1093,19 +1196,42 @@
   }
 }
 /* The hero is a photographic stage; page controls retain the active Harbor theme. */
+/* A soft ceiling so the picture never meets the tab divider as a straight edge. */
 .sh-carousel {
-  margin: 0 32px 0;
-  border-radius: 14px;
+  position: relative;
+}
+.sh-carousel:before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  block-size: 92px;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-canvas) 86%, transparent) 0%,
+    color-mix(in srgb, var(--color-canvas) 54%, transparent) 30%,
+    color-mix(in srgb, var(--color-canvas) 26%, transparent) 56%,
+    color-mix(in srgb, var(--color-canvas) 8%, transparent) 80%,
+    transparent 100%
+  );
+}
+
+/* Full bleed and themed, so the hero reads as the page rather than a card on it. */
+.sh-carousel {
+  margin: 0;
+  border-radius: 0;
   overflow: hidden;
-  background: #141619;
-  color: #fff;
+  background: var(--color-canvas);
+  color: var(--color-ink);
 }
 .sh-carousel .sh-hero {
   margin: 0;
   border-radius: 0;
   min-height: 510px;
-  background: #111517;
-  color: #fff;
+  background: var(--color-canvas);
+  color: var(--color-ink);
   grid-template-columns: 1.1fr 1fr;
 }
 .sh-hero-backdrop {
@@ -1117,23 +1243,44 @@
   object-position: 70% center;
   z-index: -2;
 }
+
+/* Fading the picture itself, not a coloured layer over it, so the edge dissolves
+   into whatever the page is actually painted with. */
+.sh-carousel .sh-hero-backdrop {
+  --sh-hero-fade: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.06) 0,
+    rgba(0, 0, 0, 0.3) 5%,
+    rgba(0, 0, 0, 0.66) 11%,
+    rgba(0, 0, 0, 0.9) 16%,
+    #000 21%,
+    #000 62%,
+    rgba(0, 0, 0, 0.5) 87%,
+    transparent 100%
+  );
+  -webkit-mask-image: var(--sh-hero-fade);
+  mask-image: var(--sh-hero-fade);
+}
 .sh-hero.has-backdrop:before {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
     90deg,
-    rgba(5, 8, 12, 0.92),
-    rgba(5, 8, 12, 0.35) 60%,
-    rgba(5, 8, 12, 0.08)
+    color-mix(in srgb, var(--color-canvas) 94%, transparent),
+    color-mix(in srgb, var(--color-canvas) 42%, transparent) 60%,
+    color-mix(in srgb, var(--color-canvas) 10%, transparent)
   );
   z-index: -1;
 }
+/* The mask on the picture does the blending; this only lifts the focal side. */
 .sh-carousel .sh-hero:after {
-  background:
-    radial-gradient(ellipse at 78% 35%, #4b4f55a6, transparent 68%),
-    linear-gradient(0deg, #080c10, transparent 35%);
-  opacity: 0.6;
+  background: radial-gradient(
+    ellipse at 78% 35%,
+    color-mix(in srgb, var(--color-ink) 9%, transparent),
+    transparent 68%
+  );
+  opacity: 1;
 }
 .sh-carousel .sh-hero-copy {
   padding: 44px 0 46px 40px;
@@ -1193,42 +1340,24 @@
   filter: drop-shadow(0 3px 20px #0008);
 }
 .sh-carousel-bottom {
+  position: relative;
   display: flex;
   align-items: stretch;
   min-height: 78px;
-  background: #1b1e22;
-  border-top: 1px solid #ffffff12;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface) 55%, var(--color-canvas)) 0%,
+    var(--color-canvas) 100%
+  );
 }
 .sh-carousel-picks {
   display: flex;
   flex: 1;
+  gap: 4px;
+  padding: 9px 10px;
   overflow: auto;
   scrollbar-width: none;
   min-width: 0;
-}
-.sh-carousel-picks > button {
-  position: relative;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  min-width: 200px;
-  max-width: 230px;
-  padding: 15px 20px;
-  text-align: start;
-  flex: 1;
-  color: #9fa5af;
-  border-inline-end: 1px solid #ffffff0b;
-}
-.sh-carousel-picks > button[aria-pressed="true"] {
-  color: #fff;
-  background: #ffffff08;
-}
-.sh-carousel-picks > button[aria-pressed="true"]:before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  background: var(--color-accent);
 }
 .sh-carousel-picks strong {
   display: -webkit-box;
@@ -1259,22 +1388,30 @@
 }
 .sh-carousel-controls {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
-  padding: 12px 16px;
-  border-inline-start: 1px solid #ffffff12;
+  padding: 12px 14px;
 }
 .sh-carousel-controls > span {
   font-size: 11px;
-  color: #9fa5af;
-  margin-inline-end: 8px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-subtle);
+  margin-inline-end: 6px;
   white-space: nowrap;
 }
 .sh-carousel-controls .sh-icon {
-  background: #ffffff09;
-  color: #fff;
   width: 30px;
-  height: 34px;
+  height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-ink-muted);
+  transition:
+    background-color 160ms ease-out,
+    color 160ms ease-out;
+}
+.sh-carousel-controls .sh-icon:hover {
+  background: color-mix(in srgb, var(--color-ink) 8%, transparent);
+  color: var(--color-ink);
 }
 .sh-card-artwork {
   width: 100%;
@@ -1357,10 +1494,6 @@
   }
   .sh-carousel-controls {
     padding: 8px;
-  }
-  .sh-carousel-picks > button {
-    min-width: 175px;
-    padding: 12px;
   }
   .sh-carousel-controls .sh-icon {
     width: 28px;
@@ -1513,6 +1646,7 @@
 .sh-fixture-time {
   width: 76px;
   flex: none;
+  overflow-wrap: anywhere;
   font-size: 12px;
   font-weight: 600;
   color: var(--color-ink-muted);
@@ -1607,6 +1741,33 @@
   font-size: 12px;
   color: var(--color-ink-muted);
   margin-top: 4px;
+}
+.sh-fixture-esports {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sh-fixture-esports-logos {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+.sh-fixture-esports-logos > span {
+  display: flex;
+}
+.sh-fixture-esports-logos .ea-image {
+  width: 32px;
+  height: 32px;
+}
+.sh-fixture-event-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@container (max-width: 650px) {
+  .sh-fixture-esports { gap: 10px; }
+  .sh-fixture-esports-logos { gap: 4px; }
+  .sh-fixture-esports-logos .ea-image { width: 26px; height: 26px; }
 }
 .sh-sport-tabs {
   padding-block: 18px 14px;
@@ -1828,8 +1989,13 @@
   overflow: auto;
   background: var(--color-canvas);
   color: var(--color-ink);
-  padding: 94px 32px 42px;
+  padding: 94px 32px calc(42px + var(--harbor-dock-gap, 0px));
+  scroll-padding-bottom: var(--harbor-dock-gap, 0px);
   container-type: inline-size;
+}
+.sh-pill-rail {
+  position: relative;
+  min-width: 0;
 }
 .sh-match-sport-pills,
 .sh-match-league-pills {
@@ -1838,7 +2004,27 @@
   overflow-x: auto;
   padding: 3px 2px 12px;
   margin-bottom: 8px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-x: contain;
+}
+.sh-match-sport-pills::-webkit-scrollbar,
+.sh-match-league-pills::-webkit-scrollbar {
+  display: none;
+}
+/* Only the edge that still has pills behind it fades, so a rail scrolled to its end looks finished
+   rather than permanently cut off. */
+.sh-match-sport-pills:not([data-start]),
+.sh-match-league-pills:not([data-start]) {
+  mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 100%);
+}
+.sh-match-sport-pills:not([data-end]),
+.sh-match-league-pills:not([data-end]) {
+  mask-image: linear-gradient(to left, transparent 0, #000 28px, #000 100%);
+}
+.sh-match-sport-pills:not([data-start]):not([data-end]),
+.sh-match-league-pills:not([data-start]):not([data-end]) {
+  mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
 }
 .sh-match-sport-pills button,
 .sh-match-league-pills button {
@@ -1917,6 +2103,15 @@
 .sh-detail-competitor .sh-athlete-link svg {
   flex-shrink: 0;
 }
+.sh-detail-record {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--color-ink-subtle);
+}
 .sh-detail-scoreboard h1 {
   font-size: 26px;
   font-weight: 650;
@@ -1984,6 +2179,13 @@
 .sh-detail-content {
   max-width: 1100px;
   margin: 26px auto 0;
+}
+.sh-detail-content > .sh-match-disclosure .sports-select {
+  align-self: flex-start;
+  width: min(240px, 100%);
+}
+.sh-detail-content > .sh-match-disclosure .sports-select > button {
+  background: var(--color-elevated);
 }
 .sh-match-page button:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -2626,7 +2828,7 @@
 }
 .sh-back-top {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + var(--harbor-music-dock, 0px) + var(--harbor-viewport-bottom, 0px));
   inset-inline-end: 24px;
   z-index: 35;
   display: flex;
@@ -3087,10 +3289,10 @@
   -webkit-user-drag: none;
 }
 .sh-carousel .sh-hero {
-  animation: sh-hero-arrive 420ms ease-out;
+  animation: sh-hero-arrive 560ms cubic-bezier(0, 0, 0.2, 1) both;
 }
 .sh-carousel .sh-hero-copy {
-  animation: sh-copy-arrive 480ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation: sh-copy-arrive 620ms 90ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 .sh-hero-skeleton {
   display: flex;
@@ -3140,7 +3342,7 @@
 }
 @keyframes sh-hero-arrive {
   from {
-    opacity: 0.25;
+    opacity: 0;
   }
   to {
     opacity: 1;
@@ -3194,11 +3396,16 @@
   max-height: var(--sh-hero-height);
   overflow: hidden;
 }
+/* A fixed-height hero must never scroll; long matchups step the title down instead. */
 .sh-carousel .sh-hero-copy {
   max-height: 100%;
-  overflow-y: auto;
-  scrollbar-width: thin;
+  overflow: hidden;
 }
+.sh-carousel .sh-hero-copy[data-long] h2 { font-size: clamp(26px, 3.1cqw, 50px); }
+.sh-carousel .sh-hero-copy[data-longest] h2 { font-size: clamp(23px, 2.6cqw, 41px); }
+.sh-carousel .sh-hero-copy[data-long] .sh-vs { padding: 6px 0; }
+.sh-carousel .sh-hero-copy[data-long] h2 { margin-bottom: 18px; }
+.sh-carousel .sh-hero-copy[data-long] .sh-hero-actions { margin-top: 22px; }
 .sh-carousel .sh-carousel-bottom {
   height: 78px;
   min-height: 78px;
@@ -3213,5 +3420,23 @@
 @container (max-width: 700px) {
   .sh-carousel {
     --sh-hero-height: 500px;
+  }
+}
+
+/* Selection stays on the date itself through its fill and type weight. */
+.sports-day {
+  transition:
+    background-color 180ms ease-out,
+    color 180ms ease-out;
+}
+.sports-day-num {
+  transition:
+    font-size 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    color 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sports-day,
+  .sports-day-num {
+    transition: none;
   }
 }

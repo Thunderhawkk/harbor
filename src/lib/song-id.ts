@@ -15,6 +15,7 @@ export type SongIdToastMsg = {
   body?: string;
   art?: string;
   href?: string;
+  song?: { title: string; artist: string; album: string; artwork: string };
 };
 
 const TOAST_EVENT = "harbor:song-id-toast";
@@ -60,6 +61,7 @@ function showResult(res: SongResult): void {
     body: sub || undefined,
     art: res.artwork || undefined,
     href: youtubeSearchUrl(res.artist, res.title),
+    song: { title: res.title, artist: res.artist, album: res.album, artwork: res.artwork },
   });
 }
 

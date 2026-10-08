@@ -3,6 +3,8 @@ import type { SportsTeam } from "./favourites";
 import { parseCatalogTeams } from "./team-catalog";
 import { parseStandingsTable, type StandingsTable } from "./standings";
 import { publicCompetitionUrl } from "./competition-metadata";
+import { espnPublishedAthleteId, type AthleteIdentityRequest } from "./athlete-identity";
+import { publishedPortraitUrl } from "./athlete-portraits";
 
 export type LeagueMetadataTeam = SportsTeam & {
   location?: string;
@@ -35,6 +37,8 @@ export type LeagueMetadata = {
   sourceUrl?: string;
   founded?: number;
   teams: LeagueMetadataTeam[];
+  /** Published standings/scoreboard participants, not a claim of a complete league roster. */
+  athletes?: AthleteIdentityRequest[];
   standings: StandingsTable | null;
   fetchedAt: number;
   partial: boolean;
@@ -45,7 +49,8 @@ export type LeagueMetadata = {
 type Raw = Record<string, unknown>;
 const obj = (value: unknown): Raw =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Raw) : {};
-const list = (value: unknown): Raw[] => (Array.isArray(value) ? value.slice(0, 2000).map(obj) : []);
+const list = (value: unknown): Raw[] =>
+  Array.isArray(value) ? value.slice(0, 2000).map(obj) : [];
 const text = (value: unknown, max = 500): string =>
   typeof value === "string"
     ? value.trim().slice(0, max)
@@ -171,7 +176,10 @@ export function parseEspnLeagueMetadata(
   const catalogRoot = catalog ?? {};
   const details = new Map([...espnTeamDetails(rawTable), ...espnTeamDetails(catalogRoot)]);
   const teams = new Map<string, SportsTeam>();
-  for (const team of [...parseCatalogTeams(rawTable, def), ...parseCatalogTeams(catalogRoot, def)])
+  for (const team of [
+    ...parseCatalogTeams(rawTable, def),
+    ...parseCatalogTeams(catalogRoot, def),
+  ])
     teams.set(team.id, team);
   result.teams = [...teams.values()]
     .map((team) => {
@@ -200,6 +208,36 @@ export function parseEspnLeagueMetadata(
           : undefined,
       };
     })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const athletes = new Map<string, AthleteIdentityRequest>();
+  for (const row of result.standings?.groups.flatMap((group) => group.rows) ?? []) {
+    if (row.athlete) athletes.set(row.athlete.id || row.name, row.athlete);
+  }
+  // Reuse the already-fetched scoreboard; no roster-wide photo or profile fetch here.
+  if (info)
+    for (const event of list(obj(infoData).events)) {
+      for (const competition of list(event.competitions)) {
+        for (const entry of list(competition.competitors)) {
+          if (entry.type !== "athlete") continue;
+          const entryLeague = /(?:^|~)l:(\d+)(?:~|$)/.exec(text(entry.uid))?.[1];
+          if (entryLeague && leagueId && entryLeague !== leagueId) continue;
+          const person = obj(entry.athlete);
+          const name = text(person.displayName) || text(person.fullName);
+          if (!name) continue;
+          const id = espnPublishedAthleteId(entry);
+          if (!athletes.has(id || name))
+            athletes.set(id || name, {
+              id,
+              name,
+              source: "espn",
+              image:
+                publishedPortraitUrl(obj(person.headshot).href || person.headshot) || undefined,
+            });
+        }
+      }
+    }
+  result.athletes = [...athletes.values()]
+    .slice(0, 2000)
     .sort((a, b) => a.name.localeCompare(b.name));
   result.partial =
     (!!Object.keys(obj(infoData)).length && !info) ||
@@ -455,7 +493,9 @@ export function createLeagueMetadataClient(options: {
       // lookup_all_teams currently returns an unrelated demo league even for valid numeric IDs.
       const [teams, table] = await Promise.all([
         verified && text(verified.strLeague)
-          ? request(`${DB}/search_all_teams.php?l=${encodeURIComponent(text(verified.strLeague))}`)
+          ? request(
+              `${DB}/search_all_teams.php?l=${encodeURIComponent(text(verified.strLeague))}`,
+            )
           : Promise.resolve({}),
         seed.season && /^\d{4}(?:[-/]\d{2,4})?$/.test(seed.season)
           ? request(`${DB}/lookuptable.php?l=${def.path}&s=${encodeURIComponent(seed.season)}`)
@@ -467,6 +507,8 @@ export function createLeagueMetadataClient(options: {
     if (!succeeded && previous) return { ...previous, partial: true };
     if (failed && previous) {
       result.teams = result.teams.length ? result.teams : previous.teams;
+      if (!result.athletes?.length && (!result.season || result.season === previous.season))
+        result.athletes = previous.athletes;
       if (!result.standings && (!result.season || result.season === previous.standings?.season))
         result.standings = previous.standings;
       for (const field of [

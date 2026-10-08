@@ -66,6 +66,12 @@ export function publishedScoreDetail(
   };
 }
 
+export const SET_SPORTS = ["tennis", "volleyball", "badminton", "tabletennis", "pickleball"];
+
+export function isSetSport(group: string | undefined): boolean {
+  return !!group && SET_SPORTS.includes(group);
+}
+
 export function scoreMetric(group: string): string {
   if (["tennis", "volleyball"].includes(group)) return "Sets won";
   if (["badminton", "tabletennis", "pickleball"].includes(group)) return "Games won";

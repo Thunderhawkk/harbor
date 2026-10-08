@@ -2,14 +2,15 @@ import { PickCard } from "@/components/pick-card";
 import { PinHomeButton } from "@/components/pin-home-button";
 import { Row } from "@/components/row";
 import { useT } from "@/lib/i18n";
-import { useMalAnimeRails } from "@/lib/use-mal-anime-rails";
+import { useMalAnimeRailsState } from "@/lib/use-mal-anime-rails";
+import { AnimeRowStatus } from "./anime-row-status";
 
 export function MalRows() {
   const t = useT();
-  const rails = useMalAnimeRails();
-  if (rails.length === 0) return null;
+  const { rails, loading, error, retry } = useMalAnimeRailsState();
   return (
     <>
+      {(error || (loading && rails.length === 0)) && <AnimeRowStatus title={t("Your MAL Lists")} loading={loading} onRetry={retry} />}
       {rails.map((rail) => (
         <div key={rail.key} data-scroll-anchor={`row:mal:${rail.key}`}>
           <Row

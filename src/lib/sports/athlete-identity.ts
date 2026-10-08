@@ -20,10 +20,22 @@ const text = (value: unknown) => (typeof value === "string" ? value.trim().slice
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const normal = (value: string) => value.toLowerCase().replace(/[^a-z]/g, "");
 
+/** Some scoreboards omit athlete.id but publish the explicit a: identity in the competitor UID. */
+export function espnPublishedAthleteId(raw: unknown): string {
+  const entry = object(raw),
+    athlete = object(entry.athlete);
+  const direct = String(athlete.id ?? "");
+  if (/^\d{1,20}$/.test(direct)) return direct;
+  const id = /(?:^|~)a:(\d{1,20})(?:~|$)/.exec(text(entry.uid))?.[1];
+  return entry.type === "athlete" && id && (!entry.id || String(entry.id) === id) ? id : "";
+}
+
 export function athleteImageUrl(value: unknown): string {
   try {
     const url = new URL(text(value));
-    return url.protocol === "https:" && !url.username && !url.password && !url.port ? url.href : "";
+    return url.protocol === "https:" && !url.username && !url.password && !url.port
+      ? url.href
+      : "";
   } catch {
     return "";
   }
@@ -34,7 +46,9 @@ export function espnAthleteRecordUrl(raw: unknown, id: string): string {
   return (
     list(raw)
       .map(object)
-      .sort((a, b) => Number(list(b.rel).includes("stats")) - Number(list(a.rel).includes("stats")))
+      .sort(
+        (a, b) => Number(list(b.rel).includes("stats")) - Number(list(a.rel).includes("stats")),
+      )
       .map((link) => text(link.href))
       .find((value) => {
         try {

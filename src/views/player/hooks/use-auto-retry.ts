@@ -237,11 +237,19 @@ export function useAutoRetry(params: {
       Date.now() - urlAtRef.current < ENGINE_FIRST_FRAME_GRACE_MS
     )
       return;
+    const recoveryBridge = bridgeRef.current;
+    if (!recoveryBridge) return;
+    const ac = new AbortController();
+    // A recovery belongs to the failed load, never to a later source or bridge.
+    const current = () => !ac.signal.aborted && bridgeRef.current === recoveryBridge;
+    const retry = () => {
+      if (current()) triggerAutoRetry(`playback error "${snap.errorCode}"`);
+    };
+    const cancel = () => ac.abort();
     const failoverHash = src.streamRef?.infoHash;
     if (failoverHash && debrids.length > 0 && !debridFailoverTriedRef.current) {
       debridFailoverTriedRef.current = true;
       const cached = Object.fromEntries((src.streamRef?.cachedSlugs ?? []).map((s) => [s, true]));
-      const ac = new AbortController();
       const hint = src.episode
         ? { season: src.episode.season ?? null, episode: src.episode.episode ?? null }
         : undefined;
@@ -255,8 +263,8 @@ export function useAutoRetry(params: {
         {},
         hint,
       ).then(async (r) => {
-        const b = bridgeRef.current;
-        if (r.ok && b) {
+        if (!current()) return;
+        if (r.ok) {
           let url = r.data.url;
           if (r.data.headers && Object.keys(r.data.headers).length > 0) {
             try {
@@ -265,17 +273,18 @@ export function useAutoRetry(params: {
               /* fall back to the raw debrid url */
             }
           }
+          if (!current()) return;
           console.warn(`[player] debrid failover via ${r.via}`);
-          void b.load({
+          void recoveryBridge.load({
             url,
             subtitles: src.subtitles,
             notWebReady: r.data.notWebReady ?? src.notWebReady,
           });
         } else {
-          triggerAutoRetry(`playback error "${snap.errorCode}"`);
+          retry();
         }
-      });
-      return;
+      }).catch(retry);
+      return cancel;
     }
     if (!sameUrlRetriedRef.current) {
       sameUrlRetriedRef.current = true;
@@ -305,12 +314,11 @@ export function useAutoRetry(params: {
         console.warn(`[player] error "${snap.errorCode}" — retrying via local stream proxy`);
         void registerStreamProxy(src.url, src.headers)
           .then((p) => {
-            const bb = bridgeRef.current;
-            if (bb)
-              void bb.load({ url: p.url, subtitles: src.subtitles, notWebReady: src.notWebReady });
+            if (current())
+              void recoveryBridge.load({ url: p.url, subtitles: src.subtitles, notWebReady: src.notWebReady });
           })
-          .catch(() => triggerAutoRetry(`playback error "${snap.errorCode}"`));
-        return;
+          .catch(retry);
+        return cancel;
       }
     }
     if (
@@ -326,11 +334,11 @@ export function useAutoRetry(params: {
         console.warn(`[player] error "${snap.errorCode}" — remuxing via ffmpeg`);
         void registerStreamProxy(src.url, src.headers, { transcode: true })
           .then((p) => {
-            const bb = bridgeRef.current;
-            if (bb) void bb.load({ url: p.url, subtitles: src.subtitles, notWebReady: true });
+            if (current())
+              void recoveryBridge.load({ url: p.url, subtitles: src.subtitles, notWebReady: true });
           })
-          .catch(() => triggerAutoRetry(`playback error "${snap.errorCode}"`));
-        return;
+          .catch(retry);
+        return cancel;
       }
     }
     if (
@@ -342,18 +350,17 @@ export function useAutoRetry(params: {
     ) {
       transcodedTriedRef.current = true;
       void probeStremioServer().then((ok) => {
+        if (!current()) return;
         if (ok) {
           console.warn("[player] decode error — retrying via p2p transcoding");
-          if (bridgeRef.current) {
-            bridgeRef.current.destroy();
-            bridgeRef.current = null;
-          }
+          recoveryBridge.destroy();
+          bridgeRef.current = null;
           setTranscodedUrl(buildTranscodedUrl(src.url));
         } else {
-          triggerAutoRetry(`playback error "${snap.errorCode}"`);
+          retry();
         }
-      });
-      return;
+      }).catch(retry);
+      return cancel;
     }
     triggerAutoRetry(`playback error "${snap.errorCode}"`);
   }, [

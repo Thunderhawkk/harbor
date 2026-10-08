@@ -6,7 +6,7 @@ import {
   aggregateSubProviders,
   ensureMangaSources,
 } from "./sources";
-import { routeById, streamAll, streamAggregateChapters } from "./sources/aggregate";
+import { routeById, streamAll, streamAggregateChapters, withProviderTag } from "./sources/aggregate";
 import { suwayomiSourcesRevision } from "./sources/suwayomi/source-events";
 import { mangaLibraryRevision } from "./library-events";
 import { loadMangaLangFilter, mangaLangFilterRevision } from "./lang-filter";
@@ -199,8 +199,8 @@ export function popularManga(offset = 0, tagId?: string) {
 }
 
 export function searchManga(query: string, offset = 0, tagId?: string) {
-  return cached("search", `${query}|${offset}|${tagId ?? ""}`, 5 * MIN, (p) =>
-    p.search(query, offset, tagId),
+  return cached("search", `${mangaLibraryRevision()}|${query}|${offset}|${tagId ?? ""}`, 5 * MIN, (p) =>
+    withProviderTag(p, tagId, (tag) => p.search(query, offset, tag)),
   );
 }
 
@@ -304,7 +304,7 @@ export function popularMangaStream(offset: number, tagId: string | undefined, on
     "pop2",
     `${offset}|${tag}`,
     5 * MIN,
-    (p) => p.popular(offset, tagId),
+    (p) => withProviderTag(p, tagId, (tag) => p.popular(offset, tag)),
     {
       tries: 3,
       timeout: 10_000,
@@ -322,9 +322,9 @@ export function searchMangaStream(
 ) {
   return streamOrCall(
     "search",
-    `${query}|${offset}|${tagId ?? ""}`,
+    `${mangaLibraryRevision()}|${query}|${offset}|${tagId ?? ""}`,
     5 * MIN,
-    (p) => p.search(query, offset, tagId),
+    (p) => withProviderTag(p, tagId, (tag) => p.search(query, offset, tag)),
     {},
     onChunk,
   );

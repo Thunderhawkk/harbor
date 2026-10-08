@@ -12,6 +12,7 @@ import {
   type MangaSummary,
 } from "@/lib/manga/api";
 import { useMangaFavorites } from "@/lib/manga-favorites";
+import { subscribeMangaLibraryChanged } from "@/lib/manga/library-events";
 import { activeMangaSource, activeMangaSourceId, subscribeMangaSources } from "@/lib/manga/sources";
 import type { SuwayomiSource } from "@/lib/manga/sources/suwayomi/provider";
 import {
@@ -99,6 +100,10 @@ export function MangaBrowse({
 
   const reload = useCallback(() => setReloadTick((n) => n + 1), []);
 
+  useEffect(() => subscribeMangaLibraryChanged(() => {
+    if (/(?:^|::)category:\d+$/.test(tagRef.current)) reload();
+  }), [reload]);
+
   const sourceRef = useRef(activeMangaSourceId());
   const activeSource = activeMangaSource();
   const allExtensionsMode = tagId === "" && !query.trim() && activeSource?.kind === "suwayomi";
@@ -119,6 +124,7 @@ export function MangaBrowse({
         const id = activeMangaSourceId();
         if (id === sourceRef.current) return;
         sourceRef.current = id;
+        setTagId("");
         reload();
       }),
     [reload],

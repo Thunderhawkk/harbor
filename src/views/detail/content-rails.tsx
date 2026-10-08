@@ -29,25 +29,29 @@ export function ContentRails({
   const order = orderedSectionKeys(available, custom);
   const byKey = new Map(sections.map((s) => [s.key, s]));
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-8">
       {order.map((key, idx) => {
         const s = byKey.get(key);
         if (!s) return null;
         const hidden = custom.hidden.includes(key);
         if (hidden && !editMode) return null;
         return (
-          <div key={key} data-section={key} className="flex scroll-mt-24 flex-col gap-3">
-            {editMode && (
-              <RailControls
-                label={s.label}
-                hidden={hidden}
-                canUp={idx > 0}
-                canDown={idx < order.length - 1}
-                onUp={() => onMove(key, -1)}
-                onDown={() => onMove(key, 1)}
-                onToggleHidden={() => onToggleHidden(key)}
-              />
-            )}
+          <div key={key} data-section={key} data-detail-section={key} className="flex scroll-mt-24 flex-col">
+            <div className="detail-layout-controls" data-editing={editMode} data-hidden={hidden} inert={!editMode} aria-hidden={!editMode}>
+              <div>
+                <div className="detail-layout-controls-content">
+                  <RailControls
+                    label={s.label}
+                    hidden={hidden}
+                    canUp={idx > 0}
+                    canDown={idx < order.length - 1}
+                    onUp={() => onMove(key, -1)}
+                    onDown={() => onMove(key, 1)}
+                    onToggleHidden={() => onToggleHidden(key)}
+                  />
+                </div>
+              </div>
+            </div>
             {!hidden && <LazyMount minHeight={s.minHeight ?? 280}>{s.node}</LazyMount>}
           </div>
         );

@@ -34,16 +34,70 @@ impl From<ApiError> for String {
     }
 }
 
+const RETRY_AFTER_CAP: u64 = 8;
+
 pub async fn get(
     http: &reqwest::Client,
     token: &str,
     path: &str,
     query: &[(&str, String)],
 ) -> Result<Value, ApiError> {
+    let mut waited = false;
+    loop {
+        let response = http
+            .get(format!("{BASE}{path}"))
+            .bearer_auth(token)
+            .query(query)
+            .timeout(std::time::Duration::from_secs(25))
+            .send()
+            .await
+            .map_err(|error| ApiError {
+                status: None,
+                message: format!("Spotify request failed: {error}"),
+            })?;
+        let status = response.status().as_u16();
+        if response.status().is_success() {
+            return response.json::<Value>().await.map_err(|error| ApiError {
+                status: Some(status),
+                message: format!("Spotify response was invalid: {error}"),
+            });
+        }
+        if status == 429 && !waited {
+            let after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.trim().parse::<u64>().ok())
+                .unwrap_or(1)
+                .clamp(1, RETRY_AFTER_CAP);
+            waited = true;
+            tokio::time::sleep(std::time::Duration::from_secs(after)).await;
+            continue;
+        }
+        let body = response.text().await.unwrap_or_default();
+        return Err(ApiError {
+            status: Some(status),
+            message: describe(status, &body),
+        });
+    }
+}
+
+pub async fn me(http: &reqwest::Client, token: &str) -> Result<Value, ApiError> {
+    get(http, token, "/me", &[]).await
+}
+
+pub async fn devices(http: &reqwest::Client, token: &str) -> Result<Value, ApiError> {
+    get(http, token, "/me/player/devices", &[]).await
+}
+
+/// Player reads answer 204 with no body whenever nothing at all is loaded on the account.
+pub async fn player_state(
+    http: &reqwest::Client,
+    token: &str,
+) -> Result<Option<Value>, ApiError> {
     let response = http
-        .get(format!("{BASE}{path}"))
+        .get(format!("{BASE}/me/player"))
         .bearer_auth(token)
-        .query(query)
         .timeout(std::time::Duration::from_secs(25))
         .send()
         .await
@@ -52,11 +106,18 @@ pub async fn get(
             message: format!("Spotify request failed: {error}"),
         })?;
     let status = response.status().as_u16();
+    if status == 204 {
+        return Ok(None);
+    }
     if response.status().is_success() {
-        return response.json::<Value>().await.map_err(|error| ApiError {
-            status: Some(status),
-            message: format!("Spotify response was invalid: {error}"),
-        });
+        return response
+            .json::<Value>()
+            .await
+            .map(Some)
+            .map_err(|error| ApiError {
+                status: Some(status),
+                message: format!("Spotify response was invalid: {error}"),
+            });
     }
     let body = response.text().await.unwrap_or_default();
     Err(ApiError {
@@ -65,8 +126,36 @@ pub async fn get(
     })
 }
 
-pub async fn me(http: &reqwest::Client, token: &str) -> Result<Value, ApiError> {
-    get(http, token, "/me", &[]).await
+/// Player writes answer 204 with no body, so nothing is parsed back out of them.
+pub async fn player_command(
+    http: &reqwest::Client,
+    token: &str,
+    path: &str,
+    query: &[(&str, String)],
+    body: Option<Value>,
+) -> Result<(), ApiError> {
+    let mut request = http
+        .put(format!("{BASE}{path}"))
+        .bearer_auth(token)
+        .query(query)
+        .timeout(std::time::Duration::from_secs(25));
+    request = match body {
+        Some(value) => request.json(&value),
+        None => request.header("content-length", "0"),
+    };
+    let response = request.send().await.map_err(|error| ApiError {
+        status: None,
+        message: format!("Spotify request failed: {error}"),
+    })?;
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let status = response.status().as_u16();
+    let text = response.text().await.unwrap_or_default();
+    Err(ApiError {
+        status: Some(status),
+        message: describe(status, &text),
+    })
 }
 
 pub async fn post(
@@ -203,9 +292,11 @@ pub async fn playlist_items(
     token: &str,
     playlist: &str,
     limit: usize,
+    offset: usize,
     market: &str,
 ) -> Result<Value, ApiError> {
     let mut query = page(limit);
+    query.push(("offset", offset.to_string()));
     query.push(("market", market.to_string()));
     query.push(("additional_types", "track".to_string()));
     match get(http, token, &format!("/playlists/{playlist}/items"), &query).await {

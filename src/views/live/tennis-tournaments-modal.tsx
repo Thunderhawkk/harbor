@@ -281,13 +281,24 @@ function MatchRow({ match }: { match: DrawMatch }) {
       </div>
       {match.players.map((p, i) => (
         <div key={`${p.name}-${i}`} className="flex items-center gap-2 py-0.5">
-          {p.flag ? (
+          {p.flags?.length ? (
+            <span className="flex shrink-0 -space-x-1.5">
+              {p.flags.map((flag, f) => (
+                <img
+                  key={`${flag}-${f}`}
+                  src={flag}
+                  alt=""
+                  className="h-3.5 w-5 rounded-[2px] object-contain ring-1 ring-canvas"
+                />
+              ))}
+            </span>
+          ) : p.flag ? (
             <img src={p.flag} alt="" className="h-3.5 w-5 shrink-0 object-contain" />
           ) : (
             <span className="h-3.5 w-5 shrink-0" />
           )}
           <span
-            className={`flex-1 truncate text-[13.5px] ${p.winner ? "font-semibold text-ink" : "text-ink-muted"}`}
+            className={`min-w-0 flex-1 text-[13.5px] ${p.flags?.length ? "leading-tight" : "truncate"} ${p.winner ? "font-semibold text-ink" : "text-ink-muted"}`}
           >
             {p.name}
           </span>

@@ -7,10 +7,11 @@ import { IMG } from "@/lib/providers/tmdb/tmdb-client";
 import { ImdbIcon } from "@/components/icons/imdb-icon";
 import { usePortCredits, type PortPerson } from "./port-hover-credits";
 import { PORT_CARD_W, placeBeside, type Spot } from "./port-hover-place";
+import "./port-hover-card.css";
 
 const OPEN_MS = 160;
 const CLOSE_MS = 120;
-const FACES = 6;
+const FACES = 4;
 
 export function usePortHover() {
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -37,6 +38,7 @@ export function usePortHover() {
     clear(closer);
     closer.current = window.setTimeout(drop, CLOSE_MS);
   };
+  const keep = () => clear(closer);
   const enter = (next: Meta, rect: DOMRect) => {
     clear(closer);
     if (live.current) {
@@ -58,11 +60,15 @@ export function usePortHover() {
       if (e.key === "Escape") drop();
     };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", drop, true);
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Element && e.target.closest(".voyage-info-bubble")) return;
+      drop();
+    };
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", drop);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", drop, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", drop);
     };
   }, [meta]);
@@ -75,10 +81,16 @@ export function usePortHover() {
     [],
   );
 
-  return { meta, anchor, enter, leave, drop };
+  return { meta, anchor, enter, leave, keep, drop };
 }
 
-export function PortHoverCard({ meta, anchor }: { meta: Meta; anchor: DOMRect }) {
+export function PortHoverCard({ meta, anchor, id, onEnter, onLeave }: {
+  meta: Meta;
+  anchor: DOMRect;
+  id: string;
+  onEnter: () => void;
+  onLeave: () => void;
+}) {
   const t = useT();
   const { settings } = useSettings();
   const credits = usePortCredits(meta, settings.tmdbKey ?? "");
@@ -90,8 +102,11 @@ export function PortHoverCard({ meta, anchor }: { meta: Meta; anchor: DOMRect })
     if (!el) return;
     const panel = document.querySelector("[data-voyage-panel]")?.getBoundingClientRect() ?? null;
     const rtl = document.documentElement.dir === "rtl";
+    const style = getComputedStyle(document.documentElement);
+    const dock = (parseFloat(style.getPropertyValue("--harbor-music-dock")) || 0)
+      + (parseFloat(style.getPropertyValue("--harbor-viewport-bottom")) || 0);
     setSpot(
-      placeBeside(anchor, el.offsetHeight, panel, window.innerWidth, window.innerHeight, rtl),
+      placeBeside(anchor, el.offsetHeight, panel, window.innerWidth, window.innerHeight - dock, rtl, el.offsetWidth),
     );
   }, [anchor, meta.id, credits]);
 
@@ -105,21 +120,34 @@ export function PortHoverCard({ meta, anchor }: { meta: Meta; anchor: DOMRect })
     .map((p) => p.name)
     .join(", ");
   const waiting = credits === undefined;
+  const horizontal = spot?.side === "left" || spot?.side === "right";
+  const pointer = spot && ref.current
+    ? Math.max(18, Math.min(
+        horizontal ? anchor.top + Math.min(anchor.height / 3, 64) - spot.top : anchor.left + anchor.width / 2 - spot.left,
+        (horizontal ? ref.current.offsetHeight : ref.current.offsetWidth) - 18,
+      ))
+    : 24;
 
   return createPortal(
     <div
       ref={ref}
+      id={id}
       role="tooltip"
+      data-side={spot?.side}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
       style={{
         left: spot?.left ?? anchor.left,
         top: spot?.top ?? anchor.top,
-        width: PORT_CARD_W,
+        width: `min(${PORT_CARD_W}px, calc(100vw - 24px))`,
         transformOrigin: spot?.origin ?? "top left",
         visibility: spot ? "visible" : "hidden",
       }}
-      className="pointer-events-none fixed z-[230] overflow-hidden rounded-xl border border-edge bg-elevated shadow-[0_18px_40px_-26px_rgba(0,0,0,0.7)] animate-popover-in"
+      className="voyage-info-bubble"
     >
-      <div key={meta.id} className="animate-fade-in-soft p-4">
+      <span aria-hidden className="voyage-info-pointer" style={horizontal ? { top: pointer } : { left: pointer }} />
+      <div className="voyage-info-content">
+      <div className="p-4">
         <div className="text-[15px] font-semibold leading-tight text-ink">{meta.name}</div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] tabular-nums text-ink-subtle">
           {facts.map((f, i) => (
@@ -138,7 +166,7 @@ export function PortHoverCard({ meta, anchor }: { meta: Meta; anchor: DOMRect })
           )}
         </div>
         {meta.description && (
-          <p className="mt-2.5 line-clamp-4 text-[12.5px] leading-relaxed text-ink-muted">
+          <p className="mt-3 line-clamp-5 text-[12.5px] leading-relaxed text-ink-muted">
             {meta.description}
           </p>
         )}
@@ -162,13 +190,14 @@ export function PortHoverCard({ meta, anchor }: { meta: Meta; anchor: DOMRect })
               )}
             </div>
             {!waiting && (
-              <span className="min-w-0 truncate text-[11.5px] text-ink-muted">{names}</span>
+              <span className="min-w-0 line-clamp-2 text-[11.5px] leading-relaxed text-ink-muted">{names}</span>
             )}
           </div>
         )}
       </div>
-      <div className="border-t border-edge-soft/60 px-4 py-2 text-[10.5px] font-medium uppercase tracking-[0.14em] text-ink-subtle">
+      <div className="px-4 pb-3 text-[11px] text-ink-subtle">
         {t("Click to choose")}
+      </div>
       </div>
     </div>,
     document.body,

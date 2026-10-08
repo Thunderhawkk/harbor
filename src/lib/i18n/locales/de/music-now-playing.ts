@@ -1,16 +1,27 @@
 const musicNowPlaying: Record<string, string> = {
+  "music.now.sameContext": "Gleiche Quelle",
+  "music.now.discoverNew": "Entdecken",
+  "music.now.moreMode": "Weitere Musik auswählen",
+  "music.now.continueFrom": "Weiter mit {name}",
+  "music.now.discoverHint": "Ähnliche Songs ohne Warteschlange und zuletzt gehörte Musik.",
+  "music.now.moreAdded": "{count} Songs hinzugefügt",
+  "music.now.contextEnd": "Keine weiteren Songs aus dieser Quelle. Probiere Entdecken.",
+  "music.now.noNewSongs": "Keine neuen Songs gefunden. Versuche es später erneut.",
+  "music.now.moreError": "Weitere Songs konnten nicht geladen werden. Erneut versuchen.",
   "music.artist.filmography": "Film & Fernsehen",
   "music.action.error": "Aktion fehlgeschlagen. Bitte erneut versuchen.",
   "music.radio.error":
     "Radio konnte nicht gestartet werden. Erneut versuchen oder andere Quelle wählen.",
-  "music.download.action": "Song herunterladen",
-  "music.download.done": "Heruntergeladen",
-  "music.download.busy": "Wird heruntergeladen",
-  "music.download.retry": "Erneut herunterladen",
+  "music.download.action": "Titel speichern",
+  "music.download.done": "Gespeichert",
+  "music.download.busy": "Wird gespeichert",
+  "music.download.retry": "Erneut speichern",
   "music.download.unsupported":
     "Diese Quelle bietet keine Audiodatei zum Herunterladen. Andere Quelle wählen.",
   "music.download.missing": "Datei fehlt. Erneut herunterladen.",
   "music.download.failed": "Download fehlgeschlagen. Erneut versuchen oder andere Quelle wählen.",
+  "music.download.changeFolder": "Ändern",
+  "music.download.defaultFolder": "Standard verwenden",
   "music.download.empty": "Songs im Player oder Titelmenü herunterladen und offline hören.",
   "music.download.folder": "Im Ordner anzeigen",
   "music.download.delete": "Download löschen",
@@ -46,6 +57,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.now.next": "Als Nächstes",
 
   "music.now.queueEmpty": "Du hast das Ende der Warteschlange erreicht.",
+  "music.now.queueBuilding": "Nächste Titel werden geladen",
 
   "music.now.exploreArtist": "Künstler entdecken",
 
@@ -72,12 +84,21 @@ const musicNowPlaying: Record<string, string> = {
   "music.buy.search": "Bei {store} suchen",
 
   "music.artist.about": "Über den Künstler",
+  "music.artist.save": "Künstler speichern",
+  "music.artist.dontPlay": "Diesen Künstler nicht spielen",
+  "music.artist.doPlay": "Diesen Künstler wieder spielen",
+  "music.artist.hideSongs": "Songs dieses Künstlers ausblenden",
+  "music.artist.showSongs": "Songs dieses Künstlers einblenden",
+  "music.artist.moreLike": "Mehr Künstler wie dieser",
+  "music.artist.unsave": "Aus gespeicherten Künstlern entfernen",
 
   "music.artist.origin": "Herkunft",
 
   "music.artist.began": "Geboren / gegründet",
 
   "music.artist.aliases": "Auch bekannt als",
+
+  "music.artist.label": "Label",
 
   "music.artist.connections": "Mitglieder und Mitwirkende",
 
@@ -88,6 +109,12 @@ const musicNowPlaying: Record<string, string> = {
   "music.artist.merch": "Merchandise",
 
   "music.artist.official": "Offizielle Website",
+  "music.artist.social": "Social Media",
+  "music.artist.gallery": "Fotos von {name}",
+  "music.artist.zoom": "Zoom",
+
+  "music.artist.kicker": "Künstler",
+  "music.artist.listenOn": "Anhören bei",
 };
 
 export default musicNowPlaying;

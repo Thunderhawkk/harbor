@@ -1,5 +1,6 @@
 import { Dropdown } from "@/components/dropdown";
 import { useT } from "@/lib/i18n";
+import type { FilmographyCompletion } from "./filmography-completion";
 import { MIN_VOTES_MOVIE, MIN_VOTES_TV, type FilmographySort } from "./filmography-rank";
 
 const SORTS: Array<{ id: FilmographySort; label: string }> = [
@@ -16,20 +17,34 @@ export function FilmographyBar({
   minRating,
   onMinRating,
   resultCount,
+  completion,
 }: {
   sort: FilmographySort;
   onSort: (s: FilmographySort) => void;
   minRating: number;
   onMinRating: (r: number) => void;
   resultCount: { shown: number; total: number } | null;
+  completion: FilmographyCompletion | null;
 }) {
   const t = useT();
   return (
     <div className="flex flex-col gap-1 pb-1">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 py-3">
-        <h2 className="font-display text-[22px] font-medium tracking-tight text-ink">
-          {t("Filmography")}
-        </h2>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="font-display text-[22px] font-medium tracking-tight text-ink">
+            {t("Filmography")}
+          </h2>
+          {completion && (
+            <span className="text-[12.5px] tabular-nums text-ink-muted">
+              {completion.seen >= completion.total
+                ? t("Seen all {total} films", { total: String(completion.total) })
+                : t("Seen {n} of {total} films", {
+                    n: String(completion.seen),
+                    total: String(completion.total),
+                  })}
+            </span>
+          )}
+        </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3 ms-auto">
           <div className="flex items-center gap-2">

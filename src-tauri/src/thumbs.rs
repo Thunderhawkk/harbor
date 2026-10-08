@@ -187,6 +187,11 @@ pub(crate) fn locate_mpv() -> Option<PathBuf> {
         candidates.push("mpv.exe".into());
         candidates.push("mpv".into());
     } else if cfg!(target_os = "macos") {
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                candidates.push(dir.join("mpv").to_string_lossy().into_owned());
+            }
+        }
         candidates.push("/opt/homebrew/bin/mpv".into());
         candidates.push("/usr/local/bin/mpv".into());
         candidates.push("mpv".into());

@@ -17,6 +17,7 @@ mod fonts;
 mod gamepad;
 mod http_fetch;
 mod http_redirect;
+mod playback_redirect;
 mod local_lib;
 mod media_server;
 mod power;
@@ -50,6 +51,8 @@ mod asr_model;
 mod browser;
 mod browser_args;
 #[cfg(desktop)]
+mod capstan;
+#[cfg(desktop)]
 mod captions;
 #[cfg(desktop)]
 mod cast;
@@ -66,11 +69,17 @@ mod discord_rp;
 #[cfg(desktop)]
 mod display_fit;
 #[cfg(desktop)]
+mod dj_deck;
+#[cfg(desktop)]
 mod dlna;
 #[cfg(desktop)]
 mod dvr;
 #[cfg(desktop)]
 mod fullscreen;
+#[cfg(desktop)]
+mod games;
+#[cfg(desktop)]
+mod monitors;
 #[cfg(desktop)]
 mod harbor_lan;
 #[cfg(desktop)]
@@ -79,9 +88,13 @@ mod hdr_overlay;
 mod installer_handoff;
 #[cfg(desktop)]
 mod media_controls;
+#[cfg(target_os = "windows")]
+mod taskbar;
 mod modal_overlay;
 #[cfg(desktop)]
 mod mpv;
+#[cfg(desktop)]
+mod playback_cache;
 #[cfg(target_os = "linux")]
 mod mpv_render_linux;
 #[cfg(target_os = "macos")]
@@ -92,6 +105,7 @@ mod multiview;
 mod music;
 #[cfg(desktop)]
 mod pip;
+mod pip_window;
 #[cfg(target_os = "macos")]
 mod pip_mac;
 #[cfg(desktop)]
@@ -706,6 +720,9 @@ pub fn run() {
 #[cfg(desktop)]
 pub fn run() {
     if music::try_run_connector_worker() { return; }
+    if games::try_run_achievement_worker() { return; }
+    if games::try_run_archive_worker() { return; }
+    if games::try_run_hydra_import_worker() { return; }
     {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if let Some(p) = media_file_from_args(&args) {
@@ -722,6 +739,7 @@ pub fn run() {
     win_graphics::configure_windows_graphics();
     let _ = rustls::crypto::ring::default_provider().install_default();
     trailer::sweep_cache();
+    std::thread::spawn(trailer::sweep_ytdlp_extractions);
     std::thread::spawn(temp_prune::sweep_temp);
 
     let proxy_state = tauri::async_runtime::block_on(stream_proxy::ProxyState::start())
@@ -731,6 +749,7 @@ pub fn run() {
         });
     let mpv_state = mpv::MpvState::new();
     let pip_state = pip::PipState::new();
+    let pip_window_state = pip_window::PipWindowState::default();
     let fullscreen_state = fullscreen::FullscreenState::new();
     let thumbs_state = thumbs::ThumbsState::new();
     let dvr_state = dvr::DvrState::new();
@@ -757,7 +776,8 @@ pub fn run() {
                 let _ = app.emit("harbor:open-file", path);
             }
         }))
-        .plugin(tauri_plugin_opener::init())
+        // tauri-plugin-opener injects a page script that itself opens target="_blank" anchors, duplicating Harbor's own openUrl.
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
@@ -784,6 +804,7 @@ pub fn run() {
         .manage(mpv_state)
         .manage(music::MusicState::new())
         .manage(pip_state)
+        .manage(pip_window_state)
         .manage(fullscreen_state)
         .manage(thumbs_state)
         .manage(dvr_state)
@@ -819,6 +840,7 @@ pub fn run() {
             }
             proc_guard::init();
             proc_guard::reap_orphans();
+            games::initialize_download_preparation(app.handle());
             music::initialize(app.handle()).map_err(std::io::Error::other)?;
             #[cfg(windows)]
             {
@@ -882,6 +904,8 @@ pub fn run() {
                 });
             }
             media_controls::ensure_started_on_setup(&app.handle());
+            #[cfg(target_os = "windows")]
+            taskbar::init(&app.handle());
             {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || discord_rp::run_loop(handle));
@@ -972,9 +996,209 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            games::games_pokemon,
+            games::games_scan_steam,
+            games::steam_shortcut_commands::games_scan_steam_shortcuts,
+            games::steam_shortcut_commands::games_launch_steam_shortcut,
+            games::steam_shortcut_commands::games_steam_shortcut_icons,
+            games::steam_shortcut_commands::games_launch_steam_shortcut_direct,
+            games::steam_shortcut_commands::games_steam_shortcut_running,
+            games::games_scan_launchers,
+            games::games_wow_addons,
+            games::games_sims_folders,
+            games::games_sims_workspace,
+            games::games_sims_inspect,
+            games::games_sims_metadata,
+            games::games_sims_packs,
+            games::games_sims_duplicates,
+            games::games_sims_dependencies,
+            games::games_sims_tray_preview,
+            games::games_sims_tray_content,
+            games::games_sims_kept_folder,
+            games::games_sims_catalog,
+            games::games_sims_lot51_catalog,
+            games::stardew_commands::games_stardew_folders,
+            games::stardew_commands::games_stardew_inspect,
+            games::stardew_commands::games_stardew_updates,
+            games::stardew_commands::games_stardew_cancel,
+            games::stardew_commands::games_stardew_workspace,
+            games::stardew_commands::games_stardew_review,
+            games::stardew_commands::games_stardew_apply,
+            games::stardew_commands::games_stardew_recover,
+            games::stardew_commands::games_stardew_discard,
+            games::stardew_commands::games_stardew_catalog,
+            games::stardew_commands::games_stardew_creator_review,
+            games::games_sims_mts_detail,
+            games::games_sims_mts_browse,
+            games::games_sims_mts_review,
+            games::games_sims_lot51_detail,
+            games::games_sims_lot51_review,
+            games::games_sims_creator_review,
+            games::games_sims_review,
+            games::games_sims_apply,
+            games::games_sims_cancel,
+            games::games_sims_sets,
+            games::games_sims_set_save,
+            games::games_sims_set_remove,
+            games::games_sims_discard,
+            games::games_sims_recover,
+            games::games_sims_save_context,
+            games::games_sims_save_recover,
+            games::games_save_recovery_status,
+            games::games_recover_save_restore,
+            games::games_sims_save_list,
+            games::games_sims_save_snapshot,
+            games::games_sims_save_review,
+            games::games_wow_addon_package,
+            games::games_wow_addon_workspace,
+            games::games_wow_addon_review,
+            games::games_wow_addon_apply,
+            games::games_wow_addon_discard,
+            games::games_wow_addon_cancel,
+            games::games_wow_addon_recover,
+            games::games_launch_launcher_game,
+            games::games_launcher_sessions,
+            games::games_inspect_archive,
+            games::games_inspect_setup,
+            games::games_setup_icon,
+            games::games_start_setup,
+            games::games_setup_jobs,
+            games::games_recover_setup,
+            games::games_reveal_setup,
+            games::games_observe_setup,
+            games::games_archive_space,
+            games::games_extract_archive,
+            games::games_cancel_archive,
+            games::games_discard_archive,
+            games::games_archive_jobs,
+            games::games_review_archive_cleanup,
+            games::games_discard_archive_cleanup,
+            games::games_recycle_archive_sources,
+            games::games_archive_cleanup_records,
+            games::games_archive_cleanup_action,
+            games::games_start_archive,
+            games::games_prepare_archive,
+            games::games_preparation_choices,
+            games::games_preparation_version,
+            games::games_preparation_candidates,
+            games::games_set_preparation,
+            games::games_disable_preparation,
+            games::games_remove_archive_job,
+            games::games_steam_account_status,
+            games::games_battlenet_account,
+            games::games_battlenet_import,
+            games::games_battlenet_cancel,
+            games::games_battlenet_preferences,
+            games::games_battlenet_disconnect,
+            games::games_minecraft_status,
+            games::games_minecraft_begin,
+            games::games_minecraft_poll,
+            games::games_minecraft_cancel,
+            games::games_minecraft_refresh,
+            games::games_minecraft_disconnect,
+            games::games_minecraft_apply_skin,
+            games::games_minecraft_apply_cape,
+            games::games_minecraft_texture,
+            games::games_minecraft_catalog,
+            games::games_minecraft_instances,
+            games::games_minecraft_instance_create,
+            games::games_minecraft_instance_rename,
+            games::games_minecraft_instance_folder,
+            games::games_minecraft_content,
+            games::games_minecraft_fabric_versions,
+            games::games_minecraft_loader_versions,
+            games::games_minecraft_pack_update_state,
+            games::games_minecraft_pack_update_review,
+            games::games_minecraft_pack_update_select,
+            games::games_minecraft_pack_update_apply,
+            games::games_minecraft_pack_update_discard,
+            games::games_minecraft_pack_update_cancel,
+            games::games_minecraft_instance_export_review,
+            games::games_minecraft_instance_export_apply,
+            games::games_minecraft_instance_storage,
+            games::games_minecraft_instance_remove_review,
+            games::games_minecraft_instance_remove_apply,
+            games::games_minecraft_lifecycle_discard,
+            games::games_minecraft_pack_review,
+            games::games_minecraft_pack_install,
+            games::games_minecraft_pack_cancel,
+            games::games_minecraft_pack_discard,
+            games::games_minecraft_runtime_state,
+            games::games_minecraft_runtime_review,
+            games::games_minecraft_runtime_install,
+            games::games_minecraft_runtime_cancel,
+            games::games_minecraft_runtime_discard,
+            games::games_minecraft_java_state,
+            games::games_minecraft_java_review,
+            games::games_minecraft_java_select,
+            games::games_minecraft_java_memory,
+            games::games_minecraft_java_install,
+            games::games_minecraft_java_discard,
+            games::games_minecraft_launch_state,
+            games::games_minecraft_launch,
+            games::games_connect_steam_account,
+            games::games_refresh_steam_account,
+            games::games_disconnect_steam_account,
+            games::games_steam_achievements,
+            games::games_read_local_achievements,
+            games::games_apply_local_achievements,
+            games::games_discard_local_achievements,
+            games::games_install_steam,
+            games::games_list_transfers,
+            games::games_transfer_settings,
+            games::games_transfer_storage,
+            games::games_download_locations,
+            games::games_set_transfer_bandwidth,
+            games::games_source_public_review,games::games_source_public_prepare,games::games_source_public_prepare_batch,games::games_source_public_cancel_batch,games::games_hydra_import_review,games::games_hydra_import_cancel,games::games_cloud_list,games::games_cloud_download,games::games_cloud_resolve_link,games::games_cloud_host_check,games::games_cloud_ad_prepare,games::games_cloud_ad_status,games::games_cloud_web_create,games::games_cloud_web_list,games::games_cloud_web_status,games::games_cloud_web_download,games::games_cloud_web_find,games::games_cloud_pm_create,games::games_cloud_pm_list,games::games_cloud_pm_status,games::games_cloud_pm_download,games::games_cloud_pm_retry,games::games_modrinth,games::games_mod_workspace,games::games_review_mods,games::games_install_mods,games::games_mod_action,games::games_cancel_mods,games::games_discard_mods,games::games_list_torrents,
+            games::games_inspect_torrent,
+            games::games_cancel_torrent_inspection,
+            games::games_discard_torrent,
+            games::games_start_torrent,
+            games::games_torrent_action,
+            games::games_seed_torrent,
+            games::games_list_save_snapshots,
+            games::games_validate_custom_launch,
+            games::games_game_shortcuts,
+            games::games_allow_game_execution,
+            games::games_custom_running,
+            games::games_custom_history,
+            games::games_validate_custom_artwork,
+            games::games_launch_custom,
+            games::games_create_save_snapshot,
+            games::games_prepare_save_restore,
+            games::games_restore_save_snapshot,
+            games::games_cancel_save_operation,
+            games::games_discard_save_restore,
+            games::games_source_browser_choose, games::games_source_browser_close,
+            games::games_source_verify, games::games_source_verify_cancel, games::games_source_verified_fetch,
+            games::games_source_http_fetch, games::games_source_http_cancel,
+            games::games_add_transfer,
+            games::games_add_transfer_batch,
+            games::games_transfer_action,
+            games::games_relink_transfer,
+            games::games_download_patch,
+            games::games_cancel_patch_download,
+            games::games_match_patch_sources,
+            games::games_prepare_patch,
+            games::games_write_patch,
+            games::games_discard_patch,
+            games::games_scan_roms,
+            games::games_find_emulators,
+            games::games_validate_emulator,
+            games::games_emulation_running,
+            games::games_launch_emulated,
+            games::games_retro_status,
+            games::games_retro_start,
+            games::games_retro_close,
+            games::games_launch_steam,
+            games::library_management::games_manage_steam,
+            games::library_management::games_manage_launcher,
+            games::library_management::games_open_installed_apps,
             privacy::privacy_status,
             privacy::privacy_set_enabled,
             set_maximize_clamp,
+            monitors::list_monitors,
+            monitors::move_main_to_monitor,
             crash_report::take_startup_crash_report,
             fonts::install_sub_font,
             fonts::remove_sub_font,
@@ -1042,6 +1266,9 @@ pub fn run() {
             music::music_spotify_status,
             music::music_spotify_connect,
             music::music_spotify_disconnect,
+            music::music_spotify_devices,
+            music::music_spotify_set_device,
+            music::music_spotify_device,
             music::music_spotify_library_page,
             music::music_spotify_create_playlist,
             music::music_spotify_add_to_playlist,
@@ -1075,13 +1302,42 @@ pub fn run() {
             music::music_export_m3u,
             music::music_play_track,
             music::music_engine_pause,
+            music::music_paused_for_video,
+            music::music_resume_after_video,
             music::music_engine_seek,
+            music::music_deck_loop,
+            music::music_deck_scratch,
+            music::music_prewarm_track,
+            music::music_scratch_window,
+            music::music_scratch_hold,
+            music::music_cable_status,
+            music::music_cable_create,
+            music::music_cable_destroy,
+            music::music_deck_play,
+            music::music_deck_pause,
+            music::music_deck_seek,
+            music::music_deck_volume,
+            music::music_deck_stop,
+            music::music_deck_states,
+            music::music_deck_primary,
+            music::music_deck_crossfade,
+            music::music_deck_crossfade_get,
+            music::music_fx_set,
+            music::music_fx_clear,
+            music::music_fx_get,
             music::music_engine_set_volume,
             music::music_audio_devices,
             music::music_audio_settings_get,
             music::music_audio_meter_set_enabled,
             music::music_audio_meter_snapshot,
             music::music_audio_settings_set,
+            music::music_export_filtered,
+            music::music_broadcast_targets,
+            music::music_broadcast_start,
+            music::music_broadcast_stop,
+            music::music_broadcast_status,
+            dj_deck::dj_deck_open,
+            dj_deck::dj_deck_close,
             music::music_engine_stop,
             music::music_home_rows,
             music::music_browse_connector,
@@ -1094,6 +1350,7 @@ pub fn run() {
             music::music_search_typed,
             music::music_video_stream,
             music::music_search_videos,
+            music::music_search_video_page,
             music::music_connections,
             music::music_connect,
             music::music_disconnect,
@@ -1104,6 +1361,7 @@ pub fn run() {
             download::download_start,
             download::download_cancel,
             stream_proxy::proxy_register,
+            streams::resolve_playback_redirect,
             stream_proxy::proxy_unregister,
             stream_proxy::proxy_gc_idle,
             cf_relay::cf_list_accounts,
@@ -1149,6 +1407,7 @@ pub fn run() {
             hdr_overlay::hdr_overlay_emit_props,
             hdr_overlay::hdr_overlay_emit_action,
             mpv::mpv_sub_add,
+            mpv::mpv_sub_remove,
             mpv::sub_download,
             mpv::mpv_stop,
             mpv::mpv_release_media,
@@ -1159,6 +1418,11 @@ pub fn run() {
             pip::pip_publish_state,
             pip::window_pip_enter,
             pip::window_pip_exit,
+            pip_window::pip_window_enter,
+            pip_window::pip_window_exit,
+            pip_window::pip_window_restore,
+            pip_window::pip_window_fit,
+            pip_window::pip_window_active,
             fullscreen::window_fullscreen_enter,
             fullscreen::window_fullscreen_exit,
             browser::browser_open,
@@ -1197,9 +1461,21 @@ pub fn run() {
             subtitle_credentials::subtitle_credential_bind,
             subtitle_credentials::subtitle_credentials_clear,
             cf_solver::cf_report,
+            capstan::capstan_ping,
+            capstan::capstan_install,
+            capstan::capstan_uninstall,
+            capstan::capstan_extensions,
+            capstan::capstan_providers,
+            capstan::capstan_search,
+            capstan::capstan_load,
+            capstan::capstan_load_links,
+            capstan::capstan_catalogue,
+            capstan::capstan_catalogue_page,
             discord_rp::discord_set_presence,
             discord_rp::discord_clear,
             media_controls::media_controls_update,
+            media_controls::media_controls_music_state,
+            media_controls::media_controls_music_art,
             media_controls::media_controls_seeked,
             media_controls::media_controls_clear,
             gamepad::gamepad_list,

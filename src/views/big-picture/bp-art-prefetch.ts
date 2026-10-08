@@ -51,8 +51,8 @@ function holdDecoded(src: string, img: HTMLImageElement) {
   }
 }
 
-export function decodeBpHeroArt(url: string | undefined) {
-  const src = bpHeroArt(url);
+export function decodeBpHeroArt(url: string | undefined, fullQuality = false) {
+  const src = bpHeroArt(url, "wide", fullQuality);
   if (!src || decoded.has(src)) return;
   const at = routeAt;
   const img = new Image();
@@ -85,9 +85,9 @@ function pump() {
   }
 }
 
-export function prefetchBpHeroArt(urls: readonly (string | undefined)[]) {
+export function prefetchBpHeroArt(urls: readonly (string | undefined)[], fullQuality = false) {
   for (const url of urls) {
-    const src = bpHeroArt(url);
+    const src = bpHeroArt(url, "wide", fullQuality);
     if (!src || seen.has(src)) continue;
     // Evict one. Clearing at the cap is the same re-queue of the whole session
     // that the route listener above refuses to do, just triggered by a counter.
@@ -105,6 +105,7 @@ export function prefetchBpRowNeighbours(
   metas: readonly Meta[],
   index: number,
   tmdbKey?: string,
+  fullQuality = false,
 ) {
   if (index < 0) return;
   const near: Meta[] = [];
@@ -116,20 +117,20 @@ export function prefetchBpRowNeighbours(
     const m = metas[index - step];
     if (m) near.push(m);
   }
-  prefetchBpHeroArt(near.map((m) => m.background));
+  prefetchBpHeroArt(near.map((m) => m.background), fullQuality);
   const next = metas[index + 1];
   if (!tmdbKey) {
-    if (next) decodeBpHeroArt(next.background);
+    if (next) decodeBpHeroArt(next.background, fullQuality);
     return;
   }
   for (const m of near) {
     void warmBpEnrich(tmdbKey, m).then((detail) => {
       const best = [detail?.gallery?.backdrops?.[0], detail?.backdrop, m.background].find(Boolean);
       if (m === next) {
-        decodeBpHeroArt(best);
+        decodeBpHeroArt(best, fullQuality);
         return;
       }
-      prefetchBpHeroArt([best]);
+      prefetchBpHeroArt([best], fullQuality);
     });
   }
 }

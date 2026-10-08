@@ -4,9 +4,13 @@ import type { PlayerShellProps } from "@/lib/player-shells/types";
 import { usePlaybackPositionGated } from "@/lib/player/playback-clock";
 import { useT } from "@/lib/i18n";
 import { FullscreenClock } from "@/components/player/fullscreen-clock";
+import { isLivePlaybackSrc } from "@/lib/player/live-src";
+import { LiveBadge, GoToLive, LiveSeekBar } from "../transport/live-controls";
 
 export function MinimalShell({
   snap,
+  isLive,
+  meta,
   visible,
   fullscreen,
   pipMode,
@@ -20,10 +24,11 @@ export function MinimalShell({
   if (pipMode) return null;
 
   const playing = snap.status === "playing";
+  const live = isLivePlaybackSrc({ meta: meta ?? {}, isLive });
 
   return (
     <>
-      {fullscreen && (
+      {fullscreen && !live && (
         <div
           className={`pointer-events-none absolute end-6 top-5 z-20 transition-opacity duration-300 ${
             visible ? "opacity-100" : "opacity-0"
@@ -64,7 +69,7 @@ export function MinimalShell({
             <span className="truncate text-[14px] font-semibold text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
               {title}
             </span>
-            <MinimalTime durationSec={snap.durationSec} visible={visible} />
+            {live ? <LiveBadge /> : <MinimalTime durationSec={snap.durationSec} visible={visible} />}
           </div>
           <button
             onClick={onFullscreen}
@@ -74,7 +79,10 @@ export function MinimalShell({
             {fullscreen ? <Minimize size={16} strokeWidth={2.2} /> : <Maximize size={16} strokeWidth={2.2} />}
           </button>
         </div>
-        <MinimalTrack durationSec={snap.durationSec} visible={visible} onSeek={onSeek} />
+        {live ? <>
+          <GoToLive durationSec={snap.durationSec} onSeek={onSeek} />
+          <LiveSeekBar durationSec={snap.durationSec} active={visible} onSeek={onSeek} />
+        </> : <MinimalTrack durationSec={snap.durationSec} visible={visible} onSeek={onSeek} />}
       </div>
     </>
   );

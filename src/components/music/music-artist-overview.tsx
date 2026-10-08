@@ -1,12 +1,20 @@
+import { MusicArtistGalleryModal } from "./music-artist-gallery-modal";
+import { MusicLinkedBio } from "./music-linked-bio";
+import { useSettings } from "@/lib/settings";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Globe2, ShoppingBag } from "lucide-react";
+import { ArrowUpRight, Globe2, ShoppingBag, UserRound } from "@/components/icons/music-icons";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 import { requestMusicGenre } from "@/lib/music/navigation";
-import { loadArtistProfile, type MusicArtistProfile } from "@/lib/music/artist-profile";
-import { resolveArtist } from "@/lib/music/artist-authority";
+import {
+  loadArtistProfile,
+  type ArtistLink,
+  type MusicArtistProfile,
+} from "@/lib/music/artist-profile";
+import { identityForRef, resolveArtist } from "@/lib/music/artist-authority";
 import type { MusicArtistRef, MusicCatalogItem } from "@/lib/music/types";
 import { MusicServiceLogo } from "./music-service-logo";
+import { MusicLinkFavicon } from "./music-link-favicon";
 import { MusicArtistExtras } from "./music-artist-extras";
 import "./music-artist-overview.css";
 
@@ -14,10 +22,12 @@ export function MusicArtistOverview({
   artist,
   onOpen,
   compact = false,
+  extraLinks = [],
 }: {
   artist: MusicArtistRef;
   onOpen: (artist: MusicArtistRef) => void;
   compact?: boolean;
+  extraLinks?: ArtistLink[];
 }) {
   const language = useUiLanguage();
   const [result, setResult] = useState<{ key: string; data: MusicArtistProfile | null } | null>(
@@ -43,6 +53,7 @@ export function MusicArtistOverview({
       artwork={artist.artwork}
       onOpen={onOpen}
       compact={compact}
+      extraLinks={extraLinks}
     />
   );
 }
@@ -52,30 +63,74 @@ export function MusicArtistStory({
   artwork,
   onOpen,
   compact = false,
+  extraLinks = [],
 }: {
   profile: MusicArtistProfile;
   artwork?: string;
   onOpen: (artist: MusicArtistRef) => void;
   compact?: boolean;
+  extraLinks?: ArtistLink[];
 }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
+  const [gallery, setGallery] = useState(false);
+  const { settings } = useSettings();
+  const [memberArt, setMemberArt] = useState<Record<string, string>>({});
+  // MusicBrainz relations carry no image, so each credited act is resolved for its portrait.
+  const memberKey = profile.members.map((member) => member.id).join("|");
+  useEffect(() => {
+    const members = profile.members;
+    if (members.length === 0) return;
+    let active = true;
+    void Promise.all(
+      members.map(async (member) => {
+        const found = await identityForRef(member).catch(() => null);
+        return found?.artwork ? ([member.id, found.artwork] as const) : null;
+      }),
+    ).then((pairs) => {
+      if (!active) return;
+      const next: Record<string, string> = {};
+      for (const pair of pairs) if (pair) next[pair[0]] = pair[1];
+      setMemberArt(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [memberKey]);
   const image = profile.artwork || artwork;
-  const artistLinks = profile.links.filter((link) => link.kind !== "merch");
+  const known = new Set(profile.links.map((link) => link.url));
+  const artistLinks = [
+    ...profile.links.filter((link) => link.kind !== "merch"),
+    ...extraLinks.filter((link) => !known.has(link.url)),
+  ];
   return (
     <section className="music-artist-overview" data-compact={compact || undefined}>
+      {gallery && (
+        <MusicArtistGalleryModal
+          profile={profile}
+          tmdbKey={settings.tmdbKey || undefined}
+          onClose={() => setGallery(false)}
+        />
+      )}
       <div className="music-artist-story">
         {image && (
-          <div className="music-artist-story-image">
+          <button
+            type="button"
+            className="music-artist-story-image"
+            onClick={() => setGallery(true)}
+            aria-label={t("music.artist.gallery", { name: profile.name })}
+          >
             <img src={image} alt={profile.name} loading="lazy" />
             <span>{t("music.artist.about")}</span>
-          </div>
+          </button>
         )}
         <div className="music-artist-story-copy">
           <h2>{image ? profile.name : t("music.artist.about")}</h2>
           {profile.biography && (
             <>
-              <p data-expanded={expanded || undefined}>{profile.biography}</p>
+              <p data-expanded={expanded || undefined}>
+                <MusicLinkedBio body={profile.biography} profile={profile} />
+              </p>
               {profile.biography.length > 320 && (
                 <button
                   type="button"
@@ -138,6 +193,19 @@ export function MusicArtistStory({
           <div className="music-artist-links">
             {profile.members.map((member) => (
               <button key={member.id} type="button" onClick={() => onOpen(member)}>
+                <span className="music-artist-member-art">
+                  {memberArt[member.id] ? (
+                    <img
+                      src={memberArt[member.id]}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      draggable={false}
+                    />
+                  ) : (
+                    <UserRound size={13} aria-hidden />
+                  )}
+                </span>
                 {member.name}
                 <ArrowUpRight size={14} />
               </button>
@@ -151,13 +219,18 @@ export function MusicArtistStory({
           <div className="music-artist-links">
             {artistLinks.map((link) => (
               <button key={link.url} type="button" onClick={() => openUrl(link.url)}>
-                {link.kind === "store" ? (
-                  <ShoppingBag size={18} />
-                ) : link.kind === "source" ? (
-                  <MusicServiceLogo source={link.name.toLowerCase()} size={18} />
-                ) : (
-                  <Globe2 size={18} />
-                )}
+                <MusicLinkFavicon
+                  url={link.url}
+                  fallback={
+                    link.kind === "store" ? (
+                      <ShoppingBag size={18} />
+                    ) : link.kind === "source" ? (
+                      <MusicServiceLogo source={link.name.toLowerCase()} size={18} />
+                    ) : (
+                      <Globe2 size={18} />
+                    )
+                  }
+                />
                 <span>
                   {link.kind === "source"
                     ? link.name
@@ -228,6 +301,7 @@ export function MusicWhereToBuy({ item }: { item: MusicCatalogItem }) {
       <div className="music-artist-links">
         {links.map((link) => (
           <button type="button" key={link.url} onClick={() => openUrl(link.url)}>
+            <MusicLinkFavicon url={link.url} fallback={<ShoppingBag size={18} />} />
             <span>
               {t(`music.artist.${link.kind}`)}
               <small>{link.name}</small>

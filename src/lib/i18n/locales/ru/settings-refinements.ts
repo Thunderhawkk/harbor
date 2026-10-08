@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "Папка кэша воспроизведения",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "Временная буферизация видео, включая потоки debrid. Применяется при повторном запуске воспроизведения; существующие файлы остаются в текущей папке.",
   "1 option formatted correctly": "1 параметр отформатирован правильно",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. Откройте раздел «Фильмы»\n2. Выберите название\n3. Нажмите «Смотреть»\n4. Опишите, что произошло",
   "3 to 24 letters, numbers, or underscores.": "От 3 до 24 букв, цифр или знаков подчёркивания.",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "Сохранённый элемент {name} будет удалён, и его изменения перестанут применяться.",
   "The server responded in {ms} ms.": "Сервер ответил за {ms} мс.",
   "The six largest local settings entries, including preferences and lookup data.": "Шесть крупнейших локальных записей настроек, включая предпочтения и справочные данные.",
+  "{count} entries": "{count} записей",
   "The volume pop-up is hidden.": "Всплывающий индикатор громкости скрыт.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "Тема, компоновка плеера, изображения и содержимое карточек Harbor.",
   "This account has been suspended. Reach out to support if you think that's wrong.": "Этот аккаунт заблокирован. Если вы считаете это ошибкой, обратитесь в поддержку.",

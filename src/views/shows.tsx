@@ -25,7 +25,8 @@ import {
   library,
   type LibraryItem,
 } from "@/lib/stremio";
-import { localCwEntry, localCwVersion, subscribeLocalCw } from "@/lib/local-cw";
+import { listLocalCw, localCwVersion, subscribeLocalCw } from "@/lib/local-cw";
+import { localToLibraryItem } from "@/lib/continue-watching";
 import { clearLocalCw } from "@/lib/local-cw";
 import {
   dismissManualWatched,
@@ -179,7 +180,7 @@ export function Shows({ active = true }: { active?: boolean }) {
   const localCwVer = useSyncExternalStore(subscribeLocalCw, localCwVersion);
   const continueWatching = useMemo(
     () =>
-      items
+      (hideSharedCw ? listLocalCw(true).map(localToLibraryItem) : items)
         .filter(
           (i) =>
             i.type === "series" &&
@@ -187,12 +188,11 @@ export function Shows({ active = true }: { active?: boolean }) {
             isCwMember(i) &&
             !isCwDismissed(i),
         )
-        .filter((i) => !hideSharedCw || localCwEntry(i._id) !== null)
         .map((i) => ({ i, k: cwSortKey(i) }))
         .sort((a, b) => b.k - a.k)
         .map((e) => e.i)
         .slice(0, 16),
-    [items, cwVersion, hideSharedCw, localCwVer],
+    [items, cwVersion, hideSharedCw, localCwVer, activeProfile?.id],
   );
 
   const manualWatchedVer = useSyncExternalStore(subscribeManualWatched, manualWatchedVersion);

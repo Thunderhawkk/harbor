@@ -42,7 +42,15 @@ function useLogo(meta: Meta): string | undefined {
   return logo;
 }
 
-export const TvCard = memo(function TvCard({ meta, kids = false }: { meta: Meta; kids?: boolean }) {
+export const TvCard = memo(function TvCard({
+  meta,
+  kids = false,
+  reason,
+}: {
+  meta: Meta;
+  kids?: boolean;
+  reason?: string;
+}) {
   const { openMeta, openManga } = useView();
   const { open: openContextMenu } = useContextMenu();
   const { settings } = useSettings();
@@ -77,6 +85,7 @@ export const TvCard = memo(function TvCard({ meta, kids = false }: { meta: Meta;
         logo={logo}
         posterSrc={poster.src}
         onPosterError={poster.onError}
+        reason={reason}
       />
     </button>
   );
@@ -121,12 +130,14 @@ export function TvCardArtwork({
   logo,
   posterSrc,
   onPosterError,
+  reason,
 }: {
   meta: Meta;
   kids?: boolean;
   logo?: string;
   posterSrc?: string;
   onPosterError?: () => void;
+  reason?: string;
 }) {
   const { settings } = useSettings();
   const [failedBackdrop, setFailedBackdrop] = useState<string>();
@@ -193,9 +204,9 @@ export function TvCardArtwork({
               {meta.name}
             </span>
           )}
-          {!kids && meta.releaseInfo && (
-            <span className="text-[11px] tabular-nums text-ink-muted [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
-              {meta.releaseInfo}
+          {!kids && (meta.releaseInfo || reason) && (
+            <span className="truncate text-[11px] tabular-nums text-ink-muted [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
+              {[meta.releaseInfo, reason].filter(Boolean).join(" · ")}
             </span>
           )}
         </span>

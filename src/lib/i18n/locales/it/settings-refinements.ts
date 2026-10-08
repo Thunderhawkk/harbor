@@ -1,4 +1,6 @@
 const settingsRefinements: Record<string, string> = {
+  "Playback cache folder": "Cartella della cache di riproduzione",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "Buffer temporaneo dei video, inclusi i flussi debrid. Si applica al riavvio della riproduzione; i file esistenti restano nella cartella attuale.",
   "1 option formatted correctly": "1 opzione formattata correttamente",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens": "1. Apri Film\n2. Seleziona un titolo\n3. Premi Riproduci\n4. Descrivi cosa succede",
   "3 to 24 letters, numbers, or underscores.": "Da 3 a 24 lettere, numeri o trattini bassi.",
@@ -431,6 +433,7 @@ const settingsRefinements: Record<string, string> = {
   "The saved {name} will be removed and its changes will stop applying.": "{name} salvato verrà rimosso e le sue modifiche non saranno più applicate.",
   "The server responded in {ms} ms.": "Il server ha risposto in {ms} ms.",
   "The six largest local settings entries, including preferences and lookup data.": "Le sei voci più grandi delle impostazioni locali, incluse preferenze e dati di ricerca.",
+  "{count} entries": "{count} voci",
   "The volume pop-up is hidden.": "L’indicatore del volume è nascosto.",
   "Theme, the player's own layout, artwork, and what Harbor shows on a card.": "Tema, layout del lettore, immagini e contenuto delle schede di Harbor.",
   "This account has been suspended. Reach out to support if you think that's wrong.": "Questo account è stato sospeso. Contatta l’assistenza se pensi che sia un errore.",

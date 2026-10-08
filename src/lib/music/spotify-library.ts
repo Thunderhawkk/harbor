@@ -6,6 +6,7 @@ export type SpotifyLibraryKind = "liked" | "playlists" | "playlist";
 export type SpotifyLibraryPlaylist = MusicPlaylistRef & { canRead: boolean; editable: boolean };
 export type SpotifyLibraryPage = {
   tracks: MusicTrack[];
+  trackAddedAt?: Record<string, string>;
   playlists: SpotifyLibraryPlaylist[];
   nextOffset: number | null;
   total: number | null;

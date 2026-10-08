@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/components/icons/music-icons";
 import { useT } from "@/lib/i18n";
 import { isWindowsDesktop } from "@/lib/platform";
 import { useView } from "@/lib/view";

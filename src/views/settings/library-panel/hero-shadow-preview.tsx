@@ -8,7 +8,7 @@ import { PreviewImage } from "../preview-image";
 export function HeroShadowPreview() {
   const { settings } = useSettings();
   const t = useT();
-  const art = useSampleArtwork();
+  const art = useSampleArtwork(1);
   const backdrop = art.background ?? art.poster;
 
   return (
@@ -37,11 +37,11 @@ export function HeroShadowPreview() {
             />
           ) : (
             <span className="font-display text-[19px] font-semibold leading-[26px] text-ink">
-              {t("The General")}
+              {art.name}
             </span>
           )}
           <span className="line-clamp-2 max-w-[46ch] text-[12px] leading-[17px] text-ink-muted">
-            {t("Buster Keaton sets off to recover his stolen locomotive.")}
+            {art.description}
           </span>
           <span className="mt-1 flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[11px] font-semibold text-canvas">

@@ -135,6 +135,7 @@ function Collage({ backdrops, rpdbKey }: { backdrops: Meta[]; rpdbKey: string })
             src={rpdbPoster(rpdbKey, m.id, m.background ?? m.poster)}
             seed={m.id}
             ratio="landscape"
+            lazy="release"
             className="h-full rounded-none [transform:skewX(8deg)_scale(1.4)]"
           />
         </div>

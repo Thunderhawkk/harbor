@@ -1,7 +1,7 @@
 import { simklRequest, SimklApiError } from "./client";
 import { getSession } from "./session";
 import { isCwDismissed } from "@/lib/cw-dismiss";
-import { readResumeEntry, saveResumeMs } from "@/lib/resume";
+import { readResumeEntry, saveResumeBatch } from "@/lib/resume";
 import type { LibraryItem } from "@/lib/stremio";
 
 type Ids = {
@@ -17,11 +17,18 @@ type Node = { title?: string; year?: number; ids?: Ids };
 
 type RawSession = {
   progress?: number;
+  paused_at?: string;
   watched_at?: string;
   movie?: Node;
   show?: Node;
   anime?: Node;
-  episode?: { season?: number; number?: number };
+  episode?: {
+    season?: number;
+    number?: number;
+    episode?: number;
+    tvdb_season?: number;
+    tvdb_number?: number;
+  };
 };
 
 const DURATION_MS = { movie: 6_300_000, series: 2_640_000 };
@@ -79,7 +86,7 @@ function buildItem(
 function toLibraryItem(raw: RawSession): LibraryItem | null {
   const pct = Math.min(100, Math.max(0, raw.progress ?? 0));
   if (pct < 1 || pct > 98) return null;
-  const when = raw.watched_at ?? new Date(0).toISOString();
+  const when = raw.paused_at ?? raw.watched_at ?? new Date(0).toISOString();
 
   if (raw.movie) {
     const id = movieMetaId(raw.movie.ids);
@@ -105,8 +112,28 @@ function toLibraryItem(raw: RawSession): LibraryItem | null {
 
   const seriesNode = raw.show ?? raw.anime;
   if (seriesNode) {
-    const id = seriesMetaId(seriesNode.ids);
+    const anime = !!raw.anime && !raw.show;
+    const ids = seriesNode.ids;
+    const nativeId =
+      anime &&
+      (ids?.kitsu
+        ? `kitsu:${ids.kitsu}`
+        : ids?.mal
+          ? `mal:${ids.mal}`
+          : ids?.anilist
+            ? `anilist:${ids.anilist}`
+            : null);
+    const mappedAnime = anime && !nativeId;
+    const id = nativeId || seriesMetaId(ids);
     if (!id) return null;
+    const season = mappedAnime
+      ? raw.episode?.tvdb_season
+      : (raw.episode?.season ?? (anime ? 1 : undefined));
+    const episode = mappedAnime
+      ? raw.episode?.tvdb_number
+      : (raw.episode?.number ?? raw.episode?.episode);
+    // Season-based anime IDs cannot be attached to franchise IDs without a mapping.
+    if (mappedAnime && (season == null || episode == null)) return null;
     return buildItem(
       id,
       "series",
@@ -114,16 +141,17 @@ function toLibraryItem(raw: RawSession): LibraryItem | null {
       pct,
       DURATION_MS.series,
       when,
-      raw.episode?.season,
-      raw.episode?.number,
-      !raw.show,
+      season,
+      episode,
+      anime,
     );
   }
   return null;
 }
 
 export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
-  if (!getSession()) return [];
+  const owner = getSession();
+  if (!owner) return [];
   let raw: RawSession[];
   try {
     raw = await simklRequest<RawSession[]>("/sync/playback?hide_watched=true&limit=40");
@@ -131,6 +159,7 @@ export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
     if (e instanceof SimklApiError && e.status === 404) return [];
     throw e;
   }
+  if (getSession() !== owner) throw new Error("SIMKL session changed");
   if (!Array.isArray(raw)) return [];
 
   const items: LibraryItem[] = [];
@@ -144,10 +173,10 @@ export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
     items.push(item);
     // A dismissed card must not be resurrected by this backfill: dismiss clears the
     // resume entry, and rewriting it with t=now would manufacture fresh activity that
-    // beats the dismissal. Genuine new progress still surfaces via watched_at/ratio.
+    // beats the dismissal. Genuine new progress still surfaces via paused_at/ratio.
     if (isCwDismissed(item)) continue;
     // Newer-wins backfill: overwrite a stale entry when the remote pause is newer
-    // (watched_at) or, when the stored entry has no usable timestamp, further ahead.
+    // (paused_at) or, when the stored entry has no usable timestamp, further ahead.
     const existing = readResumeEntry(item._id, item.state.season, item.state.episode);
     const remoteT = Date.parse(item.state.lastWatched ?? "");
     const remoteValid = Number.isFinite(remoteT) && remoteT > 0;
@@ -160,15 +189,17 @@ export async function fetchSimklPlaybackItems(): Promise<LibraryItem[]> {
       // can prefer pct x real runtime once migrated; pct rides along with the
       // winning write and is never mixed with another entry's ms.
       const pct01 = Math.min(100, Math.max(0, r.progress ?? 0)) / 100;
-      saveResumeMs(
-        item._id,
-        item.state.timeOffset,
-        item.state.season,
-        item.state.episode,
-        undefined,
-        pct01,
-        "simkl",
-      );
+      saveResumeBatch([
+        {
+          id: item._id,
+          ms: item.state.timeOffset,
+          season: item.state.season,
+          episode: item.state.episode,
+          pct: pct01,
+          source: "simkl",
+          t: remoteValid ? remoteT : 0,
+        },
+      ]);
     }
   }
   return items;

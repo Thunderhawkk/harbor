@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import type { HomeRow } from "@/views/home/home-types";
-import { buildCinemetaRows, buildTmdbRows, mergeRows, isStreamingServiceRow } from "@/views/home/home-rows";
-import { loadAddonRows, type AddonRow } from "@/lib/addons";
+import {
+  buildCinemetaRows,
+  buildTmdbRows,
+  isStreamingServiceRow,
+  mergeRows,
+} from "@/views/home/home-rows";
 import { isAnimeRow } from "@/views/anime";
+import { loadAddonRows, type AddonRow } from "@/lib/addons";
 import { applyHomeRowCustomization } from "@/lib/home-customization";
 import { bpHomeCacheLoad, bpHomeCacheSave } from "./bp-home-cache";
 import { useBpExtraRows } from "./use-bp-extra-rows";

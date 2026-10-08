@@ -4,6 +4,7 @@ import { SportsHeroScenery } from "./sports-hero-scenery";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowRight, CalendarDays, ChevronDown, LoaderCircle } from "lucide-react";
+import { Play } from "@/components/icons/play-filled";
 
 import { useT, useUiLanguage } from "@/lib/i18n";
 
@@ -235,7 +236,7 @@ function HotPoster({
             <span className="hot-open-label">
               {t("Explore event")}
 
-              <ArrowRight size={18} />
+              <Play size={17} />
             </span>
           </span>
         </div>
@@ -448,7 +449,7 @@ export function HotEventsContent({
               onOpen={onOpen}
             />
 
-            <aside className="hot-week">
+            <aside className="hot-week harbor-scroll">
               <div>
                 <h3>{t("This week")}</h3>
               </div>

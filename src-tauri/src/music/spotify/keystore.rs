@@ -8,6 +8,7 @@ pub const SESSION_KEY: &str = "harbor.spotify.v1.credentials";
 pub const DEVICE_ID_KEY: &str = "harbor.spotify.v1.deviceId";
 pub const WEB_TOKEN_KEY: &str = "harbor.spotify.v1.webToken";
 pub const CLIENT_ID_KEY: &str = "harbor.spotify.v1.clientId";
+pub const PLAY_TARGET_KEY: &str = "harbor.spotify.v1.playTarget";
 
 const TOKEN_SKEW_SECONDS: u64 = 60;
 const LEGACY_FILE: &str = "credentials.json";
@@ -79,6 +80,7 @@ pub fn forget(app: &AppHandle, cache_dir: &Path) -> Result<(), String> {
             .map_err(|error| format!("remove Spotify sign in {}: {error}", path.display()))?;
     }
     write(app, WEB_TOKEN_KEY, None)?;
+    write(app, PLAY_TARGET_KEY, None)?;
     write(app, SESSION_KEY, None)
 }
 

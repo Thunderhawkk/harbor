@@ -85,6 +85,17 @@ export class MusicQueueOrder {
     return out;
   }
 
+  /** Where the back button would land, without consuming the history that answers it. */
+  peekPrevious(queue: MusicTrack[], index: number, shuffle: boolean) {
+    if (!shuffle) return queue[index - 1] ?? null;
+    for (let at = this.history.length - 1; at >= 0; at -= 1) {
+      const key = this.history[at];
+      const previous = queue.find((track) => queueTrackKey(track) === key);
+      if (previous) return previous;
+    }
+    return null;
+  }
+
   previous(queue: MusicTrack[], index: number, shuffle: boolean) {
     if (!shuffle) return queue[index - 1] ?? null;
     while (this.history.length) {

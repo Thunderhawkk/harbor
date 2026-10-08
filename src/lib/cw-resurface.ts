@@ -9,6 +9,7 @@ import {
   type LibraryItem,
 } from "@/lib/stremio";
 import { isCwDismissed } from "@/lib/cw-dismiss";
+import { privateCwProfileId } from "@/lib/cw-profile";
 
 const ANIME_ID = /^(kitsu|mal|anilist|anidb):/;
 
@@ -59,6 +60,7 @@ export async function resurfaceCandidates(
   watchedFor?: WatchedFor,
 ): Promise<Map<string, { season: number; episode: number }>> {
   const now = Date.now();
+  const profileScope = privateCwProfileId() ?? "shared";
   const out = new Map<string, { season: number; episode: number }>();
   const candidates = library.filter((i) => {
     if (i.type !== "series" && !ANIME_ID.test(i._id)) return false;
@@ -71,12 +73,13 @@ export async function resurfaceCandidates(
     if (!Number.isFinite(lw) || now - lw > RECENT_MS) return false;
     const cur = currentEpisode(i);
     if (cur == null) return false;
-    if ((i.state.flaggedWatched ?? 0) > 0) return true;
+    if ((i.state.flaggedWatched ?? 0) > 0)
+      return !watchedFor || watchedFor(i, cur)(cur.season, cur.episode);
     return anime && !!watchedFor && watchedFor(i, cur)(cur.season, cur.episode);
   });
   for (const i of candidates) {
     const cur = currentEpisode(i)!;
-    const key = `${i._id}:${cur.season}:${cur.episode}`;
+    const key = `${profileScope}|${i._id}:${cur.season}:${cur.episode}`;
     const cached = cache.get(key);
     let nx: { season: number; episode: number } | null;
     const meta: Meta = {
@@ -89,14 +92,16 @@ export async function resurfaceCandidates(
     if (cached && now - cached.t < RESURFACE_TTL) {
       nx = cached.next;
     } else {
-      nx = await fetchAdjacentEpisodes(meta, cur, { tmdbKey: opts.tmdbKey })
-        .then((adj) =>
-          adj.next && resurfaceAired(adj.next.airDate)
-            ? { season: adj.next.season, episode: adj.next.episode }
-            : null,
-        )
-        .catch(() => null);
-      cache.set(key, { next: nx, t: now });
+      try {
+        const adj = await fetchAdjacentEpisodes(meta, cur, { tmdbKey: opts.tmdbKey });
+        nx = adj.next && resurfaceAired(adj.next.airDate)
+          ? { season: adj.next.season, episode: adj.next.episode }
+          : null;
+        cache.set(key, { next: nx, t: now });
+      } catch {
+        // A failed lookup must remain retryable on the next refresh.
+        continue;
+      }
     }
     if (nx && watchedFor && watchedFor(i, cur)(nx.season, nx.episode)) {
       nx = await fetchEpisodeList(meta, { tmdbKey: opts.tmdbKey })
@@ -109,7 +114,8 @@ export async function resurfaceCandidates(
             : null;
         })
         .catch(() => null);
-      cache.set(key, { next: nx, t: now });
+      // Cache episode availability only. Watched history can change independently
+      // of this cache, including after switching connected accounts.
     }
     if (nx) {
       const related = await relatedLibraryIds(i._id).catch(() => []);

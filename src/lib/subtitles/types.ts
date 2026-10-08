@@ -27,6 +27,8 @@ export type SubResult = {
   langName?: string;
   title?: string;
   displayTitle?: string;
+  /** Free-form row label from the source addon (e.g. a translating addon's "Make <lang> • <variant>"). */
+  label?: string;
   source:
     | "wyzie"
     | "addon"
@@ -99,6 +101,12 @@ export type SubtitleLoadMetadata = {
   prepared?: boolean;
   autoSelectionEligible?: boolean;
   originalUrl?: string;
+  /**
+   * The source advertises that the same URL can later serve a richer/updated file
+   * (AI translation addons). Engines use it to treat a not-ready payload as pending
+   * and to replace a previous track for the same source instead of duplicating it.
+   */
+  refreshable?: boolean;
   timingStatus?: SubtitleTimingStatus;
   timingMeasurementStatus?: "measured" | "unknown";
   matchExplanation?: SubtitleMatchExplanation;
@@ -106,6 +114,19 @@ export type SubtitleLoadMetadata = {
   matchConfidence?: SubtitleMatchConfidence;
   matchReasons?: string[];
   subId?: string;
+};
+
+/**
+ * A language group whose "language" is really a generated translation offer from an
+ * addon (e.g. "Make Hindi") rather than a real language code. Surfaced so the subtitle
+ * panel can offer these without the user having to open the search pane first.
+ */
+export type GeneratedSubtitleGroup = {
+  /** Group key as rendered in search results, e.g. "MAKE HINDI". */
+  key: string;
+  /** Friendly display label, e.g. "Make Hindi". */
+  label: string;
+  count: number;
 };
 
 export type SubSearchQuery = {

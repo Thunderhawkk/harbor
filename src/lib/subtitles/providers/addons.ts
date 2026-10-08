@@ -27,6 +27,7 @@ type RawAddonSub = ProviderSubtitleFlags & {
   provider?: string;
   source?: string;
   name?: string;
+  label?: string;
   addon?: string;
 };
 
@@ -210,6 +211,7 @@ export async function searchAddons(
         lang: normalizeLang(s.lang),
         title: addonName,
         displayTitle,
+        label: s.label?.trim() || undefined,
         source: "addon",
         format: (s.SubFormat?.toLowerCase() as SubResult["format"]) || undefined,
         release: s.m || undefined,

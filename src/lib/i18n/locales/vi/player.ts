@@ -384,6 +384,8 @@ const player: Record<string, string> = {
   "Couldn't restart the streaming server.": "Không thể khởi động lại máy chủ phát trực tuyến.",
   "The streaming server didn't come back up.": "Máy chủ phát trực tuyến không hoạt động trở lại.",
   "Streaming server restarted.": "Đã khởi động lại máy chủ phát trực tuyến.",
+  "Search audio language": "Tìm ngôn ngữ âm thanh",
+  "No audio track in that language.": "Không có bản âm thanh ở ngôn ngữ đó.",
 };
 
 export default player;

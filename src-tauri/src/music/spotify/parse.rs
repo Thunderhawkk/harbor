@@ -61,6 +61,7 @@ pub fn album(item: &Value) -> Option<MusicAlbumRef> {
             .get("total_tracks")
             .and_then(Value::as_u64)
             .map(|total| total as u32),
+        explicit: None,
     })
 }
 
@@ -218,6 +219,7 @@ mod tests {
             artwork: "https://example.test/album.jpg".to_string(),
             year: Some(2003),
             track_count: Some(14),
+            explicit: None,
         };
         let parsed = album_track(
             &json!({ "uri": "spotify:track:one", "name": "Apocalypse Please", "duration_ms": 137_000 }),

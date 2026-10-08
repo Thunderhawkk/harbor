@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::super::{MusicPlaylistRef, MusicState, MusicTrack};
 use super::{api, keystore, parse, SpotifyState};
 use serde::{Deserialize, Serialize};
@@ -31,6 +32,7 @@ pub struct SpotifyLibraryPlaylist {
 #[serde(rename_all = "camelCase")]
 pub struct SpotifyLibraryPage {
     tracks: Vec<MusicTrack>,
+    track_added_at: HashMap<String, String>,
     playlists: Vec<SpotifyLibraryPlaylist>,
     next_offset: Option<usize>,
     total: Option<u64>,
@@ -178,6 +180,7 @@ pub async fn music_spotify_library_page(
         .ok_or_else(|| "Spotify returned an invalid library page".to_string())?;
     let next_offset = next_offset(&body, offset, entries.len(), &[&path])?;
     let mut tracks = Vec::new();
+    let mut track_added_at = HashMap::new();
     let mut playlists = Vec::new();
     if matches!(kind, SpotifyLibraryKind::Playlists) {
         let account = profile_id(spotify, &token).await?;
@@ -186,10 +189,18 @@ pub async fn music_spotify_library_page(
             .filter_map(|entry| playlist_access(entry, &account, &scopes))
             .collect();
     } else {
-        tracks = entries.iter().filter_map(library_track).collect();
+        for entry in entries {
+            if let Some(track) = library_track(entry) {
+                if let Some(date) = entry.get("added_at").and_then(Value::as_str) {
+                    track_added_at.insert(track.id.clone(), date.to_string());
+                }
+                tracks.push(track);
+            }
+        }
     }
     let skipped = entries.len().saturating_sub(tracks.len() + playlists.len());
     Ok(SpotifyLibraryPage {
+        track_added_at,
         tracks,
         playlists,
         next_offset,

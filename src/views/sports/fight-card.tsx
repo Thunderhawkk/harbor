@@ -4,7 +4,8 @@ import { safeFetch } from "@/lib/safe-fetch";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import type { SportsGame } from "@/lib/sports/espn";
 import { parseFightInfo, type FightInfo, type FightSection } from "@/lib/sports/fight-card";
-import { EventLogo } from "./hub-cards";
+import { CompetitionAthletePortrait } from "./competition-athlete-portrait";
+import "./competition-athletes.css";
 import { hubLeague } from "@/lib/sports/hub-data";
 
 const cache = new Map<string, { at: number; info: FightInfo }>();
@@ -86,14 +87,24 @@ export function FightCard({
             <div className="sh-bout-list">
               {bouts.map((game) => (
                 <button key={game.id} onClick={() => onOpen(game)}>
-                  <EventLogo side={game.home} />
+                  <CompetitionAthletePortrait
+                    name={game.home.name}
+                    league={game.league}
+                    group="combat"
+                    athlete={{ id: game.home.id, name: game.home.name, image: game.home.logo, source: "espn" }}
+                  />
                   <span>
                     <strong>
                       {game.home.name} <em>{t("vs")}</em> {game.away.name}
                     </strong>
                     <small>{info[game.id]?.weight || game.detail}</small>
                   </span>
-                  <EventLogo side={game.away} />
+                  <CompetitionAthletePortrait
+                    name={game.away.name}
+                    league={game.league}
+                    group="combat"
+                    athlete={{ id: game.away.id, name: game.away.name, image: game.away.logo, source: "espn" }}
+                  />
                   <ArrowRight size={16} />
                 </button>
               ))}

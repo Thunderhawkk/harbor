@@ -4,6 +4,7 @@ import test from "node:test";
 import ts from "typescript";
 import { readMusicPreference, writeMusicPreference } from "../src/lib/music/preferences.ts";
 import { MusicQueueOrder, queueTrackKey } from "../src/lib/music/queue-order.ts";
+import { dedupeMusicTracks, sameMusicTrack } from "../src/lib/music/track-identity.ts";
 import type { MusicTrack } from "../src/lib/music/types.ts";
 
 type Preferences = typeof import("../src/lib/music/preferences.ts");
@@ -91,6 +92,16 @@ function player(localStorage: unknown) {
       react: {},
       "./catalog": {},
       "./queue-order": { MusicQueueOrder, queueTrackKey },
+      "./track-identity": { dedupeMusicTracks, sameMusicTrack },
+      "./deck-sync": {
+        answerDeckRequests: () => () => {},
+        broadcastDeckState: () => {},
+        isDeckWindow: () => false,
+        sendDeckAdopted: () => {},
+        sendDeckCommand: () => {},
+        serveDeckCommands: () => () => {},
+      },
+      "./deck-primary": { createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }) },
       "./liked": {
         isMusicLiked: (ids: readonly string[], t: any) => !!t && ids.includes(t.id),
         likedIdsFor: (t: any) => (t ? [t.id] : []),
@@ -117,6 +128,7 @@ function player(localStorage: unknown) {
         restoreMusicPlaybackOrigin: () => {},
       },
       "./preferences": prefs,
+      "./hidden-recents": { unhideMusicRecent: () => {} },
       "./audio-settings": {
         initializeMusicAudioSettings: async () => {},
         clampMusicVolume: (value: number) => Math.max(0, Math.min(1, value)),
@@ -227,7 +239,10 @@ test("quota failure still publishes volume and sends it to the native music engi
   assert.equal(store.getMusicState().volume, 0.65);
   assert.equal(updates, 1);
   assert.equal(prefs.readMusicPreference("harbor.music.volume.v1"), "0.65");
-  assert.deepEqual(calls, [{ command: "music_engine_set_volume", args: { volume: 0.65 } }]);
+  assert.deepEqual(calls, [
+    { command: "music_engine_set_volume", args: { volume: 0.65 } },
+    { command: "music_deck_volume", args: { deck: 1, volume: 0.65 } },
+  ]);
 });
 
 test("failed legacy cleanup cannot suppress a successful SQLite bootstrap", async () => {
