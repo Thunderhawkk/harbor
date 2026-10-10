@@ -576,23 +576,35 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   // mpv fires `audio-device-list` on every WASAPI notification, including state
   // churn on devices we are not using (e.g. SteelSeries Sonar virtual endpoints
   // reacting to app activation). Only a change in the endpoint set itself means
-  // the output may need re-binding; matching churn must not force a reload.
+  // the output may need re-binding, and only once the change settles: an
+  // endpoint that drops and reappears within the debounce window has not changed
+  // the usable outputs, while a lasting change (unplug, connect, topology
+  // switch) still reloads so playback never keeps a dead output.
   let lastAudioDeviceListSig: string | null = null;
+  let observedAudioDeviceListSig: string | null = null;
   const audioDeviceListSig = (data: unknown): string | null => {
     if (!Array.isArray(data)) return null;
     const names = data
       .map((d) => String((d as Record<string, unknown>)?.name ?? ""))
       .filter(Boolean)
       .sort();
-    return names.length > 0 ? names.join("\n") : null;
+    return names.join("\n");
   };
-  const scheduleAudioDeviceReload = () => {
+  let forceAudioDeviceReload = false;
+  const scheduleAudioDeviceReload = (forced = false) => {
     if (!isWindowsDesktop()) return;
     if (!mpvStarted) return;
     if (snap.status !== "playing" && snap.status !== "paused") return;
+    if (forced) forceAudioDeviceReload = true;
     if (audioDeviceReloadTimer != null) window.clearTimeout(audioDeviceReloadTimer);
     audioDeviceReloadTimer = window.setTimeout(() => {
       audioDeviceReloadTimer = null;
+      const mustReload = forceAudioDeviceReload;
+      forceAudioDeviceReload = false;
+      // A list change that has settled back to the signature we last acted on
+      // is churn, not a device change, and must not force the output reload.
+      if (!mustReload && observedAudioDeviceListSig === lastAudioDeviceListSig) return;
+      lastAudioDeviceListSig = observedAudioDeviceListSig;
       void (async () => {
         // Remember the selected audio track so we can restore it after the
         // output reload deselects it (mpv drops the track on ao init failure).
@@ -629,7 +641,7 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   // to the current default device and restores audio.
   const onVisibilityRestore = () => {
     if (document.visibilityState !== "visible") return;
-    scheduleAudioDeviceReload();
+    scheduleAudioDeviceReload(true);
   };
   if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", onVisibilityRestore);
@@ -647,7 +659,7 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
   };
   const onWindowFocusRestore = () => {
     if (Date.now() - lastWindowBlur < FOCUS_RELOAD_MIN_ABSENT_MS) return;
-    scheduleAudioDeviceReload();
+    scheduleAudioDeviceReload(true);
   };
   if (typeof window !== "undefined") {
     window.addEventListener("blur", onWindowBlur);
@@ -695,11 +707,16 @@ export function createMpvBridge(mpvOptions?: MpvOptions): PlayerBridge {
         const sig = audioDeviceListSig(data);
         if (sig == null) {
           // No usable list payload; keep the legacy always-reload behavior.
-          scheduleAudioDeviceReload();
-        } else if (lastAudioDeviceListSig != null && lastAudioDeviceListSig !== sig) {
-          scheduleAudioDeviceReload();
+          scheduleAudioDeviceReload(true);
+        } else if (sig !== observedAudioDeviceListSig) {
+          observedAudioDeviceListSig = sig;
+          if (lastAudioDeviceListSig == null) {
+            // First enumeration: nothing to compare against yet.
+            lastAudioDeviceListSig = sig;
+          } else if (sig !== lastAudioDeviceListSig) {
+            scheduleAudioDeviceReload();
+          }
         }
-        lastAudioDeviceListSig = sig;
       }
       if (name === "track-list" && Array.isArray(data)) {
         const list = data as Array<Record<string, unknown>>;
