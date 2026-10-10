@@ -19,6 +19,7 @@ import { engineP2pEligible } from "@/lib/torrent/stremio-stream";
 import { hasUncachedMarker } from "@/lib/streams/cached";
 import { preflightCheck } from "@/lib/streams/preflight";
 import { resolveStream, shouldPreferP2pDownload } from "@/lib/streams/resolve";
+import { resolvePlaybackRedirect } from "@/lib/streams/playback-redirect";
 import {
   beginPlaybackTrace,
   finishPlaybackTrace,
@@ -267,9 +268,17 @@ export function usePickHandler({
         advanceAuto();
         return;
       }
-      markPlaybackTrace(playbackTraceId, "resolve-ready");
       debridFailStreakRef.current = 0;
       let playUrl = r.data.url;
+      if (intent !== "download" && !autoPickRef.current && r.via === "direct") {
+        playUrl = await resolvePlaybackRedirect({
+          url: playUrl,
+          headers: r.data.headers,
+          signal: ac.signal,
+        });
+        if (ac.signal.aborted) return;
+      }
+      markPlaybackTrace(playbackTraceId, "resolve-ready");
       const hasProxyHeaders = !!r.data.headers && Object.keys(r.data.headers).length > 0;
       // Native mpv can consume ordinary debrid URLs directly. Keep the local
       // proxy off the startup path unless the source actually requires custom

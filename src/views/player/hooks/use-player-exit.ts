@@ -9,6 +9,7 @@ import {
 import type { PlayerBridge } from "@/lib/player/bridge";
 import { getPlaybackPosition } from "@/lib/player/playback-clock";
 import { saveResumeMs } from "@/lib/resume";
+import { useProfiles } from "@/lib/profiles";
 import { exitWindowFullscreenOnPlayerClose } from "@/lib/fullscreen-state";
 import type { PartialSyncState } from "@/lib/together/provider";
 import { useView, type PlayerSrc, type PlayerStreamRef } from "@/lib/view";
@@ -57,11 +58,16 @@ export function usePlayerExit(params: {
     openPicker,
   } = params;
 
+  const { activeProfile } = useProfiles();
+
   const closePlayer = useCallback(async () => {
     await captureExitSnapshot();
     const pos = getPlaybackPosition();
     if (Number.isFinite(pos) && pos > 0) {
-      saveResumeMs(src.meta.id, pos * 1000, season, episode);
+      saveResumeMs(
+        src.meta.id, pos * 1000, season, episode,
+        undefined, undefined, undefined, activeProfile?.id,
+      );
       if (liveStreamRef && pos >= REMEMBER_MIN_SEC) {
         const rememberedUrl = (src.historyUrl ?? liveUrl) || src.url;
         savePlayback(
@@ -107,6 +113,7 @@ export function usePlayerExit(params: {
     src.url,
     stopCast,
     castActiveRef,
+    activeProfile?.id,
   ]);
 
   const onStubEject = useCallback(() => {

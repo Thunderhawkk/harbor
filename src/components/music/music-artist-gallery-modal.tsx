@@ -9,6 +9,7 @@ import {
 } from "@/components/icons/music-icons";
 import { ModalShell, useModalExit } from "@/components/modal-shell";
 import { useT } from "@/lib/i18n";
+import { openUrl } from "@/lib/window";
 import { MusicLinkFavicon, linkHost } from "./music-link-favicon";
 import { MusicLinkedBio } from "./music-linked-bio";
 import { saveArtwork } from "@/lib/music/artwork-save";
@@ -219,7 +220,16 @@ export function MusicArtistGalleryModal({
           {socials.length > 0 && (
             <div className="music-artist-gallery-socials">
               {socials.map((link) => (
-                <a key={link.url} href={link.url} target="_blank" rel="noreferrer noopener">
+                <a
+                  key={link.url}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    openUrl(link.url);
+                  }}
+                >
                   <MusicLinkFavicon url={link.url} fallback={null} size={16} />
                   {socialName(linkHost(link.url))}
                 </a>

@@ -134,6 +134,8 @@ function MoreMenu({ entries, buttonClassName }: { entries: NavEntry[]; buttonCla
             <button
               key={e.key}
               type="button"
+              data-harbor-nav={e.key}
+              aria-current={e.active ? "page" : undefined}
               onClick={() => {
                 e.onSelect();
                 setOpen(false);

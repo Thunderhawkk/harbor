@@ -11,13 +11,19 @@ import { openDiagnosticsConsent } from "@/lib/social/diagnostics-open";
 import { useNotificationCenter } from "@/lib/social/use-notification-center";
 import { useT } from "@/lib/i18n";
 import { FeedRow, NotificationDetail, RequestRow } from "./notification-rows";
+import { useOptionalGameAccess } from "@/views/games/game-access";
+import { sourceAlertGame } from "@/lib/games/source-alerts";
 
 export function NotificationCenter({ trigger = true }: { trigger?: boolean } = {}) {
   const nc = useNotificationCenter();
+  const games = useOptionalGameAccess();
   const t = useT();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<CenterNotif | null>(null);
   const wasOpen = useRef(false);
+  const viewedProfile = useRef(nc.profile);
+
+  useEffect(() => { setOpen(false); setDetail(null); }, [nc.profile]);
 
   useEffect(() => subscribeNotificationOpen(() => setOpen(true)), []);
 
@@ -26,8 +32,8 @@ export function NotificationCenter({ trigger = true }: { trigger?: boolean } = {
   }, [open]);
 
   useEffect(() => {
-    if (open && !wasOpen.current) void nc.refresh();
-    if (!open && wasOpen.current) void nc.markRead();
+    if (open && !wasOpen.current) { viewedProfile.current = nc.profile; void nc.refresh(); }
+    if (!open && wasOpen.current && viewedProfile.current === nc.profile) void nc.markRead();
     wasOpen.current = open;
   }, [open, nc]);
 
@@ -42,7 +48,7 @@ export function NotificationCenter({ trigger = true }: { trigger?: boolean } = {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, detail]);
 
-  if (!nc.authed) return null;
+  if (!nc.authed && !nc.hasLocal) return null;
 
   const toProfile = (handle: string) => {
     setOpen(false);
@@ -50,6 +56,10 @@ export function NotificationCenter({ trigger = true }: { trigger?: boolean } = {
   };
 
   const openNotif = (notif: CenterNotif) => {
+    if (notif.kind === "game-source-available" && notif.data?.profile === nc.profile) {
+      const game = sourceAlertGame(notif.data.game);
+      if (game && games) { setOpen(false); games.navigate({ game }); return; }
+    }
     if (notif.kind === "diagnostics-request") {
       setOpen(false);
       const requestId = typeof notif.data?.requestId === "string" ? notif.data.requestId : undefined;

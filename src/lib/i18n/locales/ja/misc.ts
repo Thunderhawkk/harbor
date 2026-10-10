@@ -853,7 +853,7 @@ const misc: Record<string, string> = {
   "Your Stremio library + addons sync in untouched.":
     "Stremioのライブラリとアドオンをそのまま同期。",
   "No telemetry, no servers, no bundled keys.": "テレメトリなし、サーバーなし、組み込みキーなし。",
-  "For watching things": "視聴向け",
+  "Built for Adventure!": "冒険のために！",
   "Harbor curated": "Harborセレクト",
   "Hero, Top 10, Trending, In Theaters, per-service rails. Your addons append underneath.":
     "ヒーロー、トップ10、トレンド、劇場公開中、配信サービス別レールを表示します。その下にアドオンのカタログが追加されます。",

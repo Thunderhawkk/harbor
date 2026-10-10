@@ -1239,6 +1239,14 @@ export function Home({
                     />
                   </div>
                 )}
+                {seasonalInvitation && (
+                  <div
+                    data-hero-overlay-slot="seasonal"
+                    className="pointer-events-none absolute end-5 top-5 z-20 flex w-[min(360px,42%)] justify-end [&>*]:pointer-events-auto"
+                  >
+                    {seasonalInvitation}
+                  </div>
+                )}
               </div>
             )}
           {editMode && homeRowsCustom.hidden.includes("hero") && (
@@ -1260,7 +1268,10 @@ export function Home({
                 />
               </div>
             )}
-          {seasonalInvitation}
+          {(settings.homeMode === "classic" ||
+            homeRowsCustom.hidden.includes("hero") ||
+            !showHero) &&
+            seasonalInvitation}
           {!cwTop && cwBlock}
           {settings.homeMode !== "classic" && (
             <div data-scroll-anchor="streaming">

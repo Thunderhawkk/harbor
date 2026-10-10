@@ -18,7 +18,9 @@ export function usePlaylistFilters(id: string, tracks: MusicTrack[] = EMPTY, met
   const [state, setState] = useState(() => ({ id, filters: fresh() }));
   const filters = state.id === id ? state.filters : fresh();
   const update = (change: Partial<PlaylistFilters>) => setState(current => ({ id, filters: { ...(current.id === id ? current.filters : fresh()), ...change } }));
-  const [indexed, setIndexed] = useState<{ tracks: MusicTrack[]; genres: PlaylistGenreIndex } | null>(null);
+  // Playback enriches track objects without changing their genre membership.
+  const genreKey = useMemo(() => JSON.stringify([id, tracks.map(track => [track.id, track.artist])]), [id, tracks]);
+  const [indexed, setIndexed] = useState<{ key: string; genres: PlaylistGenreIndex } | null>(null);
   const [pendingGenres, setPendingGenres] = useState<MusicTrack[] | null>(null);
   useEffect(() => {
     if (metadata.genreTracks || !tracks.length) return;
@@ -38,12 +40,12 @@ export function usePlaylistFilters(id: string, tracks: MusicTrack[] = EMPTY, met
         void readArtistGenres().then(known => indexPlaylistGenres(tracks, known, signal)).then(genres => {
           if (stopped || signal.aborted) return;
           setIndexed(previous => {
-            if (!genres.size && previous?.tracks !== tracks) return previous;
+            if (!genres.size && previous?.key !== genreKey) return previous;
             // Existing pills stay in place as newly cached genres become available.
-            const ordered = previous?.tracks === tracks
+            const ordered = previous?.key === genreKey
               ? new Map([...previous.genres.keys(), ...genres.keys()].filter(id => genres.has(id)).map(id => [id, genres.get(id)!]))
               : genres;
-            return { tracks, genres: ordered };
+            return { key: genreKey, genres: ordered };
           });
         }).finally(() => {
           if (signal.aborted) return;
@@ -56,10 +58,10 @@ export function usePlaylistFilters(id: string, tracks: MusicTrack[] = EMPTY, met
     schedule(200);
     const unsubscribe = subscribeArtistGenres(() => schedule(500));
     return () => { stopped = true; clearTimeout(timer); clearTimeout(pendingTimer); abort.abort(); unsubscribe(); };
-  }, [tracks, metadata.genreTracks]);
+  }, [tracks, metadata.genreTracks, genreKey]);
   useEffect(() => { try { localStorage.setItem(VIEW_KEY, filters.view); } catch { /* Optional preference. */ } }, [filters.view]);
   const query = useDeferredValue(filters.query);
-  const genres = metadata.genreTracks ?? (indexed?.tracks === tracks ? indexed.genres : NO_GENRES);
+  const genres = metadata.genreTracks ?? (indexed?.key === genreKey ? indexed.genres : NO_GENRES);
   const { genre, source, content, sort, descending } = filters;
   const selectedGenres = genre === null ? undefined : genres;
   const visible = useMemo(() => filterPlaylist(tracks, { query, genre, source, content, sort, descending, view: "list" }, { ...metadata, genreTracks: selectedGenres }), [tracks, query, genre, source, content, sort, descending, metadata.addedAt, metadata.recentFirst, selectedGenres]);

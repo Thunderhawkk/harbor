@@ -445,7 +445,14 @@ export function HubRow({
         </div>
       </div>
 
-      <div className="sh-event-rail" ref={rail} {...handlers}>
+      <div
+        className="sh-event-rail"
+        ref={rail}
+        role="region"
+        aria-label={title}
+        tabIndex={0}
+        {...handlers}
+      >
         {games.slice(0, 36).map((g) => (
           <HubCard key={gameKey(g)} game={g} onOpen={onOpen} stale={stale} />
         ))}
@@ -530,6 +537,10 @@ export function HubHero({
       </section>
     );
 
+  // The title wraps per side, so the longest single name drives whether it still fits.
+  const heroTitleLength = game
+    ? (game.context?.name ?? "").length || Math.max(game.away.name.length, game.home.name.length)
+    : 0;
   return (
     <section
       className={`sh-hero has-backdrop ${combat ? "is-combat" : ""}`}
@@ -561,7 +572,7 @@ export function HubHero({
         />
       )}
 
-      <div className="sh-hero-copy">
+      <div className="sh-hero-copy" data-long={heroTitleLength > 17 || undefined} data-longest={heroTitleLength > 24 || undefined}>
         <div className="sh-hero-kicker">
           {game?.state === "in" && !stale ? (
             <span className="sh-live">{t("Live now")}</span>

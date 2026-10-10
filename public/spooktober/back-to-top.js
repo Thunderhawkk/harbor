@@ -7,6 +7,7 @@ const JUMP_SECTIONS=[
  ['New & coming soon','#section-new','candle'],
  ['Shudder picks','#section-shudder','midnight-film'],
  ['Masters of horror','#masters-world','moon'],
+ ['Anime','#section-anime','anime-spirit'],
  ['Playlists','.playlist-world','haunted-record','playlist-heading'],
  ['True crime','#section-true-crime','case-file'],
  ['Go deeper','.horror-paths','path-folk-horror','horror-paths-heading'],

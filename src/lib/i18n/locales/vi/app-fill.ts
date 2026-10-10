@@ -723,6 +723,7 @@ const appFill: Record<string, string> = {
     "Harbor đang đóng. Harbor Setup sẽ hoàn tất cài đặt rồi mở lại ứng dụng.",
   "Harbor Setup did not finish updating Harbor. Nothing was changed.":
     "Harbor Setup chưa hoàn tất cập nhật Harbor. Không có gì thay đổi.",
+  "Dismiss": "Bỏ qua",
 };
 
 export default appFill;

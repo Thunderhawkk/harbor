@@ -1,3 +1,4 @@
+import { CustomArtwork } from "@/components/custom-artwork";
 import {
   useCallback,
   useEffect,
@@ -373,6 +374,9 @@ export function BpConnecting({
             </p>
           )}
 
+          {!terminal && (
+            <CustomArtwork role="loading" className="h-[clamp(64px,10vh,120px)] w-[clamp(64px,10vh,120px)]" />
+          )}
           {!terminal && (
             <BpP2pReadout
               key={`${src.url}:${status.attempt}`}

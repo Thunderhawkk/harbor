@@ -4,6 +4,11 @@ use harbor_core::{
 };
 use serde::{Deserialize, Serialize};
 
+#[tauri::command]
+pub async fn resolve_playback_redirect(url: String) -> Option<String> {
+    crate::playback_redirect::resolve_playback_redirect(url).await
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PipelineResult {

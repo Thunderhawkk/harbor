@@ -45,7 +45,7 @@ export function MangaCard({
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            fav.toggle({ id: manga.id, title: manga.title, cover: manga.cover });
+            fav.toggle({ id: manga.id, title: manga.title, altTitle: manga.altTitle, cover: manga.cover });
           }}
           className="absolute start-1.5 top-1.5 rounded-full bg-canvas/70 p-1.5 backdrop-blur-sm transition-transform hover:scale-110 motion-reduce:transition-none motion-reduce:hover:scale-100"
         >

@@ -1,4 +1,5 @@
 export default {
+  "No videos found.": "Nessun video trovato.",
   "sports.guide.athletes": "Atleti",
   "sports.guide.athlete": "Atleta",
   "sports.guide.athleteCount": "{n} atleti",

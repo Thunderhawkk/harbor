@@ -193,7 +193,7 @@ class MacMpvBundleTests(unittest.TestCase):
 
     def test_verification_checks_signed_app_and_launches_bundled_helper(self):
         app, mpv = self.app()
-        bundle.verify_app(argparse.Namespace(app=app))
+        bundle.verify_app(argparse.Namespace(app=app, target=TRIPLE))
         self.assertIn(("codesign", "--verify", "--deep", "--strict", str(app)), self.calls)
         self.assertIn((str(mpv), "--no-config", "--version"), self.calls)
 
@@ -201,7 +201,7 @@ class MacMpvBundleTests(unittest.TestCase):
         app, mpv = self.app()
         mpv.unlink()
         with self.assertRaisesRegex(RuntimeError, "thumbnail mpv executable is missing"):
-            bundle.verify_app(argparse.Namespace(app=app))
+            bundle.verify_app(argparse.Namespace(app=app, target=TRIPLE))
 
     def test_verification_rejects_cli_homebrew_load_or_wrong_rpath(self):
         for change, message in (({"loads": ["/opt/homebrew/lib/libmpv.2.dylib"]}, "machine-local"),
@@ -211,7 +211,7 @@ class MacMpvBundleTests(unittest.TestCase):
                 app, mpv = self.app()
                 write_binary(mpv, **{**read_binary(mpv), **change})
                 with self.assertRaisesRegex(RuntimeError, message):
-                    bundle.verify_app(argparse.Namespace(app=app))
+                    bundle.verify_app(argparse.Namespace(app=app, target=TRIPLE))
                 self.assertTrue(app.resolve().is_relative_to(self.root))
                 shutil.rmtree(app)
 
@@ -219,7 +219,45 @@ class MacMpvBundleTests(unittest.TestCase):
         app, _ = self.app()
         self.launch_failure = True
         with self.assertRaises(subprocess.CalledProcessError):
-            bundle.verify_app(argparse.Namespace(app=app))
+            bundle.verify_app(argparse.Namespace(app=app, target=TRIPLE))
+
+    def test_release_selection_never_uses_another_target(self):
+        other = write_binary(self.root / "src-tauri/target/x86_64-apple-darwin/release/harbor")
+        with patch.dict(os.environ, {"CARGO_TARGET_DIR": str(self.root / "src-tauri/target")}):
+            with self.assertRaisesRegex(RuntimeError, "Could not locate"):
+                bundle.release_binary(self.root, TRIPLE)
+            native = write_binary(self.root / "src-tauri/target/release/harbor")
+            self.assertEqual(bundle.release_binary(self.root, TRIPLE), native)
+            target = write_binary(self.root / f"src-tauri/target/{TRIPLE}/release/harbor")
+            self.assertEqual(bundle.release_binary(self.root, TRIPLE), target)
+
+    def test_verification_rejects_wrong_architecture_in_final_app(self):
+        app, _ = self.app()
+        binary = app / "Contents/MacOS/harbor"
+        write_binary(binary, **{**read_binary(binary), "arch": "x86_64"})
+        with self.assertRaises(subprocess.CalledProcessError):
+            bundle.verify_app(argparse.Namespace(app=app, target=TRIPLE))
+
+    def test_verification_checks_other_shipped_helpers(self):
+        app, _ = self.app()
+        write_binary(app / "Contents/MacOS/ffmpeg", loads=["/opt/homebrew/lib/libmissing.dylib"])
+        with self.assertRaisesRegex(RuntimeError, "machine-local"):
+            bundle.verify_app(argparse.Namespace(app=app, target=TRIPLE))
+
+    def test_relative_dependencies_must_exist_inside_frameworks(self):
+        app, _ = self.app()
+        executable = app / "Contents/MacOS/harbor"
+        frameworks = app / "Contents/Frameworks"
+        for load, error in (("@loader_path/../Frameworks/missing.dylib", "unbundled"),
+                            ("@rpath/subdir/libmpv.2.dylib", "unbundled"),
+                            ("@rpath/../libmpv.2.dylib", "outside bundled"),
+                            ("libmpv.2.dylib", "unsupported relative")):
+            with self.subTest(load=load):
+                write_binary(executable, loads=[load])
+                with self.assertRaisesRegex(RuntimeError, error):
+                    macho.verify_macho(executable, frameworks)
+        write_binary(executable, loads=["@executable_path/../Frameworks/libmpv.2.dylib"])
+        macho.verify_macho(executable, frameworks)
 
 
 if __name__ == "__main__":

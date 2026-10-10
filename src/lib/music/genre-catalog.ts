@@ -3,6 +3,7 @@ export type MusicGenreFamily = 'popular' | 'electronic' | 'guitars' | 'roots' | 
 export type MusicDiscoveryGenre = {
   id: number; slug: string; name: string; family: MusicGenreFamily;
   countries: string[]; aliases: string[]; deezerId?: number;
+  searchHints?: string[];
   picture_big?: string; picture_medium?: string;
 };
 // IDs are persistent taste identities. Never derive them from the array index.
@@ -1015,6 +1016,24 @@ export const MUSIC_GENRES: MusicDiscoveryGenre[] = [
       "2-step"
     ]
   },
+  {"id": 10116, "slug": "chicago-drill", "name": "Chicago drill", "family": "popular", "countries": ["US"], "aliases": ["Drill Chicago"]},
+  {"id": 10117, "slug": "new-york-drill", "name": "New York drill", "family": "popular", "countries": ["US"], "aliases": ["Brooklyn drill", "NY drill", "Drill New York"]},
+  {"id": 10118, "slug": "east-coast-hip-hop", "name": "East Coast hip hop", "family": "popular", "countries": ["US"], "aliases": ["East Coast rap", "East Coast essentials"]},
+  {"id": 10119, "slug": "west-coast-hip-hop", "name": "West Coast hip hop", "family": "popular", "countries": ["US"], "aliases": ["West Coast rap", "West Coast essentials"]},
+  {"id": 10120, "slug": "southern-hip-hop", "name": "Southern hip hop", "family": "popular", "countries": ["US"], "aliases": ["Southern rap", "Dirty South", "South Side essentials"]},
+  {"id": 10121, "slug": "atlanta-rap", "name": "Atlanta rap", "family": "popular", "countries": ["US"], "aliases": ["Atlanta trap"]},
+  {"id": 10122, "slug": "houston-rap", "name": "Houston rap", "family": "popular", "countries": ["US"], "aliases": []},
+  {"id": 10123, "slug": "memphis-rap", "name": "Memphis rap", "family": "popular", "countries": ["US"], "aliases": ["Memphis underground rap"]},
+  {"id": 10124, "slug": "detroit-rap", "name": "Detroit rap", "family": "popular", "countries": ["US"], "aliases": ["Detroit Flint Michigan rap"]},
+  {"id": 10125, "slug": "bay-area-rap", "name": "Bay Area rap", "family": "popular", "countries": ["US"], "aliases": ["Hyphy"]},
+  {"id": 10126, "slug": "g-funk", "name": "G-funk", "family": "popular", "countries": ["US"], "aliases": ["G funk"]},
+  {"id": 10127, "slug": "boom-bap", "name": "Boom bap", "family": "popular", "countries": ["US"], "aliases": ["Boombap"]},
+  {"id": 10128, "slug": "jazz-rap", "name": "Jazz rap", "family": "popular", "countries": ["US"], "aliases": ["Jazzy hip hop", "Jazz hip hop"]},
+  {"id": 10129, "slug": "conscious-hip-hop", "name": "Conscious hip hop", "family": "popular", "countries": ["US"], "aliases": ["Conscious rap"]},
+  {"id": 10130, "slug": "alternative-hip-hop", "name": "Alternative hip hop", "family": "popular", "countries": ["US"], "aliases": ["Alternative rap"]},
+  {"id": 10131, "slug": "crunk", "name": "Crunk", "family": "popular", "countries": ["US"], "aliases": []},
+  {"id": 10132, "slug": "miami-bass", "name": "Miami bass", "family": "popular", "countries": ["US"], "aliases": ["Miami booty bass"]},
+  {"id": 10133, "slug": "chopped-and-screwed", "name": "Chopped and screwed", "family": "popular", "countries": ["US"], "aliases": ["Chopped & screwed", "Screwed and chopped"]},
   {
     "id": 10070,
     "slug": "grime",
@@ -1060,6 +1079,8 @@ export const MUSIC_GENRES: MusicDiscoveryGenre[] = [
       "Deutschrap"
     ]
   },
+  { id: 10110, slug: 'ukrainian-rap', name: 'Ukrainian rap', family: 'popular', countries: ['UA'], aliases: ['Український реп','Ukrainian hip hop'], searchHints: ['YARMAK','SKOFKA','Kalush','alyona alyona','ТНМК','OTOY'] },
+  { id: 10111, slug: 'ukrainian-wartime', name: 'Ukrainian wartime music', family: 'world', countries: ['UA'], aliases: ['Ukrainian war songs','Пісні війни'], searchHints: ['OTOY','YARMAK','Варнак','Ницо Потворно','Третя Штурмова','хейтспіч','паліндром','ЕНЕМІ','ОКОЛОФРОНТ','Військовий реп'] },
   {
     "id": 10074,
     "slug": "turkish-rap",
@@ -1300,6 +1321,8 @@ export const MUSIC_GENRES: MusicDiscoveryGenre[] = [
       "Retrowave"
     ]
   },
+  { id: 10108, slug: 'russian-rap', name: 'Russian rap & trap', family: 'popular', countries: ['RU'], aliases: ['Russian rap','Russian trap','Русский рэп','Русский трэп'], searchHints: ['Kai Angel','9mice','Big Baby Tape','kizaru'] },
+  { id: 10109, slug: 'russian-hyperpop', name: 'Russian hyperpop', family: 'electronic', countries: ['RU'], aliases: ['Русский гиперпоп'], searchHints: ['Kill Eva','Killeva','Мэйби Бэйби','Sqwore'] },
   {
     "id": 10095,
     "slug": "ambient",
@@ -1343,6 +1366,8 @@ export const MUSIC_GENRES: MusicDiscoveryGenre[] = [
     ],
     "aliases": []
   },
+  { id: 10112, slug: 'horrorcore', name: 'Horrorcore', family: 'popular', countries: ['US'], aliases: ['Horror rap'], searchHints: ['Gravediggaz','Insane Clown Posse','Twiztid','Esham'] },
+  { id: 10113, slug: 'goth', name: 'Goth', family: 'guitars', countries: ['GB','DE'], aliases: ['Gothic rock','Goth rock','Darkwave'], searchHints: ['Bauhaus','The Sisters of Mercy','Siouxsie and the Banshees','Lebanon Hanover'] },
   {
     "id": 10099,
     "slug": "emo",
@@ -1517,17 +1542,21 @@ export const MUSIC_GENRES: MusicDiscoveryGenre[] = [
       "Children"
     ],
     "deezerId": 95
-  }
+  },
+  { id: 10115, slug: 'internet-classics', name: 'Internet classics', family: 'popular', countries: [], aliases: ['Internet music','Meme songs'], searchHints: ['Parry Gripp','Raining Tacos','Mr Weebl','Badgers','Narwhals','Lemon Demon','Numa Numa','Nyan Cat','Rickroll','Tay Zonday','Chocolate Rain','Viral songs'] }
 ];
 export const MUSIC_GENRE_FAMILIES: MusicGenreFamily[] = ['popular','electronic','guitars','roots','latin','africa','asia','world'];
 export const MUSIC_GENRE_COUNTRIES = [...new Set(MUSIC_GENRES.flatMap(genre => genre.countries))];
 export function musicGenre(id: number) { return MUSIC_GENRES.find(genre => genre.id === id); }
+export function musicGenreName(genre: MusicDiscoveryGenre, t: (key: string) => string) {
+  return genre.id >= 10108 && genre.id <= 10133 ? t(`music.genre.${genre.slug}`) : genre.name;
+}
 export function genreSearchKey(value: string) {
   return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
-export function filterMusicGenres(genres: readonly MusicDiscoveryGenre[], query: string, countries: readonly string[] = [], family = '', regionName: (code: string) => string = code => code) {
+export function filterMusicGenres(genres: readonly MusicDiscoveryGenre[], query: string, countries: readonly string[] = [], family = '', regionName: (code: string) => string = code => code, genreName: (genre: MusicDiscoveryGenre) => string = genre => genre.name) {
   const terms = genreSearchKey(query).split(/\s+/).filter(Boolean);
-  return genres.filter(genre => (!family || genre.family === family) && (!countries.length || countries.some(country => genre.countries.includes(country))) && terms.every(term => genreSearchKey([genre.name, ...genre.aliases, ...genre.countries.map(regionName)].join(' ')).includes(term)));
+  return genres.filter(genre => (!family || genre.family === family) && (!countries.length || countries.some(country => genre.countries.includes(country))) && terms.every(term => genreSearchKey([genre.name, genreName(genre), ...genre.aliases, ...(genre.searchHints ?? []), ...genre.countries.map(regionName)].join(' ')).includes(term)));
 }
 export function relatedMusicGenres(genre: MusicDiscoveryGenre) {
   return MUSIC_GENRES.filter(item => item.id !== genre.id && item.id >= 10000 && (item.family === genre.family || item.countries.some(code => genre.countries.includes(code))))

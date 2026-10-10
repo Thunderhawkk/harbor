@@ -53,7 +53,7 @@ export function SpooktoberHome({ active = true, onReady }: { active?: boolean; o
   return (
     <div className="spooktober-home">
       <div className="spooktober-home-base" inert={screen !== "home"} style={{ visibility: screen === "home" ? "visible" : "hidden" }}>
-        <Home active={active && screen === "home"} onReady={onReady} seasonalInvitation={available && !isDismissed("spooktober") ? <SpooktoberInvitation onDismiss={() => dismiss("spooktober")} onOpen={openFestival} onPrepare={prepareFestival} /> : undefined} />
+        <Home active={active && screen === "home"} onReady={onReady} seasonalInvitation={available ? <SpooktoberInvitation collapsed={isDismissed("spooktober")} onDismiss={() => dismiss("spooktober")} onOpen={openFestival} onPrepare={prepareFestival} /> : undefined} />
       </div>
       {festivalOpened && <div className="spooktober-surface" data-spooktober-surface hidden={screen !== "festival"} inert={screen !== "festival"}>
         <Suspense fallback={<SpooktoberLoadingScene onBack={active && screen === "festival" ? close : undefined} />}><Festival active={active && screen === "festival"} onBack={close} playlistRequest={playlistRequest} entryToken={entryToken} /></Suspense>

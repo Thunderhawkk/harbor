@@ -16,6 +16,7 @@ import {
 import { playMusic, closeMusicPlayer, getMusicState } from "@/lib/music/player";
 import { useMusicPlaylistPicker } from "./music-playlist-picker";
 import { Poster } from "@/components/poster";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 export function MusicDownloads({ query = "" }: { query?: string }) {
   const t = useT(),
     entries = useMusicDownloads(),
@@ -112,7 +113,7 @@ export function MusicDownloads({ query = "" }: { query?: string }) {
             onClick={() => void run(entry.id, () => play(entry))}
             aria-label={`${t("music.play")} · ${entry.track.title}`}
           >
-            <Poster src={entry.track.artwork} seed={entry.id} ratio="square" className="size-12" />
+            <Poster src={entry.track.artwork} seed={entry.id} ratio="square" className="size-12"><MusicTrackPlaybackMark track={{...entry.track,id:`download:${entry.id}`,connectorId:"local"}}/></Poster>
           </button>
           <div className="min-w-0 flex-1">
             <strong className="block truncate">{entry.track.title}</strong>

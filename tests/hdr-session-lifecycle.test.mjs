@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const native = readFileSync(new URL("../src-tauri/src/mpv.rs", import.meta.url), "utf8");
+const native = readFileSync(new URL("../src-tauri/src/mpv.rs", import.meta.url), "utf8").replace(
+  /\r\n/g,
+  "\n",
+);
 const start = native.slice(
   native.indexOf("pub async fn mpv_start("),
   native.indexOf("async fn restore_display_sdr_if_flipped("),
@@ -22,15 +25,18 @@ test("Windows start and stop serialize lifecycle changes separately from propert
     const lifecycle = operation.indexOf("state.lifecycle.lock().await");
     const session = operation.indexOf("state.inner.lock().await");
     assert.ok(lifecycle >= 0 && lifecycle < session);
-    assert.ok(
-      operation.indexOf("drop(g)") <
-        operation.indexOf("restore_display_sdr_if_flipped(&app, was_off).await"),
+    const restoreAt = operation.search(
+      /restore_display_sdr_if_flipped\(&app, was_off, (?:prev|session)_monitor\)\.await/,
     );
+    assert.ok(restoreAt >= 0, "restore uses the previous session's display");
+    assert.ok(operation.indexOf("drop(g)") < restoreAt);
   }
 });
 
 test("Windows startup reacquires the session only after SDR restoration", () => {
-  const restoreAt = start.indexOf("restore_display_sdr_if_flipped(&app, was_off).await");
+  const restoreAt = start.indexOf(
+    "restore_display_sdr_if_flipped(&app, was_off, prev_monitor).await",
+  );
   assert.ok(restoreAt >= 0);
   assert.ok(start.indexOf("state.inner.lock().await", restoreAt) > restoreAt);
 });

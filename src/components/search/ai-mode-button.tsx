@@ -114,6 +114,7 @@ export function AiModeButton({
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label={t("AI search")}
+          aria-pressed={active}
           className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all ${
             active
               ? "border-accent/60 bg-accent/15 shadow-[0_0_0_3px_var(--color-accent-soft)]"

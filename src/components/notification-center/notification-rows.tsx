@@ -26,6 +26,7 @@ function fullDate(ms: number): string {
 }
 
 function iconFor(kind: string) {
+  if (kind === "game-source-available") return ArrowDownToLine;
   if (kind === "downloads") return ArrowDownToLine;
   if (kind === "stars") return Star;
   if (kind === "mention") return AtSign;

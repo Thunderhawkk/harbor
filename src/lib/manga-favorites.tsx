@@ -4,7 +4,13 @@ import { persistCritical } from "./storage-recovery";
 import { setMangaInLibrary } from "./manga/api";
 import { notifyMangaLibraryChanged } from "./manga/library-events";
 
-export type MangaFavEntry = { id: string; title: string; cover?: string; addedAt: number };
+export type MangaFavEntry = {
+  id: string;
+  title: string;
+  altTitle?: string;
+  cover?: string;
+  addedAt: number;
+};
 
 const PREFIX = "harbor.mangafav.v1.";
 const keyFor = (pid: string) => PREFIX + pid;
@@ -38,6 +44,7 @@ function readMap(key: string): Map<string, MangaFavEntry> {
         map.set(el.id, {
           id: el.id,
           title: typeof el.title === "string" ? el.title : "",
+          altTitle: typeof el.altTitle === "string" ? el.altTitle : undefined,
           cover: typeof el.cover === "string" ? el.cover : undefined,
           addedAt: typeof el.addedAt === "number" ? el.addedAt : 0,
         });
@@ -56,7 +63,12 @@ function writeMap(key: string, map: Map<string, MangaFavEntry>): void {
 export type MangaFavoritesStore = {
   items: Map<string, MangaFavEntry>;
   has: (id: string) => boolean;
-  toggle: (input: { id: string; title?: string; cover?: string }) => void;
+  toggle: (input: { id: string; title?: string; altTitle?: string; cover?: string }) => void;
+  /** Self-heals a stale entry after it re-resolves to a live id/cover. */
+  repair: (
+    oldId: string,
+    next: { id: string; title?: string; altTitle?: string; cover?: string },
+  ) => void;
   count: number;
 };
 
@@ -84,6 +96,7 @@ export function MangaFavoritesProvider({ children }: { children: ReactNode }) {
           next.set(input.id, {
             id: input.id,
             title: input.title ?? "",
+            altTitle: input.altTitle,
             cover: input.cover,
             addedAt: Date.now(),
           });
@@ -91,6 +104,32 @@ export function MangaFavoritesProvider({ children }: { children: ReactNode }) {
         }
         writeMap(keyFor(pid), next);
         setItems(next);
+      },
+      repair: (oldId, update) => {
+        const current = items.get(oldId);
+        if (!current) return;
+        if (
+          update.id === oldId &&
+          (update.cover ?? current.cover) === current.cover &&
+          (update.title ?? current.title) === current.title
+        ) {
+          return;
+        }
+        const next = new Map(items);
+        next.delete(oldId);
+        const existing = next.get(update.id);
+        next.set(update.id, {
+          ...current,
+          id: update.id,
+          title: update.title ?? current.title,
+          altTitle: update.altTitle ?? current.altTitle,
+          cover: update.cover ?? current.cover,
+          addedAt: existing ? Math.min(existing.addedAt, current.addedAt) : current.addedAt,
+        });
+        writeMap(keyFor(pid), next);
+        setItems(next);
+        // Keep the server library pointing at the live id so it stays openable.
+        if (update.id !== oldId) syncLibrary(update.id, true);
       },
       count: items.size,
     }),

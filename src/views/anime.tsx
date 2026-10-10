@@ -36,6 +36,7 @@ import { useCrunchyrollAwardMetas } from "@/lib/use-crunchyroll-award-metas";
 import { useWatchHistoryRecommendations } from "@/lib/use-watch-history-recs";
 import { AnilistRows } from "./anime/anilist-rows";
 import { MalRows } from "./anime/mal-rows";
+import { AnimeRowStatus } from "./anime/anime-row-status";
 import { useCwAdvance } from "./home/hooks/use-cw-advance";
 import { detectAnimeForCw, useDetectedAnimeVersion } from "@/lib/anime-detect";
 import { useExternalCw } from "@/lib/feed/external-cw";
@@ -169,7 +170,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
               if (cancelled) return;
               setRowsByKey((prev) => ({
                 ...prev,
-                [s.key]: { metas: [], page: 1, hasMore: false, ready: true },
+                [s.key]: { metas: [], page: 1, hasMore: false, ready: true, failed: true },
               }));
             }
           }),
@@ -205,16 +206,32 @@ export function AnimeView({ active = true }: { active?: boolean }) {
               ...cur,
               metas: [...cur.metas, ...fresh],
               page: next,
+              failed: false,
               hasMore: more.length >= ROW_MIN_VISIBLE && cur.metas.length + fresh.length < 80,
             },
           };
         });
       })
-      .catch(() => {})
+      .catch(() => setRowsByKey(prev => ({ ...prev, [key]: { ...prev[key], failed: true } })))
       .finally(() => {
         loadingRef.current.delete(key);
       });
   }, []);
+
+  const retryRow = useCallback((key: string) => {
+    if (loadingRef.current.has(key)) return;
+    const spec = SPECS.find(s => s.key === key);
+    const row = rowsRef.current[key];
+    if (!spec || !row) return;
+    if (row.metas.length > 0) { loadMore(key); return; }
+    loadingRef.current.add(key);
+    setRowsByKey(prev => ({ ...prev, [key]: { ...prev[key], ready: false, failed: false } }));
+    spec.fetcher(1).then(metas => {
+      setRowsByKey(prev => ({ ...prev, [key]: { metas, page: 1, hasMore: metas.length >= ROW_MIN_VISIBLE, ready: true } }));
+    }).catch(() => {
+      setRowsByKey(prev => ({ ...prev, [key]: { ...prev[key], ready: true, failed: true } }));
+    }).finally(() => loadingRef.current.delete(key));
+  }, [loadMore]);
 
   const filterSig = `${settings.animeExcludeOrigins.join(",")}|${settings.animeHideWatchedPicks}`;
   const [heroSeed, setHeroSeed] = useState(() => Math.floor(Math.random() * 0x7fffffff));
@@ -781,7 +798,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
   useEffect(() => {
     for (const spec of SPECS) {
       const raw = rowsByKey[spec.key];
-      if (!raw?.ready || !raw.hasMore || raw.page >= ROW_MAX_PAGES) continue;
+      if (!raw?.ready || raw.failed || !raw.hasMore || raw.page >= ROW_MAX_PAGES) continue;
       const shown = filteredRowsByKey[spec.key];
       if (!shown || shown.metas.length >= ROW_MIN_VISIBLE) continue;
       loadMore(spec.key);
@@ -1010,10 +1027,11 @@ export function AnimeView({ active = true }: { active?: boolean }) {
               // as it fills, so it stays a skeleton until it has settled.
               const settling =
                 r.ready &&
+                !r.failed &&
                 r.metas.length < ROW_MIN_VISIBLE &&
                 !!raw?.hasMore &&
                 (raw?.page ?? 1) < ROW_MAX_PAGES;
-              if (r.ready && !settling && r.metas.length === 0) continue;
+              if (r.ready && !r.failed && !settling && r.metas.length === 0) continue;
               const specName = nameOf(spec.key, t(spec.title));
               const rankName = t("Top 10 {name}", { name: specName.replace(/^Top\s*/i, "") });
               const viewAll = () =>
@@ -1025,7 +1043,14 @@ export function AnimeView({ active = true }: { active?: boolean }) {
               rd.push({
                 key: spec.key,
                 name: spec.rank ? rankName : specName,
-                node: !r.ready || settling ? (
+                node: r.failed ? (
+                  <>
+                    <AnimeRowStatus title={specName} onRetry={() => retryRow(spec.key)} />
+                    {r.metas.length > 0 && <Row title="" scrollKey={`anime:${spec.key}`} onViewAll={viewAll}>
+                      {r.metas.map((m, i) => <PickCard key={`${m.id}-${i}`} meta={m} />)}
+                    </Row>}
+                  </>
+                ) : !r.ready || settling ? (
                   <RowSkeleton title={spec.rank ? rankName : specName} />
                 ) : spec.rank && r.metas.length >= 10 ? (
                   <Row

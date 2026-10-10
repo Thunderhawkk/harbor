@@ -152,7 +152,7 @@ export function MangaHero({
             </button>
             <button
               type="button"
-              onClick={() => toggle({ id: current.id, title: current.title, cover: current.cover })}
+              onClick={() => toggle({ id: current.id, title: current.title, altTitle: current.altTitle, cover: current.cover })}
               aria-label={fav ? t("Remove from favorites") : t("Add to favorites")}
               aria-pressed={fav}
               className={`flex h-12 w-12 items-center justify-center rounded-full transition-[transform,background-color] duration-200 active:scale-[0.98] ${

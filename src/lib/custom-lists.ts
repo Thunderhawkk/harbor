@@ -10,6 +10,7 @@ export type ListItem = {
   id: string;
   type: "movie" | "series" | "manga";
   name: string;
+  altTitle?: string;
   poster?: string;
   addedAt: number;
   addonOrigin?: Meta["addonOrigin"];
@@ -20,6 +21,7 @@ export type ListItemInput = {
   id: string;
   type?: string;
   name?: string;
+  altTitle?: string;
   poster?: string;
   addonOrigin?: Meta["addonOrigin"];
   videos?: Meta["videos"];
@@ -54,6 +56,11 @@ export type ListStore = {
   deleteList: (id: string) => void;
   addToList: (listId: string, item: ListItemInput) => void;
   removeFromList: (listId: string, itemId: string) => void;
+  updateListItem: (
+    listId: string,
+    itemId: string,
+    patch: { id?: string; name?: string; altTitle?: string; poster?: string },
+  ) => void;
   toggleInList: (listId: string, item: ListItemInput) => boolean;
   listContains: (listId: string, itemId: string) => boolean;
   useLists: () => CustomList[];
@@ -78,6 +85,7 @@ function toItem(input: ListItemInput): ListItem {
     id: input.id,
     type: normalizeType(input.type, input.id),
     name: input.name ?? "",
+    altTitle: input.altTitle,
     poster: input.poster,
     addedAt: Date.now(),
     addonOrigin: persistableAddonOrigin(input.addonOrigin),
@@ -137,6 +145,7 @@ export function createListStore(storageKey: string): ListStore {
               id: it.id,
               type: it.type === "series" ? "series" : it.type === "manga" ? "manga" : "movie",
               name: typeof it.name === "string" ? it.name : "",
+              altTitle: typeof it.altTitle === "string" ? it.altTitle : undefined,
               poster: typeof it.poster === "string" ? it.poster : undefined,
               addedAt: typeof it.addedAt === "number" ? it.addedAt : 0,
               addonOrigin: persistableAddonOrigin(it.addonOrigin),
@@ -295,6 +304,34 @@ export function createListStore(storageKey: string): ListStore {
     write(lists);
   }
 
+  function updateListItem(
+    listId: string,
+    itemId: string,
+    patch: { id?: string; name?: string; altTitle?: string; poster?: string },
+  ): void {
+    const lists = read();
+    const list = lists.find((l) => l.id === listId);
+    if (!list) return;
+    const index = list.items.findIndex((it) => it.id === itemId);
+    if (index < 0) return;
+    const current = list.items[index];
+    const id = patch.id ?? current.id;
+    const next: ListItem = {
+      ...current,
+      id,
+      name: patch.name ?? current.name,
+      altTitle: patch.altTitle ?? current.altTitle,
+      poster: patch.poster ?? current.poster,
+    };
+    // Drop any other item already holding the new id, then replace in place.
+    list.items = list.items.filter((it, i) => i === index || it.id !== id);
+    const at = list.items.findIndex((it) => it.id === itemId);
+    if (at < 0) return;
+    list.items[at] = next;
+    list.updatedAt = Date.now();
+    write(lists);
+  }
+
   function toggleInList(listId: string, item: ListItemInput): boolean {
     const lists = read();
     const list = lists.find((l) => l.id === listId);
@@ -356,6 +393,7 @@ export function createListStore(storageKey: string): ListStore {
     deleteList,
     addToList,
     removeFromList,
+    updateListItem,
     toggleInList,
     listContains,
     useLists,

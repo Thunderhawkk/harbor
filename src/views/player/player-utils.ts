@@ -1,6 +1,7 @@
 import { createHtml5Bridge } from "@/lib/player/html5";
 import { createMpvBridge, probeMpv, type MpvRect } from "@/lib/player/mpv";
 import type { PlayerBridge } from "@/lib/player/bridge";
+import type { MonitorInfo } from "@/lib/monitors";
 import { isLinuxDesktop, isMacDesktop, isWindowsDesktop } from "@/lib/platform";
 
 export const SYNC_DRIFT_TOLERANCE_S = 0.6;
@@ -67,6 +68,8 @@ export async function pickBridge(
     forceYuv420p?: boolean;
     extraOptions?: string;
     fullDownload?: boolean;
+    separateDisplay?: MonitorInfo | null;
+    separateCoverTaskbar?: boolean;
     cacheDir?: string;
     getEmbedRect?: () => Promise<MpvRect | null> | MpvRect | null;
   },
@@ -75,14 +78,21 @@ export async function pickBridge(
   if (want === "mpv") {
     const probe = await probeMpv();
     if (probe.available) return { bridge: createMpvBridge(mpvOpts), engine: "mpv" };
-    console.warn("[harbor] mpv requested but libmpv probe failed; falling back to in-webview html5 decode (high memory). Reason:", probe.error);
+    console.warn(
+      "[harbor] mpv requested but libmpv probe failed; falling back to in-webview html5 decode (high memory). Reason:",
+      probe.error,
+    );
     return { bridge: createHtml5Bridge(), engine: "html5" };
   }
   const isDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
   if (isDesktop || notWebReady) {
     const probe = await probeMpv();
     if (probe.available) return { bridge: createMpvBridge(mpvOpts), engine: "mpv" };
-    if (isDesktop) console.warn("[harbor] desktop libmpv probe failed; falling back to in-webview html5 decode (high memory). Reason:", probe.error);
+    if (isDesktop)
+      console.warn(
+        "[harbor] desktop libmpv probe failed; falling back to in-webview html5 decode (high memory). Reason:",
+        probe.error,
+      );
   }
   return { bridge: createHtml5Bridge(), engine: "html5" };
 }

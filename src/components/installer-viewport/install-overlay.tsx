@@ -2,6 +2,7 @@ import lottie, { type AnimationItem } from "lottie-web";
 import { Check } from "lucide-react";
 import { useEffect, useRef } from "react";
 import installBoat from "@/assets/lottie/install-boat-white.json";
+import { CustomArtwork } from "@/components/custom-artwork";
 import { useT } from "@/lib/i18n";
 
 export type OverlayPhase =
@@ -61,7 +62,7 @@ export function InstallOverlay({ phase, logo }: { phase: OverlayPhase; logo: str
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-canvas/92 backdrop-blur-xl animate-in fade-in duration-200">
       <div className="flex flex-col items-center gap-3 animate-in zoom-in-95 duration-300">
-        <InstallBoat logo={cargoLogo} />
+        <CustomArtwork role="loading" className="h-60 w-60" fallback={<InstallBoat logo={cargoLogo} />} />
         <div className="flex flex-col items-center gap-1.5">
           {installing ? (
             <span className="text-[10.5px] font-bold uppercase tracking-[0.26em] text-accent">

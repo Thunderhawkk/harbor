@@ -181,15 +181,23 @@ def reject_duplicates(path: Path, command: str, sections: list[list[str]]) -> No
             raise RuntimeError(f"{path} carries a duplicate {command}: {', '.join(repeated)}")
 
 
-def verify_macho(path: Path, frameworks_dir: Path) -> None:
-    available = {item.name for item in frameworks_dir.glob("*.dylib")}
+def verify_macho(path: Path, frameworks_dir: Path, executable: Path | None = None) -> None:
+    executable = executable or path
     sections = load_sets(path)
     for load in dict.fromkeys(load for section in sections for load in section):
         if is_system(load):
             continue
         if load.startswith("/"):
             raise RuntimeError(f"{path} still references a machine-local library: {load}")
-        if load.startswith("@rpath/") and Path(load).name not in available:
+        if load.startswith("@rpath/"):
+            candidate = frameworks_dir / load[len("@rpath/"):]
+        elif load.startswith(("@loader_path/", "@executable_path/")):
+            candidate = expand_special(load, path, executable)
+        else:
+            raise RuntimeError(f"{path} carries an unsupported relative library: {load}")
+        if not candidate.resolve().is_relative_to(frameworks_dir.resolve()):
+            raise RuntimeError(f"{path} references a library outside bundled Frameworks: {load}")
+        if not candidate.is_file():
             raise RuntimeError(f"{path} references an unbundled library: {load}")
     # dyld rejects these only when the Mach-O's own SDK is macOS 26+ (dyld Policy.cpp fall2025).
     reject_duplicates(path, "LC_LOAD_DYLIB", sections)

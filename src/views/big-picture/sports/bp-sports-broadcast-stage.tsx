@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { ExternalLink, X } from "lucide-react";
 import { SFX } from "@/lib/sfx";
 import { openUrl } from "@/lib/window";
 import {
-  esportsEmbedUrl,
   esportsExternalUrl,
+  esportsPlayback,
   type EsportsStream,
 } from "@/lib/sports/esports-streams";
 import { StreamPlatform } from "@/views/sports/esports-broadcast";
@@ -29,6 +30,15 @@ function autoplaying(embed: string, platform: EsportsStream["platform"]): string
   );
 }
 
+// Twitch refuses every iframe at Harbor's packaged origin, so it plays as its own document.
+function openBroadcastWindow(url: string) {
+  if (!("__TAURI_INTERNALS__" in window)) {
+    openUrl(url);
+    return;
+  }
+  void invoke("browser_open", { url }).catch(() => openUrl(url));
+}
+
 export function BpSportsBroadcastStage({
   stream,
   others,
@@ -42,12 +52,17 @@ export function BpSportsBroadcastStage({
 }) {
   const t = useBpT();
   const seedRef = useRef<HTMLButtonElement | null>(null);
-  const embed = esportsEmbedUrl(stream, window.location.hostname);
+  const openRef = useRef<HTMLButtonElement | null>(null);
+  const playback = esportsPlayback(stream, window.location.hostname);
+  const embed = playback?.mode === "iframe" ? playback.url : null;
+  const windowUrl = playback?.mode === "window" ? playback.url : null;
   const external = esportsExternalUrl(stream.url);
 
   useEffect(() => {
     const previous = currentBpFocus(bpFirstVisible("[data-bp-root]"));
-    if (seedRef.current) setBpFocus(seedRef.current, { silent: true });
+    // openRef is only attached in window mode, where nothing plays until it is pressed.
+    const seed = openRef.current || seedRef.current;
+    if (seed) setBpFocus(seed, { silent: true });
     return () => {
       if (previous?.isConnected) setBpFocus(previous, { silent: true });
     };
@@ -129,12 +144,14 @@ export function BpSportsBroadcastStage({
             </button>
             {external && (
               <button
+                ref={windowUrl ? openRef : undefined}
                 type="button"
                 data-bp-focusable
                 data-bp-chip
                 onClick={() => {
                   SFX.click();
-                  openUrl(external);
+                  if (windowUrl) openBroadcastWindow(windowUrl);
+                  else openUrl(external);
                 }}
                 className={BAR_BUTTON}
               >

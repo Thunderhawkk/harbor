@@ -9,21 +9,22 @@ import { readLocalJson, writeLocalJson } from "./local-store";
 import { rankMixArtists, type MixArtist, type MixTaste } from "./made-for-you-selection";
 import { mixRecordings } from "./mix-quality";
 import { musicTrackIdentity } from "./track-identity";
+import { genreMixHasVariety, loadMadeForYouGenres } from "./made-for-you-genres";
 import type { MusicArtistRef, MusicTrack } from "./types";
 
 export type MadeForYouMix = {
-  id: string; kind: "daily" | "artist"; index: number; name: string;
+  id: string; kind: "daily" | "artist" | "genre"; index: number; name: string; genreId?: number;
   artists: string[]; tracks: MusicTrack[]; artwork: string[]; seeds: MusicTrack[];
 };
-type Snapshot = { day: string; personalized: boolean; mixes: MadeForYouMix[] };
+type Snapshot = { day: string; personalized: boolean; mixes: MadeForYouMix[]; genres?: boolean };
 const pending = new Map<string, Promise<MadeForYouMix[]>>();
 const store = (profile: string) => `made-for-you-v2-${dailySeed(profile)}`;
 const allowed = (tracks: readonly MusicTrack[]) => mixRecordings(filterBlockedTracks(filterBlockedTracks(tracks, "show"), "play"));
 
 function valid(mix: MadeForYouMix): MadeForYouMix | null {
-  if (!mix || !Array.isArray(mix.tracks) || !["daily", "artist"].includes(mix.kind)) return null;
+  if (!mix || !Array.isArray(mix.tracks) || !["daily", "artist", "genre"].includes(mix.kind)) return null;
   const tracks = allowed(mix.tracks);
-  if (mix.kind === "daily" ? !dailyMixHasVariety(tracks) : tracks.length < 5 || tracks.some(track => dailyArtistKey(track) !== artistIdentityKey(mix.name))) return null;
+  if (mix.kind === "genre" ? !genreMixHasVariety(tracks) : mix.kind === "daily" ? !dailyMixHasVariety(tracks) : tracks.length < 5 || tracks.some(track => dailyArtistKey(track) !== artistIdentityKey(mix.name))) return null;
   return { ...mix, tracks };
 }
 
@@ -37,6 +38,7 @@ export async function readMadeForYouShelf(day: string, profile: string, hasListe
   const saved = await readLocalJson<Snapshot[]>(store(profile));
   const held = Array.isArray(saved) ? saved.find(value => value.day === day) : null;
   if (hasListening && !held?.personalized) return [];
+  if (!held?.genres) return [];
   const clean = held?.mixes.flatMap(mix => valid(mix) ?? []) ?? [];
   return clean.length === held?.mixes.length ? clean : [];
 }
@@ -62,11 +64,18 @@ export async function loadMadeForYou(taste: MixTaste, day: string, profile: stri
     const saved = await readLocalJson<Snapshot[]>(store(profile));
     const history = Array.isArray(saved) ? saved : [];
     const held = history.find(value => value.day === day);
+    const ranked = rankMixArtists({ ...taste, liked: allowed(taste.liked), recents: allowed(taste.recents), library: allowed(taste.library) });
+    const withGenres = async (base: MadeForYouMix[], pool: MusicTrack[]) => {
+      onUpdate?.(base);
+      const genres = await loadMadeForYouGenres(ranked, allowed([...pool, ...ranked.flatMap(artist => artist.seeds)]), day, profile).catch(() => []);
+      const mixes = [...base.filter(mix => mix.kind !== "genre"), ...genres];
+      if (mixes.length) writeLocalJson(store(profile), [...history.filter(value => value.day !== day).slice(-2), { day, personalized, mixes, genres: true }]);
+      return mixes;
+    };
     if (held?.mixes.length && (!personalized || held.personalized)) {
       const clean = held.mixes.flatMap(mix => valid(mix) ?? []);
-      if (clean.length === held.mixes.length) return clean;
+      if (clean.length === held.mixes.length) return held.genres ? clean : withGenres(clean, clean.flatMap(mix => mix.tracks));
     }
-    const ranked = rankMixArtists({ ...taste, liked: allowed(taste.liked), recents: allowed(taste.recents), library: allowed(taste.library) });
     if (!ranked.length) return [];
     const tags = await readArtistGenres();
     // Three requests at a time across the entire shelf, including shared artist catalogs.
@@ -119,8 +128,7 @@ export async function loadMadeForYou(taste: MixTaste, day: string, profile: stri
       onUpdate?.(mixes);
     }
     const mixes = buildMixes(candidates, day, profile);
-    if (mixes.length) writeLocalJson(store(profile), [...history.filter(value => value.day !== day).slice(-2), { day, personalized, mixes }]);
-    return mixes;
+    return withGenres(mixes, candidates.flatMap(candidate => candidate.tracks));
   })();
   pending.set(key, request);
   try { return await request; } finally { pending.delete(key); }

@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { subscribeSecretsReady } from "@/lib/secret-store";
 import {
   completeAuthorization,
   pollForToken,
@@ -55,13 +56,18 @@ export function SimklProvider({ children }: { children: ReactNode }) {
   const [connectState, setConnectState] = useState<ConnectState>({ kind: "idle" });
   const pollHandleRef = useRef<PollHandle | null>(null);
 
-  useEffect(
-    () =>
-      subscribeSession(() => {
-        setLocalSession(getSession());
-      }),
-    [],
-  );
+  useEffect(() => {
+    const syncSession = () => setLocalSession(getSession());
+    const unsubscribe = subscribeSession(syncSession);
+    // Profile restoration can finish after render but before this subscription.
+    syncSession();
+    // The persisted store also loads after mount; re-read when it lands.
+    const stopSecrets = subscribeSecretsReady(syncSession);
+    return () => {
+      stopSecrets();
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     return () => {

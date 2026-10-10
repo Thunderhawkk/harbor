@@ -21,6 +21,39 @@ export function genreMatchesTags(genre: MusicDiscoveryGenre, tags: readonly stri
   return tags.some(tag => accepted.has(genreSearchKey(tag)));
 }
 
+// Tag lists arrive ranked, so an early tag says far more about an artist than a late one.
+// Kanye West carries hip hop, pop and electronic tags; without weighting he qualifies for
+// all three and every genre mix converges on the same handful of popular artists.
+export function genreTagScore(genre: MusicDiscoveryGenre, tags: readonly string[]): number {
+  let accepted = acceptedTags.get(genre);
+  if (!accepted) {
+    accepted = new Set([genre.name, ...genre.aliases, ...(STYLES[genre.slug] ?? [])].map(genreSearchKey));
+    acceptedTags.set(genre, accepted);
+  }
+  let score = 0;
+  for (const [index, tag] of tags.entries()) {
+    if (accepted.has(genreSearchKey(tag))) score += 1 / (index + 1);
+  }
+  return score;
+}
+
+/** The one genre an artist most belongs to, so a mix cannot borrow them from a stronger scene. */
+export function primaryGenre(
+  genres: readonly MusicDiscoveryGenre[],
+  tags: readonly string[],
+): MusicDiscoveryGenre | null {
+  let best: MusicDiscoveryGenre | null = null;
+  let bestScore = 0;
+  for (const genre of genres) {
+    const score = genreTagScore(genre, tags);
+    if (score > bestScore || (score === bestScore && score > 0 && best && genre.id < best.id)) {
+      best = genre;
+      bestScore = score;
+    }
+  }
+  return bestScore > 0 ? best : null;
+}
+
 export function genreIdMatchesTags(id: number, tags: readonly string[]): boolean {
   const genre = musicGenre(id);
   return !!genre && genreMatchesTags(genre, tags);

@@ -1,5 +1,6 @@
 import { HarborMark } from "@/components/icons/harbor-mark";
 import { useT } from "@/lib/i18n";
+import { openUrl } from "@/lib/window";
 
 export function MobileNotice() {
   const t = useT();
@@ -28,6 +29,10 @@ export function MobileNotice() {
         href="https://github.com/harborstremio/harbor"
         target="_blank"
         rel="noreferrer"
+        onClick={(event) => {
+          event.preventDefault();
+          openUrl("https://github.com/harborstremio/harbor");
+        }}
         className="flex h-11 items-center justify-center rounded-full bg-elevated px-6 text-[14px] font-semibold text-ink ring-1 ring-edge-soft transition-colors hover:bg-raised"
       >
         {t("Build from source")}

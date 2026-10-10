@@ -1,14 +1,18 @@
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Poster } from "@/components/poster";
-import { searchManga } from "@/lib/manga/api";
 import { hasAnyMangaSource } from "@/lib/manga/sources";
-import type { MangaFavEntry } from "@/lib/manga-favorites";
+import { resolveMangaOpen } from "@/lib/manga/open-resolve";
+import { useMangaFavorites, type MangaFavEntry } from "@/lib/manga-favorites";
+import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
 
 export function MangaFavCard({ entry }: { entry: MangaFavEntry }) {
+  const t = useT();
   const { openManga } = useView();
+  const favorites = useMangaFavorites();
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState(false);
 
   const open = async () => {
     if (busy) return;
@@ -18,20 +22,30 @@ export function MangaFavCard({ entry }: { entry: MangaFavEntry }) {
       return;
     }
     setBusy(true);
-    let target = entry.id;
-    try {
-      const norm = (s: string) => s.trim().toLowerCase();
-      const results = await searchManga(title);
-      const match =
-        results.find(
-          (r) => norm(r.title) === norm(title) || (r.altTitle != null && norm(r.altTitle) === norm(title)),
-        ) ?? results[0];
-      if (match) target = match.id;
-    } catch {
-      /* fall back to the stored id */
-    }
+    setMissing(false);
+    const resolved = await resolveMangaOpen({
+      id: entry.id,
+      title,
+      altTitle: entry.altTitle,
+    });
     setBusy(false);
-    openManga(target);
+    if (!resolved) {
+      setMissing(true);
+      return;
+    }
+    // Self-heal a stale id/cover so this favorite opens directly next time.
+    if (
+      resolved.id !== entry.id ||
+      resolved.cover !== entry.cover ||
+      resolved.title !== entry.title
+    ) {
+      favorites.repair(entry.id, {
+        id: resolved.id,
+        title: resolved.title,
+        cover: resolved.cover,
+      });
+    }
+    openManga(resolved.id);
   };
 
   return (
@@ -57,6 +71,11 @@ export function MangaFavCard({ entry }: { entry: MangaFavEntry }) {
       <p className="line-clamp-2 min-h-9 text-[13px] font-medium leading-snug text-ink">
         {entry.title}
       </p>
+      {missing && (
+        <p className="text-[11.5px] leading-snug text-ink-subtle">
+          {t("This title would not open")}
+        </p>
+      )}
     </button>
   );
 }

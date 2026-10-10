@@ -107,6 +107,10 @@
   padding: 18px;
   border-radius: 10px;
 }
+.sh-athlete-profile[data-sport="golf"] .sh-athlete-summary > div {
+  min-width: min(220px, 100%);
+  overflow-wrap: anywhere;
+}
 .sh-athlete-summary strong,
 .sh-athlete-summary span {
   display: block;

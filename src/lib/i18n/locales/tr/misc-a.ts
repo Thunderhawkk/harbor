@@ -1427,7 +1427,7 @@ const miscA: Record<string, string> = {
     "Şimdilik lütfen bu siteyi masaüstünde açın veya Harbor'ı kaynak koddan derleyin.",
   "For series and anime, keep playing the rest of the season from the release you first picked. Applies whether Play is instant or manual.":
     "Dizi ve animelerde sezonun kalanını ilk seçtiğiniz sürümden oynatmaya devam eder. Oynatma ister anında ister elle başlatılsın geçerlidir.",
-  "For watching things": "İzlemek için",
+  "Built for Adventure!": "Macera için tasarlandı!",
   "Forced to 1.85:1": "1.85:1'e zorlanır",
   "Forced to 16:9": "16:9'a zorlanır",
   "Forced to 2.39:1, widescreen letterbox":

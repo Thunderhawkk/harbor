@@ -2,10 +2,17 @@ import { MUSIC_GENRES, relatedMusicGenres, type MusicDiscoveryGenre } from "./ge
 
 // Editorial relationships, not country-based guesses: rap should lead to rap scenes.
 const SCENES: Record<string, string[]> = {
-  "hip-hop": ["trap", "uk-drill", "grime", "phonk", "lofi", "french-rap", "brazilian-trap", "german-rap", "latin-trap", "turkish-rap"],
+  "hip-hop": ["chicago-drill","new-york-drill","east-coast-hip-hop","west-coast-hip-hop","southern-hip-hop","atlanta-rap","houston-rap","memphis-rap","detroit-rap","bay-area-rap","g-funk","boom-bap","jazz-rap","conscious-hip-hop","alternative-hip-hop","crunk","miami-bass","chopped-and-screwed", "trap", "russian-rap", "ukrainian-rap", "horrorcore", "uk-drill", "grime", "phonk", "lofi", "french-rap", "brazilian-trap", "german-rap", "latin-trap", "turkish-rap"],
+  'russian-rap': ['russian-hyperpop','trap','phonk'],
+  'russian-hyperpop': ['hyperpop','russian-rap','nightcore','phonk'],
+  'ukrainian-rap': ['ukrainian-wartime','hip-hop','trap'],
+  'ukrainian-wartime': ['ukrainian-rap','hip-hop','alternative'],
+  'internet-classics': ['nightcore','vocaloid','anime','hyperpop'],
+  'goth': ['post-punk','new-wave','emo','shoegaze','alternative'],
+  'hyperpop': ['russian-hyperpop','internet-classics','nightcore'],
   pop: ["indie-pop", "hyperpop", "k-pop", "j-pop", "city-pop", "mandopop", "cantopop", "v-pop", "thai-pop", "opm"],
   rnb: ["neo-soul", "soul-funk", "gospel", "afrobeats"],
-  rock: ["alternative", "punk", "pop-punk", "emo", "shoegaze", "progressive-rock", "j-rock", "metal"],
+  rock: ["alternative", "punk", "pop-punk", "emo", "goth", "shoegaze", "progressive-rock", "j-rock", "metal"],
   alternative: ["indie-pop", "shoegaze", "emo", "punk", "progressive-rock"],
   metal: ["metalcore", "death-metal", "black-metal", "hardcore", "progressive-rock"],
   electronic: ["house", "techno", "drum-and-bass", "trance", "dubstep", "breakbeat", "ambient", "synthwave", "uk-garage", "hardstyle"],

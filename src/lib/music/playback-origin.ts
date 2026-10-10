@@ -93,13 +93,24 @@ export function recordMusicPlaylistPlayback(
 export type MusicTitleTarget =
   | { kind: "playlist"; playlistId: string }
   | { kind: "similar"; seedId: string; name: string }
+  | { kind: "library"; view: "liked" | "recent" }
+  | { kind: "catalog"; item: Exclude<MusicCatalogItem, { kind: "track" }> }
+  | { kind: "spotify"; collection: "playlist" | "liked"; id: string }
   | { kind: "album" };
 
 export function musicTitleTarget(from: MusicPlaybackOrigin): MusicTitleTarget {
   if (from?.kind === "playlist" && from.id) return { kind: "playlist", playlistId: from.id };
   if (from?.kind === "similar" && from.id)
     return { kind: "similar", seedId: from.id, name: from.name };
+  if (from?.kind === "library") return { kind: "library", view: from.id };
+  if (from?.kind === "catalog") return { kind: "catalog", item: from.item };
+  if (from?.kind === "spotify") return { kind: "spotify", collection: from.collection, id: from.id };
   return { kind: "album" };
+}
+
+/** The name to put on the menu entry, empty when there is nowhere to go back to. */
+export function musicOriginName(from: MusicPlaybackOrigin): string {
+  return from?.name?.trim() ?? "";
 }
 
 export function recordMusicSimilarPlayback(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import plistlib
 from pathlib import Path
 import re
 import subprocess
@@ -50,6 +51,19 @@ def team_identifier(display: str) -> str:
 def verify(app: Path) -> None:
     display = run("codesign", "--display", "--verbose=4", str(app))
     flags = signature_flags(display)
+    if "runtime" in flags:
+        entitlements = run("codesign", "--display", "--entitlements", ":-", str(app))
+        start = entitlements.find("<?xml")
+        end = entitlements.find("</plist>", start)
+        try:
+            values = plistlib.loads(entitlements[start:end + len("</plist>")].encode())
+        except (ValueError, plistlib.InvalidFileException) as error:
+            raise RuntimeError(f"{app.name} has no readable signed entitlements") from error
+        if values.get("com.apple.security.cs.disable-library-validation") is not True:
+            raise RuntimeError(
+                f"{app.name} enables hardened runtime without disable-library-validation; "
+                "its bundled ad-hoc libraries can be rejected at launch. Re-sign with Entitlements.plist"
+            )
     requested = apple_identity_source()
     if "adhoc" in flags:
         if requested:

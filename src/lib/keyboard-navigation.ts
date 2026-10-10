@@ -81,6 +81,7 @@ const LOCAL_KEYBOARD_SELECTOR = [
 const AXIS_TOLERANCE = 24;
 
 let activeSearchEditEl: HTMLElement | null = null;
+let navEnabled = false;
 let focusStylesInjected = false;
 let hasTvNavigationIntent = false;
 
@@ -626,6 +627,30 @@ function ensureFocusStyles() {
     html:not([data-input-modality="pointer"]) [data-tv-search-editing-focused="true"] [data-search-editing="true"] {
       box-shadow: none !important;
     }
+
+    /*
+     * A typed field never carries the navigation ring. The markers are set from
+     * several paths (nav engine, exported tvFocus, programmatic focus from a
+     * dialog), so gating the writers is not enough; this removes the ring at the
+     * only place that draws it.
+     *
+     * The repeated attribute is deliberate. The ring rules above carry both
+     * !important and a :not() prefix, so a plainer selector here loses on
+     * specificity and the ring survives. Repeating the marker outranks them.
+     */
+    html input[data-tv-focused="true"][data-tv-focused][data-tv-focused][data-tv-focused],
+    html textarea[data-tv-focused="true"][data-tv-focused][data-tv-focused][data-tv-focused],
+    html [contenteditable="true"][data-tv-focused="true"][data-tv-focused][data-tv-focused][data-tv-focused],
+    html label[data-tv-focused="true"][data-tv-focused][data-tv-focused][data-tv-focused]:has(input, textarea),
+    html [data-tv-text-field][data-tv-focused="true"][data-tv-focused][data-tv-focused][data-tv-focused],
+    html [data-tv-focus-container][data-tv-focused="true"][data-tv-focused][data-tv-focused][data-tv-focused]:has(input, textarea),
+    html [data-tv-search-nav-focused="true"][data-tv-search-nav-focused][data-tv-search-nav-focused][data-tv-search-nav-focused],
+    html [data-tv-search-editing-focused="true"][data-tv-search-editing-focused][data-tv-search-editing-focused][data-tv-search-editing-focused],
+    html [data-search-editing="true"][data-search-editing][data-search-editing][data-search-editing],
+    html [data-search-nav-mode="true"][data-search-nav-mode][data-search-nav-mode][data-search-nav-mode] {
+      outline: none !important;
+      box-shadow: none !important;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -719,15 +744,19 @@ function focusElement(el: HTMLElement, scroll: "center" | "nearest" | "none" = "
   // Remove stale TV focus markers while keeping the marker on the new item.
   clearTvFocusRing(el);
 
-  el.setAttribute("data-tv-focused", "true");
-  borrowRadius(el);
+  // With navigation off there is no remote to show a ring for, and no modality is
+  // ever recorded, so the ring rules would match on every pointer focus.
+  if (navEnabled) {
+    el.setAttribute("data-tv-focused", "true");
+    borrowRadius(el);
+  }
   lastFocusedEl = el;
 
   if (el.hasAttribute("data-focused-card")) {
     document.getElementById("root")?.setAttribute("data-card-focus-active", "");
   }
 
-  if (isSearchLikeField(el) && activeSearchEditEl !== el) {
+  if (navEnabled && inputModality !== "pointer" && isSearchLikeField(el) && activeSearchEditEl !== el) {
     // Navigation focus is not editing mode.
     el.removeAttribute("data-search-editing");
     setSearchNavMode(el);
@@ -1190,7 +1219,16 @@ export function useKeyboardNavigation(options: TVNavigationOptions = {}) {
   arrowsRef.current = arrows;
 
   useEffect(() => {
-    if (!enabled) clearTvFocusRing();
+    navEnabled = enabled;
+    if (enabled) return;
+    clearTvFocusRing();
+    if (activeSearchEditEl) {
+      activeSearchEditEl.removeAttribute("data-search-editing");
+      activeSearchEditEl = null;
+    }
+    document.querySelectorAll<HTMLElement>('[data-search-nav-mode="true"]').forEach((field) => {
+      clearSearchNavMode(field);
+    });
   }, [enabled]);
 
   // F6 is WebView2 pane-focus: on this frameless window it tears down the

@@ -28,13 +28,14 @@ function load<T>(name: string, mocks: Record<string, unknown>): T {
 }
 
 test("Surprise selects unheard recordings, spaces familiar artists and de-duplicates provider copies", () => {
-  const input = tracks(), familiar = new Set(input.filter((_, n) => n % 8 < 2).map(musicTrackIdentity));
+  const input = Array.from({ length: 14 }, (_, a) => Array.from({ length: 8 }, (_, n) => track(`Artist ${a}`, n))).flat();
+  const familiar = new Set(input.filter((_, n) => n % 8 < 2).map(musicTrackIdentity));
   const picks = selection.selectSurpriseTracks([...input, ...input.map(t => ({ ...t, id: `other:${t.id}` }))], familiar, new Set(), [], 20, () => .37);
   assert.equal(picks.length, 20);
   assert.equal(picks.filter(t => familiar.has(musicTrackIdentity(t))).length, 0);
   assert.equal(new Set(picks.map(musicTrackIdentity)).size, picks.length);
   assert.ok(picks.every((t, n) => n === 0 || t.artist !== picks[n - 1].artist));
-  assert.ok(picks.every(t => picks.filter(other => other.artist === t.artist).length <= 3));
+  assert.ok(picks.every(t => picks.filter(other => other.artist === t.artist).length <= 2));
 });
 
 test("Surprise never pads a shortage with familiar songs or invalid catalog entries", () => {
@@ -65,6 +66,7 @@ function catalogFixture(input?: ranking.MixTaste) {
     "./made-for-you": { readMadeForYouShelf: async () => [{ tracks: [track("Cached", 1)] }] },
     "./made-for-you-selection": ranking,
     "./mix-quality": quality,
+    "./playlist-neighbours": { playlistNeighbours: async (name: string) => remote([{ name: `${name} shelfmate`, id: `deezer:artist:${name} shelfmate`, connectorId: "catalog" }]) },
     "./artist-blocks": { filterBlockedTracks: (input: MusicTrack[]) => input.filter(t => t.artist !== blocked) },
     "./surprise-selection": selection,
     "./track-identity": { musicTrackIdentity },
@@ -98,7 +100,9 @@ test("playlist-only taste discovers other recordings from those artists and thei
   await h.instance.expand();
   assert.ok(h.instance.candidates().some(t => t.artist === "Playlist artist A" && t.title === "Song 20"));
   await h.instance.expand();
-  assert.ok(h.instance.candidates().some(t => t.artist.endsWith("neighbour")));
+  await h.instance.expand();
+  assert.ok(h.instance.candidates().some(t => t.artist.endsWith("neighbour")), "related artists reach the pool");
+  assert.ok(h.instance.candidates().some(t => t.artist.endsWith("shelfmate")), "shared-playlist artists reach the pool");
   assert.ok(h.instance.candidates().every(t => !library.some(saved => musicTrackIdentity(saved) === musicTrackIdentity(t))));
 });
 
@@ -149,6 +153,10 @@ function sessionFixture(options: { empty?: boolean; warmGate?: Promise<void>; di
       nextMusic: () => { const index = state.queueIndex + 1; update({ current: state.queue[index], queueIndex: index, phase: "playing", currentTime: 0 }); },
     },
     "./liked-artists": { getLikedArtists: () => [] },
+    "./artist-popularity": { artistIdentityKey },
+    "./daily-discovery-selection": daily,
+    "./surprise-preferences": { getSurpriseBlend: () => "balanced", hydrateSurpriseBlend: async () => {} },
+    "./surprise-feedback": { noteSurpriseTrack: () => {}, resetSurpriseFeedback: () => {} },
     "./listening-affinity": { hydrateListeningAffinity: async () => {}, readListeningAffinity: () => ({}) },
     "./surprise-library": { loadSurpriseLibrary: async (primary: boolean) => { assert.equal(primary, options.primary ?? false); return options.library ?? []; } },
     "./playback-origin": history.origin,
@@ -329,6 +337,7 @@ function playerEntries() {
     rankByExplicitness: (v: unknown) => v, explicitnessOf: () => null, adoptRequestedIdentity,
     stopCastOwner: async () => {}, ensureNativeEvents: async () => {}, updateMediaSession: () => {},
     likedIdsFor: () => [], isMusicLiked: () => false, getMusicSpeakerState: () => ({ active: false }),
+    skipUnavailableTrack: () => false,
     deckAdoption: { deck: () => 0 }, require: () => ({ unhideMusicRecent: () => {} }),
   };
   new Function(...Object.keys(scope), "exports", code)(...Object.values(scope), module.exports);

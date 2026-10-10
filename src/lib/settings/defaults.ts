@@ -4,6 +4,7 @@ import {
 } from "@/lib/gamepad/cursor";
 import { DEFAULT_THEME } from "@/lib/theme";
 import { DEFAULT_FULLSCREEN_CLOCK_SIZE_PX } from "@/lib/local-time";
+import { AUTO_DISPLAY } from "@/lib/monitors";
 import type { Settings } from "./types";
 
 export const STORAGE_KEY = "harbor.settings";
@@ -128,8 +129,9 @@ export const DEFAULT: Settings = {
   resumePlayback: true,
   keepFullscreenOnExit: true,
   fullscreenRestorePosition: true,
+  // Advisories interrupt playback, so they require an explicit opt-in.
   contentAdvisoryToast: false,
-  contentAdvisoryTheme: "colored",
+  contentAdvisoryTheme: "monochrome",
   contentAdvisoryShowIgnore: true,
   playerVolumeHud: true,
   playerVolumeHudPosition: "top",
@@ -238,6 +240,8 @@ export const DEFAULT: Settings = {
   playerAnime4kAnimeOnly: true,
   playerAnime4kIndicator: true,
   playerMpvEmbed: true,
+  playerSeparateDisplay: AUTO_DISPLAY,
+  playerSeparateCoverTaskbar: true,
   playerP2pChip: true,
   showQualityInfo: false,
   stremioServerTranscode: false,
@@ -349,6 +353,11 @@ export const DEFAULT: Settings = {
   songIdAiKey: "",
   songIdAiModel: "gemini-3.6-flash",
   aiSearchKey: "",
+  steamSearchShortcut: true,
+  gameAgeRatingAgency: "ESRB",
+  gameArtworkSelection: "first",
+  gameArtworkScreenshots: true,
+  gameArtworkCoverIcon: false,
   aiSearchModel: "",
   aiSearchProvider: "openrouter",
   aiGroqKey: "",
@@ -382,8 +391,11 @@ export const DEFAULT: Settings = {
   playerTvNavigation: false,
   bigPictureButton: true,
   bigPictureAutoStart: false,
+  bigPictureDisplay: AUTO_DISPLAY,
   bigPictureSound: "cinematic",
   bigPictureMosaic: true,
+  bigPictureBackdropZoom: true,
+  tabHotkeys: true,
   bigPictureOverscan: null,
   playerHdrStage: "auto",
   opensubtitlesApiKey: "",
@@ -403,6 +415,7 @@ export const DEFAULT: Settings = {
   hideWatchedInCatalogs: false,
   hideUnreleased: false,
   localEpisodeSortDesc: false,
+  localReviewDismissedCount: 0,
   smoothScroll: false,
   showSimklCard: false,
   showLetterboxdCard: false,
@@ -573,6 +586,8 @@ export const DEFAULT: Settings = {
   iptvForceProxy: false,
   iptvEpgOffsetHours: 0,
   sidebarCollapsed: false,
+  showQuickGameLibrary: false,
+  gamesOpenInLibrary: false,
   wrappedButton: true,
   libraryHero: false,
   mangaEnabled: false,

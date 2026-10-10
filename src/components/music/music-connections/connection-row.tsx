@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import {
   AudioLines,
   FolderOpen,
@@ -14,6 +14,7 @@ import { SpotifyPlaybackTarget } from "./spotify-devices";
 import { SpotifySetupFields } from "./spotify-setup";
 import { MusicLastFm } from "@/components/music/music-lastfm";
 import { useT } from "@/lib/i18n";
+import "@/components/music/music-connect-field.css";
 import { connectSource, disconnectSource, scanLocalFolder } from "@/lib/music/catalog";
 import {
   isGatedMusicSource,
@@ -77,6 +78,7 @@ export function MusicConnectionRow({
   onRefresh: () => void;
 }) {
   const t = useT();
+  const rowRef = useRef<HTMLLIElement>(null);
   useMusicSourceConsent();
   const [open, setOpen] = useState(defaultOpen && connection.needs.length > 0);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -162,7 +164,7 @@ export function MusicConnectionRow({
       : null;
 
   return (
-    <li className="border-b border-edge-soft last:border-b-0">
+    <li ref={rowRef} className="border-b border-edge-soft last:border-b-0">
       <div className="grid min-h-24 grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4">
         <span className="grid size-10 place-items-center text-ink-muted">
           <MusicServiceLogo
@@ -201,8 +203,23 @@ export function MusicConnectionRow({
             </span>
           )}
           {failure && (
-            <span role="alert" className="mt-1 block text-[13px] leading-5 text-danger">
-              {displayError(failure)}
+            <span role="alert" className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] leading-5 text-danger">
+              <span className="min-w-0">{displayError(failure)}</span>
+              <button
+                type="button"
+                className="inline-flex h-7 shrink-0 items-center rounded-full border border-danger/40 px-3 text-[12px] font-medium text-danger transition-colors duration-200 ease-out hover:bg-danger/10"
+                onClick={() => connect(connection.needs.length > 0 ? values : {})}
+              >
+                {t("common.retry")}
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-7 shrink-0 items-center rounded-full px-2 text-[12px] font-medium text-ink-subtle transition-colors duration-200 ease-out hover:text-ink"
+                aria-label={t("common.close")}
+                onClick={() => setFailure(null)}
+              >
+                {t("common.close")}
+              </button>
             </span>
           )}
           {busy === "connect" && handoff && (
@@ -233,7 +250,7 @@ export function MusicConnectionRow({
             </span>
           )}
         </span>
-        {lastFm ? (
+        {lastFm || (open && connection.needs.length > 0) ? (
           <span />
         ) : (
           <RowAction
@@ -247,8 +264,8 @@ export function MusicConnectionRow({
       </div>
 
       {lastFm && (
-        <div className="border-t border-edge-soft px-3 py-3">
-          <MusicLastFm />
+        <div className="border-t border-edge-soft px-4 py-4">
+          <MusicLastFm embedded />
         </div>
       )}
 
@@ -280,6 +297,7 @@ export function MusicConnectionRow({
                   value={values[field.key] ?? ""}
                   onChange={(next) => setValues((current) => ({ ...current, [field.key]: next }))}
                   onPick={() => pickFolder(field.key)}
+                  disabled={busy !== null}
                 />
               ))}
             </div>
@@ -291,7 +309,10 @@ export function MusicConnectionRow({
                 ? t(spotifySetup ? "music.spotifySetup.authorize" : "music.connect.action")
                 : t("music.connect.connecting")}
             </button>
-            <button type="button" onClick={() => setOpen(false)} className={SECONDARY_BUTTON}>
+            <button type="button" disabled={busy !== null} onClick={() => {
+              setOpen(false);
+              requestAnimationFrame(() => rowRef.current?.querySelector<HTMLButtonElement>(":scope > div:first-child > button")?.focus());
+            }} className={SECONDARY_BUTTON}>
               {t("common.cancel")}
             </button>
           </div>
@@ -380,13 +401,16 @@ function FieldControl({
   value,
   onChange,
   onPick,
+  disabled,
 }: {
   field: MusicConnectionField;
   value: string;
   onChange: (next: string) => void;
   onPick: () => void;
+  disabled: boolean;
 }) {
   const t = useT();
+  const id = useId();
   const label = (
     <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-ink-subtle">
       {field.label}
@@ -395,16 +419,12 @@ function FieldControl({
 
   if (field.kind === "folder") {
     return (
-      <div>
-        {label}
-        <div className="mt-1.5 flex items-center gap-2">
-          <span
-            className="min-w-0 flex-1 truncate rounded-md border border-edge bg-canvas px-3 py-3 text-[13px] text-ink"
-            title={value || undefined}
-          >
-            {value || field.placeholder || ""}
-          </span>
-          <button type="button" onClick={onPick} className={SECONDARY_BUTTON}>
+      <div className="music-connect-folder">
+        <label htmlFor={id}>{field.label}</label>
+        <div className="music-connect-folder-control">
+          <input id={id} readOnly value={value} placeholder={field.placeholder || t("music.connect.chooseFolder")}
+            disabled={disabled} title={value || undefined} dir="auto" />
+          <button type="button" onClick={onPick} disabled={disabled} className={SECONDARY_BUTTON}>
             <FolderOpen size={20} aria-hidden="true" />
             {t("music.connect.chooseFolder")}
           </button>
@@ -414,7 +434,7 @@ function FieldControl({
   }
 
   return (
-    <label className="block">
+    <label className="music-connect-field block">
       {label}
       <input
         type={field.kind === "password" ? "password" : field.kind === "url" ? "url" : "text"}
@@ -422,9 +442,10 @@ function FieldControl({
         onChange={(event) => onChange(event.currentTarget.value)}
         placeholder={field.placeholder}
         required={field.required}
+        disabled={disabled}
         autoComplete="off"
         aria-label={field.label}
-        className="mt-1.5 h-11 w-full rounded-md border border-edge bg-canvas px-3 text-[14px] text-ink outline-none transition-colors duration-200 ease-out focus:border-ink-muted"
+        className="mt-1.5 h-11 w-full rounded-md border border-edge bg-canvas px-3 text-[14px] text-ink"
       />
     </label>
   );

@@ -2390,6 +2390,35 @@ function EBookInformation({ ebook }: { ebook: EBook }) {
     { label: t("Status"), value: ebook.status || t("Not available") },
     { label: t("Genres"), value: ebook.genres.join(" · ") || t("Not available") },
     { label: t("Rating"), value: score || t("Not available") },
+    ...(ebook.pages ? [{ label: t("Length"), value: t("{n} pages", { n: ebook.pages }) }] : []),
+    ...(ebook.editionCount
+      ? [{ label: t("Editions"), value: t("{n} published", { n: ebook.editionCount }) }]
+      : []),
+    ...(ebook.readerRating
+      ? [
+          {
+            label: t("Readers"),
+            value: `${ebook.readerRating.toFixed(1)} / 5${
+              ebook.readerRatingCount ? ` · ${t("{n} ratings", { n: ebook.readerRatingCount })}` : ""
+            }`,
+          },
+        ]
+      : []),
+    ...(ebook.shelvedBy
+      ? [{ label: t("Want to read"), value: t("{n} readers", { n: ebook.shelvedBy }) }]
+      : []),
+    ...(ebook.people?.length
+      ? [{ label: t("Characters"), value: ebook.people.slice(0, 5).join(" · ") }]
+      : []),
+    ...(ebook.places?.length
+      ? [{ label: t("Setting"), value: ebook.places.slice(0, 5).join(" · ") }]
+      : []),
+    ...(ebook.periods?.length
+      ? [{ label: t("Period"), value: ebook.periods.slice(0, 4).join(" · ") }]
+      : []),
+    ...(ebook.languages?.length
+      ? [{ label: t("Translations"), value: t("{n} languages", { n: ebook.languages.length }) }]
+      : []),
   ];
   const adaptationItems = adaptations
     ? [...adaptations.anime, ...adaptations.manga, ...adaptations.liveAction]

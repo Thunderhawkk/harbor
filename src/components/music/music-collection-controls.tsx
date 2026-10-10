@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HoverTooltip } from "@/components/hover-tooltip";
 import { LoaderCircle, Pause, Play, Shuffle } from "@/components/icons/music-icons";
 import { useT } from "@/lib/i18n";
 import type { MusicTrack } from "@/lib/music/types";
@@ -42,17 +43,18 @@ export function MusicCollectionControls({
         )}
       </button>
       {(tracks.length > 1 || loading) && (
+        <HoverTooltip label={t("music.transport.shuffle")} side="top" align="center" disabled={disabled || loading}>
         <button
           type="button"
           className="music-collection-shuffle"
           disabled={disabled || loading}
           aria-pressed={transport.shuffle}
           aria-label={t("music.transport.shuffle")}
-          title={t("music.transport.shuffle")}
           onClick={toggleMusicShuffle}
         >
           <Shuffle size={26} aria-hidden />
         </button>
+        </HoverTooltip>
       )}
       {extra}
     </div>

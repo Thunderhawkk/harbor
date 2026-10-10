@@ -3,7 +3,7 @@ import { List, Star, type LucideIcon } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useMangaFavorites } from "@/lib/manga-favorites";
 import { mangaLists } from "@/lib/manga-lists";
-import { searchManga } from "@/lib/manga/api";
+import { resolveMangaOpen } from "@/lib/manga/open-resolve";
 import { hasAnyMangaSource } from "@/lib/manga/sources";
 import { useView } from "@/lib/view";
 import type { MangaSummary } from "@/lib/manga/types";
@@ -15,8 +15,10 @@ import { useProxiedImageSrc } from "@/lib/remote-image-proxy";
 
 function useOpenTitle() {
   const { openManga } = useView();
+  const favorites = useMangaFavorites();
   const busyRef = useRef<Set<string>>(new Set());
-  return async (id: string, title: string) => {
+  const [missing, setMissing] = useState<Set<string>>(() => new Set());
+  const open = async (id: string, title: string, altTitle?: string) => {
     if (busyRef.current.has(id)) return;
     const name = title.trim();
     if (!name || !hasAnyMangaSource()) {
@@ -24,20 +26,32 @@ function useOpenTitle() {
       return;
     }
     busyRef.current.add(id);
+    setMissing((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     try {
-      const norm = (s: string) => s.trim().toLowerCase();
-      const results = await searchManga(name);
-      const match =
-        results.find(
-          (r) => norm(r.title) === norm(name) || (r.altTitle != null && norm(r.altTitle) === norm(name)),
-        ) ?? results[0];
-      openManga(match ? match.id : id);
-    } catch {
-      openManga(id);
+      const resolved = await resolveMangaOpen({ id, title: name, altTitle });
+      if (!resolved) {
+        setMissing((prev) => new Set(prev).add(id));
+        return;
+      }
+      const entry = favorites.items.get(id);
+      if (
+        resolved.id !== id ||
+        resolved.cover !== entry?.cover ||
+        resolved.title !== entry?.title
+      ) {
+        favorites.repair(id, { id: resolved.id, title: resolved.title, cover: resolved.cover });
+      }
+      openManga(resolved.id);
     } finally {
       busyRef.current.delete(id);
     }
   };
+  return { open, missing };
 }
 
 type LibrarySection = "favorites" | "lists";
@@ -47,8 +61,17 @@ type LibrarySection = "favorites" | "lists";
 // bucketing, retry timers, explicit decode) is pure overhead here. This gates
 // the <img> behind a shared viewport observer and lets the browser decode
 // lazily instead of hammering el.decode() for every mounted cell.
-function FavCell({ m, onOpen }: { m: MangaSummary; onOpen: (item: MangaSummary) => void }) {
+function FavCell({
+  m,
+  onOpen,
+  missing = false,
+}: {
+  m: MangaSummary;
+  onOpen: (item: MangaSummary) => void;
+  missing?: boolean;
+}) {
   const { open: openContextMenu } = useContextMenu();
+  const t = useT();
   const ref = useRef<HTMLDivElement | null>(null);
   const [near, setNear] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -85,17 +108,20 @@ function FavCell({ m, onOpen }: { m: MangaSummary; onOpen: (item: MangaSummary) 
         )}
       </div>
       <p className="line-clamp-2 text-[13px] font-medium leading-snug text-ink">{m.title}</p>
+      {missing && (
+        <p className="text-[11.5px] leading-snug text-ink-subtle">{t("This title would not open")}</p>
+      )}
     </button>
   );
 }
 
 export function MangaLibrary({ scrollRef }: { scrollRef: React.RefObject<HTMLElement | null> }) {
   const t = useT();
-  const openTitle = useOpenTitle();
-  const openRef = useRef(openTitle);
-  openRef.current = openTitle;
+  const { open, missing } = useOpenTitle();
+  const openRef = useRef(open);
+  openRef.current = open;
   const openRailTitle = useCallback(
-    (m: MangaSummary) => void openRef.current(m.id, m.title),
+    (m: MangaSummary) => void openRef.current(m.id, m.title, m.altTitle),
     [],
   );
   const { items } = useMangaFavorites();
@@ -196,7 +222,9 @@ export function MangaLibrary({ scrollRef }: { scrollRef: React.RefObject<HTMLEle
               gapY={28}
               estimateRowHeight={270}
               getKey={(m) => m.id}
-              renderItem={(fav) => <FavCell m={fav} onOpen={openRailTitle} />}
+              renderItem={(fav) => (
+                <FavCell m={fav} onOpen={openRailTitle} missing={missing.has(fav.id)} />
+              )}
             />
           )}
         </section>

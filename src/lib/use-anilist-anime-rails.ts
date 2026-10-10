@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import { useAnilist } from "@/lib/anilist/provider";
 import { fetchMediaListCollection, readCachedCollection } from "@/lib/anilist/lists";
@@ -39,9 +39,11 @@ export function useAnilistAnimeRails(): AnilistRail[] {
   return useAnilistAnimeRailsState().rails;
 }
 
-export function useAnilistAnimeRailsState(): AnilistRailsState {
+export function useAnilistAnimeRailsState(): AnilistRailsState & { retry: () => void } {
   const { isConnected, session } = useAnilist();
   const [state, setState] = useState<AnilistRailsState>(IDLE);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt(value => value + 1), []);
 
   useEffect(() => {
     if (!isConnected || !session) {
@@ -56,6 +58,8 @@ export function useAnilistAnimeRailsState(): AnilistRailsState {
       const groups = await fetchMediaListCollection(userId);
       if (cancelled) return;
       const out = buildStatusRails(groups);
+      // Recommendations are optional: never hold the user's own lists behind them.
+      setState({ rails: out, loading: false, error: false });
       const entriesByStatus = new Map(groups.map((g) => [g.status, g.entries]));
       const excludeIds = new Set<number>();
       for (const g of groups) for (const e of g.entries) excludeIds.add(e.media.id);
@@ -63,7 +67,7 @@ export function useAnilistAnimeRailsState(): AnilistRailsState {
       const seedIds = SEED_STATUSES.flatMap((s) =>
         (entriesByStatus.get(s) ?? []).map((e) => e.media.id),
       );
-      const recs = seedIds.length > 0 ? await fetchAnilistRecommendations(seedIds, excludeIds) : [];
+      const recs = seedIds.length > 0 ? await fetchAnilistRecommendations(seedIds, excludeIds).catch(() => []) : [];
       if (cancelled) return;
       setState({
         rails:
@@ -80,7 +84,7 @@ export function useAnilistAnimeRailsState(): AnilistRailsState {
     return () => {
       cancelled = true;
     };
-  }, [isConnected, session?.userId]);
+  }, [isConnected, session?.userId, session?.accessToken, attempt]);
 
-  return state;
+  return { ...state, retry };
 }

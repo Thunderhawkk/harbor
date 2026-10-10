@@ -1,5 +1,6 @@
 import type { SportsGame } from "./sports/espn";
 import type { SectionId } from "@/views/settings/shared";
+import type { EsportsMatch } from "./sports/esports-feeds";
 import {
   navigateUnderPreview,
   previewPageStack,
@@ -19,6 +20,7 @@ import {
 } from "react";
 import { subscribeOpenProfile } from "@/lib/social/open-profile";
 import { subscribeOpenGroup } from "@/lib/social/open-group";
+import { useBigPicture } from "@/lib/big-picture";
 import type { Meta } from "./cinemeta";
 import type { PeopleDept, RankSource } from "./harbor-rank";
 import { profileFromMeta, trackEvent } from "./discover";
@@ -43,6 +45,7 @@ export type View =
   | "movies"
   | "shows"
   | "music"
+  | "games"
   | "kids"
   | "library"
   | "collections-hub"
@@ -182,10 +185,11 @@ export type Frame =
   | { kind: "movies" }
   | { kind: "shows" }
   | { kind: "music" }
+  | { kind: "games" }
   | { kind: "kids" }
   | { kind: "library" }
   | { kind: "live" }
-  | { kind: "sports" }
+  | { kind: "sports"; esportsEvent?: EsportsMatch }
   | { kind: "vod" }
   | { kind: "downloads" }
   | { kind: "manga"; mangaId?: string }
@@ -200,7 +204,14 @@ export type Frame =
       seasonEntryId?: string;
     }
   | { kind: "addon-collection"; meta: Meta }
-  | { kind: "episode-detail"; seriesId: string; season: number; episode: number; seriesMeta?: Meta; playback?: EpisodeDetailPlayback }
+  | {
+      kind: "episode-detail";
+      seriesId: string;
+      season: number;
+      episode: number;
+      seriesMeta?: Meta;
+      playback?: EpisodeDetailPlayback;
+    }
   | { kind: "person"; id: number }
   | { kind: "profile"; handle: string }
   | { kind: "feed" }
@@ -227,7 +238,7 @@ export type Frame =
       resume?: boolean;
     }
   | { kind: "player"; src: PlayerSrc }
-  | { kind: "match-detail"; game: SportsGame };
+  | { kind: "match-detail"; game: SportsGame; eventGames?: SportsGame[] };
 
 export type ScrollSnapshot = {
   anchor?: string;
@@ -244,8 +255,12 @@ const RESTORE_RETRIES = 20;
 export type SettingsSection = SectionId;
 
 type ViewValue = {
+  sportsEvent: EsportsMatch | null;
+  openGames: () => void;
+  openSportsEvent: (event?: EsportsMatch) => void;
   matchDetailGame: SportsGame | null;
-  openMatchDetail: (game: SportsGame) => void;
+  matchDetailEventGames: SportsGame[] | undefined;
+  openMatchDetail: (game: SportsGame, eventGames?: SportsGame[]) => void;
   view: View;
   setView: (v: View) => void;
   openSettings: (section?: SettingsSection) => void;
@@ -268,8 +283,20 @@ type ViewValue = {
       exact?: boolean;
     },
   ) => void;
-  episodeDetail: { seriesId: string; season: number; episode: number; seriesMeta?: Meta; playback?: EpisodeDetailPlayback } | null;
-  openEpisodeDetail: (seriesId: string, season: number, episode: number, seriesMeta?: Meta, playback?: EpisodeDetailPlayback) => void;
+  episodeDetail: {
+    seriesId: string;
+    season: number;
+    episode: number;
+    seriesMeta?: Meta;
+    playback?: EpisodeDetailPlayback;
+  } | null;
+  openEpisodeDetail: (
+    seriesId: string,
+    season: number,
+    episode: number,
+    seriesMeta?: Meta,
+    playback?: EpisodeDetailPlayback,
+  ) => void;
   promoteMetaToRoot: () => void;
   personId: number | null;
   openPerson: (id: number | null) => void;
@@ -374,7 +401,7 @@ function pushFrame(cur: Frame[], next: Frame): Frame[] {
 function frameKey(f: Frame): string {
   switch (f.kind) {
     case "match-detail":
-      return `match-detail:${f.game.id}`;
+      return `match-detail:${f.game.source ?? "espn"}:${f.game.league}:${f.game.id}:${f.eventGames ? "event" : "match"}`;
     case "home":
       return "home";
     case "settings":
@@ -403,6 +430,8 @@ function frameKey(f: Frame): string {
       return "shows";
     case "music":
       return "music";
+    case "games":
+      return "games";
     case "kids":
       return "kids";
     case "library":
@@ -503,6 +532,12 @@ export function ViewProvider({ children }: { children: ReactNode }) {
   stackRef.current = stack;
   forwardStackRef.current = forwardStack;
   const [chromeHidden, setChromeHidden] = useState(false);
+  // Big Picture is its own full-screen shell, so every layout's nav stands down
+  // for it. That is exactly what chromeHidden means to the chrome components,
+  // and routing it through here is what finally hides them: the MinUI dock read
+  // chromeHidden but nothing ever set it for Big Picture, so it kept painting
+  // over the shell as a bordered box.
+  const bigPictureActive = useBigPicture().active;
   const sectionBackActive = useSectionBackActive();
   const [homeResetTick, setHomeResetTick] = useState(0);
   const scrollMem = useRef<Map<string, ScrollSnapshot>>(new Map());
@@ -556,6 +591,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       if (f.kind === "movies") return "movies";
       if (f.kind === "shows") return "shows";
       if (f.kind === "music") return "music";
+      if (f.kind === "games") return "games";
       if (f.kind === "kids") return "kids";
       if (f.kind === "library") return "library";
       if (f.kind === "collections-hub") return "collections-hub";
@@ -635,6 +671,8 @@ export function ViewProvider({ children }: { children: ReactNode }) {
     ],
   );
   const matchDetailGame = top.kind === "match-detail" ? top.game : null;
+  const matchDetailEventGames = top.kind === "match-detail" ? top.eventGames : undefined;
+  const sportsEvent = lastOfKind(stack, "sports")?.esportsEvent ?? null;
   const filterFrame = lastOfKind(stack, "filter");
   const filter = filterFrame ? filterFrame.filter : null;
   const brandsFrame = lastOfKind(stack, "brands");
@@ -835,6 +873,11 @@ export function ViewProvider({ children }: { children: ReactNode }) {
           rowScrollMem.current.clear();
           return [{ kind: "music" }];
         }
+        if (v === "games") {
+          scrollMem.current.clear();
+          rowScrollMem.current.clear();
+          return [{ kind: "games" }];
+        }
         if (v === "kids") {
           scrollMem.current.clear();
           rowScrollMem.current.clear();
@@ -958,8 +1001,8 @@ export function ViewProvider({ children }: { children: ReactNode }) {
         setNavStack((cur) => {
           const t = cur[cur.length - 1];
           if (t.kind === "meta" && t.meta.id === target.id) return cur;
-          const returningToSeries = t.kind === "episode-detail" &&
-            (t.seriesMeta?.id ?? t.seriesId) === target.id;
+          const returningToSeries =
+            t.kind === "episode-detail" && (t.seriesMeta?.id ?? t.seriesId) === target.id;
           if (returningToSeries) {
             // The episode's series link returns to its parent, not another history entry.
             for (let i = cur.length - 2; i >= 0; i--) {
@@ -1116,19 +1159,33 @@ export function ViewProvider({ children }: { children: ReactNode }) {
     [setNavStack],
   );
 
+  const openGames = useCallback(() => {
+    setNavStack(cur => cur.at(-1)?.kind === "games" ? cur : pushFrame(cur, { kind: "games" }));
+  }, [setNavStack]);
+
+  const openSportsEvent = useCallback((event?: EsportsMatch) => {
+    setNavStack(cur => pushFrame(cur, { kind: "sports", ...(event ? { esportsEvent: event } : {}) }));
+  }, [setNavStack]);
+
   const openMatchDetail = useCallback(
-    (game: SportsGame) => {
+    (game: SportsGame, eventGames?: SportsGame[]) => {
       setNavStack((cur) => {
         const t = cur[cur.length - 1];
-        if (t.kind === "match-detail" && t.game.id === game.id) return cur;
-        return pushFrame(cur, { kind: "match-detail", game });
+        if (t.kind === "match-detail" && t.game.id === game.id && t.game.league === game.league && t.game.source === game.source && !!t.eventGames === !!eventGames) return cur;
+        return pushFrame(cur, { kind: "match-detail", game, eventGames });
       });
     },
     [setNavStack],
   );
 
   const openEpisodeDetail = useCallback(
-    (seriesId: string, season: number, episode: number, seriesMeta?: Meta, playback?: EpisodeDetailPlayback) => {
+    (
+      seriesId: string,
+      season: number,
+      episode: number,
+      seriesMeta?: Meta,
+      playback?: EpisodeDetailPlayback,
+    ) => {
       setNavStack((cur) => {
         const t = cur[cur.length - 1];
         if (
@@ -1143,7 +1200,14 @@ export function ViewProvider({ children }: { children: ReactNode }) {
         ) {
           return cur;
         }
-        return pushFrame(cur, { kind: "episode-detail", seriesId, season, episode, seriesMeta, playback });
+        return pushFrame(cur, {
+          kind: "episode-detail",
+          seriesId,
+          season,
+          episode,
+          seriesMeta,
+          playback,
+        });
       });
     },
     [setNavStack],
@@ -1387,7 +1451,11 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       openEpisodeDetail,
       openQueue,
       matchDetailGame,
+      matchDetailEventGames,
       openMatchDetail,
+      sportsEvent,
+      openGames,
+      openSportsEvent,
       filter,
       openFilter,
       brands,
@@ -1426,7 +1494,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       recallScroll,
       rememberRowScroll,
       recallRowScroll,
-      chromeHidden,
+      chromeHidden: chromeHidden || bigPictureActive,
       setChromeHidden,
       setNavStack,
     }),
@@ -1466,7 +1534,11 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       filter,
       brands,
       matchDetailGame,
+      matchDetailEventGames,
       openMatchDetail,
+      sportsEvent,
+      openGames,
+      openSportsEvent,
       stackKinds,
       awardType,
       homeResetTick,
@@ -1505,6 +1577,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       rememberScroll,
       recallScroll,
       chromeHidden,
+      bigPictureActive,
       setNavStack,
     ],
   );

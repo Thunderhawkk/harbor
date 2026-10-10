@@ -387,7 +387,13 @@ export function AddonDetail({
         </section>
       )}
 
-      <section className="-mx-12 bg-elevated/15 px-12 py-12">
+      <section
+        className="-mx-12 px-12 py-12"
+        style={{
+          background:
+            "linear-gradient(180deg, transparent 0, color-mix(in oklch, var(--color-elevated) 15%, transparent) 160px)",
+        }}
+      >
         <div className="mx-auto max-w-5xl">
           {community?.slug && <AddonDocumentation slug={community.slug} />}
           <div className="mb-8 flex items-baseline justify-between gap-4">

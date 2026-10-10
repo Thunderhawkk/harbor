@@ -15,15 +15,15 @@ const hook = read("src/views/player/hooks/use-content-advisory.ts");
 const overlays = read("src/views/player/stage-overlays.tsx");
 const overlayLayers = read("src/views/player/player-overlay-layers.tsx");
 
-test("content advisory uses the revised PR 1376 presentation", () => {
+test("content advisory uses a quiet borderless presentation", () => {
   assert.match(toast, /start-6 top-20/);
-  assert.match(toast, /w-\[238px\]/);
   assert.match(toast, /bg-black\/70/);
-  assert.match(toast, /uppercase tracking-\[0\.16em\]/);
-  assert.match(toast, /h-2\.5 w-1 rounded-full/);
-  assert.match(toast, /const HOLD_MS = 28_000/);
+  assert.match(toast, /const HOLD_MS = 8_000/);
   assert.match(toast, /const HOVER_TAIL_MS = 2_500/);
-  assert.match(toast, /harbor-content-advisory-row/);
+  assert.doesNotMatch(
+    toast,
+    /border-t|shadow-\[|backdrop-blur|rounded-xl|harbor-content-advisory-row/,
+  );
   assert.doesNotMatch(toast, /h-\[2px\] bg-white\/10/);
   assert.doesNotMatch(toast, /start-4 top-44|w-\[286px\]|bg-black\/80/);
 });
@@ -33,20 +33,21 @@ test("content advisory waits for playback and fully unmounts after dismissal", (
   assert.match(toast, /const hasPlaybackStarted = preview \|\| positionSec > 0\.3/);
   assert.match(
     toast,
-    /if \(preview \|\| !playKey \|\| !hasPlaybackStarted \|\| !hasContent \|\| hasTriggered\) return/,
+    /if \(!enabled \|\| preview \|\| !playKey \|\| !hasPlaybackStarted \|\| !hasContent \|\| hasTriggered\)\s+return/,
   );
   assert.match(toast, /type Phase = "idle" \| "holding" \| "collapsing" \| "done"/);
   assert.match(toast, /setPhase\("done"\)[\s\S]*setActive\(false\)/);
   assert.match(
     toast,
-    /if \(!hasContent \|\| !active \|\| !hasPlaybackStarted \|\| phase === "done"\) return null/,
+    /if \(!enabled \|\| !hasContent \|\| !active \|\| !hasPlaybackStarted \|\| phase === "done"\) return null/,
   );
   assert.match(toast, /isCardExiting \? "pointer-events-none" : "pointer-events-auto"/);
   assert.doesNotMatch(toast, /visible \? "translate-y-0 opacity-100"/);
 });
 
-test("content advisory keeps hover, dismiss, progress, and accessibility safeguards", () => {
-  assert.match(toast, /window\.cancelAnimationFrame\(rafRef\.current\)/);
+test("content advisory keeps hover, dismiss, and accessibility safeguards without a render loop", () => {
+  assert.match(toast, /window\.clearTimeout\(timer\)/);
+  assert.doesNotMatch(toast, /requestAnimationFrame|setProgress/);
   assert.match(toast, /durationRef\.current = HOVER_TAIL_MS/);
   assert.match(toast, /onMouseEnter=\{preview \? undefined : \(\) => setPaused\(true\)\}/);
   assert.match(toast, /onFocusCapture=\{preview \? undefined : \(\) => setPaused\(true\)\}/);
@@ -57,7 +58,6 @@ test("content advisory keeps hover, dismiss, progress, and accessibility safegua
   assert.match(toast, /aria-label=\{t\("Dismiss"\)\}/);
   assert.match(toast, /aria-hidden="true"/);
   assert.match(toast, /prefers-reduced-motion: reduce/);
-  assert.match(toast, /countdownWidth/);
 });
 
 test("content advisory keeps its preview and component compatibility contracts", () => {
@@ -88,14 +88,18 @@ test("content advisory keeps IMDb fetching and PiP suppression", () => {
   assert.match(overlays, /!pipMode && \(\s*<ContentAdvisoryToast/);
 });
 
-test("approved advisory update preserves saved opt-out and decreasing countdown", () => {
+test("advisories stay opt-in and cannot render from stale data while disabled", () => {
   assert.doesNotMatch(
     read("src/lib/settings/load.ts"),
     /if \(!parsed\._contentAdvisoryOnByDefaultV1\)/,
   );
   assert.match(toast, /category\.severity !== "None"/);
-  assert.match(toast, /const remaining = Math\.max\(0, 1 - elapsed \/ durationRef\.current\)/);
-  assert.match(toast, /Math\.min\(100, progress \* 100\)/);
+  assert.match(read("src/lib/settings/defaults.ts"), /contentAdvisoryToast: false/);
+  assert.match(
+    read("src/lib/settings/load.ts"),
+    /parsed\.contentAdvisoryToast = parsed\.contentAdvisoryToast === true/,
+  );
+  assert.match(toast, /const enabled = preview \|\| settings\.contentAdvisoryToast === true/);
 });
 
 test("profile background adapts slider units and reloads when the picker opens", () => {

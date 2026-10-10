@@ -1,5 +1,6 @@
 import { Play } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 import { useT } from "@/lib/i18n";
 import { enqueueMusic, playMusic } from "@/lib/music/player";
 import type { MusicTrack } from "@/lib/music/types";
@@ -47,7 +48,7 @@ export function MusicUpNextRow({
           ratio="square"
           className="w-full [--poster-radius:0px]"
           lazy
-        />
+        ><MusicTrackPlaybackMark track={track}/></Poster>
       </button>
       <span className="music-now-next-title">
         <button type="button" onClick={play}>

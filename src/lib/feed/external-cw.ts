@@ -86,8 +86,10 @@ export function setExternalCwSources(mask: { trakt: boolean; simkl: boolean }): 
 
 async function runRefresh(gen: number): Promise<boolean> {
   const enabled: Array<{ source: "simkl" | "trakt"; fetch: () => Promise<LibraryItem[]> }> = [];
-  if (getSimklSession() && sourceMask.simkl) enabled.push({ source: "simkl", fetch: fetchSimklPlaybackItems });
-  if (getTraktSession() && sourceMask.trakt) enabled.push({ source: "trakt", fetch: fetchTraktPlaybackItems });
+  if (getSimklSession() && sourceMask.simkl)
+    enabled.push({ source: "simkl", fetch: fetchSimklPlaybackItems });
+  if (getTraktSession() && sourceMask.trakt)
+    enabled.push({ source: "trakt", fetch: fetchTraktPlaybackItems });
   const results = await Promise.all(
     enabled.map(async ({ fetch }) => {
       try {
@@ -103,7 +105,9 @@ async function runRefresh(gen: number): Promise<boolean> {
   fetchedAt = complete ? Date.now() : 0;
   const succeeded = results.filter((r): r is LibraryItem[] => r !== null);
   if (succeeded.length === 0) return false;
-  const failedSources = new Set(enabled.filter((_, index) => results[index] === null).map(({ source }) => source));
+  const failedSources = new Set(
+    enabled.filter((_, index) => results[index] === null).map(({ source }) => source),
+  );
   const retained = items.filter((i) => i.external && failedSources.has(i.external));
   setItems(merge([...succeeded, retained]));
   if (complete) retryAttempt = 0;
@@ -133,11 +137,13 @@ function scheduleRetry(): void {
 }
 
 function startRefresh(gen: number): Promise<void> {
-  inflight = runRefresh(gen).then((ok) => {
-    if (gen === refreshGen && !ok) scheduleRetry();
-  }).finally(() => {
-    inflight = null;
-  });
+  inflight = runRefresh(gen)
+    .then((ok) => {
+      if (gen === refreshGen && !ok) scheduleRetry();
+    })
+    .finally(() => {
+      inflight = null;
+    });
   return inflight;
 }
 
@@ -171,25 +177,30 @@ export function subscribeExternalCw(fn: () => void): () => void {
   };
 }
 
-function connSignature(): string {
-  const sm = sourceMask.simkl && getSimklSession() ? "s" : "-";
-  const tm = sourceMask.trakt && getTraktSession() ? "t" : "-";
-  return `${sm}${tm}`;
-}
-
-let lastConn = "";
+let lastSimkl = getSimklSession();
+let lastTrakt = getTraktSession();
 
 function onSessionChange(): void {
-  const sig = connSignature();
-  if (sig === lastConn) return;
-  lastConn = sig;
+  const simkl = getSimklSession();
+  const trakt = getTraktSession();
+  if (simkl === lastSimkl && trakt === lastTrakt) return;
+  setItems(
+    items.filter(
+      (i) =>
+        (i.external !== "simkl" || simkl === lastSimkl) &&
+        (i.external !== "trakt" || trakt === lastTrakt),
+    ),
+  );
+  lastSimkl = simkl;
+  lastTrakt = trakt;
   fetchedAt = 0;
   if (!externalCwConnected()) setItems(EMPTY);
   void refreshExternalCw(true);
 }
 
 function onProfileChange(): void {
-  lastConn = "";
+  lastSimkl = getSimklSession();
+  lastTrakt = getTraktSession();
   fetchedAt = 0;
   setItems(EMPTY);
   void refreshExternalCw(true);
@@ -206,7 +217,7 @@ export function useExternalCw(enabled = true): LibraryItem[] {
   const snapshot = useSyncExternalStore(subscribeExternalCw, listExternalCw, listExternalCw);
   useEffect(() => {
     if (!enabled) return;
-    lastConn = connSignature();
+    onSessionChange();
     void refreshExternalCw();
     const onFocus = (): void => {
       if (Date.now() - fetchedAt > FOCUS_STALE_MS) void refreshExternalCw(true);
@@ -219,9 +230,11 @@ export function useExternalCw(enabled = true): LibraryItem[] {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
+    const timer = window.setInterval(onVisible, STALE_MS);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(timer);
     };
   }, [enabled]);
   return enabled ? snapshot : EMPTY;

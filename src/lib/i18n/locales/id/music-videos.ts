@@ -3,6 +3,7 @@ const musicVideos: Record<string, string> = {
   "music.videos.concerts": "Konser",
   "music.videos.youtubeSource": "Dari YouTube",
   "music.videos.title": "Video musik",
+  "music.videos.studios": "Video dari studio",
   "music.videos.source": "Dari YouTube Music",
   "music.videos.search": "Cari video musik",
   "music.videos.loading": "Mencari video musik…",

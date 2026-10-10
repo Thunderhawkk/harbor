@@ -103,7 +103,18 @@ export type PlayerSource = {
   headers?: Record<string, string>;
 };
 
+export type PlayerEmbedRect = {
+  cssLeft: number;
+  cssTop: number;
+  cssWidth: number;
+  cssHeight: number;
+  cssViewW: number;
+  cssViewH: number;
+};
+
 export type PlayerBridge = {
+  /** Commit the matching DOM position only after the native viewport has moved. */
+  moveEmbeddedSurface?: (rect: PlayerEmbedRect, commit: () => void) => boolean;
   attach: (host: HTMLElement) => void;
   detach: () => void;
   load: (src: PlayerSource) => Promise<void>;

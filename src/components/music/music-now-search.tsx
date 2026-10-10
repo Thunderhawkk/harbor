@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Check, Loader2, Play, Plus, Search, X } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
+import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 import { useT } from "@/lib/i18n";
 import { searchTyped } from "@/lib/music/catalog";
 import { enqueueMusic, playMusic } from "@/lib/music/player";
@@ -271,7 +272,7 @@ export function MusicNowSearch({ onClose }: { onClose: () => void }) {
                     ratio="square"
                     className="w-full [--poster-radius:0px]"
                     lazy
-                  />
+                  ><MusicTrackPlaybackMark track={track}/></Poster>
                   <span className="music-now-search-meta">
                     <strong>{track.title}</strong>
                     <span className="music-now-search-sub">

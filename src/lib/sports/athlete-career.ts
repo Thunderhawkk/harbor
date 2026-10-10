@@ -1,5 +1,6 @@
 export type AthleteCareerCategory = {
   name: string;
+  season?: string;
   rowLabel?: string;
   teamLabel?: string;
   labels: string[];
@@ -177,6 +178,96 @@ export function parseCoreAthleteCareer(raw: unknown): AthleteCareerCategory[] {
     .filter((category) => category.name && category.labels.length);
 }
 
+const golfMetrics = [
+  "tournamentsPlayed",
+  "wins",
+  "topTenFinishes",
+  "cutsMade",
+  "roundsPlayed",
+  "scoringAverage",
+  "yardsPerDrive",
+  "driveAccuracyPct",
+  "greensInRegPct",
+  "puttsGirAvg",
+  "birdies",
+  "eagles",
+  "amount",
+  "cupPoints",
+];
+
+function golfRef(value: unknown): string {
+  try {
+    const url = new URL(text(object(value).$ref));
+    if (
+      !["https:", "http:"].includes(url.protocol) ||
+      url.hostname !== "sports.core.api.espn.com" ||
+      url.port || url.username || url.password
+    ) {
+      return "";
+    }
+    return url.pathname;
+  } catch {
+    return "";
+  }
+}
+
+/** Golf's common /stats endpoint fails; its log identifies seasons with published tour stats. */
+export function golfStatSeasons(raw: unknown, tour: string, athleteId: string): string[] {
+  const prefix = `/v2/sports/golf/leagues/${tour}/seasons/`;
+  const seasons = list(object(raw).entries).slice(0, 100).flatMap((entry) => {
+    const item = object(entry),
+      ref = golfRef(item.season);
+    const year = ref.startsWith(prefix) ? ref.slice(prefix.length) : "";
+    if (!/^\d{4}$/.test(year)) return [];
+    const expected = `${prefix}${year}/types/2/athletes/${athleteId}/statistics/0`;
+    return list(item.statistics).some((stat) => golfRef(object(stat).statistics) === expected)
+      ? [year]
+      : [];
+  });
+  return [...new Set(seasons)].sort((a, b) => Number(b) - Number(a));
+}
+
+/** These are season totals, never career totals. ESPN also supplies empty display-only zeroes. */
+export function parseGolfAthleteSeason(
+  raw: unknown,
+  tour: string,
+  athleteId: string,
+  season: string,
+): AthleteCareerCategory[] {
+  const data = object(raw),
+    prefix = `/v2/sports/golf/leagues/${tour}/seasons/${season}`;
+  if (
+    golfRef(data.athlete) !== `${prefix}/athletes/${athleteId}` ||
+    golfRef(data.season) !== prefix ||
+    object(data.splits).type !== "total"
+  ) {
+    return [];
+  }
+  const available = new Map(
+    list(object(data.splits).categories)
+      .slice(0, 20)
+      .flatMap((category) => list(object(category).stats).slice(0, 100))
+      .map(object)
+      .map((stat) => [text(stat.name), stat]),
+  );
+  const stats = golfMetrics.map((name) => available.get(name)).filter((stat): stat is Json => {
+    if (!stat) return false;
+    if (typeof stat.value === "number" && Number.isFinite(stat.value)) return true;
+    const display = text(stat.displayValue);
+    return !!display && !/^(?:0(?:\.0+)?|—|--|-)$/.test(display);
+  });
+  return stats.length
+    ? [{
+        name: "Stats",
+        season,
+        labels: stats.map((stat) => text(stat.abbreviation) || text(stat.name)),
+        descriptions: stats.map((stat) => text(stat.displayName) || text(stat.name)),
+        totals: stats.map((stat) => cell(text(stat.displayValue) || stat.value)),
+        rows: [],
+      }]
+    : [];
+}
+
 type RequestJson = (url: string, signal: AbortSignal) => Promise<unknown>;
 const BASE = "https://site.web.api.espn.com/apis/common/v3/sports";
 const validPath =
@@ -204,7 +295,7 @@ function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 
-/** One bounded request per profile; no season-by-season fan-out. Failures are never cached. */
+/** Bounded requests per profile; golf reads its log then the latest available season. Failures are never cached. */
 export function createAthleteCareerClient(request: RequestJson) {
   const cache = new Map<string, { at: number; data: AthleteCareerCategory[] }>();
   let active = 0;
@@ -247,25 +338,47 @@ export function createAthleteCareerClient(request: RequestJson) {
     if (hit && Date.now() - hit.at < (hit.data.length ? 3_600_000 : 60_000)) return hit.data;
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(9000)]);
     let raw: unknown;
+    let golf: AthleteCareerCategory[] | undefined;
     if (path.startsWith("mma/") && bio) raw = await abortable(bio, deadline);
     else {
       const release = await acquire(deadline);
       try {
         deadline.throwIfAborted();
-        const url = path.startsWith("tennis/")
-          ? `https://sports.core.api.espn.com/v2/sports/tennis/leagues/${path.split("/")[1]}/athletes/${athleteId}/statistics`
-          : `${BASE}/${path}/athletes/${athleteId}${path.startsWith("mma/") ? "" : "/stats"}`;
-        raw = await abortable(request(url, deadline), deadline);
+        if (path.startsWith("golf/")) {
+          const tour = path.split("/")[1];
+          const core = `https://sports.core.api.espn.com/v2/sports/golf/leagues/${tour}`;
+          const log = await abortable(
+            request(`${core}/athletes/${athleteId}/statisticslog`, deadline), deadline,
+          );
+          golf = [];
+          // A listed season can have disappeared or be empty. Try at most three published seasons.
+          for (const season of golfStatSeasons(log, tour, athleteId).slice(0, 3)) {
+            deadline.throwIfAborted();
+            const stats = await abortable(
+              request(`${core}/seasons/${season}/types/2/athletes/${athleteId}/statistics/0`, deadline),
+              deadline,
+            );
+            golf = parseGolfAthleteSeason(stats, tour, athleteId, season);
+            if (golf.length) break;
+          }
+        } else {
+          const url = path.startsWith("tennis/")
+            ? `https://sports.core.api.espn.com/v2/sports/tennis/leagues/${path.split("/")[1]}/athletes/${athleteId}/statistics`
+            : `${BASE}/${path}/athletes/${athleteId}${path.startsWith("mma/") ? "" : "/stats"}`;
+          raw = await abortable(request(url, deadline), deadline);
+        }
       } finally {
         release();
       }
     }
     deadline.throwIfAborted();
-    const data = path.startsWith("mma/")
-      ? parseMmaAthleteCareer(raw, athleteId)
-      : path.startsWith("tennis/")
-        ? parseCoreAthleteCareer(raw)
-        : parseWebAthleteCareer(raw);
+    const data = golf ?? (
+      path.startsWith("mma/")
+        ? parseMmaAthleteCareer(raw, athleteId)
+        : path.startsWith("tennis/")
+          ? parseCoreAthleteCareer(raw)
+          : parseWebAthleteCareer(raw)
+    );
     if (cache.size >= 30) cache.delete(cache.keys().next().value!);
     cache.set(key, { at: Date.now(), data });
     return data;

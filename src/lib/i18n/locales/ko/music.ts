@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "다음 기수",
+  "music.xxl.older": "이전 기수",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -377,6 +379,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "아래 목록에서 저장했거나 최근 재생한 트랙을 추가하세요.",
   "music.library.savedTracks": "저장한 트랙",
   "music.library.readyForPlaylist": "{name}에 추가할 준비됨",
+  "music.library.addTracks": "트랙 추가",
+  "music.library.addTracksCount": "추가할 수 있는 {count}개",
   "music.library.permanent": "영구 컬렉션",
   "music.library.recent": "최근 재생",
   "music.library.newestFirst": "최근 재생순",
@@ -553,6 +557,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "콘텐츠",
   "music.playlistTools.explicit": "명시적 콘텐츠",
   "music.playlistTools.clean": "명시적 콘텐츠 없음",
+  "music.surprise.rate.title": "이 믹스 어떤가요?",
+  "music.surprise.rate.note": "지금까지 {count}곡",
+  "music.surprise.rate.yes": "마음에 들어요",
+  "music.surprise.rate.no": "제 취향이 아니에요",
+  "music.surprise.redirect.title": "대신 무엇을 듣고 싶으세요?",
+  "music.surprise.redirect.note": "방향을 고르면 믹스가 다시 시작됩니다.",
+  "music.surprise.redirect.more": "다른 장르",
+  "music.surprise.back": "뒤로",
   "music.surprise.title": "알아서 재생",
   "music.surprise.stop": "알아서 재생 종료",
   "music.surprise.body": "청취 기록과 플레이리스트를 바탕으로 아직 듣지 않은 곡을 만나보세요.",

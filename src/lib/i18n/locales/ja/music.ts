@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "新しいクラス",
+  "music.xxl.older": "過去のクラス",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -377,6 +379,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "下のリストから保存済みまたは最近再生した曲を追加してください。",
   "music.library.savedTracks": "保存済みの曲",
   "music.library.readyForPlaylist": "{name}に追加できます",
+  "music.library.addTracks": "曲を追加",
+  "music.library.addTracksCount": "追加できる曲 {count}",
   "music.library.permanent": "いつまでも残すコレクション",
   "music.library.recent": "最近再生した曲",
   "music.library.newestFirst": "新しく再生した順",
@@ -556,6 +560,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "内容",
   "music.playlistTools.explicit": "露骨な表現を含む",
   "music.playlistTools.clean": "露骨な表現なし",
+  "music.surprise.rate.title": "このミックスはいかがですか?",
+  "music.surprise.rate.note": "これまで{count}曲",
+  "music.surprise.rate.yes": "気に入った",
+  "music.surprise.rate.no": "好みではない",
+  "music.surprise.redirect.title": "かわりに何を聴きたいですか?",
+  "music.surprise.redirect.note": "方向を選ぶとミックスが始まり直します。",
+  "music.surprise.redirect.more": "他のジャンル",
+  "music.surprise.back": "戻る",
   "music.surprise.title": "おまかせ再生",
   "music.surprise.stop": "おまかせ再生を終了",
   "music.surprise.body": "再生履歴やプレイリストをもとに、まだ聴いたことのない曲を。",

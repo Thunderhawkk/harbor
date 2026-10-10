@@ -3,7 +3,13 @@ import { fetchEpisodeList, nextUnwatchedAfter } from "@/lib/series-episodes";
 import type { Meta } from "@/lib/cinemeta";
 import type { PlayEpisode } from "@/lib/view";
 import { getEpisodeProgress } from "@/lib/episode-progress";
-import { loadSimklProgress, simklWatchedForId, statusForId, type SimklProgress, type WatchlistStatus } from "@/lib/simkl/list-status";
+import {
+  loadSimklProgress,
+  simklWatchedForId,
+  statusForId,
+  type SimklProgress,
+  type WatchlistStatus,
+} from "@/lib/simkl/list-status";
 import { getSession as getSimklSession, subscribeSession } from "@/lib/simkl/session";
 import { manualWatchedState } from "@/lib/manual-watched";
 import {
@@ -52,6 +58,11 @@ function currentEpisode(i: LibraryItem): { season: number; episode: number } | n
   const season = i.state?.season;
   const episode = i.state?.episode;
   if (season && episode) return { season, episode };
+  const videoId = i.state?.video_id ?? "";
+  if (ANIME_ID.test(i._id) && videoId.split(":").length === 3) {
+    const number = Number(videoId.split(":")[2]);
+    return Number.isInteger(number) && number > 0 ? { season: 1, episode: number } : null;
+  }
   return episodeFromVideoId(i.state?.video_id ?? "");
 }
 
@@ -176,12 +187,17 @@ export function useCwAdvance(
   const { activeProfile, profiles } = useProfiles();
   const privacyOwner =
     settings.cwPerProfile && anyProfileSharesStremioWith(activeProfile, profiles)
-      ? activeProfile?.id ?? null
+      ? (activeProfile?.id ?? null)
       : null;
   const simklSession = useSyncExternalStore(subscribeSession, getSimklSession, getSimklSession);
   const simklEnabled = settings.cwSources.simkl;
   const profileId = activeProfile?.id ?? null;
-  const [resolvedOwner, setResolvedOwner] = useState({ privacyOwner, profileId, simklSession, simklEnabled });
+  const [resolvedOwner, setResolvedOwner] = useState({
+    privacyOwner,
+    profileId,
+    simklSession,
+    simklEnabled,
+  });
   const [advanced, setAdvanced] = useState<Map<string, LibraryItem>>(new Map());
   const [extra, setExtra] = useState<LibraryItem[]>([]);
   const [removed, setRemoved] = useState<Set<string>>(new Set());
@@ -193,22 +209,63 @@ export function useCwAdvance(
     session: typeof simklSession;
     data: SimklProgress;
   } | null>(null);
-  const simkl = !privacyOwner && simklEnabled && simklSession &&
-    remoteProgress?.profileId === profileId && remoteProgress.session === simklSession
-    ? remoteProgress.data : null;
+  const simkl =
+    !privacyOwner &&
+    simklEnabled &&
+    simklSession &&
+    remoteProgress?.profileId === profileId &&
+    remoteProgress.session === simklSession
+      ? remoteProgress.data
+      : null;
 
   // A slow provider must not hold up local completion. Refresh in the background;
   // the shared activity gate/cache coalesces readers across retained pages.
   useEffect(() => {
     if (!enabled || privacyOwner || !simklEnabled || !simklSession) return;
     let cancelled = false;
-    void loadSimklProgress().then((data) => {
-      if (!cancelled) setRemoteProgress((prev) => prev?.profileId === profileId &&
-        prev.session === simklSession && prev.data === data ? prev : { profileId, session: simklSession, data });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [enabled, privacyOwner, profileId, simklEnabled, simklSession, items, library, watchedVersion,
-    simklWatched, simklStatus, airTick]);
+    let refreshing = false;
+    const refresh = () => {
+      if (refreshing || document.visibilityState === "hidden") return;
+      refreshing = true;
+      void loadSimklProgress()
+        .then((data) => {
+          if (!cancelled)
+            setRemoteProgress((prev) =>
+              prev?.profileId === profileId && prev.session === simklSession && prev.data === data
+                ? prev
+                : { profileId, session: simklSession, data },
+            );
+        })
+        .catch(() => {})
+        .finally(() => {
+          refreshing = false;
+        });
+    };
+    refresh();
+    // Completed sessions disappear from /playback, so an unchanged empty playback
+    // list must still discover progress made in another app.
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [
+    enabled,
+    privacyOwner,
+    profileId,
+    simklEnabled,
+    simklSession,
+    items,
+    library,
+    watchedVersion,
+    simklWatched,
+    simklStatus,
+    airTick,
+  ]);
 
   useEffect(() => {
     if (!enabled) {
@@ -233,16 +290,28 @@ export function useCwAdvance(
         // Imported resume timestamps record fetch time, not playback time. Only
         // locally played progress can overrule the provider's pause/completion dates.
         const mtime: unknown = i._mtime;
-        const stamps = [Date.parse(i.state?.lastWatched ?? ""),
-          typeof mtime === "number" ? mtime : Date.parse(String(mtime))];
+        const stamps = [
+          Date.parse(i.state?.lastWatched ?? ""),
+          typeof mtime === "number" ? mtime : Date.parse(String(mtime)),
+        ];
         if (resume && !resume.source) stamps.push(resume.t);
         if (lastPlayed && !lastPlayed.source) stamps.push(lastPlayed.t);
         const activity = Math.max(0, ...stamps.filter(Number.isFinite));
-        return at >= activity && watchedPredicate(i, cur, traktWatched,
-          effectiveSimklWatched, anilistWatched, effectiveSimklStatus)(cur.season, cur.episode);
+        return (
+          at >= activity &&
+          watchedPredicate(
+            i,
+            cur,
+            traktWatched,
+            effectiveSimklWatched,
+            anilistWatched,
+            effectiveSimklStatus,
+          )(cur.season, cur.episode)
+        );
       };
-      const candidates = items.filter((i) => currentEpisode(i) != null &&
-        (isFinishedSeries(i) || completedRemotely(i)));
+      const candidates = items.filter(
+        (i) => currentEpisode(i) != null && (isFinishedSeries(i) || completedRemotely(i)),
+      );
       const next = new Map<string, LibraryItem>();
       const remove = new Set<string>();
       for (const i of candidates) {
@@ -335,9 +404,7 @@ export function useCwAdvance(
             if (privacyOwner) return false;
             if (checkWatched(s, e)) return true;
             if (!scoped) return false;
-            return providerAliasCoords(list, s, e).some(
-              (a) => checkWatched(a.season, a.episode),
-            );
+            return providerAliasCoords(list, s, e).some((a) => checkWatched(a.season, a.episode));
           },
           episodeHiding ? (s, e) => isEpisodeHidden(i._id, s, e) : undefined,
         );
@@ -366,13 +433,22 @@ export function useCwAdvance(
             nextAirDate: nextEp.airDate,
           } as LibraryItem);
         } else if (
-          shouldDropFinished(list, fetchOk, completedRemotely(i) ? undefined : i.state,
-            animeMode, effCur, nextEp, hideCaughtUp)
+          shouldDropFinished(
+            list,
+            fetchOk,
+            completedRemotely(i) ? undefined : i.state,
+            animeMode,
+            effCur,
+            nextEp,
+            hideCaughtUp,
+          )
         ) {
           remove.add(i._id);
         }
       }
-      const baseLibrary = privacyOwner ? listLocalCw(true).map(localToLibraryItem) : library ?? items;
+      const baseLibrary = privacyOwner
+        ? listLocalCw(true).map(localToLibraryItem)
+        : (library ?? items);
       // Playback endpoints remove finished sessions. Keep recent completion anchors
       // available to the existing aired-episode resurfacing path, without saving fake progress.
       const libById = new Map(baseLibrary.map((i) => [i._id, i]));
@@ -385,17 +461,24 @@ export function useCwAdvance(
         .slice(0, 40);
       for (const remote of remoteSeries) {
         const times = simkl!.watchedAt.get(remote._id);
-        const existing = baseLibrary.find((i) => i._id === remote._id ||
-          (times && simkl!.watchedAt.get(i._id) === times));
+        const existing = baseLibrary.find(
+          (i) => i._id === remote._id || (times && simkl!.watchedAt.get(i._id) === times),
+        );
         if (existing) {
           // A removed title, a newer local watch, or an active pause owns its slot.
           // Only replace an older inactive anchor, preserving its identity and art.
-          if ((existing.removed && !existing.temp) || isCwMember(existing) ||
-            Date.parse(existing.state?.lastWatched ?? existing._mtime) > Date.parse(remote._mtime)) continue;
+          if (
+            (existing.removed && !existing.temp) ||
+            isCwMember(existing) ||
+            Date.parse(existing.state?.lastWatched ?? existing._mtime) > Date.parse(remote._mtime)
+          )
+            continue;
           const cur = currentEpisode(remote)!;
           if (manualWatchedState(existing._id, cur.season, cur.episode) === false) continue;
-          libById.set(existing._id, { ...existing, state: { ...remote.state!,
-            video_id: `${existing._id}:${cur.season}:${cur.episode}` } });
+          libById.set(existing._id, {
+            ...existing,
+            state: { ...remote.state!, video_id: `${existing._id}:${cur.season}:${cur.episode}` },
+          });
         } else {
           libById.set(remote._id, remote);
         }
@@ -403,8 +486,15 @@ export function useCwAdvance(
       const lib = [...libById.values()];
       const inCw = new Set(items.map((i) => i._id));
       const watchedFor = (item: LibraryItem, c: { season: number; episode: number }) =>
-        watchedPredicate(item, c, traktWatched, effectiveSimklWatched, anilistWatched,
-          effectiveSimklStatus, !!privacyOwner);
+        watchedPredicate(
+          item,
+          c,
+          traktWatched,
+          effectiveSimklWatched,
+          anilistWatched,
+          effectiveSimklStatus,
+          !!privacyOwner,
+        );
       const resurfaced = await resurfaceCandidates(
         lib,
         inCw,
@@ -482,8 +572,13 @@ export function useCwAdvance(
     simkl,
   ]);
 
-  if (!enabled || resolvedOwner.privacyOwner !== privacyOwner || resolvedOwner.profileId !== profileId ||
-    resolvedOwner.simklSession !== simklSession || resolvedOwner.simklEnabled !== simklEnabled)
+  if (
+    !enabled ||
+    resolvedOwner.privacyOwner !== privacyOwner ||
+    resolvedOwner.profileId !== profileId ||
+    resolvedOwner.simklSession !== simklSession ||
+    resolvedOwner.simklEnabled !== simklEnabled
+  )
     return items.filter((i) => !isCwDismissed(i));
   // Dismissal targets the displayed up-next episode, which may differ from the
   // library entry. Filter stored display results immediately, without refetching.

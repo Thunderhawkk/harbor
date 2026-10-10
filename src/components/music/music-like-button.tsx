@@ -19,6 +19,7 @@ export function MusicLikeButton({ liked, onToggle, className, size, dock = false
   useEffect(() => { if (!liked) setBurst(0); }, [liked]);
   return <button type="button" className={className} data-like-burst
     data-music-dock-like={dock || undefined} data-burst={liked && burst || undefined}
+    data-music-tooltip={dock ? "" : undefined}
     aria-pressed={liked} aria-label={t(liked ? "music.unsaveTrack" : "music.saveTrack")}
     onClick={() => { setBurst(liked ? 0 : ++sequence.current); onToggle(); }}>
     <MusicGlyph key={`heart:${liked ? burst : 0}`} name={liked ? "heart-filled" : "heart"} size={size} aria-hidden="true" />

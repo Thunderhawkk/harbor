@@ -863,7 +863,7 @@ const misc: Record<string, string> = {
     "Sua biblioteca do Stremio + addons sincronizam sem alterações.",
   "No telemetry, no servers, no bundled keys.":
     "Sem telemetria, sem servidores, sem chaves embutidas.",
-  "For watching things": "Para assistir coisas",
+  "Built for Adventure!": "Feito para a aventura!",
   "Harbor curated": "Curadoria do Harbor",
   "Hero, Top 10, Trending, In Theaters, per-service rails. Your addons append underneath.":
     "Destaque, Top 10, Em alta, Nos cinemas, faixas por serviço. Seus addons aparecem abaixo.",

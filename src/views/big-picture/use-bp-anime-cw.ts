@@ -5,7 +5,7 @@ import type { AddonRow } from "@/lib/addons";
 import { loadAnimeAddonRows } from "@/lib/addons-anime-filter";
 import { absorbCloudAnimeCw } from "@/lib/anime-cw-absorb";
 import { detectAnimeForCw, useDetectedAnimeVersion } from "@/lib/anime-detect";
-import { useExternalCw } from "@/lib/feed/external-cw";
+import { setExternalCwSources, useExternalCw } from "@/lib/feed/external-cw";
 import { isCwDismissed, useCwDismissVersion } from "@/lib/cw-dismiss";
 import { franchiseRoot, franchiseRootSync } from "@/lib/providers/anime-franchise-root";
 import { publishResumeStates } from "@/lib/hover-preview/store";
@@ -17,8 +17,6 @@ import {
   subscribeManualWatched,
 } from "@/lib/manual-watched";
 import { useSettings } from "@/lib/settings";
-import { fetchSimklPlaybackItems } from "@/lib/simkl/playback";
-import { useSimkl } from "@/lib/simkl/provider";
 import {
   ANIME_CLOUD_ID,
   isAnimeCwItem,
@@ -44,8 +42,9 @@ export type BpAnimeCwBase = {
   ready: boolean;
 };
 
-function localItems(privateOnly: boolean): LibraryItem[] {
+function localItems(privateOnly: boolean, sources: { library: boolean; local: boolean }): LibraryItem[] {
   return listLocalCw(privateOnly)
+    .filter((e) => e.source === "library" ? sources.library : sources.local)
     .filter((e) => ANIME_CLOUD_ID.test(e.id) || e.isAnime)
     .map((e) => ({
       _id: e.id,
@@ -77,14 +76,16 @@ export function useBpAnimeCwBase(): BpAnimeCwBase {
   const { activeProfile, profiles } = useProfiles();
   const hideSharedCw =
     settings.cwPerProfile && anyProfileSharesStremioWith(activeProfile, profiles);
-  const { isConnected: simklConnected } = useSimkl();
   const cwVersion = useCwDismissVersion();
   const animeDetectVer = useDetectedAnimeVersion();
-  const trackerCw = useExternalCw(!hideSharedCw && settings.cwSources.trakt);
+  const { cwSources } = settings;
+  useEffect(() => {
+    setExternalCwSources({ trakt: cwSources.trakt, simkl: cwSources.simkl });
+  }, [cwSources.trakt, cwSources.simkl]);
+  const trackerCw = useExternalCw(!hideSharedCw && (cwSources.trakt || cwSources.simkl));
   const localCwVer = useSyncExternalStore(subscribeLocalCw, localCwVersion);
   const manualWatchedVer = useSyncExternalStore(subscribeManualWatched, manualWatchedVersion);
   const [libItems, setLibItems] = useState<LibraryItem[]>([]);
-  const [simklCw, setSimklCw] = useState<LibraryItem[]>([]);
   const [addonRows, setAddonRows] = useState<AddonRow[]>([]);
   const [rootVersion, setRootVersion] = useState(0);
 
@@ -120,35 +121,24 @@ export function useBpAnimeCwBase(): BpAnimeCwBase {
     return loadAnimeAddonRows(authKey, setAddonRows);
   }, [authKey]);
 
-  useEffect(() => {
-    if (!simklConnected) {
-      setSimklCw([]);
-      return;
-    }
-    let cancelled = false;
-    fetchSimklPlaybackItems()
-      .then((cw) => {
-        if (!cancelled) setSimklCw(cw.filter(isAnimeCwItem));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [simklConnected]);
-
   const localAnimeCw = useMemo<LibraryItem[]>(() => {
     void localCwVer;
-    return localItems(hideSharedCw);
-  }, [localCwVer, hideSharedCw, activeProfile?.id]);
+    return localItems(hideSharedCw, cwSources);
+  }, [localCwVer, hideSharedCw, activeProfile?.id, cwSources]);
 
   const pool = useMemo(
     () => [
       ...localAnimeCw,
-      ...(hideSharedCw ? [] : libItems.filter((i) => !ANIME_CLOUD_ID.test(i._id))),
-      ...(hideSharedCw ? [] : simklCw),
-      ...(hideSharedCw ? [] : trackerCw.filter((i) => i.external === "trakt")),
+      ...(hideSharedCw || !cwSources.library
+        ? []
+        : libItems.filter((i) => !ANIME_CLOUD_ID.test(i._id))),
+      ...(hideSharedCw
+        ? []
+        : trackerCw.filter((i) =>
+            i.external === "trakt" ? cwSources.trakt : i.external === "simkl" && cwSources.simkl,
+          )),
     ],
-    [localAnimeCw, libItems, simklCw, trackerCw, hideSharedCw],
+    [localAnimeCw, libItems, trackerCw, hideSharedCw, cwSources],
   );
 
   const raw = useMemo(() => {

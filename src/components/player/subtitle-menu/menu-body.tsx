@@ -158,7 +158,7 @@ export function MenuBody(props: SubtitleMenuProps & { onClose: () => void }) {
     <div className="flex h-full flex-col overflow-hidden">
       <MenuHeader
         engine={props.engine ?? "html5"}
-        count={languageTracks.length}
+        count={visibleVariants.length}
         selectedTrack={selectedTrack}
         hasSecondary={secondaryTrack != null}
         delaySec={delaySec}

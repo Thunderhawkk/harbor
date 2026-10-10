@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "دفعة أحدث",
+  "music.xxl.older": "دفعة أقدم",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -376,6 +378,8 @@ const music: Record<string, string> = {
   "music.library.playlistEmpty": "أضف مقطعًا محفوظًا أو حديثًا من القوائم أدناه.",
   "music.library.savedTracks": "المقاطع المحفوظة",
   "music.library.readyForPlaylist": "جاهز للإضافة إلى {name}",
+  "music.library.addTracks": "إضافة مقاطع",
+  "music.library.addTracksCount": "{count} جاهزة للإضافة",
   "music.library.permanent": "مجموعتك الدائمة",
   "music.library.recent": "شُغّل مؤخرًا",
   "music.library.newestFirst": "الأحدث تشغيلًا أولًا",
@@ -553,6 +557,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "المحتوى",
   "music.playlistTools.explicit": "محتوى صريح",
   "music.playlistTools.clean": "بدون محتوى صريح",
+  "music.surprise.rate.title": "كيف تجد هذا المزيج؟",
+  "music.surprise.rate.note": "{count} أغنية حتى الآن",
+  "music.surprise.rate.yes": "يعجبني",
+  "music.surprise.rate.no": "ليس مناسبًا لي",
+  "music.surprise.redirect.title": "ماذا تفضل أن تسمع بدلًا منه؟",
+  "music.surprise.redirect.note": "اختر اتجاهًا وسيبدأ المزيج من جديد.",
+  "music.surprise.redirect.more": "مزيد من الأنواع",
+  "music.surprise.back": "رجوع",
   "music.surprise.title": "فاجئني",
   "music.surprise.stop": "إيقاف فاجئني",
   "music.surprise.body": "أغانٍ جديدة عليك، مستوحاة مما تستمع إليه وقوائم تشغيلك.",

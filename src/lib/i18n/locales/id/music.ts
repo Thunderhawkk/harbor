@@ -15,6 +15,8 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.xxl.newer": "Angkatan lebih baru",
+  "music.xxl.older": "Angkatan lebih lama",
   ...musicMiku,
   ...musicGif,
   ...musicListeningLab,
@@ -378,6 +380,8 @@ const music: Record<string, string> = {
     "Tambahkan lagu tersimpan atau yang baru diputar dari daftar di bawah.",
   "music.library.savedTracks": "Lagu tersimpan",
   "music.library.readyForPlaylist": "Siap ditambahkan ke {name}",
+  "music.library.addTracks": "Tambahkan lagu",
+  "music.library.addTracksCount": "{count} siap ditambahkan",
   "music.library.permanent": "Koleksi tetap Anda",
   "music.library.recent": "Baru diputar",
   "music.library.newestFirst": "Putaran terbaru lebih dulu",
@@ -557,6 +561,14 @@ const music: Record<string, string> = {
   "music.playlistTools.content": "Konten",
   "music.playlistTools.explicit": "Eksplisit",
   "music.playlistTools.clean": "Tanpa konten eksplisit",
+  "music.surprise.rate.title": "Bagaimana campuran ini?",
+  "music.surprise.rate.note": "{count} lagu sejauh ini",
+  "music.surprise.rate.yes": "Suka banget",
+  "music.surprise.rate.no": "Bukan selera saya",
+  "music.surprise.redirect.title": "Kamu lebih suka mendengar apa?",
+  "music.surprise.redirect.note": "Pilih arah dan campuran dimulai lagi.",
+  "music.surprise.redirect.more": "Genre lainnya",
+  "music.surprise.back": "Kembali",
   "music.surprise.title": "Kejutkan saya",
   "music.surprise.stop": "Hentikan Kejutkan saya",
   "music.surprise.body": "Lagu yang belum kamu dengar, berdasarkan kebiasaan mendengar dan playlistmu.",

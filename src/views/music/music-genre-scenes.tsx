@@ -1,3 +1,4 @@
+import { musicGenreName } from "@/lib/music/genre-catalog";
 import { Row } from "@/components/row";
 import { MusicDiscoveryIcon } from "@/components/music/music-discovery-icon";
 import { useT } from "@/lib/i18n";
@@ -18,7 +19,7 @@ export function MusicGenreScenes({ genre, onSelect }: {
     {scenes.map(scene => <button key={scene.id} type="button" className="music-genre-scene-card" onClick={() => onSelect(scene)}>
       <img src={MUSIC_GENRE_ARTWORK[scene.id]} alt="" loading="lazy"/>
       <MusicDiscoveryIcon genreId={scene.id}/>
-      <strong>{scene.name}</strong>
+      <strong>{musicGenreName(scene, t)}</strong>
     </button>)}
   </Row>;
 }

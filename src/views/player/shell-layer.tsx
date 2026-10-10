@@ -10,6 +10,7 @@ import type { useVideoDownload } from "./hooks/use-video-download";
 export const ShellLayer = memo(function ShellLayer({
   shellId,
   shellSnap,
+  isLive,
   snapRef,
   bridgeRef,
   engine,
@@ -67,6 +68,7 @@ export const ShellLayer = memo(function ShellLayer({
 }: {
   shellId: string;
   shellSnap: PlayerSnapshot;
+  isLive?: boolean;
   snapRef: RefObject<PlayerSnapshot>;
   bridgeRef: RefObject<PlayerBridge | null>;
   engine: "html5" | "mpv";
@@ -126,6 +128,7 @@ export const ShellLayer = memo(function ShellLayer({
   return (
     <ActiveShell
       snap={shellSnap}
+      isLive={isLive}
       engine={engine}
       useOverlayPopups={false}
       onMenuOpenChange={onMenuOpenChange}

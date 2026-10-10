@@ -22,6 +22,8 @@ export function legacySingleArtist(context: Pick<MusicRecentContext, "id" | "see
 
 export function musicRecentContextIdentity(context: Pick<MusicRecentContext, "kind" | "id" | "seed">): string {
   if (context.kind === "similar") {
+    const personalGenre = /^mix:personal:v2:([a-z0-9]+):\d{4}-\d{2}-\d{2}:genre:(\d+)$/.exec(context.id);
+    if (personalGenre) return `genre-mix:${personalGenre[1]}:${personalGenre[2]}`;
     const personal = /^mix:personal:v2:([a-z0-9]+):\d{4}-\d{2}-\d{2}:([a-z0-9]+)(:artist)?$/.exec(context.id);
     if (personal) return personal[3] && context.seed ? `artist-mix:${artistIdentityKey(context.seed.collectionOrigin?.artist || context.seed.artist)}` : `daily-mix:${personal[1]}:${personal[2]}`;
     const genre = /^mix:discovery:v1:\d{4}-\d{2}-\d{2}:(\d+):/.exec(context.id)?.[1]

@@ -1,6 +1,4 @@
-import { safeFetch } from "@/lib/safe-fetch";
-
-const JIKAN = "https://api.jikan.moe/v4";
+import { animeCatalogRequest } from "./providers/anime-catalog-client";
 const CACHE_KEY = "harbor.mal.hero.v1";
 const TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -31,9 +29,7 @@ function cleanSynopsis(s?: string): string | undefined {
 
 async function jikanPage(filter: string, page: number): Promise<Array<Record<string, unknown>>> {
   try {
-    const res = await safeFetch(`${JIKAN}/top/anime?filter=${filter}&page=${page}&sfw=true`);
-    if (!res.ok) return [];
-    const j = (await res.json()) as { data?: Array<Record<string, unknown>> };
+    const j = await animeCatalogRequest<Array<Record<string, unknown>>>(`/top/anime?filter=${filter}&page=${page}&limit=25&sfw=true`);
     return j?.data ?? [];
   } catch {
     return [];

@@ -1,4 +1,5 @@
 export default {
+  "No videos found.": "未找到视频。",
   "sports.guide.athletes": "运动员",
   "sports.guide.athlete": "运动员",
   "sports.guide.athleteCount": "{n} 位运动员",

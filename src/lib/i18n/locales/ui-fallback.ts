@@ -1,5 +1,20 @@
 // Newly introduced UI copy remains usable until each locale provides an override.
 const uiFallback: Record<string, string> = {
+  "Big Picture display": "Big Picture display",
+  "Which monitor Big Picture opens on at startup.":
+    "Which monitor Big Picture opens on at startup.",
+  "Separate window display": "Separate window display",
+  "Which monitor the separate mpv window opens on. Harbor's own window stays where it is.":
+    "Which monitor the separate mpv window opens on. Harbor's own window stays where it is.",
+  "Cover the taskbar": "Cover the taskbar",
+  "Span the whole screen including the taskbar. Turn off to keep the taskbar visible on that monitor.":
+    "Span the whole screen including the taskbar. Turn off to keep the taskbar visible on that monitor.",
+  "True HDR, separate window is selected. That mode always plays in its own window, so mpv cannot be embedded. Choose a different HDR mode to change this.":
+    "True HDR, separate window is selected. That mode always plays in its own window, so mpv cannot be embedded. Choose a different HDR mode to change this.",
+  "Follow Harbor": "Follow Harbor",
+  "Open on the same monitor as Harbor": "Open on the same monitor as Harbor",
+  "Open on {name}": "Open on {name}",
+  Primary: "Primary",
   "A source couldn't be reached": "A source couldn't be reached",
   "{n} sources couldn't be reached": "{n} sources couldn't be reached",
   "blocked by the network policy": "blocked by the network policy",
@@ -11,7 +26,7 @@ const uiFallback: Record<string, string> = {
   "Refresh subtitle": "Refresh subtitle",
   "Translating… try again in a minute": "Translating… try again in a minute",
   "Translating… we'll add it when it's ready": "Translating… we'll add it when it's ready",
-  "Translations": "Translations",
+  Translations: "Translations",
   "Showing {lang}": "Showing {lang}",
   "Sends HDR to the display through macOS EDR instead of mapping it down to SDR. Needs HDR-to-SDR tonemapping off, mpv embedded, and a display with HDR headroom. Takes effect on the next video. Experimental: color can look flat, and an SDR video after an HDR one may need a window resize.":
     "Sends HDR to the display through macOS EDR instead of mapping it down to SDR. Needs HDR-to-SDR tonemapping off, mpv embedded, and a display with HDR headroom. Takes effect on the next video. Experimental: color can look flat, and an SDR video after an HDR one may need a window resize.",

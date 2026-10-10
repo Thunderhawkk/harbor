@@ -55,7 +55,7 @@ export function MusicDockOverflow({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t("music.card.moreActions", { title })}
-        title={t("music.card.moreActions", { title })}
+        data-music-tooltip=""
         className={className}
       >
         <MusicGlyph name="more" size={18} aria-hidden="true" />

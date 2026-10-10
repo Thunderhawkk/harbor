@@ -19,8 +19,8 @@ import { useView, type PlayerSrc } from "@/lib/view";
 import { openUrl } from "@/lib/window";
 import {
   esportsChatPopoutUrl,
-  esportsEmbedUrl,
   esportsExternalUrl,
+  esportsPlayback,
   type EsportsStream,
 } from "@/lib/sports/esports-streams";
 import { broadcastPipSession } from "@/lib/sports/broadcast-pip";
@@ -79,13 +79,14 @@ function BroadcastPlayer({
   const [minimized, setMinimized] = useState(false);
   const [loaded, setLoaded] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const [windowFailed, setWindowFailed] = useState(false);
   const [openingPip, setOpeningPip] = useState(false);
   const [pipFailed, setPipFailed] = useState(false);
   const [chatFailed, setChatFailed] = useState(false);
   const openingPipRef = useRef(false);
   const docked = src.sportsDocked !== false;
-  const rawEmbed = esportsEmbedUrl(stream, window.location.hostname);
+  const playback = esportsPlayback(stream, window.location.hostname);
+  const rawEmbed = playback?.mode === "iframe" ? playback.url : null;
   const embed =
     detached && rawEmbed
       ? rawEmbed.replace(
@@ -93,14 +94,10 @@ function BroadcastPlayer({
           stream.platform === "youtube" ? "autoplay=1" : "autoplay=true",
         )
       : rawEmbed;
+  // Twitch refuses an iframe at Harbor's packaged origin, so the channel plays top-level.
+  const windowUrl = playback?.mode === "window" ? playback.url : null;
   const external = esportsExternalUrl(stream.url);
   const chatPopoutUrl = esportsChatPopoutUrl(stream);
-  const channel =
-    stream.platform === "twitch" && embed ? new URL(embed).searchParams.get("channel") : null;
-  const chatUrl = channel
-    ? `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?${new URLSearchParams({ parent: window.location.hostname, darkpopout: "" })}`
-    : null;
-  const chatVisible = !!chatUrl && showChat && (!docked || isFullscreen);
   const drag = useDockDrag(root, docked && !detached && !isFullscreen);
   useEffect(() => setMinimized(false), [stream.url]);
   useEffect(() => {
@@ -140,6 +137,22 @@ function BroadcastPlayer({
     void leaveFullscreen();
     exitPlayback();
   }, [exitPlayback, leaveFullscreen]);
+  const openWindow = useCallback(async (url: string) => {
+    setWindowFailed(false);
+    try {
+      if ("__TAURI_INTERNALS__" in window) await invoke("browser_open", { url });
+      else openUrl(url);
+    } catch {
+      setWindowFailed(true);
+    }
+  }, []);
+  const openedRef = useRef("");
+  useEffect(() => {
+    // Mounting this player is the watch intent, so the channel opens once per selection.
+    if (!windowUrl || openedRef.current === windowUrl) return;
+    openedRef.current = windowUrl;
+    void openWindow(windowUrl);
+  }, [windowUrl, openWindow]);
   useEffect(() => {
     const back = (event: Event) => {
       event.preventDefault();
@@ -254,7 +267,7 @@ function BroadcastPlayer({
           <X size={18} />
         </button>
       </header>
-      <div className="sports-embed-body" data-chat={chatVisible}>
+      <div className="sports-embed-body">
         <div
           ref={stage}
           className="sports-embed-stage"
@@ -287,6 +300,19 @@ function BroadcastPlayer({
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             </>
+          ) : windowUrl ? (
+            <div className="sports-embed-unavailable">
+              <p>{t("Watch on the official channel")}</p>
+              <button
+                type="button"
+                style={{ alignSelf: "center" }}
+                onClick={() => void openWindow(windowUrl)}
+              >
+                <ExternalLink size={15} />
+                <span>{t("Open broadcast")}</span>
+              </button>
+              {windowFailed && <span role="alert">{t("Try again")}</span>}
+            </div>
           ) : (
             <div className="sports-embed-unavailable">
               <p>{t("Watch on the official channel")}</p>
@@ -294,19 +320,9 @@ function BroadcastPlayer({
             </div>
           )}
         </div>
-        {chatVisible && (
-          <aside className="sports-embed-chat" aria-label={t("Chat")}>
-            <iframe
-              key={chatUrl}
-              title={`Twitch · ${t("Chat")}`}
-              src={chatUrl!}
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          </aside>
-        )}
       </div>
       <footer>
-        {external && (
+        {external && !windowUrl && (
           <button type="button" onClick={() => openUrl(external)} title={t("Open broadcast")}>
             <ExternalLink size={15} />
             <span>{t("Open broadcast")}</span>
@@ -338,24 +354,6 @@ function BroadcastPlayer({
           </button>
         )}
         {chatFailed && <span role="alert">{t("Try again")}</span>}
-        {chatUrl && (
-          <button
-            type="button"
-            aria-label={t("Chat")}
-            title={t("Chat")}
-            aria-pressed={chatVisible}
-            onClick={() => {
-              setShowChat(!chatVisible);
-              if (!chatVisible && docked && !isFullscreen) {
-                setMinimized(false);
-                replacePlayerSrc({ ...src, sportsDocked: false });
-              }
-            }}
-          >
-            <MessageSquare size={17} />
-            <span>{t("Chat")}</span>
-          </button>
-        )}
         {!detached && embed && "__TAURI_INTERNALS__" in window && (
           <button
             type="button"
@@ -381,17 +379,19 @@ function BroadcastPlayer({
             <Maximize2 size={17} />
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            if (isFullscreen) void leaveFullscreen();
-            else fullscreen();
-          }}
-          aria-label={t(isFullscreen ? "Exit fullscreen" : "Fullscreen")}
-          title={t(isFullscreen ? "Exit fullscreen" : "Fullscreen")}
-        >
-          {isFullscreen ? <Shrink size={17} /> : <Expand size={17} />}
-        </button>
+        {!windowUrl && (
+          <button
+            type="button"
+            onClick={() => {
+              if (isFullscreen) void leaveFullscreen();
+              else fullscreen();
+            }}
+            aria-label={t(isFullscreen ? "Exit fullscreen" : "Fullscreen")}
+            title={t(isFullscreen ? "Exit fullscreen" : "Fullscreen")}
+          >
+            {isFullscreen ? <Shrink size={17} /> : <Expand size={17} />}
+          </button>
+        )}
       </footer>
     </section>,
     document.body,

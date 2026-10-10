@@ -12,8 +12,21 @@
 .music-dock-device {
   filter: brightness(1.6);
 }
+/* One contrast-safe reading of the album colour, shared by every surface that tints.
+   Raw cover colours are unusable directly: some albums are near-white, some near-black.
+   Pinning lightness per scheme and clamping chroma keeps the hue while guaranteeing the
+   result reads on both cream and charcoal. --music-art-wash is the same hue as a surface.
+   light-dark() needs color-scheme, which applyTheme sets from the theme mode. */
+[data-art-colors] {
+  --music-art-tone: light-dark(
+    oklch(from var(--music-art-accent) 0.46 clamp(0.05, c, 0.17) h),
+    oklch(from var(--music-art-accent) 0.78 clamp(0.05, c, 0.15) h)
+  );
+  --music-art-wash: color-mix(in srgb, var(--music-art-tone) 12%, var(--color-canvas));
+}
+
 [data-music-dock][data-art-colors]:not([data-music-dock-tab]) {
-  background: color-mix(in srgb, var(--music-art-accent) 8%, var(--color-canvas));
+  background: var(--music-art-wash);
 }
 [data-art-colors] .music-dock-play {
   background: var(--music-art-accent);
@@ -22,7 +35,7 @@
 /* Seek visibility must not depend on the artwork palette. Theme ink supplies a
    contrast floor for both dark covers and light themes. */
 [data-art-colors] .music-dock-seek-track > span {
-  background: color-mix(in srgb, var(--music-art-accent) 40%, var(--color-ink));
+  background: color-mix(in srgb, var(--music-art-tone) 55%, var(--color-ink));
 }
 [data-art-colors] .music-dock-seek-track > .music-dock-seek-thumb {
   background: var(--color-ink);
@@ -31,10 +44,10 @@
    as a clash against a blue or green cover, so hover deepens toward the album
    colour instead, keeping the ink floor that guarantees contrast. */
 [data-art-colors] .music-dock-seek:is(:hover, :focus-within, [data-dragging]) .music-dock-seek-fill {
-  background: color-mix(in srgb, var(--music-art-accent) 75%, var(--color-ink));
+  background: var(--music-art-tone);
 }
 [data-art-colors] .music-dock-volume:is(:hover, :focus-within) {
-  --dock-vol-fill: color-mix(in srgb, var(--music-art-accent) 75%, var(--color-ink));
+  --dock-vol-fill: var(--music-art-tone);
 }
 .music-dock-seek {
   position: absolute;
@@ -95,7 +108,8 @@
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
-.music-dock-seek-tip {
+.music-dock-seek-tip,
+.music-dock-control-tip {
   position: absolute;
   bottom: 15px;
   transform: translateX(-50%);
@@ -112,7 +126,8 @@
   box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.55);
   z-index: 6;
 }
-.music-dock-seek-tip::after {
+.music-dock-seek-tip::after,
+.music-dock-control-tip::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -123,6 +138,23 @@
   background: var(--color-elevated);
   border-inline-end: 1px solid var(--color-edge-soft);
   border-block-end: 1px solid var(--color-edge-soft);
+}
+
+.music-dock-control-tip {
+  position: fixed;
+  bottom: auto;
+  transform: none;
+  max-width: min(280px, calc(100vw - 16px));
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  z-index: 2000;
+  animation: music-dock-tip-in 120ms ease-out;
+}
+.music-dock-control-tip::after { left: var(--music-tip-arrow, 50%); }
+@keyframes music-dock-tip-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .music-dock-control-tip { animation: none; }
 }
 
 /* The shared settings slider has a canvas border around its handle. Playback
@@ -188,25 +220,25 @@
   z-index: 1;
 }
 .music-dock-volume .harbor-slider::-webkit-slider-thumb {
-  width: 12px;
-  height: 12px;
-  margin-top: 1px;
-  border: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 0;
+  border: 2px solid var(--color-canvas);
   border-radius: 50%;
-  background: var(--color-ink);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.45);
+  background: var(--dock-vol-fill);
+  box-shadow: none;
   opacity: 0;
   transition:
     opacity 140ms ease-out,
     transform 140ms ease-out;
 }
 .music-dock-volume .harbor-slider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border: 0;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-canvas);
   border-radius: 50%;
-  background: var(--color-ink);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.45);
+  background: var(--dock-vol-fill);
+  box-shadow: none;
   opacity: 0;
   transition:
     opacity 140ms ease-out,
@@ -270,7 +302,7 @@
   background: color-mix(in srgb, var(--color-ink) 22%, transparent);
 }
 [data-music-dock-tab][data-art-colors] .music-dock-tab-line > span {
-  background: color-mix(in srgb, var(--music-art-accent) 40%, var(--color-ink));
+  background: color-mix(in srgb, var(--music-art-tone) 55%, var(--color-ink));
 }
 .music-dock-tab-line {
   position: absolute;

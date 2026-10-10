@@ -132,7 +132,7 @@ function PillBtn({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="flex h-10 items-center gap-2 rounded-full border border-edge-soft bg-surface px-3.5 text-[13px] font-semibold text-ink-muted shadow-[0_2px_8px_-4px_rgba(15,15,18,0.18)] transition-all hover:-translate-y-px hover:border-edge hover:text-ink hover:shadow-[0_4px_12px_-4px_rgba(15,15,18,0.22)]"
+      className="flex h-10 items-center gap-2 rounded-full px-2 text-[13px] font-semibold text-ink-muted transition-colors hover:text-ink"
     >
       {children}
     </button>

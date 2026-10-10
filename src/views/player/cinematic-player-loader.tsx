@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { HarborLoader } from "@/components/harbor-loader";
+import { CustomArtwork } from "@/components/custom-artwork";
 import type { PlayerSnapshot } from "@/lib/player/bridge";
 import { isLocalUrl } from "@/lib/player/local-url";
 import { usePlaybackPositionGated } from "@/lib/player/playback-clock";
@@ -217,6 +218,7 @@ export function CinematicPlayerLoader({
             </div>
           ) : (
             <div className="flex w-full max-w-sm flex-col items-center gap-3">
+              <CustomArtwork role="loading" className="h-32 w-32" />
               <StreamLoadingBar key={src.url} ready={ready} done={done} />
               <p className="text-[12.5px] font-medium uppercase tracking-[0.18em] text-white/70">
                 {snap.buffering ? t("Buffering") : t("Preparing stream")}

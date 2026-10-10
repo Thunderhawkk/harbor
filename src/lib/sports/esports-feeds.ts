@@ -465,25 +465,59 @@ export function parseBlastRocketLeague(html: string, now = Date.now()): EsportsM
 
 const feedCache = new Map<EsportsGameId, EsportsFeed>();
 const inFlight = new Map<EsportsGameId, Promise<EsportsFeed>>();
-const responseCache = new Map<string, { at: number; data: string }>();
+const responseCache = new Map<string, { at: number; url: string; status: number; data: string }>();
 
-export async function requestEsportsText(url: string, ttl: number): Promise<string> {
-  const cached = responseCache.get(url);
-  if (cached && Date.now() - cached.at < ttl) return cached.data;
+/** Extra request headers, for a source that needs a key or a particular encoding. */
+export interface EsportsRequestOptions {
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
+/**
+ * Headers change the answer, so they belong to the cache identity. Only a signature of the
+ * values is kept: a key belongs in the request, never in a second long lived structure.
+ */
+function cacheKey(url: string, headers?: Record<string, string>): string {
+  const names = Object.keys(headers ?? {}).sort();
+  if (!names.length) return url;
+  let hash = 0x811c9dc5;
+  for (const name of names)
+    for (const character of `${name.toLowerCase()}=${headers?.[name] ?? ""};`) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+  return `${url} #${names.length}.${hash.toString(36)}`;
+}
+
+/** Reports the status instead of throwing on it, so a caller can tell 403 from an outage. */
+async function requestEsportsResponse(
+  url: string,
+  ttl: number,
+  options: EsportsRequestOptions = {},
+): Promise<{ ok: boolean; status: number; data: string }> {
+  const key = cacheKey(url, options.headers);
+  const cached = responseCache.get(key);
+  if (cached && Date.now() - cached.at < ttl)
+    return { ok: true, status: cached.status, data: cached.data };
   const controller = new AbortController();
+  const relay = () => controller.abort();
+  options.signal?.addEventListener("abort", relay);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    options.signal?.throwIfAborted();
     const work = (async () => {
       const { safeFetch } = await import("../safe-fetch");
-      const response = await safeFetch(url, { signal: controller.signal });
-      if (!response.ok) throw new Error("Esports source is unavailable");
+      const response = await safeFetch(url, {
+        signal: controller.signal,
+        ...(options.headers ? { headers: options.headers } : {}),
+      });
       if (Number(response.headers.get("content-length")) > 8_000_000)
         throw new Error("Schedule response is too large");
-      const data = await response.text();
+      const data = response.ok ? await response.text() : "";
       if (data.length > 8_000_000) throw new Error("Schedule response is too large");
-      return data;
+      return { ok: response.ok, status: response.status, data };
     })();
-    const data = await Promise.race([
+    const result = await Promise.race([
       work,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
@@ -492,79 +526,200 @@ export async function requestEsportsText(url: string, ttl: number): Promise<stri
         }, 10_000);
       }),
     ]);
-    responseCache.set(url, { at: Date.now(), data });
+    if (!result.ok) return result;
+    responseCache.set(key, { at: Date.now(), url, status: result.status, data: result.data });
     // Enforce a byte budget too: the official Riot SSR pages are much larger than JSON feeds.
     let retainedSize = [...responseCache.values()].reduce(
       (sum, value) => sum + value.data.length * 2,
       0,
     );
-    for (const [key, value] of responseCache) {
+    for (const [entry, value] of responseCache) {
       if (responseCache.size <= 20 && retainedSize <= 16_000_000) break;
       retainedSize -= value.data.length * 2;
-      responseCache.delete(key);
+      responseCache.delete(entry);
     }
-    return data;
+    return result;
   } finally {
     clearTimeout(timer);
+    options.signal?.removeEventListener("abort", relay);
   }
 }
 
+export async function requestEsportsText(
+  url: string,
+  ttl: number,
+  options: EsportsRequestOptions = {},
+): Promise<string> {
+  const response = await requestEsportsResponse(url, ttl, options);
+  if (!response.ok) throw new Error("Esports source is unavailable");
+  return response.data;
+}
+
+export async function requestEsportsJson(
+  url: string,
+  ttl: number,
+  options: EsportsRequestOptions = {},
+): Promise<unknown> {
+  return JSON.parse(await requestEsportsText(url, ttl, options)) as unknown;
+}
+
+/** A reader that keeps the shared response cache while still surfacing the status. */
+const cachedReader =
+  (ttl: number) =>
+  async (url: string, init: { headers: Record<string, string>; signal?: AbortSignal }) => {
+    const response = await requestEsportsResponse(url, ttl, init);
+    return { ok: response.ok, status: response.status, text: async () => response.data };
+  };
+
 const request = requestEsportsText;
+
+type FeedBatch = { matches: EsportsMatch[]; partial: boolean };
+
+async function settledMatches(jobs: Promise<EsportsMatch[]>[]): Promise<FeedBatch> {
+  const results = await Promise.allSettled(jobs);
+  const succeeded = results.filter(
+    (result): result is PromiseFulfilledResult<EsportsMatch[]> => result.status === "fulfilled",
+  );
+  if (!succeeded.length) throw new Error("Esports source is unavailable");
+  return {
+    matches: currentEsportsMatches(succeeded.flatMap((result) => result.value)),
+    partial: succeeded.length !== results.length,
+  };
+}
+
+/** One allowlist for every adapter: a link Harbor cannot open never reaches a card. */
+export function allowedEsportsStreams(matches: EsportsMatch[]): EsportsMatch[] {
+  return matches.map((match) => {
+    const streams = match.streams
+      .filter((stream) => esportsEmbedUrl(stream, "localhost"))
+      .slice(0, 12);
+    return streams.length === match.streams.length ? match : { ...match, streams };
+  });
+}
+
+/** Bo3's v1 list carries broadcast links, so one request replaces a request per match. */
+async function bo3Matches(
+  game: "cs2" | "dota2",
+  statuses: readonly ("current" | "upcoming" | "finished")[],
+  ttl: number,
+): Promise<EsportsMatch[]> {
+  const api = await import("./esports-bo3-api");
+  const query = { game, statuses, limit: 100 };
+  return api.bo3FeedMatches(
+    api.parseBo3Matches(await requestEsportsJson(api.bo3MatchesUrl(query), ttl), query),
+  );
+}
+
+/**
+ * Riot's JSON gateway first, the proven SSR page behind it. The gateway key is a constant their
+ * own web client ships and Riot can rotate it without notice, so the scrape is what makes
+ * depending on it safe: a 403 falls back instead of rendering an empty board.
+ */
+async function riotFeed(game: "lol" | "valorant"): Promise<FeedBatch> {
+  const api = await import("./esports-riot-api");
+  const scrape = async () => parseRiotEsports(await request(SOURCES[game].url, 90_000), game);
+  const schedule = await api
+    .fetchRiotSchedule(game, { fetchImpl: cachedReader(5 * MINUTE) })
+    .catch(() => null);
+  if (!schedule) return { matches: await scrape(), partial: false };
+  // An empty board is the one answer the gateway cannot tell apart from a changed contract, so
+  // the scrape gets the last word on it and the empty board stands if it sees none either.
+  if (!schedule.length) return { matches: await scrape().catch(() => schedule), partial: false };
+  // Only the gw live board is measured working; the val path answers 400. VALORANT is not asked
+  // for a board it refuses, and its schedule events carry the same per event stream list.
+  const live =
+    game === "lol"
+      ? await api
+          .fetchRiotLive(game, { fetchImpl: cachedReader(MINUTE) })
+          .then((board) => board.matches)
+          .catch(() => [])
+      : [];
+  // Live rows come last so an in progress row, which is the one carrying broadcasts, wins a tie.
+  return { matches: currentEsportsMatches([...schedule, ...live]), partial: false };
+}
+
+/** The v2 tier lists stay as the CS2 fallback: they are the coverage that ships working today. */
+async function cs2Feed(): Promise<FeedBatch> {
+  try {
+    const [scheduled, finished] = await Promise.all([
+      bo3Matches("cs2", ["current", "upcoming"], MINUTE),
+      bo3Matches("cs2", ["finished"], 5 * MINUTE).then(
+        (rows) => rows,
+        () => null,
+      ),
+    ]);
+    return {
+      matches: currentEsportsMatches([...(finished ?? []), ...scheduled]),
+      partial: finished === null,
+    };
+  } catch {
+    const iso = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
+    const base = "https://api.bo3.gg/api/v2/matches/";
+    const query = "?filter%5Bdiscipline_id%5D%5Beq%5D=1";
+    return settledMatches([
+      requestEsportsJson(`${base}live${query}`, MINUTE).then((raw) => parseBo3Esports(raw)),
+      ...[0, 1].map((day) =>
+        requestEsportsJson(
+          `${base}upcoming${query}&date=${iso(day)}&utc_offset=0`,
+          5 * MINUTE,
+        ).then((raw) => parseBo3Esports(raw)),
+      ),
+      ...[0, -1].map((day) =>
+        requestEsportsJson(
+          `${base}finished${query}&date=${iso(day)}&utc_offset=0`,
+          5 * MINUTE,
+        ).then((raw) => parseBo3Esports(raw)),
+      ),
+    ]);
+  }
+}
+
+/** OpenDota stays primary for live and recent: it is the only source that reports freshness. */
+async function dota2Feed(): Promise<FeedBatch> {
+  // OpenDota publishes no schedule at all, so bo3 contributes the upcoming board only. Keeping
+  // the states disjoint is what stops one match arriving twice under two provider ids, and it is
+  // an addition to a working board, so it neither reports a partial feed nor stands in for one.
+  const [opendota, upcoming] = await Promise.all([
+    settledMatches([
+      requestEsportsJson("https://api.opendota.com/api/live", MINUTE).then((raw) =>
+        parseOpenDotaEsports(raw, true),
+      ),
+      requestEsportsJson("https://api.opendota.com/api/proMatches", 5 * MINUTE).then((raw) =>
+        parseOpenDotaEsports(raw, false),
+      ),
+    ]),
+    bo3Matches("dota2", ["upcoming"], 5 * MINUTE).catch(() => []),
+  ]);
+  const matches = currentEsportsMatches([...opendota.matches, ...upcoming]);
+  const broadcasts = await import("./esports-dota-broadcasts");
+  return {
+    partial: opendota.partial,
+    matches: await broadcasts.attachDotaLeagueBroadcasts(matches).catch(() => matches),
+  };
+}
 
 async function loadFeed(game: EsportsGameId): Promise<EsportsFeed> {
   const source = SOURCES[game];
   try {
-    let matches: EsportsMatch[];
-    let partial = false;
-    if (game === "lol" || game === "valorant")
-      matches = parseRiotEsports(await request(source.url, 90_000), game);
-    else if (game === "rocketleague")
-      matches = parseBlastRocketLeague(await request(source.url, 90_000));
-    else {
-      const iso = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
-      const base = "https://api.bo3.gg/api/v2/matches/";
-      const query = "?filter%5Bdiscipline_id%5D%5Beq%5D=1";
-      const jobs =
-        game === "dota2"
-          ? [
-              request("https://api.opendota.com/api/live", MINUTE).then((raw) =>
-                parseOpenDotaEsports(JSON.parse(raw), true),
-              ),
-              request("https://api.opendota.com/api/proMatches", 5 * MINUTE).then((raw) =>
-                parseOpenDotaEsports(JSON.parse(raw), false),
-              ),
-            ]
-          : [
-              request(`${base}live${query}`, MINUTE).then((raw) =>
-                parseBo3Esports(JSON.parse(raw)),
-              ),
-              ...[0, 1].map((day) =>
-                request(`${base}upcoming${query}&date=${iso(day)}&utc_offset=0`, 5 * MINUTE).then(
-                  (raw) => parseBo3Esports(JSON.parse(raw)),
-                ),
-              ),
-              ...[0, -1].map((day) =>
-                request(`${base}finished${query}&date=${iso(day)}&utc_offset=0`, 5 * MINUTE).then(
-                  (raw) => parseBo3Esports(JSON.parse(raw)),
-                ),
-              ),
-            ];
-      const results = await Promise.allSettled(jobs);
-      const succeeded = results.filter(
-        (result): result is PromiseFulfilledResult<EsportsMatch[]> => result.status === "fulfilled",
-      );
-      if (!succeeded.length) throw new Error("Esports source is unavailable");
-      partial = succeeded.length !== results.length;
-      matches = currentEsportsMatches(succeeded.flatMap((result) => result.value));
-    }
+    const batch: FeedBatch =
+      game === "lol" || game === "valorant"
+        ? await riotFeed(game)
+        : game === "cs2"
+          ? await cs2Feed()
+          : game === "dota2"
+            ? await dota2Feed()
+            : {
+                matches: parseBlastRocketLeague(await request(source.url, 90_000)),
+                partial: false,
+              };
     const result: EsportsFeed = {
       game,
-      matches,
+      matches: allowedEsportsStreams(batch.matches),
       status: "ready",
-      partial,
+      partial: batch.partial,
       fetchedAt: Date.now(),
       source,
-      reason: partial
+      reason: batch.partial
         ? "Some match feeds did not respond. Available matches are shown."
         : undefined,
     };
@@ -603,10 +758,12 @@ export async function fetchEsportsFeed(
         game === "cs2"
           ? ["api.bo3.gg"]
           : game === "dota2"
-            ? ["api.opendota.com"]
-            : [new URL(SOURCES[game].url).hostname];
-      for (const url of responseCache.keys())
-        if (hosts.includes(new URL(url).hostname)) responseCache.delete(url);
+            ? ["api.opendota.com", "api.bo3.gg", "www.dota2.com"]
+            : game === "rocketleague"
+              ? [new URL(SOURCES[game].url).hostname]
+              : ["esports-api.lolesports.com", new URL(SOURCES[game].url).hostname];
+      for (const [key, value] of responseCache)
+        if (hosts.includes(new URL(value.url).hostname)) responseCache.delete(key);
     }
     pending = loadFeed(game).finally(() => {
       inFlight.delete(game);

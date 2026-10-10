@@ -73,6 +73,37 @@ export function takeMusicPlaylistRequest(): { id: string; trackId?: string } | n
   return request;
 }
 
+export const MUSIC_PLAY_EVENT = "harbor:music-play";
+let pendingPlay: { track: MusicTrack; queue: MusicTrack[] } | null = null;
+/** The quick dock lives outside the Music view, where the source picker context does not exist. */
+export function requestMusicPlay(track: MusicTrack, queue: MusicTrack[] = []) {
+  pendingPlay = { track, queue };
+  window.dispatchEvent(new Event(MUSIC_PLAY_EVENT));
+}
+export function takeMusicPlayRequest(): { track: MusicTrack; queue: MusicTrack[] } | null {
+  const request = pendingPlay;
+  pendingPlay = null;
+  return request;
+}
+
+export const MUSIC_LIBRARY_EVENT = "harbor:music-library";
+export type MusicLibraryRequest = {
+  view?: string;
+  playlistId?: string;
+  spotifyKind?: "playlists" | "liked";
+};
+let pendingLibrary: MusicLibraryRequest | null = null;
+/** Open a library view, for the dock menu when playback began in Saved or a connected account. */
+export function requestMusicLibrary(target: MusicLibraryRequest) {
+  pendingLibrary = target;
+  window.dispatchEvent(new Event(MUSIC_LIBRARY_EVENT));
+}
+export function takeMusicLibraryRequest(): MusicLibraryRequest | null {
+  const request = pendingLibrary;
+  pendingLibrary = null;
+  return request;
+}
+
 export const MUSIC_PANEL_EVENT = "harbor:music-panel";
 export type MusicPanelRequest = "__audio" | "__speakers";
 let pendingPanel: MusicPanelRequest | null = null;

@@ -82,6 +82,16 @@ fn cf_clear_failure(host: &str) {
     cf_failures().lock().unwrap().remove(host);
 }
 
+/// Must already be on the main thread. Topmost is set before the window is shown
+/// because Windows refuses SetForegroundWindow to a process that does not own the
+/// current foreground window, which left the check sitting behind Harbor.
+fn raise_window(w: &tauri::WebviewWindow) {
+    let _ = w.unminimize();
+    let _ = w.set_always_on_top(true);
+    let _ = w.show();
+    let _ = w.set_focus();
+}
+
 struct SolverDismiss(AppHandle);
 
 impl Drop for SolverDismiss {
@@ -189,8 +199,8 @@ fn open_solver(app: &AppHandle, url: &str) -> Result<(), String> {
             "window.location.href = {};",
             serde_json::to_string(url).unwrap_or_else(|_| "''".into())
         ));
-        let _ = existing.show();
-        let _ = existing.set_focus();
+        let w = existing.clone();
+        let _ = app.run_on_main_thread(move || raise_window(&w));
         return Ok(());
     }
 
@@ -211,8 +221,7 @@ fn open_solver(app: &AppHandle, url: &str) -> Result<(), String> {
         let built = crate::browser_args::match_main(&app_main, builder).build();
         match built {
             Ok(window) => {
-                let _ = window.show();
-                let _ = window.set_focus();
+                raise_window(&window);
                 eprintln!("[cf] solver window built + shown");
                 let _ = tx.send(Ok(()));
             }
@@ -244,10 +253,15 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
     open_solver(&app, &url)?;
     let _dismiss = SolverDismiss(app.clone());
     if let Some(w) = app.get_webview_window(SOLVER_LABEL) {
-        let _ = w.unminimize();
-        let _ = w.set_always_on_top(true);
-        let _ = w.set_focus();
-        eprintln!("[cf] raised solver window to front");
+        // Raising a window re-enters the platform event loop. Driving that inline from
+        // this async task overflowed the main thread's stack and took the app down, so
+        // the raise is handed to the main thread and never blocks the solve.
+        let raise = app.run_on_main_thread(move || raise_window(&w));
+        if let Err(error) = raise {
+            eprintln!("[cf] could not raise solver window: {error}");
+        } else {
+            eprintln!("[cf] raised solver window to front");
+        }
     }
 
     match tokio::time::timeout(Duration::from_secs(90), rx).await {

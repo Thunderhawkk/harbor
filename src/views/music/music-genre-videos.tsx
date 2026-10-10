@@ -1,3 +1,4 @@
+import { musicGenreName } from "@/lib/music/genre-catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, LoaderCircle } from "@/components/icons/music-icons";
 import { MusicVideoDiscovery } from "@/components/music/music-video-discovery";
@@ -7,6 +8,7 @@ import type { MusicDiscoveryGenre } from "@/lib/music/genre-catalog";
 import { musicVideoQuery } from "@/lib/music/video-discovery";
 import { loadGenreArtistRoster } from "@/lib/music/genre-artist-roster";
 import { HIP_HOP_ARTIST_SEEDS } from "@/lib/music/genre-artist-seeds";
+import { EDITORIAL_SCENES } from "@/lib/music/genre-editorial";
 import { resolveArtist } from "@/lib/music/artist-authority";
 
 function ArtistFilter({ artist, selected, onSelect }: { artist: MusicArtistRef; selected: boolean; onSelect: () => void }) {
@@ -36,8 +38,11 @@ export function MusicGenreVideos({ genre, artists, active, onWatch }: {
 }) {
   const t = useT();
   const [artist, setArtist] = useState<string | null>(null);
-  const [choices, setChoices] = useState(() => genre.slug === "hip-hop" ? HIP_HOP_ARTIST_SEEDS.map(name => artists.find(item => item.name.toLowerCase() === name.toLowerCase()) ?? { id: `scene:${name}`, name, connectorId: "catalog" }) : artists);
-  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false), [ended, setEnded] = useState(false);
+  const [choices, setChoices] = useState(() => {
+    const seeds = genre.slug === "hip-hop" ? HIP_HOP_ARTIST_SEEDS : EDITORIAL_SCENES[genre.slug]?.artists;
+    return seeds ? seeds.map(name => artists.find(item => item.name.toLowerCase() === name.toLowerCase()) ?? { id: `scene:${name}`, name, connectorId: "catalog" }) : artists;
+  });
+  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false), [ended, setEnded] = useState(genre.slug === "ukrainian-wartime");
   const cursor = useRef(0), loading = useRef(false), alive = useRef(true);
   const rail = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: true, end: false });
@@ -61,12 +66,14 @@ export function MusicGenreVideos({ genre, artists, active, onWatch }: {
   useEffect(() => { measure(); const observer = new ResizeObserver(measure); if (rail.current) observer.observe(rail.current); return () => observer.disconnect(); }, [choices, measure]);
   const move = (step: number) => { const el = rail.current; if (el) el.scrollBy({ left: (getComputedStyle(el).direction === "rtl" ? -1 : 1) * step * el.clientWidth * .8, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }); };
   return <MusicVideoDiscovery kinds={["videos", "concerts", "interviews"]} subject={artist ?? genre.name} filterSubject={artist ?? ""}
-    queryForKind={kind => !artist && kind === "interviews" ? `${genre.name} artists full interview` : musicVideoQuery(kind, artist ?? genre.name)}
+    queryForKind={kind => !artist && genre.slug === "ukrainian-wartime"
+      ? kind === "interviews" ? "OTOY YARMAK військовий реп інтерв'ю" : kind === "concerts" ? "український військовий реп наживо" : "український військовий реп офіційний кліп"
+      : !artist && kind === "interviews" ? `${genre.name} artists full interview` : musicVideoQuery(kind, artist ?? genre.name)}
     active={active} onWatch={onWatch} headerContent={
       <div className="music-genre-artist-picker">
       <button type="button" aria-label={t("common.previous")} disabled={edges.start} onClick={() => move(-1)}><ArrowLeft size={16} className="dir-icon"/></button>
       <div ref={rail} className="music-genre-video-artists" role="group" aria-label={t("music.search.artists")} onScroll={() => { measure(); const el = rail.current; if (el && el.scrollWidth - el.clientWidth - Math.abs(el.scrollLeft) < 180 && !failed) void more(); }}>
-        <button type="button" aria-pressed={!artist} onClick={() => setArtist(null)}>{genre.name}</button>
+        <button type="button" aria-pressed={!artist} onClick={() => setArtist(null)}>{musicGenreName(genre, t)}</button>
         {choices.map(item => <ArtistFilter key={item.name} artist={item} selected={artist === item.name} onSelect={() => setArtist(item.name)}/>)}
         {!ended && <button type="button" disabled={busy} onClick={() => { void more(); }}>{busy && <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none"/>}{t(failed ? "common.retry" : "music.library.loadMore")}</button>}
       </div>

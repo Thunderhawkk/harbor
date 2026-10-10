@@ -346,7 +346,7 @@ fn host_is_blocked_literal(url: &reqwest::Url) -> bool {
 // and private network addresses. It is only set by callers that have explicitly
 // received a URL from the user (e.g. wiring up their own self-hosted Suwayomi
 // server), never for implicitly-discovered URLs.
-async fn validate_target(url: &reqwest::Url, allow_local: bool) -> Result<(), String> {
+pub(crate) async fn validate_target(url: &reqwest::Url, allow_local: bool) -> Result<(), String> {
     let host = match url.host_str() {
         Some(h) => h.trim_start_matches('[').trim_end_matches(']').to_string(),
         None => return Ok(()),
@@ -453,7 +453,7 @@ fn http_client() -> Result<&'static reqwest::Client, String> {
         .map_err(|e| e.clone())
 }
 
-async fn public_http_client(url: &reqwest::Url) -> Result<reqwest::Client, String> {
+pub(crate) async fn public_http_client(url: &reqwest::Url) -> Result<reqwest::Client, String> {
     let host = url
         .host_str()
         .ok_or_else(|| "public target has no host".to_string())?;

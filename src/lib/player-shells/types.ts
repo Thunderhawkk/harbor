@@ -5,6 +5,7 @@ import type { SubtitleAddHandler } from "@/lib/player/subtitle-load";
 
 export type PlayerShellProps = {
   snap: PlayerSnapshot;
+  isLive?: boolean;
   capabilities: PlayerCapabilities;
   visible: boolean;
   fullscreen: boolean;

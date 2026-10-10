@@ -3,13 +3,14 @@ import { ArrowUpRight, LoaderCircle, Play, X, Youtube } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { openUrl } from "@/lib/window";
 import { useDragScroll } from "@/lib/use-drag-scroll";
+import { useSectionBack } from "@/lib/section-back";
 import {
   athleteYoutubeSearch,
   loadAthleteVideos,
   type AthleteVideo,
 } from "@/lib/sports/athlete-videos";
 import "./athlete-videos.css";
-import { loadSportsYoutubeVideos } from "@/lib/sports/youtube-videos";
+import { loadAthleteYoutubeVideos } from "@/lib/sports/athlete-youtube";
 
 type Video = AthleteVideo & { publisher?: string; youtube?: boolean };
 
@@ -61,6 +62,18 @@ export function AthleteVideos({
   const [retry, setRetry] = useState(0);
   const [selected, setSelected] = useState<Video | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const closeVideo = () => {
+    setSelected(null);
+    requestAnimationFrame(() => trigger.current?.focus({preventScroll:true}));
+  };
+  useSectionBack(closeVideo, !!selected);
+  useEffect(() => {
+    if (selected) {
+      closeButton.current?.focus({preventScroll:true});
+      closeButton.current?.closest('.sh-athlete-video-player')?.scrollIntoView({block:'nearest'});
+    }
+  },[selected]);
   const { ref, handlers } = useDragScroll<HTMLDivElement>();
   useEffect(() => {
     if (!section.current) return;
@@ -85,25 +98,15 @@ export function AthleteVideos({
     const clips: Video[] = [];
     const publish = (next: Video[]) => {
       if (controller.signal.aborted) return;
-      clips.push(...next);
+      clips.push(...next.filter(video=>!clips.some(existing=>existing.id===video.id)));
       clips.sort(
-        (a, b) => (Date.parse(b.published || "") || 0) - (Date.parse(a.published || "") || 0),
+        (a, b) => Number(!!b.youtube)-Number(!!a.youtube) || (Date.parse(b.published || "") || 0) - (Date.parse(a.published || "") || 0),
       );
       setVideos(clips.slice(0, 12));
     };
     void Promise.allSettled([
       loadAthleteVideos(name, sport, controller.signal).then(publish),
-      loadSportsYoutubeVideos({ names: [name], league }, controller.signal).then((result) =>
-        publish(
-          result.map((video) => ({
-            ...video,
-            id: `youtube:${video.id}`,
-            publisher: video.channel,
-            youtube: true,
-            embed: `https://www.youtube-nocookie.com/embed/${video.id}?autoplay=0&rel=0`,
-          })),
-        ),
-      ),
+      loadAthleteYoutubeVideos(name, league, controller.signal).then(publish),
     ])
       .then((result) => {
         if (!controller.signal.aborted) {
@@ -138,21 +141,19 @@ export function AthleteVideos({
           <div>
             <strong>{selected.title}</strong>
             <button
+              ref={closeButton}
               className="sh-icon"
               aria-label={t("Close video")}
-              onClick={() => {
-                setSelected(null);
-                requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true }));
-              }}
+              onClick={closeVideo}
             >
               <X size={18} />
             </button>
           </div>
           <iframe
             key={selected.id}
-            src={selected.embed}
+            src={selected.youtube ? `${selected.embed.replace('autoplay=0','autoplay=1')}&playsinline=1` : selected.embed}
             title={selected.title}
-            allow="fullscreen; encrypted-media; picture-in-picture"
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
           />
@@ -196,13 +197,11 @@ export function AthleteVideos({
           {t(
             status === "error"
               ? "Videos are unavailable right now."
-              : "No matching clips were published by this feed.",
+              : "No videos found.",
           )}
-          {status === "error" && (
-            <button className="sh-text-button" onClick={() => setRetry((n) => n + 1)}>
-              {t("Retry")}
-            </button>
-          )}
+          <button className="sh-text-button" onClick={() => setRetry((n) => n + 1)}>
+            {t("Retry")}
+          </button>
         </p>
       )}
     </section>

@@ -1,6 +1,8 @@
 .music-now-playing {
   position: fixed;
-  inset-block: 0 var(--harbor-dock-gap, 76px);
+  /* Overlap the dock by a pixel so no hairline shows where they meet, while still
+     ending at the dock so the transport controls stay clickable. */
+  inset-block: 0 calc(var(--harbor-dock-gap, 76px) - 1px);
   inset-inline-end: 0;
   display: flex;
   flex-direction: column;
@@ -166,6 +168,11 @@
   position: relative;
   overflow: hidden;
   white-space: nowrap;
+  /* line-height 1.08 puts descenders below the line box, where overflow:hidden (needed
+     for the marquee) clips the tails off a y or g. Pad inside, pull back outside, so
+     the glyphs are whole and the layout is unchanged. */
+  padding-block-end: 0.14em;
+  margin-block-end: -0.14em;
 }
 .music-now-title:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -680,24 +687,29 @@
   outline-offset: 3px;
   border-radius: 6px;
 }
+/* Counter the slide with an equal bottom clip so every frame stays behind the dock. */
 @keyframes music-now-rise {
   from {
     opacity: 0;
     transform: translateY(56px);
+    clip-path: inset(0 0 56px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+    clip-path: inset(0);
   }
 }
 @keyframes music-now-fall {
   from {
     opacity: 1;
     transform: translateY(0);
+    clip-path: inset(0);
   }
   to {
     opacity: 0;
     transform: translateY(40px);
+    clip-path: inset(0 0 40px);
   }
 }
 @container (max-width:780px) {
@@ -792,6 +804,14 @@
   align-self: start;
 }
 @container (min-width:781px) {
+  .music-now-playing:not([data-immersive="1"]) .music-now-content:has(> .music-now-panel[data-panel="queue"]) {
+    height: 100%;
+  }
+  .music-now-playing:not([data-immersive="1"]) .music-now-content > .music-now-panel[data-panel="queue"] {
+    flex: 1 1 0;
+    height: auto;
+    max-height: none;
+  }
   .music-now-layout {
     height: 100%;
     grid-template-rows: minmax(0, 1fr);

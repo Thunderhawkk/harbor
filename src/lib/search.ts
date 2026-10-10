@@ -1,3 +1,4 @@
+import { animeCatalogRequest } from "./providers/anime-catalog-client";
 import { effectiveTmdbLanguage, get } from "@/lib/providers/tmdb/tmdb-client";
 import { movieMeta, seriesMeta, type Page, type RawMovie, type RawSeries } from "@/lib/providers/tmdb/tmdb-meta-mappers";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/feed/tags";
@@ -141,10 +142,7 @@ async function jikanAnimeSearch(query: string, limit: number): Promise<AnimeHit[
   const q = query.trim();
   if (q.length < 2) return [];
   try {
-    const url = `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&order_by=popularity&sort=asc&limit=${limit}&sfw=true`;
-    const res = await safeFetch(url);
-    if (!res.ok) return [];
-    const data = (await res.json()) as { data?: JikanAnime[] };
+    const data = await animeCatalogRequest<JikanAnime[]>(`/anime?q=${encodeURIComponent(q)}&order_by=popularity&sort=asc&limit=${limit}&sfw=true`);
     return (data.data ?? []).map((a) => {
       const year = a.year ?? (a.aired?.from ? Number(a.aired.from.slice(0, 4)) : null);
       const name = a.title_english?.trim() || a.title?.trim() || "Untitled";

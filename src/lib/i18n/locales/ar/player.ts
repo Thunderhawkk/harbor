@@ -514,6 +514,8 @@ const player: Record<string, string> = {
   "Ignore this title": "تجاهل هذا العنوان",
   "Never show the content advisory for this title again":
     "عدم إظهار تنبيه المحتوى لهذا العنوان مرة أخرى",
+  "Search audio language": "ابحث عن لغة الصوت",
+  "No audio track in that language.": "لا يوجد مسار صوتي بهذه اللغة.",
 };
 
 export default player;

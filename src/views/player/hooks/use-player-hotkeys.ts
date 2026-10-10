@@ -6,7 +6,7 @@ import { useGifRecorder } from "./use-gif-recorder";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useLiveChannelOverlay } from "./use-live-channel-overlay";
 import { useSleepTimer } from "./use-sleep-timer";
-import { useVideoFill } from "./use-video-fill";
+import { useVideoFill, ZOOM_STEP } from "./use-video-fill";
 
 export function usePlayerHotkeys(params: {
   bridgeRef: RefObject<PlayerBridge | null>;
@@ -119,8 +119,8 @@ export function usePlayerHotkeys(params: {
     onGifRecord: quickToolsEnabled ? () => gif.toggle() : undefined,
     onClipRecord: quickToolsEnabled ? () => clip.openChooser() : undefined,
     onToggleCrop: () => videoFill.cycle(),
-    onPanscanUp: () => videoFill.step(0.1),
-    onPanscanDown: () => videoFill.step(-0.1),
+    onPanscanUp: () => videoFill.step(ZOOM_STEP),
+    onPanscanDown: () => videoFill.step(-ZOOM_STEP),
     onPrevChannel: liveOverlay.isLive ? liveOverlay.goPrevChannel : undefined,
     onToggleAnime4k,
     onAnime4kOn,

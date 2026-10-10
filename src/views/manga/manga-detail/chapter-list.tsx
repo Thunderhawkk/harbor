@@ -202,6 +202,33 @@ function chapterSourceId(id: string): string {
   return i === -1 ? "" : id.slice(0, i);
 }
 
+// The owning provider of an aggregate manga id ("providerId::orig").
+function ownSourceId(mangaId?: string): string {
+  if (!mangaId) return "";
+  const i = mangaId.indexOf("::");
+  return i === -1 ? "" : mangaId.slice(0, i);
+}
+
+const CHAPTER_SOURCE_KEY = "harbor.manga.chaptersource.v1.";
+const CHAPTER_SCAN_KEY = "harbor.manga.chapterscan.v1.";
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key: string, value: string): void {
+  try {
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {
+    /* storage unavailable — filters simply reset */
+  }
+}
+
 function isCurrentChapter(progress: MangaProgressEntry | undefined, c: MangaChapter): boolean {
   if (!progress) return false;
   return progress.chapterId === c.id;
@@ -418,13 +445,61 @@ export function ChapterList({
   const [view, setView] = useState<ChapterView>(readView);
   const [range, setRange] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [scanFilter, setScanFilter] = useState("");
+  const [sourceFilter, setSourceFilterState] = useState("");
+  const [scanFilter, setScanFilterState] = useState("");
+  const filterInitRef = useRef("");
+  const userPickedSourceRef = useRef(false);
   const batch = useMangaDownloadBatch(mangaId ?? "");
+
+  const chooseSource = (id: string) => {
+    userPickedSourceRef.current = true;
+    setSourceFilterState(id);
+    writeStored(CHAPTER_SOURCE_KEY + (mangaId ?? ""), id);
+  };
+  const chooseScan = (name: string) => {
+    setScanFilterState(name);
+    writeStored(CHAPTER_SCAN_KEY + (mangaId ?? ""), name);
+  };
 
   useEffect(() => {
     localStorage.setItem(VIEW_KEY, view);
   }, [view]);
+
+  // A new manga resets the one-shot filter handling below.
+  useEffect(() => {
+    userPickedSourceRef.current = false;
+  }, [mangaId]);
+
+  const sourceOptions = useMemo(() => {
+    const all = listMangaSources();
+    const ids = new Set<string>();
+    for (const c of chapters) ids.add(chapterSourceId(c.id));
+    return [...ids].filter(Boolean).map((sid) => {
+      const s = all.find((x) => x.id === sid);
+      return { id: sid, name: s?.name ?? sid, iconUrl: s ? sourceIconUrl(s) : undefined };
+    });
+  }, [chapters]);
+
+  // Restore the persisted source/scanlator filter, defaulting to the owning
+  // source instead of "All" on first visit. Runs once per manga after its
+  // chapters finish streaming so partially-loaded options cannot decide.
+  useEffect(() => {
+    const key = mangaId ?? "";
+    if (!key || filterInitRef.current === key || userPickedSourceRef.current) return;
+    if (pending) return;
+    filterInitRef.current = key;
+    const stored = readStored(CHAPTER_SOURCE_KEY + key);
+    if (stored && sourceOptions.some((o) => o.id === stored)) {
+      setSourceFilterState(stored);
+    } else if (stored !== "") {
+      const own = ownSourceId(mangaId);
+      setSourceFilterState(own && sourceOptions.some((o) => o.id === own) ? own : "");
+    } else {
+      setSourceFilterState("");
+    }
+    const storedScan = readStored(CHAPTER_SCAN_KEY + key);
+    setScanFilterState(storedScan ?? "");
+  }, [mangaId, pending, sourceOptions]);
 
   useEffect(() => {
     setRange(null);
@@ -440,19 +515,11 @@ export function ChapterList({
     openContextMenu(e, { kind: "manga-chapter", mangaId, mangaTitle, mangaCover, chapter: c });
   };
 
-  const sourceOptions = useMemo(() => {
-    const all = listMangaSources();
-    const ids = new Set<string>();
-    for (const c of chapters) ids.add(chapterSourceId(c.id));
-    return [...ids].filter(Boolean).map((sid) => {
-      const s = all.find((x) => x.id === sid);
-      return { id: sid, name: s?.name ?? sid, iconUrl: s ? sourceIconUrl(s) : undefined };
-    });
-  }, [chapters]);
-
   useEffect(() => {
-    if (sourceFilter && !sourceOptions.some((o) => o.id === sourceFilter)) setSourceFilter("");
-  }, [sourceOptions, sourceFilter]);
+    if (pending) return;
+    if (sourceFilter && !sourceOptions.some((o) => o.id === sourceFilter))
+      setSourceFilterState("");
+  }, [sourceOptions, sourceFilter, pending]);
 
   const rawScoped = useMemo(
     () =>
@@ -480,8 +547,9 @@ export function ChapterList({
   }, [rawScoped]);
 
   useEffect(() => {
-    if (scanFilter && !scanOptions.some((o) => o.name === scanFilter)) setScanFilter("");
-  }, [scanOptions, scanFilter]);
+    if (pending) return;
+    if (scanFilter && !scanOptions.some((o) => o.name === scanFilter)) chooseScan("");
+  }, [scanOptions, scanFilter, pending]);
 
   const scoped = useMemo(
     () => (scanFilter ? rawScoped.filter((c) => displayGroup(c.group) === scanFilter) : rawScoped),
@@ -759,7 +827,7 @@ export function ChapterList({
             <SourceFilterDropdown
               options={sourceOptions}
               selected={sourceFilter}
-              onSelect={setSourceFilter}
+              onSelect={chooseSource}
             />
           )}
           {langs.length > 1 && (
@@ -786,7 +854,7 @@ export function ChapterList({
           <span className="mr-1 text-[13px] font-medium text-ink-subtle">{t("Scanlator")}</span>
           <button
             type="button"
-            onClick={() => setScanFilter("")}
+            onClick={() => chooseScan("")}
             className={`h-9 rounded-lg px-3.5 text-[13px] font-medium transition-colors ${
               scanFilter === ""
                 ? "bg-accent text-canvas"
@@ -799,7 +867,7 @@ export function ChapterList({
             <button
               key={o.name}
               type="button"
-              onClick={() => setScanFilter(o.name)}
+              onClick={() => chooseScan(o.name)}
               className={`h-9 rounded-lg px-3.5 text-[13px] font-medium transition-colors ${
                 scanFilter === o.name
                   ? "bg-accent text-canvas"

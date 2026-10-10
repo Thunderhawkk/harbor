@@ -1,7 +1,7 @@
 import { MusicPlaylistToolbar } from "@/components/music/music-playlist-toolbar";
 import { MusicPlaylistLoading } from "@/components/music/music-skeletons";
 import { usePlaylistFilters } from "@/lib/music/use-playlist-filters";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ChevronDown, ChevronLeft } from "@/components/icons/music-icons";
 import { useSectionBack } from "@/lib/section-back";
@@ -23,6 +23,7 @@ import {
   reorderMusicPlaylist,
 } from "@/lib/music/library";
 import { useT } from "@/lib/i18n";
+import { musicTrackIdentity } from "@/lib/music/track-identity";
 import type { MusicPlaylist, MusicTrack } from "@/lib/music/types";
 import "./music-playlist-page.css";
 
@@ -64,6 +65,21 @@ export function MusicPlaylistPage({
   const [notice, setNotice] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [adding, setAdding] = useState(false);
+  // The tray adds tracks TO this playlist, so the count must be what is still missing,
+  // not the playlist's own length, and the title must not repeat the playlist name.
+  const addable = useMemo(() => {
+    if (!playlist) return 0;
+    const held = new Set(playlist.tracks.map((track) => musicTrackIdentity(track)));
+    const seen = new Set<string>();
+    let count = 0;
+    for (const track of [...player.likedTracks, ...player.recents]) {
+      const key = musicTrackIdentity(track);
+      if (held.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      count += 1;
+    }
+    return count;
+  }, [playlist, player.likedTracks, player.recents]);
   const heading = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -231,8 +247,8 @@ export function MusicPlaylistPage({
                   />
                 </span>
                 <span className="music-library-add-copy">
-                  <strong>{t("music.library.readyForPlaylist", { name: playlist.name })}</strong>
-                  <small>{t("music.trackCount", { count: playlist.tracks.length })}</small>
+                  <strong>{t("music.library.addTracks")}</strong>
+                  <small>{t("music.library.addTracksCount", { count: addable })}</small>
                 </span>
                 <ChevronDown size={18} className="music-library-add-chev" aria-hidden />
               </summary>

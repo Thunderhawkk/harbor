@@ -1,4 +1,5 @@
 export default {
+  "No videos found.": "Tidak ada video ditemukan.",
   "sports.guide.athletes": "Atlet",
   "sports.guide.athlete": "Atlet",
   "sports.guide.athleteCount": "{n} atlet",

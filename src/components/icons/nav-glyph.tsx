@@ -7,6 +7,7 @@ import collections from "@/assets/nav-icons/collections.svg?raw";
 import download from "@/assets/nav-icons/download.svg?raw";
 import ebook from "@/assets/nav-icons/ebook.svg?raw";
 import explore from "@/assets/nav-icons/explore.svg?raw";
+import games from "@/assets/nav-icons/games.svg?raw";
 import guide from "@/assets/nav-icons/guide.svg?raw";
 import home from "@/assets/nav-icons/home.svg?raw";
 import library from "@/assets/nav-icons/library.svg?raw";
@@ -43,6 +44,7 @@ const GLYPHS = {
   download: prep(download),
   ebook: prep(ebook),
   explore: prep(explore),
+  games: prep(games),
   guide: prep(guide),
   home: prep(home),
   library: prep(library),

@@ -1,4 +1,29 @@
+import scene10133 from "@/assets/music-genres/chopped-and-screwed.svg?raw";
+import scene10132 from "@/assets/music-genres/miami-bass.svg?raw";
+import scene10131 from "@/assets/music-genres/crunk.svg?raw";
+import scene10130 from "@/assets/music-genres/alternative-hip-hop.svg?raw";
+import scene10129 from "@/assets/music-genres/conscious-hip-hop.svg?raw";
+import scene10128 from "@/assets/music-genres/jazz-rap.svg?raw";
+import scene10127 from "@/assets/music-genres/boom-bap.svg?raw";
+import scene10126 from "@/assets/music-genres/g-funk.svg?raw";
+import scene10125 from "@/assets/music-genres/bay-area-rap.svg?raw";
+import scene10124 from "@/assets/music-genres/detroit-rap.svg?raw";
+import scene10123 from "@/assets/music-genres/memphis-rap.svg?raw";
+import scene10122 from "@/assets/music-genres/houston-rap.svg?raw";
+import scene10121 from "@/assets/music-genres/atlanta-rap.svg?raw";
+import scene10120 from "@/assets/music-genres/southern-hip-hop.svg?raw";
+import scene10119 from "@/assets/music-genres/west-coast-hip-hop.svg?raw";
+import scene10118 from "@/assets/music-genres/east-coast-hip-hop.svg?raw";
+import scene10117 from "@/assets/music-genres/new-york-drill.svg?raw";
+import scene10116 from "@/assets/music-genres/chicago-drill.svg?raw";
 import icon0 from "@/assets/music-genres/pop.svg?raw";
+import russianRap from "@/assets/music-genres/russian-rap.svg?raw";
+import russianHyperpop from "@/assets/music-genres/russian-hyperpop.svg?raw";
+import ukrainianRap from "@/assets/music-genres/ukrainian-rap.svg?raw";
+import ukrainianWartime from "@/assets/music-genres/ukrainian-wartime.svg?raw";
+import horrorcore from "@/assets/music-genres/horrorcore.svg?raw";
+import goth from "@/assets/music-genres/goth.svg?raw";
+import internetClassics from "@/assets/music-genres/internet-classics.svg?raw";
 import icon1 from "@/assets/music-genres/hip-hop.svg?raw";
 import icon2 from "@/assets/music-genres/rock.svg?raw";
 import icon3 from "@/assets/music-genres/rnb.svg?raw";
@@ -268,10 +293,36 @@ const drawings: Record<number, string> = {
   81: icon131,
   197: icon132,
   95: icon133,
+  10108: russianRap,
+  10109: russianHyperpop,
+  10110: ukrainianRap,
+  10111: ukrainianWartime,
+  10112: horrorcore,
+  10113: goth,
+  10115: internetClassics,
+  10116: scene10116,
+  10117: scene10117,
+  10118: scene10118,
+  10119: scene10119,
+  10120: scene10120,
+  10121: scene10121,
+  10122: scene10122,
+  10123: scene10123,
+  10124: scene10124,
+  10125: scene10125,
+  10126: scene10126,
+  10127: scene10127,
+  10128: scene10128,
+  10129: scene10129,
+  10130: scene10130,
+  10131: scene10131,
+  10132: scene10132,
+  10133: scene10133,
+
 };
 const bodies = Object.fromEntries(Object.entries(drawings).map(([id,svg]) => [id, svg.match(/<svg[^>]*>([\s\S]*?)<\/svg>/)?.[1] ?? ""]));
 
-/** Original native Illustrator paths, sharing Harbor's rounded instrument stroke. */
+/** Original genre drawings sharing Harbor's rounded instrument stroke. */
 export function MusicDiscoveryIcon({ genreId, className }: { genreId?: number; className?: string }) {
   return <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" aria-hidden="true" className={className} dangerouslySetInnerHTML={{ __html: bodies[genreId ?? 0] ?? '<g stroke-width="2.3" stroke-linecap="round"><circle cx="24" cy="24" r="18"/><circle cx="24" cy="24" r="5"/><path d="M12 23a12 12 0 0 1 10-11m4 24a12 12 0 0 0 10-11"/></g>' }} />;
 }

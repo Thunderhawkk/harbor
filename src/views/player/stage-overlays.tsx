@@ -20,6 +20,7 @@ import {
 } from "@/components/player/content-advisory-toast";
 import { useT } from "@/lib/i18n";
 import { useCaptionsPopoutOpen } from "@/lib/player/captions-popout-state";
+import { ContentAdvisoryPrompt } from "@/components/player/content-advisory-prompt";
 
 export const StageOverlays = memo(function StageOverlays({
   snap,
@@ -125,6 +126,12 @@ export const StageOverlays = memo(function StageOverlays({
           titleId={contentAdvisory.imdbId}
           position={contentAdvisoryPosition}
           mpaRating={contentAdvisory.mpaRating}
+        />
+      )}
+      {!pipMode && (
+        <ContentAdvisoryPrompt
+          ready={snap.status === "playing" && snap.firstFrameReady && !!contentAdvisory.imdbId}
+          position={contentAdvisoryPosition}
         />
       )}
       {!pipMode && <SubStyleBar />}

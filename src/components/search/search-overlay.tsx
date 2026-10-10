@@ -1,6 +1,6 @@
 import { X, Loader2, CornerDownLeft, CalendarRange, Tag } from "lucide-react";
 import { Search } from "@/components/icons/search-icon";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { createPortal } from "react-dom";
 import { TvModalClose } from "@/components/tv-modal-close";
@@ -47,6 +47,9 @@ import { useSettings } from "@/lib/settings";
 import { useExitPresence } from "@/lib/use-exit-presence";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { isMagnetInput, isDirectVideoUrl } from "@/lib/torrent/magnet";
+import { useProfiles } from "@/lib/profiles";
+import { steamStoreQuery } from "@/lib/games/steam-store-search";
+const SteamStoreSearch = lazy(() => import("./steam-store-search").then(module => ({default:module.SteamStoreSearch})));
 
 export function SearchOverlay() {
   const {
@@ -72,10 +75,12 @@ export function SearchOverlay() {
   const [aiMode, setAiMode] = useState(false);
   const [aiRunSignal, setAiRunSignal] = useState(0);
   const [mediaFilter, setMediaFilter] = useState<SearchFilter>("all");
+  const {activeProfile}=useProfiles();
+  const { settings, update } = useSettings();
+  const storeQuery=activeProfile?.kid?null:steamStoreQuery(query, settings.steamSearchShortcut);
   useEffect(() => {
     setMediaFilter("all");
   }, [query]);
-  const { settings, update } = useSettings();
   const { mounted, closing } = useExitPresence(open, 150);
   const fullscreen = useWindowFullscreen();
 
@@ -86,7 +91,7 @@ export function SearchOverlay() {
 
   const close = () => {
     backdropGesture.current?.();
-    if (query.trim() && results) recordRecent(query);
+    if (query.trim() && (results || storeQuery !== null)) recordRecent(query);
     setOpen(false);
   };
 
@@ -124,8 +129,8 @@ export function SearchOverlay() {
   }, [query]);
 
   useEffect(() => {
-    setAiHold(aiMode);
-  }, [aiMode, setAiHold]);
+    setAiHold(aiMode || storeQuery !== null);
+  }, [aiMode, storeQuery !== null, setAiHold]);
 
   useEffect(() => {
     if (!open) return;
@@ -174,7 +179,7 @@ export function SearchOverlay() {
 
   const trimmedQ = query.trim();
   const collectionsQuery =
-    !trimmedQ || isMagnetInput(trimmedQ) || isDirectVideoUrl(trimmedQ) ? "" : trimmedQ;
+    !trimmedQ || storeQuery !== null || isMagnetInput(trimmedQ) || isDirectVideoUrl(trimmedQ) ? "" : trimmedQ;
   const collectionHits = useCollectionHits(collectionsQuery);
 
   if (!mounted) return null;
@@ -341,7 +346,7 @@ export function SearchOverlay() {
               className={`shrink-0 transition-colors ${aiMode ? "text-accent" : "text-ink-muted"}`}
               strokeWidth={1.9}
             />
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <input
                 ref={inputRef}
                 type="text"
@@ -352,6 +357,11 @@ export function SearchOverlay() {
                     e.preventDefault();
                     e.stopPropagation();
                     handleModalClose();
+                    return;
+                  }
+                  if (e.key === "Enter" && storeQuery !== null) {
+                    e.preventDefault();
+                    panelRef.current?.querySelector<HTMLAnchorElement>(".steam-store-result-title")?.focus();
                     return;
                   }
                   if (e.key === "Enter" && e.shiftKey) {
@@ -381,13 +391,13 @@ export function SearchOverlay() {
                     openMeta(meta);
                   }
                 }}
-                placeholder={aiMode ? "" : t("Search movies, shows, people, genres, years...")}
+                placeholder={storeQuery !== null ? t("games.storeSearch.empty") : aiMode ? "" : t("Search movies, shows, people, genres, years...")}
                 className="h-16 w-full bg-transparent text-[20px] text-ink placeholder:text-ink-subtle focus:outline-none sm:text-[22px]"
                 spellCheck={false}
                 autoComplete="off"
                 data-tv-text-auto="true"
               />
-              {aiMode && (
+              {aiMode && storeQuery === null && (
                 <AiExampleHint
                   hidden={query.trim().length > 0}
                   examples={SEARCH_EXAMPLES}
@@ -396,11 +406,11 @@ export function SearchOverlay() {
                 />
               )}
             </div>
-            {status === "loading" && (
+            {status === "loading" && storeQuery === null && (
               <Loader2 size={18} className="shrink-0 animate-spin text-ink-subtle" />
             )}
             <Hint />
-            {(settings.aiSearchKey.trim() || settings.aiGroqKey.trim()) && (
+            {storeQuery === null && (settings.aiSearchKey.trim() || settings.aiGroqKey.trim()) && (
               <AiModeButton
                 active={aiMode}
                 currentModel={settings.aiSearchModel}
@@ -424,7 +434,7 @@ export function SearchOverlay() {
           </div>
 
           <div className="harbor-search-body relative isolate min-h-0 overflow-x-hidden overflow-y-auto px-7 py-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {explore.length > 0 ? (
+            {storeQuery !== null ? <Suspense fallback={<p role="status">{t("common.loading")}</p>}><SteamStoreSearch key={activeProfile?.id ?? "default"} profile={activeProfile?.id ?? "default"} query={storeQuery} active={open&&!closing} onAction={()=>recordRecent(query)}/></Suspense> : explore.length > 0 ? (
               <ExplorePane
                 key={explore.length}
                 frame={explore[explore.length - 1]}

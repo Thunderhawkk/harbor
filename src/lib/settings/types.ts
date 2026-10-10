@@ -9,6 +9,7 @@ import type { FullscreenClockFormat, FullscreenClockStyle } from "@/lib/local-ti
 import type { SubtitleOffsetPosition, SubtitleOffsetSize } from "@/lib/player/subtitle-offset";
 import type { BufferSizeId } from "@/lib/player/buffer-profile";
 import type { UiLanguage } from "@/lib/i18n/languages";
+import type { DisplaySelection } from "@/lib/monitors";
 
 export type StreamingService =
   | "netflix"
@@ -302,6 +303,10 @@ export type Settings = {
   playerAnime4kAnimeOnly: boolean;
   playerAnime4kIndicator: boolean;
   playerMpvEmbed: boolean;
+  /** Where the separate mpv window opens. Windows only; see src/lib/monitors.ts. */
+  playerSeparateDisplay: DisplaySelection;
+  /** Fill the whole monitor (cover the taskbar) for the separate mpv window. */
+  playerSeparateCoverTaskbar: boolean;
   playerP2pChip: boolean;
   showQualityInfo: boolean;
   stremioServerTranscode: boolean;
@@ -430,6 +435,11 @@ export type Settings = {
   songIdAiKey: string;
   songIdAiModel: string;
   aiSearchKey: string;
+  steamSearchShortcut: boolean;
+  gameAgeRatingAgency: "ESRB" | "PEGI";
+  gameArtworkSelection: "first" | "random" | "manual";
+  gameArtworkScreenshots: boolean;
+  gameArtworkCoverIcon: boolean;
   aiSearchModel: string;
   aiSearchProvider: "openrouter" | "groq";
   aiGroqKey: string;
@@ -463,8 +473,12 @@ export type Settings = {
   playerTvNavigation: boolean;
   bigPictureButton: boolean;
   bigPictureAutoStart: boolean;
+  /** Which monitor Big Picture opens on at startup. Windows only. */
+  bigPictureDisplay: DisplaySelection;
   bigPictureSound: "none" | "glass" | "modern" | "retro" | "cinematic";
   bigPictureMosaic: boolean;
+  bigPictureBackdropZoom: boolean;
+  tabHotkeys: boolean;
   /**
    * Fraction of each edge a television is assumed to crop, 0 to 0.1. Read at
    * import time by bp-safe-area straight out of localStorage, which is why it
@@ -495,6 +509,8 @@ export type Settings = {
   hideWatchedInCatalogs: boolean;
   hideUnreleased: boolean;
   localEpisodeSortDesc: boolean;
+  /** Review count when the banner was last dismissed; it returns only if more turn up. */
+  localReviewDismissedCount: number;
   smoothScroll: boolean;
   showSimklCard: boolean;
   showLetterboxdCard: boolean;
@@ -657,7 +673,8 @@ export type Settings = {
     | "custom"
     | "simkl"
     | "simkl-anticipated"
-    | "anime";
+    | "anime"
+    | "games";
   simklHomeRailsEnabled: boolean;
   simklUpNextRailEnabled: boolean;
   simklTrendingRailEnabled: boolean;
@@ -710,6 +727,8 @@ export type Settings = {
   iptvForceProxy: boolean;
   iptvEpgOffsetHours: number;
   sidebarCollapsed: boolean;
+  showQuickGameLibrary: boolean;
+  gamesOpenInLibrary: boolean;
   wrappedButton: boolean;
   libraryHero: boolean;
   mangaEnabled: boolean;

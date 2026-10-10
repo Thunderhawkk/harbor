@@ -2,6 +2,8 @@ import { SliderRow } from "../theme-panel/display-section";
 import { useEffect, useRef, useState } from "react";
 import harborStyleImg from "@/assets/onboarding/harborstyle.webp";
 import traditionalStyleImg from "@/assets/onboarding/traditional.webp";
+import simklLogo from "@/assets/simkl.png";
+import traktLogo from "@/assets/trakt.svg";
 import {
   Check,
   Contrast,
@@ -254,6 +256,7 @@ export function HomeTab() {
           />
           <ToggleRow
             label={t("Trakt progress")}
+            leading={<img src={traktLogo} alt="" className="size-[18px] object-contain" />}
             sub={t(
               "Pulls what you have part-watched on Trakt into the row, marked with the Trakt logo. Requires a connected Trakt account.",
             )}
@@ -269,6 +272,7 @@ export function HomeTab() {
           />
           <ToggleRow
             label={t("Simkl progress")}
+            leading={<img src={simklLogo} alt="" className="size-[18px] object-contain" />}
             sub={t(
               "Pulls what you have part-watched on Simkl into the row, marked with the Simkl logo. Requires a connected Simkl account.",
             )}

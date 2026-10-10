@@ -43,6 +43,10 @@ export function useBpSettingsWriter(): BpSettingsWriter {
         update({ bigPictureMosaic: on });
         return;
       }
+      if (id === "backdropZoom") {
+        update({ bigPictureBackdropZoom: on });
+        return;
+      }
       if (id === "uiLanguage") {
         setUiLanguage(value as UiLanguage);
         update({ uiLanguage: value as UiLanguage });

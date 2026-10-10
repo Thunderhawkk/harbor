@@ -9,7 +9,8 @@ import {
   type RefObject,
 } from "react";
 
-type Spot = { x: number; y: number };
+export type DockSpot = { x: number; y: number };
+type Spot = DockSpot;
 
 const EDGE = 8;
 let held: Spot | null = null;
@@ -21,16 +22,33 @@ function clamp(spot: Spot, box: DOMRect): Spot {
   };
 }
 
-export function useDockDrag(root: RefObject<HTMLElement | null>, enabled: boolean, onPositionChange?: () => void) {
+export function useDockDrag(
+  root: RefObject<HTMLElement | null>,
+  enabled: boolean,
+  onPositionChange?: () => void,
+  prepareMove?: (spot: Spot, commit: () => void) => boolean,
+) {
   const [spot, setSpot] = useState<Spot | null>(held);
   const grab = useRef<(Spot & { pointerId: number }) | null>(null);
   const frame = useRef<number | null>(null);
+  const generation = useRef(0);
   useLayoutEffect(() => { if (enabled) onPositionChange?.(); }, [enabled, spot, onPositionChange]);
-  useEffect(() => () => {
+  useLayoutEffect(() => () => {
+    generation.current += 1;
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
     grab.current = null;
   }, [enabled]);
+  const move = useCallback((next: Spot) => {
+    const currentGeneration = generation.current;
+    const commit = () => {
+      if (!root.current || generation.current !== currentGeneration) return;
+      Object.assign(root.current.style, { left: `${next.x}px`, right: "auto", top: `${next.y}px`, bottom: "auto" });
+      onPositionChange?.();
+      if (!grab.current) setSpot(next);
+    };
+    if (!prepareMove?.(next, commit)) commit();
+  }, [root, onPositionChange, prepareMove]);
   useEffect(() => {
     if (!enabled) return;
     const element = root.current;
@@ -73,21 +91,20 @@ export function useDockDrag(root: RefObject<HTMLElement | null>, enabled: boolea
       if (frame.current === null) frame.current = requestAnimationFrame(() => {
         frame.current = null;
         if (!root.current || !held) return;
-        Object.assign(root.current.style, { left: `${held.x}px`, right: "auto", top: `${held.y}px`, bottom: "auto" });
-        onPositionChange?.();
+        move(held);
       });
     },
-    [enabled, root, onPositionChange],
+    [enabled, root, move],
   );
   const onPointerUp = useCallback((event: PointerEvent<HTMLElement>) => {
     if (grab.current?.pointerId !== event.pointerId) return;
     grab.current = null;
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
-    setSpot(held);
+    if (held) move(held);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
-  }, []);
+  }, [move]);
   const style: CSSProperties | undefined =
     enabled && spot
       ? { left: `${spot.x}px`, right: "auto", top: `${spot.y}px`, bottom: "auto" }

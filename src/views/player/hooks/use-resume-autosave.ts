@@ -106,7 +106,10 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
     if (!session.ready) return;
     // Keep the last usable duration through the bridge's teardown/reset event.
     if (snap.durationSec > 0 || !session.latest) session.latest = params;
-    if (snap.positionSec >= MIN_POSITION_SEC) session.position = snap.positionSec;
+    // Position-only events update the playback clock, not this React snapshot.
+    // A subtitle/settings rerender must not replace that newer clock position.
+    if (session.position === 0 && snap.positionSec >= MIN_POSITION_SEC)
+      session.position = snap.positionSec;
   });
 
   useEffect(

@@ -40,6 +40,7 @@ const RETIRED_GEMINI = new Set([
 import { DEFAULT, STORAGE_KEY } from "./defaults";
 import type { Settings } from "./types";
 import { adoptLegacyPlaylists, readPlaylists } from "@/lib/iptv/playlists-store";
+import { sanitizeDisplaySelection } from "@/lib/monitors";
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 
@@ -159,7 +160,6 @@ function parseStoredSettings(raw: string | null): Settings {
       _pickerLayoutStremio?: boolean;
       _pickerLayoutStremioV2?: boolean;
       _stremioDeeplinkOnByDefault?: boolean;
-      _contentAdvisoryOnByDefaultV1?: boolean;
       _skipButtonHideSecV2?: boolean;
       _anilistSyncOnV1?: boolean;
       _musicSeekThumbV1?: boolean;
@@ -217,8 +217,9 @@ function parseStoredSettings(raw: string | null): Settings {
       parsed.stremioDeeplinkInstall = true;
       parsed._stremioDeeplinkOnByDefault = true;
     }
+    parsed.contentAdvisoryToast = parsed.contentAdvisoryToast === true;
     if (parsed.contentAdvisoryTheme !== "monochrome" && parsed.contentAdvisoryTheme !== "colored") {
-      parsed.contentAdvisoryTheme = "colored";
+      parsed.contentAdvisoryTheme = DEFAULT.contentAdvisoryTheme;
     }
     if (typeof parsed.contentAdvisoryShowIgnore !== "boolean") {
       parsed.contentAdvisoryShowIgnore = true;
@@ -263,6 +264,11 @@ function parseStoredSettings(raw: string | null): Settings {
       parsed.songIdAiModel = DEFAULT.songIdAiModel;
     }
     if (parsed.aiSearchModel) parsed.aiSearchModel = migrateModelId(parsed.aiSearchModel);
+    if (typeof parsed.steamSearchShortcut !== "boolean") parsed.steamSearchShortcut = DEFAULT.steamSearchShortcut;
+    if (!["first", "random", "manual"].includes(parsed.gameArtworkSelection as string)) parsed.gameArtworkSelection = DEFAULT.gameArtworkSelection;
+    if (typeof parsed.gameArtworkScreenshots !== "boolean") parsed.gameArtworkScreenshots = DEFAULT.gameArtworkScreenshots;
+    if (typeof parsed.gameArtworkCoverIcon !== "boolean") parsed.gameArtworkCoverIcon = DEFAULT.gameArtworkCoverIcon;
+    if (parsed.gameAgeRatingAgency !== "ESRB" && parsed.gameAgeRatingAgency !== "PEGI") parsed.gameAgeRatingAgency = DEFAULT.gameAgeRatingAgency;
     if (parsed.aiSearchProvider !== "groq" && parsed.aiSearchProvider !== "openrouter") {
       parsed.aiSearchProvider = parsed.aiSearchModel
         ? providerTabFor(parsed.aiSearchModel)
@@ -356,12 +362,19 @@ function parseStoredSettings(raw: string | null): Settings {
       ...DEFAULT,
       ...parsed,
       ...posterCards,
+      showQuickGameLibrary: parsed.showQuickGameLibrary === true,
       topbarAppearance: sanitizeTopbarAppearance(
         parsed.topbarAppearance,
         parsed.transparentTopBar,
         parsed.topbarGlassControls,
       ),
       posterDockTransitionMs: sanitizePosterDockTransition(parsed.posterDockTransitionMs),
+      bigPictureDisplay: sanitizeDisplaySelection(parsed.bigPictureDisplay),
+      playerSeparateDisplay: sanitizeDisplaySelection(parsed.playerSeparateDisplay),
+      playerSeparateCoverTaskbar:
+        typeof parsed.playerSeparateCoverTaskbar === "boolean"
+          ? parsed.playerSeparateCoverTaskbar
+          : DEFAULT.playerSeparateCoverTaskbar,
       fullscreenClockEnabled:
         typeof parsed.fullscreenClockEnabled === "boolean"
           ? parsed.fullscreenClockEnabled
@@ -512,6 +525,10 @@ function parseStoredSettings(raw: string | null): Settings {
         typeof parsed.animePicksDismissedAt === "number"
           ? parsed.animePicksDismissedAt
           : DEFAULT.animePicksDismissedAt,
+      localReviewDismissedCount:
+        typeof parsed.localReviewDismissedCount === "number"
+          ? parsed.localReviewDismissedCount
+          : DEFAULT.localReviewDismissedCount,
       animeAnilistRowsHidden: Array.isArray(parsed.animeAnilistRowsHidden)
         ? parsed.animeAnilistRowsHidden.filter((k): k is string => typeof k === "string")
         : DEFAULT.animeAnilistRowsHidden,

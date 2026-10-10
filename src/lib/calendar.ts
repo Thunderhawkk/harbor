@@ -12,6 +12,7 @@ import { ensureNotifyPermission } from "@/lib/reminders";
 import { setItemWithRecovery } from "@/lib/storage-recovery";
 import { focusWindow } from "@/lib/window";
 import { tmdbImdbId } from "./providers/tmdb";
+import { automaticNotificationPermission } from "./notification-permission";
 
 const TMDB = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p";
@@ -534,13 +535,19 @@ export async function ensureDesktopNotifyPermission(): Promise<boolean> {
   }
 }
 
+/** Read permission for automatic events without prompting the user. */
+export async function hasDesktopNotifyPermission(): Promise<boolean> {
+  return automaticNotificationPermission(isDesktopTauri(), "Notification" in window ? Notification.permission : undefined,
+    () => invoke<boolean | null>("plugin:notification|is_permission_granted"));
+}
+
 function detailDeepLink(item: CalendarItem): string | undefined {
   if (!item.imdbId) return undefined;
   const metaType = item.type === "tv" ? "series" : "movie";
   return `harbor://detail/${metaType}/${encodeURIComponent(item.imdbId)}`;
 }
 
-async function sendDesktopNotification(
+export async function sendDesktopNotification(
   title: string,
   body: string,
   deepLink?: string,

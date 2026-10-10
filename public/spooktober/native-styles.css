@@ -1021,6 +1021,11 @@ dialog:has(.dialog-back:not([hidden])) .detail-layout { padding-top:64px; }
 .imdb-rating { display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;color:var(--color-ink-muted);vertical-align:middle; }
 .imdb-rating>img { display:block;width:28px;height:14px;object-fit:contain;border-radius:2px; }
 .media-rating.imdb-rating>span { color:inherit;background:none;padding:0;font-size:inherit;font-weight:500; }
+.media-ratings { display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:7px; }
+.media-ratings>.media-rating { margin-top:0; }
+.mal-rating { display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;color:var(--color-ink-muted); }
+.mal-rating>img { display:block;width:30px;height:12px;object-fit:contain; }
+.media-rating.mal-rating>span { color:inherit;background:none;padding:0;font-size:inherit;font-weight:500; }
 .feature-selector .queue-facts>span:last-child { display:flex;align-items:center;gap:3px; }
 .queue-facts .imdb-rating { gap:3px;font-size:10px; }.queue-facts .imdb-rating>img { width:25px;height:12px; }
 .rating-meta { color:var(--color-ink-muted); }
@@ -1596,5 +1601,79 @@ main::after {display:none}
 
 .hero .moon-disc{display:none}
 .hero .cinema-foreground,.hero .cinema-tree-stage .hero-depth{transform:none!important;will-change:auto!important}
+
+/* Featured now: flat cards, no rule beneath. The active one is a filled tile, not an underline. */
+.feature-selector > i { display: none; }
+.feature-selector {
+  border-radius: 10px;
+  padding: 10px 10px;
+  background: transparent;
+  transition:
+    background-color 200ms ease-in-out,
+    color 200ms ease-in-out;
+}
+.feature-selector > img { border-radius: 6px; }
+.feature-selector[aria-pressed="true"],
+.feature-selector:is(.intent-active, :focus-visible) {
+  background: color-mix(in srgb, var(--color-elevated) 82%, transparent);
+  color: var(--color-ink);
+}
+.feature-selector:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .feature-selector { transition: none; }
+}
+
+/* Book and manga details share Harbor's quiet cover-and-copy composition. */
+.inline-detail .detail-layout {
+  grid-template-columns:clamp(170px,22cqw,260px) minmax(0,1fr);
+  align-items:center;
+  gap:clamp(28px,4cqw,56px);
+  max-width:1120px;
+  padding:24px 20px 36px 0;
+}
+.inline-detail .detail-layout .detail-art { display:flex;justify-content:flex-start; }
+.inline-detail .detail-layout .detail-poster {
+  width:100%;height:auto;max-height:340px;object-fit:contain;object-position:left center;
+  border-radius:var(--radius-sm,6px);
+}
+.inline-detail .detail-layout .detail-copy {
+  display:flex;flex-wrap:wrap;align-items:center;column-gap:22px;row-gap:0;min-width:0;padding:0;
+}
+.inline-detail .detail-layout .detail-copy>p,
+.inline-detail .detail-layout .detail-copy>h2 { flex-basis:100%; }
+.inline-detail .detail-layout .detail-meta { margin:0 0 10px;color:var(--color-ink-muted);font-size:13px;line-height:1.5; }
+.inline-detail .detail-layout .detail-copy h2 { margin:0;font-size:clamp(30px,3.6cqw,46px);line-height:1.12;letter-spacing:-.035em;text-wrap:balance; }
+.inline-detail .detail-layout .detail-creator { margin:12px 0 0;color:var(--color-ink-muted);font-size:16px;line-height:1.5; }
+.inline-detail .detail-layout .detail-copy .description { max-width:none;margin:22px 0 28px;color:var(--color-ink-muted);font-size:16px;line-height:1.7;text-wrap:pretty; }
+.inline-detail .detail-layout .save-title {
+  min-height:48px;margin:0;padding:13px 20px;gap:10px;border-radius:var(--radius-md,10px);
+  background:var(--color-ink);color:var(--color-canvas);font-size:14px;font-weight:600;
+}
+.inline-detail .detail-layout .save-title:hover { background:color-mix(in srgb,var(--color-ink),var(--color-canvas) 10%); }
+.inline-detail .detail-layout .source-link {
+  align-items:center;gap:5px;min-height:48px;margin:0;padding-block:10px;color:var(--color-ink-muted);
+  font-size:14px;line-height:1.5;text-decoration:none;
+}
+.inline-detail .detail-layout .source-link:hover { color:var(--color-ink);text-decoration:underline; }
+.inline-detail:has(.detail-layout) .inline-toolbar { padding-bottom:4px; }
+.inline-detail:has(.detail-layout) .inline-toolbar button { color:var(--color-ink-muted); }
+.inline-detail:has(.detail-layout) .inline-toolbar button:hover { color:var(--color-ink); }
+.inline-detail:has(.detail-layout) :is(button,a):focus-visible { outline:2px solid var(--color-accent);outline-offset:4px; }
+@container spooktober (max-width:650px) {
+  .inline-detail .detail-layout { grid-template-columns:110px minmax(0,1fr);align-items:start;gap:22px;padding:16px 4px 28px 0; }
+  .inline-detail .detail-layout .detail-poster { max-height:180px; }
+  .inline-detail .detail-layout .detail-copy h2 { font-size:28px; }
+  .inline-detail .detail-layout .detail-creator { font-size:14px;margin-top:8px; }
+  .inline-detail .detail-layout .detail-copy .description { margin:18px 0 22px;font-size:14px;line-height:1.65; }
+  .inline-detail .detail-layout .source-link { font-size:13px; }
+}
+@container spooktober (max-width:400px) {
+  .inline-detail .detail-layout { grid-template-columns:80px minmax(0,1fr);gap:16px; }
+  .inline-detail .detail-layout .detail-copy h2 { font-size:25px; }
+  .inline-detail .detail-layout .save-title { padding-inline:14px; }
+}
 
 .spook-native-body{padding:0;border:0;border-radius:0}.spook-native-viewport{background:transparent!important}.harbor-native .page-navigation{display:none}.harbor-native .route-page-content{padding-top:28px}

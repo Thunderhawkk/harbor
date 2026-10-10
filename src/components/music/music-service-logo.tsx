@@ -58,7 +58,7 @@ export function MusicServiceLogo({
       aria-hidden="true"
       width={size}
       height={size}
-      className={`shrink-0 select-none object-contain ${className}`}
+      className={`shrink-0 select-none object-contain ${service === "soundcloud" ? "rounded-[20%]" : ""} ${className}`}
       style={{ width: size, height: size }}
       loading="lazy"
       decoding="async"
